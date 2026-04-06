@@ -3,30 +3,44 @@ import { Search, AlertCircle } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { MovieCard } from "./MovieCard";
+import { SeriesCard } from "./SeriesCard";
 import {
   searchMoviesPage,
   getPopularMoviesPage,
 } from "../services/movieService";
+import {
+  searchSeriesPage,
+  getPopularSeriesPage,
+} from "../services/seriesService";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "./ui/alert";
 import type { Movie } from "../types/movie";
+import type { Series } from "../types/series";
 
 export function Home() {
   const [query, setQuery] = useState("");
   const [movies, setMovies] = useState<Movie[]>([]);
+  const [seriesQuery, setSeriesQuery] = useState("");
+  const [series, setSeries] = useState<Series[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isSeriesSearching, setIsSeriesSearching] = useState(false);
+  const [isSeriesLoading, setIsSeriesLoading] = useState(true);
+  const [isSeriesLoadingMore, setIsSeriesLoadingMore] = useState(false);
   const [showApiWarning, setShowApiWarning] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [seriesCurrentPage, setSeriesCurrentPage] = useState(1);
+  const [seriesTotalPages, setSeriesTotalPages] = useState(1);
 
   // Charger les films populaires au démarrage
   useEffect(() => {
     loadPopularMovies();
+    loadPopularSeries();
   }, []);
 
   const loadPopularMovies = async (
@@ -101,6 +115,67 @@ export function Home() {
     }
   };
 
+  const loadPopularSeries = async (
+    page = 1,
+    append = false,
+  ) => {
+    if (page === 1) {
+      setIsSeriesLoading(true);
+    } else {
+      setIsSeriesLoadingMore(true);
+    }
+
+    try {
+      const response = await getPopularSeriesPage(page);
+      setSeries((prevSeries) =>
+        append
+          ? [...prevSeries, ...response.series]
+          : response.series,
+      );
+      setSeriesCurrentPage(response.page);
+      setSeriesTotalPages(response.totalPages);
+    } catch (error) {
+      console.error("Error loading popular series:", error);
+    } finally {
+      if (page === 1) {
+        setIsSeriesLoading(false);
+      } else {
+        setIsSeriesLoadingMore(false);
+      }
+    }
+  };
+
+  const runSeriesSearch = async (
+    searchQuery: string,
+    page = 1,
+    append = false,
+  ) => {
+    if (page === 1) {
+      setIsSeriesSearching(true);
+    } else {
+      setIsSeriesLoadingMore(true);
+    }
+
+    try {
+      const response = await searchSeriesPage(searchQuery, page);
+      setSeries((prevSeries) =>
+        append
+          ? [...prevSeries, ...response.series]
+          : response.series,
+      );
+      setSeriesCurrentPage(response.page);
+      setSeriesTotalPages(response.totalPages);
+    } catch (error) {
+      console.error("Error searching series:", error);
+    } finally {
+      if (page === 1) {
+        setIsSeriesSearching(false);
+      } else {
+        setIsSeriesLoadingMore(false);
+      }
+    }
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     await runSearch(query, 1, false);
@@ -116,7 +191,23 @@ export function Home() {
     await loadPopularMovies(nextPage, true);
   };
 
+  const handleSeriesSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runSeriesSearch(seriesQuery, 1, false);
+  };
+
+  const handleSeriesLoadMore = async () => {
+    const nextPage = seriesCurrentPage + 1;
+    if (seriesQuery.trim()) {
+      await runSeriesSearch(seriesQuery, nextPage, true);
+      return;
+    }
+
+    await loadPopularSeries(nextPage, true);
+  };
+
   const hasMoreMovies = currentPage < totalPages;
+  const hasMoreSeries = seriesCurrentPage < seriesTotalPages;
 
   return (
     <div className="space-y-8">
@@ -224,6 +315,80 @@ export function Home() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Series Search Section */}
+      <div className="space-y-6 pt-4">
+        <h3 className="text-2xl font-semibold text-white">
+          Recherche de séries
+        </h3>
+
+        <form
+          onSubmit={handleSeriesSearch}
+          className="max-w-3xl"
+        >
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
+              <Input
+                type="text"
+                placeholder="Rechercher une série..."
+                value={seriesQuery}
+                onChange={async (e) => {
+                  const newQuery = e.target.value;
+                  setSeriesQuery(newQuery);
+                  await runSeriesSearch(newQuery, 1, false);
+                }}
+                className="pl-10 h-12 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+              />
+            </div>
+          </div>
+        </form>
+
+        <div>
+          <h4 className="text-xl font-semibold text-white mb-6">
+            {seriesQuery
+              ? `Résultats séries pour "${seriesQuery}"`
+              : "Séries populaires"}
+          </h4>
+
+          {isSeriesLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[...Array(4)].map((_, i) => (
+                <div
+                  key={i}
+                  className="aspect-[2/3] bg-white/5 rounded-lg animate-pulse"
+                />
+              ))}
+            </div>
+          ) : series.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {series.map((seriesItem) => (
+                  <SeriesCard key={seriesItem.id} series={seriesItem} />
+                ))}
+              </div>
+
+              {hasMoreSeries && (
+                <div className="flex justify-center mt-8">
+                  <Button
+                    onClick={handleSeriesLoadMore}
+                    disabled={isSeriesLoadingMore || isSeriesSearching}
+                    className="min-w-40"
+                  >
+                    {isSeriesLoadingMore ? "Chargement..." : "Load More"}
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-white/60 text-lg">
+                Aucune série trouvée
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

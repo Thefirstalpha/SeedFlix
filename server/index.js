@@ -266,6 +266,103 @@ app.get("/api/movies/:id", async (req, res) => {
   }
 });
 
+app.get("/api/series/popular", async (req, res) => {
+  if (!assertTmdbKey(req, res)) {
+    return;
+  }
+
+  try {
+    const page = Number(req.query.page || 1);
+    const language = String(req.query.language || "fr-FR");
+    const url = buildTmdbUrl("/tv/popular", { page, language });
+    const { response, data } = await fetchTmdb(url);
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error("Popular series proxy failed:", error);
+    res.status(500).json({ error: "Failed to fetch popular series" });
+  }
+});
+
+app.get("/api/series/search", async (req, res) => {
+  if (!assertTmdbKey(req, res)) {
+    return;
+  }
+
+  try {
+    const query = String(req.query.query || "").trim();
+    const page = Number(req.query.page || 1);
+    const language = String(req.query.language || "fr-FR");
+
+    if (!query) {
+      res.status(400).json({ error: "query is required" });
+      return;
+    }
+
+    const url = buildTmdbUrl("/search/tv", {
+      query,
+      page,
+      language,
+    });
+    const { response, data } = await fetchTmdb(url);
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error("Search series proxy failed:", error);
+    res.status(500).json({ error: "Failed to search series" });
+  }
+});
+
+app.get("/api/series/:id", async (req, res) => {
+  if (!assertTmdbKey(req, res)) {
+    return;
+  }
+
+  try {
+    const id = Number(req.params.id);
+    const language = String(req.query.language || "fr-FR");
+
+    if (!Number.isFinite(id)) {
+      res.status(400).json({ error: "Invalid series id" });
+      return;
+    }
+
+    const url = buildTmdbUrl(`/tv/${id}`, {
+      language,
+      append_to_response: "credits",
+    });
+    const { response, data } = await fetchTmdb(url);
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error("Series details proxy failed:", error);
+    res.status(500).json({ error: "Failed to fetch series details" });
+  }
+});
+
+app.get("/api/series/:id/seasons/:seasonNumber", async (req, res) => {
+  if (!assertTmdbKey(req, res)) {
+    return;
+  }
+
+  try {
+    const id = Number(req.params.id);
+    const seasonNumber = Number(req.params.seasonNumber);
+    const language = String(req.query.language || "fr-FR");
+
+    if (!Number.isFinite(id) || !Number.isFinite(seasonNumber)) {
+      res.status(400).json({ error: "Invalid series id or season number" });
+      return;
+    }
+
+    const url = buildTmdbUrl(`/tv/${id}/season/${seasonNumber}`, {
+      language,
+    });
+    const { response, data } = await fetchTmdb(url);
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error("Season details proxy failed:", error);
+    res.status(500).json({ error: "Failed to fetch season details" });
+  }
+});
+
 app.listen(port, () => {
   console.log(`API server running on http://localhost:${port}`);
 });
