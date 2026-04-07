@@ -27,6 +27,7 @@ export interface UserSettings {
       port?: string;
       authRequired?: boolean;
       username?: string;
+      password?: string;
       moviesFolder?: string;
       seriesFolder?: string;
     };

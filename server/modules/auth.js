@@ -42,6 +42,7 @@ function buildDefaultSettings(username = "admin") {
         port: "",
         authRequired: false,
         username: "",
+        password: "",
         moviesFolder: "",
         seriesFolder: "",
       },

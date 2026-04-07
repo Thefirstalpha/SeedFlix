@@ -80,12 +80,16 @@ async function executeTransmissionSessionGet(url, headers) {
 function resolveTorrentSettings(auth, body) {
   const savedTorrent = auth.user.settings?.placeholders?.torrent || {};
 
+  const hasBodyPassword =
+    body && typeof body === "object" && Object.hasOwn(body, "password");
+  const passwordSource = hasBodyPassword ? body.password : savedTorrent.password;
+
   return {
     url: String(body?.url || savedTorrent.url || "").trim(),
     port: String(body?.port || savedTorrent.port || "").trim(),
     authRequired: Boolean(body?.authRequired ?? savedTorrent.authRequired),
     username: String(body?.username || savedTorrent.username || "").trim(),
-    password: String(body?.password || "").trim(),
+    password: String(passwordSource || "").trim(),
   };
 }
 

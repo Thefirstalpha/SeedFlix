@@ -61,7 +61,7 @@ export function Settings() {
     setTorrentPort(torrentSettings.port || "");
     setTorrentAuthRequired(torrentSettings.authRequired || false);
     setTorrentUsername(torrentSettings.username || "");
-    setTorrentPassword("");
+    setTorrentPassword(torrentSettings.password || "");
     setTorrentMoviesFolder(torrentSettings.moviesFolder || "");
     setTorrentSeriesFolder(torrentSettings.seriesFolder || "");
 
@@ -148,6 +148,7 @@ export function Settings() {
         port: torrentPort,
         authRequired: torrentAuthRequired,
         username: torrentAuthRequired ? torrentUsername : undefined,
+        password: torrentAuthRequired ? torrentPassword : "",
         moviesFolder: torrentMoviesFolder,
         seriesFolder: torrentSeriesFolder,
       },
