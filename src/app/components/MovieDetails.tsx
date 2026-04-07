@@ -285,23 +285,18 @@ export function MovieDetails() {
                       key={item.guid || item.link || `${item.title}_${index}`}
                       className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleAddTorrent(item.link)}
-                        disabled={addingTorrentLink === item.link}
-                        className="text-left text-white font-medium hover:text-cyan-300 underline underline-offset-2 line-clamp-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                      >
+                      <p className="text-white font-medium line-clamp-2">
                         {item.title}
-                      </button>
+                      </p>
 
                       <div className="flex flex-wrap gap-2 items-center">
                         <Button
                           size="sm"
-                          onClick={() => handleAddTorrent(item.link)}
-                          disabled={addingTorrentLink === item.link}
+                          onClick={() => handleAddTorrent(item.downloadUrl || item.link)}
+                          disabled={addingTorrentLink === (item.downloadUrl || item.link)}
                           className="bg-cyan-600 hover:bg-cyan-700 text-white"
                         >
-                          {addingTorrentLink === item.link ? (
+                          {addingTorrentLink === (item.downloadUrl || item.link) ? (
                             <>
                               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                               Ajout...

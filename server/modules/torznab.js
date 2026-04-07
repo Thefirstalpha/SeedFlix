@@ -125,6 +125,7 @@ function parseTorznabItems(xmlText, maxItems = 5) {
   for (const block of itemBlocks.slice(0, maxItems)) {
     const titleMatch = block.match(/<title>([\s\S]*?)<\/title>/i);
     const linkMatch = block.match(/<link>([\s\S]*?)<\/link>/i);
+    const enclosureUrlMatch = block.match(/<enclosure[^>]*url="([^"]+)"[^>]*>/i);
     const guidMatch = block.match(/<guid[^>]*>([\s\S]*?)<\/guid>/i);
     const pubDateMatch = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/i);
     const sizeMatch = block.match(/torznab:attr[^>]*name="size"[^>]*value="([^"]+)"/i);
@@ -158,12 +159,17 @@ function parseTorznabItems(xmlText, maxItems = 5) {
       attributes.language ||
       attributes.lang ||
       null;
+    const downloadUrl =
+      attributes.magneturl ||
+      decodeXmlEntities(enclosureUrlMatch?.[1] || "").trim() ||
+      decodeXmlEntities(linkMatch?.[1]?.trim() || "");
 
     const size = Number(sizeMatch?.[1] || 0) || null;
 
     items.push({
       title,
       link: decodeXmlEntities(linkMatch?.[1]?.trim() || ""),
+      downloadUrl,
       guid: decodeXmlEntities(guidMatch?.[1]?.trim() || ""),
       pubDate: decodeXmlEntities(pubDateMatch?.[1]?.trim() || ""),
       size,
@@ -183,7 +189,7 @@ function parseTorznabItems(xmlText, maxItems = 5) {
     const sizeA = Number(a.size || 0);
     const sizeB = Number(b.size || 0);
     if (sizeA !== sizeB) {
-      return sizeB - sizeA;
+      return sizeA - sizeB;
     }
 
     const seedersA = Number(a.seeders || 0);

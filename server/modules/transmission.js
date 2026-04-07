@@ -1,4 +1,6 @@
 import { requireAuth } from "./auth.js";
+import { promises as fs } from "node:fs";
+import { appTorrentsFilePath, dataDir } from "../config.js";
 
 const transmissionTimeoutMs = 8000;
 const transmissionRpcPath = "/transmission/rpc";
@@ -11,6 +13,58 @@ const transmissionStatusLabels = {
   5: "Queued to seed",
   6: "Seeding",
 };
+
+async function ensureAppTorrentsStore() {
+  await fs.mkdir(dataDir, { recursive: true });
+  try {
+    await fs.access(appTorrentsFilePath);
+  } catch {
+    await fs.writeFile(appTorrentsFilePath, "{}", "utf-8");
+  }
+}
+
+async function readAppTorrentsStore() {
+  await ensureAppTorrentsStore();
+  const content = await fs.readFile(appTorrentsFilePath, "utf-8");
+  try {
+    const parsed = JSON.parse(content);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+async function writeAppTorrentsStore(data) {
+  await ensureAppTorrentsStore();
+  await fs.writeFile(appTorrentsFilePath, JSON.stringify(data, null, 2), "utf-8");
+}
+
+async function registerAppTorrentForUser(userId, torrent) {
+  const hash = String(torrent?.hashString || "").trim().toLowerCase();
+  if (!hash) {
+    return;
+  }
+
+  const store = await readAppTorrentsStore();
+  const key = String(userId);
+  const existing = Array.isArray(store[key]) ? store[key] : [];
+  const merged = Array.from(new Set([...existing, hash]));
+  store[key] = merged;
+  await writeAppTorrentsStore(store);
+}
+
+async function getAppTorrentHashesForUser(userId) {
+  const store = await readAppTorrentsStore();
+  const values = Array.isArray(store[String(userId)]) ? store[String(userId)] : [];
+  return new Set(
+    values
+      .map((value) => String(value || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
 
 function buildTransmissionRpcUrl(rawUrl, rawPort) {
   let url;
@@ -66,6 +120,42 @@ async function postTransmissionRpc(url, headers, sessionId, body) {
       body: JSON.stringify(body),
       signal: controller.signal,
     });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function isMagnetLink(value) {
+  return String(value || "").trim().toLowerCase().startsWith("magnet:?");
+}
+
+async function fetchTorrentMetainfo(torrentUrl) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), transmissionTimeoutMs);
+
+  try {
+    const response = await fetch(torrentUrl, {
+      headers: {
+        Accept: "application/x-bittorrent,application/octet-stream,*/*;q=0.1",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Impossible de télécharger le fichier torrent (${response.status})`);
+    }
+
+    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+    if (contentType.includes("text/html")) {
+      throw new Error("Le lien fourni n'est pas un fichier torrent valide");
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.length) {
+      throw new Error("Le fichier torrent est vide");
+    }
+
+    return buffer.toString("base64");
   } finally {
     clearTimeout(timeout);
   }
@@ -199,9 +289,11 @@ export function registerTransmissionRoutes(app) {
       const payload = {
         method: "torrent-add",
         arguments: {
-          filename: torrentUrl,
           paused: false,
           ...(downloadDir ? { "download-dir": downloadDir } : {}),
+          ...(isMagnetLink(torrentUrl)
+            ? { filename: torrentUrl }
+            : { metainfo: await fetchTorrentMetainfo(torrentUrl) }),
         },
       };
 
@@ -220,6 +312,8 @@ export function registerTransmissionRoutes(app) {
       }
 
       const added = data?.arguments?.["torrent-added"] || data?.arguments?.["torrent-duplicate"] || null;
+      await registerAppTorrentForUser(auth.user.id, added);
+
       res.json({
         ok: true,
         message: "Torrent ajouté au client",
@@ -264,6 +358,7 @@ export function registerTransmissionRoutes(app) {
         arguments: {
           fields: [
             "id",
+            "hashString",
             "name",
             "status",
             "percentDone",
@@ -294,24 +389,31 @@ export function registerTransmissionRoutes(app) {
         return;
       }
 
+      const allowedHashes = await getAppTorrentHashesForUser(auth.user.id);
       const torrents = Array.isArray(data?.arguments?.torrents)
-        ? data.arguments.torrents.map((torrent) => ({
-            id: torrent.id,
-            name: torrent.name,
-            status: torrent.status,
-            statusLabel: transmissionStatusLabels[torrent.status] || "Unknown",
-            progress: Math.round(Number(torrent.percentDone || 0) * 1000) / 10,
-            rateDownload: Number(torrent.rateDownload || 0),
-            eta: Number(torrent.eta || 0),
-            totalSize: Number(torrent.totalSize || 0),
-            downloadDir: torrent.downloadDir,
-            addedDate: torrent.addedDate,
-            isFinished: Boolean(torrent.isFinished),
-            leftUntilDone: Number(torrent.leftUntilDone || 0),
-            peersConnected: Number(torrent.peersConnected || 0),
-            error: Number(torrent.error || 0),
-            errorString: torrent.errorString || "",
-          }))
+        ? data.arguments.torrents
+            .filter((torrent) => {
+              const hash = String(torrent?.hashString || "").trim().toLowerCase();
+              return hash && allowedHashes.has(hash);
+            })
+            .map((torrent) => ({
+              id: torrent.id,
+              hashString: torrent.hashString,
+              name: torrent.name,
+              status: torrent.status,
+              statusLabel: transmissionStatusLabels[torrent.status] || "Unknown",
+              progress: Math.round(Number(torrent.percentDone || 0) * 1000) / 10,
+              rateDownload: Number(torrent.rateDownload || 0),
+              eta: Number(torrent.eta || 0),
+              totalSize: Number(torrent.totalSize || 0),
+              downloadDir: torrent.downloadDir,
+              addedDate: torrent.addedDate,
+              isFinished: Boolean(torrent.isFinished),
+              leftUntilDone: Number(torrent.leftUntilDone || 0),
+              peersConnected: Number(torrent.peersConnected || 0),
+              error: Number(torrent.error || 0),
+              errorString: torrent.errorString || "",
+            }))
         : [];
 
       res.json({

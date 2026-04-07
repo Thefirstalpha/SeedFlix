@@ -21,4 +21,5 @@ export const wishlistFilePath = path.join(dataDir, "wishlist-movies.json");
 export const seriesWishlistFilePath = path.join(dataDir, "wishlist-series.json");
 export const usersFilePath = path.join(dataDir, "users.json");
 export const sessionsFilePath = path.join(dataDir, "sessions.json");
+export const appTorrentsFilePath = path.join(dataDir, "app-torrents.json");
 export const defaultSettingsFilePath = path.join(serverDir, "defaultSettings.json");

@@ -17,6 +17,7 @@ export interface GenreItem {
 export interface TorznabMovieResult {
   title: string;
   link: string;
+  downloadUrl?: string;
   guid?: string;
   pubDate?: string;
   size?: number | null;

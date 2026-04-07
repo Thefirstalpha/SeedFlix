@@ -5,6 +5,7 @@ import {
   authCookieName,
   dataDir,
   defaultSettingsFilePath,
+  appTorrentsFilePath,
   sessionDurationMs,
   sessionsFilePath,
   usersFilePath,
@@ -464,6 +465,7 @@ export function registerAuthRoutes(app) {
       await writeWishlist([]);
       await writeSeriesWishlist([]);
       await writeSessions([]);
+      await fs.writeFile(appTorrentsFilePath, "{}", "utf-8");
       clearSessionCookie(res);
 
       res.json({
@@ -474,6 +476,7 @@ export function registerAuthRoutes(app) {
           wishlist: true,
           seriesWishlist: true,
           sessions: true,
+          appTorrents: true,
         },
       });
     } catch (error) {
