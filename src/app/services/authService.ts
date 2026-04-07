@@ -37,6 +37,18 @@ export interface UserSettings {
   };
 }
 
+export interface IndexerTestResponse {
+  ok: boolean;
+  message: string;
+  endpoint?: string;
+}
+
+export interface TorrentTestResponse {
+  ok: boolean;
+  message: string;
+  endpoint?: string;
+}
+
 const AUTH_BASE = `${API_BASE_URL}/auth`;
 const SETTINGS_BASE = `${API_BASE_URL}/settings`;
 
@@ -110,4 +122,30 @@ export async function resetSettings() {
     credentials: "include",
   });
   return parseJson<{ ok: true; loggedOut: true }>(response);
+}
+
+export async function testIndexerConnection(url: string, token: string) {
+  const response = await fetch(`${API_BASE_URL}/indexer/test`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url, token }),
+  });
+  return parseJson<IndexerTestResponse>(response);
+}
+
+export async function testTorrentConnection(payload: {
+  url: string;
+  port: string;
+  authRequired: boolean;
+  username: string;
+  password: string;
+}) {
+  const response = await fetch(`${API_BASE_URL}/torrent/test`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseJson<TorrentTestResponse>(response);
 }

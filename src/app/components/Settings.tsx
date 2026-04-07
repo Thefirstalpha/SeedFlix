@@ -16,7 +16,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
-import { changePassword, getSettings, resetSettings, updateSettings, type UserSettings } from "../services/authService";
+import {
+  changePassword,
+  getSettings,
+  resetSettings,
+  testIndexerConnection,
+  testTorrentConnection,
+  updateSettings,
+  type UserSettings,
+} from "../services/authService";
 import { useAuth } from "../context/AuthContext";
 
 export function Settings() {
@@ -58,8 +66,22 @@ export function Settings() {
     setTorrentSeriesFolder(torrentSettings.seriesFolder || "");
 
     setIndexerUrl(incomingSettings.placeholders?.indexer?.url || "");
-    setIndexerToken("");
+    setIndexerToken(incomingSettings.placeholders?.indexer?.token || "");
   };
+
+  const buildUpdatedSettings = (overrides: Partial<UserSettings["placeholders"]>): UserSettings => ({
+    profile: settings?.profile || { username: user?.username || "admin" },
+    security: settings?.security || {
+      lastPasswordChangeAt: new Date().toISOString(),
+    },
+    placeholders: {
+      notifications: settings?.placeholders?.notifications || {},
+      preferences: settings?.placeholders?.preferences || {},
+      torrent: settings?.placeholders?.torrent,
+      indexer: settings?.placeholders?.indexer,
+      ...overrides,
+    },
+  });
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -119,32 +141,44 @@ export function Settings() {
     setTorrentError(null);
     setTorrentMessage(null);
     setIsTorrentSaving(true);
+
+    const updatedSettings: UserSettings = buildUpdatedSettings({
+      torrent: {
+        url: torrentUrl,
+        port: torrentPort,
+        authRequired: torrentAuthRequired,
+        username: torrentAuthRequired ? torrentUsername : undefined,
+        moviesFolder: torrentMoviesFolder,
+        seriesFolder: torrentSeriesFolder,
+      },
+    });
+
     try {
-      const updatedSettings: UserSettings = {
-        profile: settings?.profile || { username: user?.username || "admin" },
-        security: settings?.security || {
-          lastPasswordChangeAt: new Date().toISOString(),
-        },
-        placeholders: {
-          notifications: settings?.placeholders?.notifications || {},
-          preferences: settings?.placeholders?.preferences || {},
-          torrent: {
-            url: torrentUrl,
-            port: torrentPort,
-            authRequired: torrentAuthRequired,
-            username: torrentAuthRequired ? torrentUsername : undefined,
-            moviesFolder: torrentMoviesFolder,
-            seriesFolder: torrentSeriesFolder,
-          },
-        },
-      };
       await updateSettings(updatedSettings);
       setLocalSettings(updatedSettings);
       setSettings(updatedSettings);
-      setTorrentMessage("Configuration torrent enregistrée.");
     } catch (submitError) {
       setTorrentError(
         submitError instanceof Error ? submitError.message : "Mise à jour impossible"
+      );
+      setIsTorrentSaving(false);
+      return;
+    }
+
+    try {
+      const response = await testTorrentConnection({
+        url: torrentUrl,
+        port: torrentPort,
+        authRequired: torrentAuthRequired,
+        username: torrentUsername,
+        password: torrentPassword,
+      });
+      setTorrentMessage(`Configuration enregistrée. ${response.message}`);
+    } catch (submitError) {
+      setTorrentError(
+        submitError instanceof Error
+          ? `Configuration enregistrée, mais le test a échoué: ${submitError.message}`
+          : "Configuration enregistrée, mais le test de connexion a échoué"
       );
     } finally {
       setIsTorrentSaving(false);
@@ -157,29 +191,34 @@ export function Settings() {
     setIndexerError(null);
     setIndexerMessage(null);
     setIsIndexerSaving(true);
+
+    const updatedSettings: UserSettings = buildUpdatedSettings({
+      indexer: {
+        url: indexerUrl,
+        token: indexerToken,
+      },
+    });
+
     try {
-      const updatedSettings: UserSettings = {
-        profile: settings?.profile || { username: user?.username || "admin" },
-        security: settings?.security || {
-          lastPasswordChangeAt: new Date().toISOString(),
-        },
-        placeholders: {
-          notifications: settings?.placeholders?.notifications || {},
-          preferences: settings?.placeholders?.preferences || {},
-          torrent: settings?.placeholders?.torrent,
-          indexer: {
-            url: indexerUrl,
-            token: indexerToken,
-          },
-        },
-      };
       await updateSettings(updatedSettings);
       setLocalSettings(updatedSettings);
       setSettings(updatedSettings);
-      setIndexerMessage("Configuration indexer enregistrée.");
     } catch (submitError) {
       setIndexerError(
         submitError instanceof Error ? submitError.message : "Mise à jour impossible"
+      );
+      setIsIndexerSaving(false);
+      return;
+    }
+
+    try {
+      const response = await testIndexerConnection(indexerUrl, indexerToken);
+      setIndexerMessage(`Configuration enregistrée. ${response.message}`);
+    } catch (submitError) {
+      setIndexerError(
+        submitError instanceof Error
+          ? `Configuration enregistrée, mais le test a échoué: ${submitError.message}`
+          : "Configuration enregistrée, mais le test de connexion a échoué"
       );
     } finally {
       setIsIndexerSaving(false);
@@ -444,7 +483,7 @@ export function Settings() {
                 {torrentError && <p className="text-sm text-red-300">{torrentError}</p>}
 
                 <Button type="submit" disabled={isTorrentSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
-                  {isTorrentSaving ? "Enregistrement..." : "Enregistrer la configuration"}
+                  {isTorrentSaving ? "Enregistrement et test..." : "Enregistrer et tester la connexion"}
                 </Button>
               </form>
             </CardContent>
@@ -486,7 +525,7 @@ export function Settings() {
                 {indexerError && <p className="text-sm text-red-300">{indexerError}</p>}
 
                 <Button type="submit" disabled={isIndexerSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
-                  {isIndexerSaving ? "Enregistrement..." : "Enregistrer la configuration"}
+                  {isIndexerSaving ? "Enregistrement et test..." : "Enregistrer et tester la connexion"}
                 </Button>
               </form>
             </CardContent>

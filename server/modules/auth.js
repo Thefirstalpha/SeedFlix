@@ -265,6 +265,8 @@ async function requireAuth(req, res) {
   return auth;
 }
 
+export { requireAuth };
+
 export function registerAuthRoutes(app) {
   app.get("/api/auth/me", async (req, res) => {
     try {

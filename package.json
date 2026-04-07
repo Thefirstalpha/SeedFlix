@@ -7,7 +7,9 @@
     "build": "vite build",
     "dev": "vite",
     "dev:server": "node server/index.js",
-    "dev:all": "concurrently \"npm:dev:server\" \"npm:dev\""
+    "dev:server:debug": "node server/index.js --debug",
+    "dev:all": "concurrently \"npm:dev:server\" \"npm:dev\"",
+    "dev:all:debug": "concurrently \"npm:dev:server:debug\" \"npm:dev\""
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
