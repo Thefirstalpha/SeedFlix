@@ -1,395 +1,328 @@
-import { useState, useEffect } from "react";
-import { Search, AlertCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { MovieCard } from "./MovieCard";
 import { SeriesCard } from "./SeriesCard";
-import {
-  searchMoviesPage,
-  getPopularMoviesPage,
-} from "../services/movieService";
-import {
-  searchSeriesPage,
-  getPopularSeriesPage,
-} from "../services/seriesService";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "./ui/alert";
+import { searchMoviesPage, getPopularMoviesPage } from "../services/movieService";
+import { searchSeriesPage, getPopularSeriesPage } from "../services/seriesService";
 import type { Movie } from "../types/movie";
 import type { Series } from "../types/series";
 
+type ContentFilter = "all" | "movie" | "series";
+
+function toSortedUnique(items: string[]): string[] {
+  return Array.from(new Set(items)).sort((a, b) => a.localeCompare(b, "fr"));
+}
+
 export function Home() {
   const [query, setQuery] = useState("");
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [seriesQuery, setSeriesQuery] = useState("");
-  const [series, setSeries] = useState<Series[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [isSeriesSearching, setIsSeriesSearching] = useState(false);
-  const [isSeriesLoading, setIsSeriesLoading] = useState(true);
-  const [isSeriesLoadingMore, setIsSeriesLoadingMore] = useState(false);
-  const [showApiWarning, setShowApiWarning] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [seriesCurrentPage, setSeriesCurrentPage] = useState(1);
-  const [seriesTotalPages, setSeriesTotalPages] = useState(1);
+  const [contentFilter, setContentFilter] = useState<ContentFilter>("all");
+  const [genreFilter, setGenreFilter] = useState("all");
+  const [yearFrom, setYearFrom] = useState("");
+  const [yearTo, setYearTo] = useState("");
+  const [minRating, setMinRating] = useState("0");
 
-  // Charger les films populaires au démarrage
+  const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
+  const [popularSeries, setPopularSeries] = useState<Series[]>([]);
+  const [searchMovies, setSearchMovies] = useState<Movie[]>([]);
+  const [searchSeries, setSearchSeries] = useState<Series[]>([]);
+
+  const [isLoadingInitial, setIsLoadingInitial] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const hasSearch = query.trim().length > 0;
+
   useEffect(() => {
-    loadPopularMovies();
-    loadPopularSeries();
+    const loadPopular = async () => {
+      setIsLoadingInitial(true);
+      try {
+        const [movieResponse, seriesResponse] = await Promise.all([
+          getPopularMoviesPage(1),
+          getPopularSeriesPage(1),
+        ]);
+        setPopularMovies(movieResponse.movies);
+        setPopularSeries(seriesResponse.series);
+      } catch (error) {
+        console.error("Error loading home content:", error);
+      } finally {
+        setIsLoadingInitial(false);
+      }
+    };
+
+    loadPopular();
   }, []);
 
-  const loadPopularMovies = async (
-    page = 1,
-    append = false,
-  ) => {
-    if (page === 1) {
-      setIsLoading(true);
-    } else {
-      setIsLoadingMore(true);
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setSearchMovies([]);
+      setSearchSeries([]);
+      return;
     }
 
-    try {
-      const response = await getPopularMoviesPage(page);
-      setMovies((prevMovies) =>
-        append
-          ? [...prevMovies, ...response.movies]
-          : response.movies,
-      );
-      setCurrentPage(response.page);
-      setTotalPages(response.totalPages);
-    } catch (error) {
-      console.error("Error loading popular movies:", error);
-    } finally {
-      if (page === 1) {
-        setIsLoading(false);
-      } else {
-        setIsLoadingMore(false);
-      }
-    }
-  };
-
-  const runSearch = async (
-    searchQuery: string,
-    page = 1,
-    append = false,
-  ) => {
-    if (page === 1) {
+    const timeoutId = setTimeout(async () => {
       setIsSearching(true);
-    } else {
-      setIsLoadingMore(true);
-    }
-
-    try {
-      const response = await searchMoviesPage(searchQuery, page);
-      setMovies((prevMovies) =>
-        append
-          ? [...prevMovies, ...response.movies]
-          : response.movies,
-      );
-      setCurrentPage(response.page);
-      setTotalPages(response.totalPages);
-
-      // Afficher l'avertissement si aucun résultat et pas de clé API
-      if (
-        page === 1 &&
-        response.movies.length === 0 &&
-        searchQuery.trim()
-      ) {
-        setShowApiWarning(true);
-      } else if (page === 1) {
-        setShowApiWarning(false);
-      }
-    } catch (error) {
-      console.error("Error searching movies:", error);
-    } finally {
-      if (page === 1) {
+      try {
+        const [movieResponse, seriesResponse] = await Promise.all([
+          searchMoviesPage(trimmed, 1),
+          searchSeriesPage(trimmed, 1),
+        ]);
+        setSearchMovies(movieResponse.movies);
+        setSearchSeries(seriesResponse.series);
+      } catch (error) {
+        console.error("Error searching mixed content:", error);
+        setSearchMovies([]);
+        setSearchSeries([]);
+      } finally {
         setIsSearching(false);
-      } else {
-        setIsLoadingMore(false);
       }
+    }, 350);
+
+    return () => clearTimeout(timeoutId);
+  }, [query]);
+
+  const baseMovies = hasSearch ? searchMovies : popularMovies;
+  const baseSeries = hasSearch ? searchSeries : popularSeries;
+
+  const availableGenres = useMemo(() => {
+    const movieGenres = contentFilter !== "series" ? baseMovies.map((m) => m.genre) : [];
+    const seriesGenres = contentFilter !== "movie" ? baseSeries.map((s) => s.genre) : [];
+    return toSortedUnique([...movieGenres, ...seriesGenres].filter(Boolean));
+  }, [baseMovies, baseSeries, contentFilter]);
+
+  useEffect(() => {
+    if (genreFilter !== "all" && !availableGenres.includes(genreFilter)) {
+      setGenreFilter("all");
     }
-  };
+  }, [availableGenres, genreFilter]);
 
-  const loadPopularSeries = async (
-    page = 1,
-    append = false,
-  ) => {
-    if (page === 1) {
-      setIsSeriesLoading(true);
-    } else {
-      setIsSeriesLoadingMore(true);
-    }
+  const yearStart = Number(yearFrom) || 0;
+  const yearEnd = Number(yearTo) || 9999;
+  const ratingThreshold = Number(minRating) || 0;
 
-    try {
-      const response = await getPopularSeriesPage(page);
-      setSeries((prevSeries) =>
-        append
-          ? [...prevSeries, ...response.series]
-          : response.series,
-      );
-      setSeriesCurrentPage(response.page);
-      setSeriesTotalPages(response.totalPages);
-    } catch (error) {
-      console.error("Error loading popular series:", error);
-    } finally {
-      if (page === 1) {
-        setIsSeriesLoading(false);
-      } else {
-        setIsSeriesLoadingMore(false);
-      }
-    }
-  };
+  const filteredMovies = useMemo(() => {
+    return baseMovies.filter((movie) => {
+      const matchesGenre = genreFilter === "all" || movie.genre === genreFilter;
+      const matchesYear = movie.year >= yearStart && movie.year <= yearEnd;
+      const matchesRating = movie.rating >= ratingThreshold;
+      return matchesGenre && matchesYear && matchesRating;
+    });
+  }, [baseMovies, genreFilter, yearStart, yearEnd, ratingThreshold]);
 
-  const runSeriesSearch = async (
-    searchQuery: string,
-    page = 1,
-    append = false,
-  ) => {
-    if (page === 1) {
-      setIsSeriesSearching(true);
-    } else {
-      setIsSeriesLoadingMore(true);
-    }
+  const filteredSeries = useMemo(() => {
+    return baseSeries.filter((show) => {
+      const matchesGenre = genreFilter === "all" || show.genre === genreFilter;
+      const matchesYear = show.year >= yearStart && show.year <= yearEnd;
+      const matchesRating = show.rating >= ratingThreshold;
+      return matchesGenre && matchesYear && matchesRating;
+    });
+  }, [baseSeries, genreFilter, yearStart, yearEnd, ratingThreshold]);
 
-    try {
-      const response = await searchSeriesPage(searchQuery, page);
-      setSeries((prevSeries) =>
-        append
-          ? [...prevSeries, ...response.series]
-          : response.series,
-      );
-      setSeriesCurrentPage(response.page);
-      setSeriesTotalPages(response.totalPages);
-    } catch (error) {
-      console.error("Error searching series:", error);
-    } finally {
-      if (page === 1) {
-        setIsSeriesSearching(false);
-      } else {
-        setIsSeriesLoadingMore(false);
-      }
-    }
-  };
+  const showMovies = contentFilter !== "series";
+  const showSeries = contentFilter !== "movie";
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await runSearch(query, 1, false);
-  };
-
-  const handleLoadMore = async () => {
-    const nextPage = currentPage + 1;
-    if (query.trim()) {
-      await runSearch(query, nextPage, true);
-      return;
-    }
-
-    await loadPopularMovies(nextPage, true);
-  };
-
-  const handleSeriesSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await runSeriesSearch(seriesQuery, 1, false);
-  };
-
-  const handleSeriesLoadMore = async () => {
-    const nextPage = seriesCurrentPage + 1;
-    if (seriesQuery.trim()) {
-      await runSeriesSearch(seriesQuery, nextPage, true);
-      return;
-    }
-
-    await loadPopularSeries(nextPage, true);
-  };
-
-  const hasMoreMovies = currentPage < totalPages;
-  const hasMoreSeries = seriesCurrentPage < seriesTotalPages;
+  const emptyMessage = hasSearch
+    ? "Aucun résultat trouvé pour cette recherche avec les filtres actifs."
+    : "Aucun contenu disponible avec ces filtres.";
 
   return (
     <div className="space-y-8">
-      {/* Hero Section */}
       <div className="text-center space-y-4 py-8">
         <h2 className="text-4xl md:text-5xl font-bold text-white">
-          Trouvez votre prochain film préféré
+          Films et séries, au même endroit
         </h2>
-        <p className="text-xl text-white/70 max-w-2xl mx-auto">
-          Explorez des milliers de films avec l'API TMDB et
-          découvrez des informations détaillées
+        <p className="text-xl text-white/70 max-w-3xl mx-auto">
+          Utilisez une seule recherche, filtrez par type, genre, date et note, puis
+          explorez en mode carrousel ou en liste selon votre besoin.
         </p>
       </div>
 
-      {/* API Warning */}
-      {showApiWarning && (
-        <Alert className="max-w-3xl mx-auto bg-yellow-500/10 border-yellow-500/30">
-          <AlertCircle className="h-4 w-4 text-yellow-500" />
-          <AlertTitle className="text-yellow-500">
-            Configuration API requise
-          </AlertTitle>
-          <AlertDescription className="text-white/70">
-            Pour utiliser la recherche en temps réel TMDB,
-            ajoutez votre clé API dans{" "}
-            <code className="bg-white/10 px-1 rounded">
-              /src/app/config/tmdb.ts
-            </code>
-            . Obtenez votre clé gratuite sur{" "}
-            <a
-              href="https://www.themoviedb.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
+      <div className="max-w-5xl mx-auto space-y-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
+          <Input
+            type="text"
+            placeholder="Rechercher un film ou une série..."
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="pl-10 h-12 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+          />
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-4">
+          <div className="flex items-center gap-2 text-white">
+            <SlidersHorizontal className="w-4 h-4" />
+            <span className="text-sm font-semibold">Filtres</span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => setContentFilter("all")}
+              className={contentFilter === "all" ? "bg-white text-slate-900 hover:bg-white/90" : "bg-white/10 text-white hover:bg-white/20"}
             >
-              themoviedb.org
-            </a>
-            .
-          </AlertDescription>
-        </Alert>
+              Tout
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setContentFilter("movie")}
+              className={contentFilter === "movie" ? "bg-purple-500 text-white hover:bg-purple-600" : "bg-white/10 text-white hover:bg-white/20"}
+            >
+              Films
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setContentFilter("series")}
+              className={contentFilter === "series" ? "bg-cyan-500 text-slate-900 hover:bg-cyan-400" : "bg-white/10 text-white hover:bg-white/20"}
+            >
+              Series
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <select
+              value={genreFilter}
+              onChange={(event) => setGenreFilter(event.target.value)}
+              className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
+            >
+              <option value="all">Tous les genres</option>
+              {availableGenres.map((genre) => (
+                <option key={genre} value={genre}>
+                  {genre}
+                </option>
+              ))}
+            </select>
+
+            <Input
+              type="number"
+              min={1900}
+              max={2100}
+              placeholder="Date min (annee)"
+              value={yearFrom}
+              onChange={(event) => setYearFrom(event.target.value)}
+              className="h-10 bg-slate-900 border-white/20 text-white"
+            />
+
+            <Input
+              type="number"
+              min={1900}
+              max={2100}
+              placeholder="Date max (annee)"
+              value={yearTo}
+              onChange={(event) => setYearTo(event.target.value)}
+              className="h-10 bg-slate-900 border-white/20 text-white"
+            />
+
+            <select
+              value={minRating}
+              onChange={(event) => setMinRating(event.target.value)}
+              className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
+            >
+              <option value="0">Toutes les notes</option>
+              <option value="6">Note {">="} 6</option>
+              <option value="7">Note {">="} 7</option>
+              <option value="8">Note {">="} 8</option>
+              <option value="9">Note {">="} 9</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {(isLoadingInitial || isSearching) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="aspect-[2/3] bg-white/5 rounded-lg animate-pulse" />
+          ))}
+        </div>
       )}
 
-      {/* Search Bar */}
-      <form
-        onSubmit={handleSearch}
-        className="max-w-3xl mx-auto"
-      >
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
-            <Input
-              type="text"
-              placeholder="Rechercher un film..."
-              value={query}
-              onChange={async (e) => {
-                const newQuery = e.target.value;
-                setQuery(newQuery);
-                await runSearch(newQuery, 1, false);
-              }}
-              className="pl-10 h-12 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-            />
-          </div>
-        </div>
-      </form>
-
-      {/* Results Section */}
-      <div>
-        <h3 className="text-2xl font-semibold text-white mb-6">
-          {query
-            ? `Résultats pour "${query}"`
-            : "Films populaires"}
-        </h3>
-        {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {[...Array(8)].map((_, i) => (
-              <div
-                key={i}
-                className="aspect-[2/3] bg-white/5 rounded-lg animate-pulse"
-              />
-            ))}
-          </div>
-        ) : movies.length > 0 ? (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {movies.map((movie) => (
-                <MovieCard key={movie.id} movie={movie} />
-              ))}
-            </div>
-
-            {hasMoreMovies && (
-              <div className="flex justify-center mt-8">
-                <Button
-                  onClick={handleLoadMore}
-                  disabled={isLoadingMore}
-                  className="min-w-40"
-                >
-                  {isLoadingMore ? "Chargement..." : "Load More"}
-                </Button>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-white/60 text-lg">
-              Aucun film trouvé
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Series Search Section */}
-      <div className="space-y-6 pt-4">
-        <h3 className="text-2xl font-semibold text-white">
-          Recherche de séries
-        </h3>
-
-        <form
-          onSubmit={handleSeriesSearch}
-          className="max-w-3xl"
-        >
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
-              <Input
-                type="text"
-                placeholder="Rechercher une série..."
-                value={seriesQuery}
-                onChange={async (e) => {
-                  const newQuery = e.target.value;
-                  setSeriesQuery(newQuery);
-                  await runSeriesSearch(newQuery, 1, false);
-                }}
-                className="pl-10 h-12 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-              />
-            </div>
-          </div>
-        </form>
-
-        <div>
-          <h4 className="text-xl font-semibold text-white mb-6">
-            {seriesQuery
-              ? `Résultats séries pour "${seriesQuery}"`
-              : "Séries populaires"}
-          </h4>
-
-          {isSeriesLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[...Array(4)].map((_, i) => (
-                <div
-                  key={i}
-                  className="aspect-[2/3] bg-white/5 rounded-lg animate-pulse"
-                />
-              ))}
-            </div>
-          ) : series.length > 0 ? (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {series.map((seriesItem) => (
-                  <SeriesCard key={seriesItem.id} series={seriesItem} />
-                ))}
+      {!isLoadingInitial && !isSearching && !hasSearch && (
+        <div className="space-y-8">
+          {showMovies && (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-semibold text-white">Carrousel films</h3>
+                <span className="text-white/60 text-sm">{filteredMovies.length} element(s)</span>
               </div>
 
-              {hasMoreSeries && (
-                <div className="flex justify-center mt-8">
-                  <Button
-                    onClick={handleSeriesLoadMore}
-                    disabled={isSeriesLoadingMore || isSeriesSearching}
-                    className="min-w-40"
-                  >
-                    {isSeriesLoadingMore ? "Chargement..." : "Load More"}
-                  </Button>
+              {filteredMovies.length > 0 ? (
+                <div className="flex gap-4 overflow-x-auto pb-2">
+                  {filteredMovies.map((movie) => (
+                    <div key={movie.id} className="min-w-[220px] max-w-[220px] shrink-0">
+                      <MovieCard movie={movie} />
+                    </div>
+                  ))}
                 </div>
+              ) : (
+                <p className="text-white/60">{emptyMessage}</p>
               )}
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-white/60 text-lg">
-                Aucune série trouvée
-              </p>
-            </div>
+            </section>
+          )}
+
+          {showSeries && (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-semibold text-white">Carrousel series</h3>
+                <span className="text-white/60 text-sm">{filteredSeries.length} element(s)</span>
+              </div>
+
+              {filteredSeries.length > 0 ? (
+                <div className="flex gap-4 overflow-x-auto pb-2">
+                  {filteredSeries.map((show) => (
+                    <div key={show.id} className="min-w-[220px] max-w-[220px] shrink-0">
+                      <SeriesCard series={show} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-white/60">{emptyMessage}</p>
+              )}
+            </section>
           )}
         </div>
-      </div>
+      )}
+
+      {!isLoadingInitial && !isSearching && hasSearch && (
+        <div className="space-y-8">
+          <h3 className="text-2xl font-semibold text-white">Resultats en liste verticale pour "{query.trim()}"</h3>
+
+          {showMovies && (
+            <section className="space-y-4">
+              <h4 className="text-xl font-semibold text-white">Films</h4>
+              {filteredMovies.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6">
+                  {filteredMovies.map((movie) => (
+                    <MovieCard key={movie.id} movie={movie} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-white/60">Aucun film ne correspond.</p>
+              )}
+            </section>
+          )}
+
+          {showSeries && (
+            <section className="space-y-4">
+              <h4 className="text-xl font-semibold text-white">Series</h4>
+              {filteredSeries.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6">
+                  {filteredSeries.map((show) => (
+                    <SeriesCard key={show.id} series={show} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-white/60">Aucune serie ne correspond.</p>
+              )}
+            </section>
+          )}
+
+          {((showMovies && filteredMovies.length === 0) &&
+            (showSeries && filteredSeries.length === 0)) && (
+            <p className="text-white/60">{emptyMessage}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
