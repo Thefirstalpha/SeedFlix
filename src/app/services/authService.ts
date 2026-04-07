@@ -103,3 +103,11 @@ export async function updateSettings(settings: UserSettings) {
   });
   return parseJson<UserSettings>(response);
 }
+
+export async function resetSettings() {
+  const response = await fetch(`${SETTINGS_BASE}/reset`, {
+    method: "POST",
+    credentials: "include",
+  });
+  return parseJson<{ ok: true; loggedOut: true }>(response);
+}

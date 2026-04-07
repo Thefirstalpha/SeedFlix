@@ -17,6 +17,7 @@ const wishlistFilePath = path.join(dataDir, "wishlist.json");
 const seriesWishlistFilePath = path.join(dataDir, "seriesWishlist.json");
 const usersFilePath = path.join(dataDir, "users.json");
 const sessionsFilePath = path.join(dataDir, "sessions.json");
+const defaultSettingsFilePath = path.join(__dirname, "defaultSettings.json");
 const authCookieName = "catalogfinder_session";
 const sessionDurationMs = 1000 * 60 * 60 * 24 * 7;
 
@@ -37,6 +38,33 @@ function verifyPassword(password, salt, expectedHash) {
   );
 }
 
+function buildDefaultSettings(username = "admin") {
+  return {
+    profile: {
+      username,
+    },
+    security: {
+      lastPasswordChangeAt: new Date().toISOString(),
+    },
+    placeholders: {
+      notifications: {},
+      preferences: {},
+      torrent: {
+        url: "",
+        port: "",
+        authRequired: false,
+        username: "",
+        moviesFolder: "",
+        seriesFolder: "",
+      },
+      indexer: {
+        url: "",
+        token: "",
+      },
+    },
+  };
+}
+
 function defaultUserRecord() {
   const { salt, hash } = hashPassword("admin");
   return {
@@ -45,18 +73,7 @@ function defaultUserRecord() {
     passwordSalt: salt,
     passwordHash: hash,
     mustChangePassword: true,
-    settings: {
-      profile: {
-        username: "admin",
-      },
-      security: {
-        lastPasswordChangeAt: new Date().toISOString(),
-      },
-      placeholders: {
-        notifications: {},
-        preferences: {},
-      },
-    },
+    settings: buildDefaultSettings("admin"),
   };
 }
 
@@ -136,6 +153,10 @@ async function ensureSessionsStore() {
   await ensureJsonStore(sessionsFilePath, []);
 }
 
+async function ensureDefaultSettingsStore() {
+  await ensureJsonStore(defaultSettingsFilePath, buildDefaultSettings("admin"));
+}
+
 async function readUsers() {
   await ensureJsonStore(usersFilePath, [defaultUserRecord()]);
   const content = await fs.readFile(usersFilePath, "utf-8");
@@ -166,6 +187,20 @@ async function readSessions() {
 async function writeSessions(sessions) {
   await ensureSessionsStore();
   await fs.writeFile(sessionsFilePath, JSON.stringify(sessions, null, 2), "utf-8");
+}
+
+async function readDefaultSettings() {
+  await ensureDefaultSettingsStore();
+  const content = await fs.readFile(defaultSettingsFilePath, "utf-8");
+  try {
+    const parsed = JSON.parse(content);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return buildDefaultSettings("admin");
+    }
+    return parsed;
+  } catch {
+    return buildDefaultSettings("admin");
+  }
 }
 
 function parseCookies(cookieHeader = "") {
@@ -547,6 +582,47 @@ app.put("/api/settings", async (req, res) => {
   } catch (error) {
     console.error("Update settings failed:", error);
     res.status(500).json({ error: "Failed to update settings" });
+  }
+});
+
+app.post("/api/settings/reset", async (req, res) => {
+  try {
+    const auth = await requireAuth(req, res);
+    if (!auth) {
+      return;
+    }
+
+    const defaults = await readDefaultSettings();
+    const resetUser = {
+      ...defaultUserRecord(),
+      settings: {
+        ...defaults,
+        profile: {
+          ...(defaults.profile || {}),
+          username: "admin",
+        },
+      },
+    };
+
+    await writeUsers([resetUser]);
+    await writeWishlist([]);
+    await writeSeriesWishlist([]);
+    await writeSessions([]);
+    clearSessionCookie(res);
+
+    res.json({
+      ok: true,
+      loggedOut: true,
+      reset: {
+        users: true,
+        wishlist: true,
+        seriesWishlist: true,
+        sessions: true,
+      },
+    });
+  } catch (error) {
+    console.error("Reset settings failed:", error);
+    res.status(500).json({ error: "Failed to reset settings" });
   }
 });
 

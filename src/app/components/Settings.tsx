@@ -5,7 +5,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { changePassword, getSettings, updateSettings, type UserSettings } from "../services/authService";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "./ui/alert-dialog";
+import { changePassword, getSettings, resetSettings, updateSettings, type UserSettings } from "../services/authService";
 import { useAuth } from "../context/AuthContext";
 
 export function Settings() {
@@ -33,6 +44,22 @@ export function Settings() {
   const [indexerMessage, setIndexerMessage] = useState<string | null>(null);
   const [indexerError, setIndexerError] = useState<string | null>(null);
   const [isIndexerSaving, setIsIndexerSaving] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const applySettingsToForms = (incomingSettings: UserSettings) => {
+    const torrentSettings = incomingSettings.placeholders?.torrent || {};
+    setTorrentUrl(torrentSettings.url || "");
+    setTorrentPort(torrentSettings.port || "");
+    setTorrentAuthRequired(torrentSettings.authRequired || false);
+    setTorrentUsername(torrentSettings.username || "");
+    setTorrentPassword("");
+    setTorrentMoviesFolder(torrentSettings.moviesFolder || "");
+    setTorrentSeriesFolder(torrentSettings.seriesFolder || "");
+
+    setIndexerUrl(incomingSettings.placeholders?.indexer?.url || "");
+    setIndexerToken("");
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -44,21 +71,7 @@ export function Settings() {
         const response = await getSettings();
         setLocalSettings(response);
         setSettings(response);
-        
-        // Load torrent settings
-        const torrentSettings = response.placeholders?.torrent || {};
-        setTorrentUrl(torrentSettings.url || "");
-        setTorrentPort(torrentSettings.port || "");
-        setTorrentAuthRequired(torrentSettings.authRequired || false);
-        setTorrentUsername(torrentSettings.username || "");
-        setTorrentPassword("");
-        setTorrentMoviesFolder(torrentSettings.moviesFolder || "");
-        setTorrentSeriesFolder(torrentSettings.seriesFolder || "");
-        
-        // Load indexer settings
-        const indexerSettings = response.placeholders?.indexer || {};
-        setIndexerUrl(indexerSettings.url || "");
-        setIndexerToken("");
+        applySettingsToForms(response);
       } catch (loadError) {
         setError(
           loadError instanceof Error ? loadError.message : "Impossible de charger les paramètres"
@@ -102,6 +115,7 @@ export function Settings() {
 
   const handleTorrentSave = async (event: React.FormEvent) => {
     event.preventDefault();
+    setResetError(null);
     setTorrentError(null);
     setTorrentMessage(null);
     setIsTorrentSaving(true);
@@ -139,6 +153,7 @@ export function Settings() {
 
   const handleIndexerSave = async (event: React.FormEvent) => {
     event.preventDefault();
+    setResetError(null);
     setIndexerError(null);
     setIndexerMessage(null);
     setIsIndexerSaving(true);
@@ -171,6 +186,27 @@ export function Settings() {
     }
   };
 
+  const handleResetSettings = async () => {
+    setResetError(null);
+    setTorrentMessage(null);
+    setTorrentError(null);
+    setIndexerMessage(null);
+    setIndexerError(null);
+    setIsResetting(true);
+
+    try {
+      await resetSettings();
+      await refresh();
+      navigate("/login", { replace: true, state: { reset: true } });
+    } catch (submitError) {
+      setResetError(
+        submitError instanceof Error ? submitError.message : "Réinitialisation impossible"
+      );
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -196,6 +232,9 @@ export function Settings() {
           </TabsTrigger>
           <TabsTrigger value="future" disabled={mustChangePassword} className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
             Téléchargements
+          </TabsTrigger>
+          <TabsTrigger value="factory" disabled={mustChangePassword} className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
+            Réinitialisation
           </TabsTrigger>
         </TabsList>
 
@@ -254,6 +293,54 @@ export function Settings() {
             </CardHeader>
             <CardContent className="space-y-2 text-white/80">
               <p>Nom d'utilisateur: {user?.username || settings?.profile?.username || "-"}</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="factory">
+          <Card className="border-red-500/30 bg-red-950/15 text-white">
+            <CardHeader>
+              <CardTitle className="text-red-200">Réinitialisation d'usine</CardTitle>
+              <CardDescription className="text-red-100/70">
+                Cette action réinitialise l'application: compte admin par défaut, paramètres, wishlist films/séries, puis déconnexion automatique.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {resetError && <p className="text-sm text-red-300">{resetError}</p>}
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={isResetting}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {isResetting ? "Réinitialisation..." : "Réinitialiser les paramètres"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="border-red-500/30 bg-slate-950 text-white">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-red-200">
+                      Confirmer la réinitialisation d'usine
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-white/70">
+                      Toutes les données locales seront remises à zéro (utilisateur, paramètres, wishlist films/séries) puis votre session sera expirée. Cette action est irréversible.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                      Annuler
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleResetSettings}
+                      className="bg-red-600 text-white hover:bg-red-700"
+                    >
+                      Oui, réinitialiser
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </CardContent>
           </Card>
         </TabsContent>
