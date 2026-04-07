@@ -63,9 +63,6 @@ export function Home() {
   const movieCarouselRef = useRef<HTMLDivElement | null>(null);
   const seriesCarouselRef = useRef<HTMLDivElement | null>(null);
 
-  const [movieScrollProgress, setMovieScrollProgress] = useState(0);
-  const [seriesScrollProgress, setSeriesScrollProgress] = useState(0);
-
   const hasSearch = query.trim().length > 0;
   const showMovies = contentFilter !== "series";
   const showSeries = contentFilter !== "movie";
@@ -190,8 +187,6 @@ export function Home() {
       setMovieTotalPages(1);
       setSeriesPage(1);
       setSeriesTotalPages(1);
-      setMovieScrollProgress(0);
-      setSeriesScrollProgress(0);
       if (movieCarouselRef.current) {
         movieCarouselRef.current.scrollLeft = 0;
       }
@@ -250,32 +245,6 @@ export function Home() {
 
     return () => clearTimeout(timeoutId);
   }, [query]);
-
-  const updateCarouselProgress = (
-    container: HTMLDivElement | null,
-    setProgress: (value: number) => void
-  ) => {
-    if (!container) {
-      setProgress(0);
-      return;
-    }
-
-    const maxScroll = container.scrollWidth - container.clientWidth;
-    if (maxScroll <= 0) {
-      setProgress(100);
-      return;
-    }
-
-    setProgress((container.scrollLeft / maxScroll) * 100);
-  };
-
-  useEffect(() => {
-    updateCarouselProgress(movieCarouselRef.current, setMovieScrollProgress);
-  }, [recommendedMovies]);
-
-  useEffect(() => {
-    updateCarouselProgress(seriesCarouselRef.current, setSeriesScrollProgress);
-  }, [recommendedSeries]);
 
   const maybeLoadMoreMovies = async (container: HTMLDivElement | null) => {
     if (!container || hasSearch || isLoadingMoreMovies || moviePage >= movieTotalPages) {
@@ -482,10 +451,7 @@ export function Home() {
         <div className="space-y-8">
           {showMovies && (
             <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-semibold text-white">Films populaires</h3>
-                <span className="text-white/60 text-sm">{filteredMovies.length} element(s)</span>
-              </div>
+              <h3 className="text-2xl font-semibold text-white">Films populaires</h3>
 
               {filteredMovies.length > 0 ? (
                 <div className="space-y-4">
@@ -504,7 +470,6 @@ export function Home() {
                       ref={movieCarouselRef}
                       onScroll={(event) => {
                         const container = event.currentTarget;
-                        updateCarouselProgress(container, setMovieScrollProgress);
                         void maybeLoadMoreMovies(container);
                       }}
                       onWheel={handleCarouselWheel}
@@ -529,18 +494,6 @@ export function Home() {
                       <ChevronRight className="w-4 h-4" />
                     </Button>
                   </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-purple-400 to-cyan-400 transition-all duration-200"
-                        style={{ width: `${Math.max(movieScrollProgress, 8)}%` }}
-                      />
-                    </div>
-                    <span className="min-w-28 text-right text-xs text-white/50">
-                      {isLoadingMoreMovies ? "Chargement..." : `${moviePage}/${movieTotalPages}`}
-                    </span>
-                  </div>
                 </div>
               ) : (
                 <p className="text-white/60">{emptyMessage}</p>
@@ -550,10 +503,7 @@ export function Home() {
 
           {showSeries && (
             <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-2xl font-semibold text-white">Séries populaires</h3>
-                <span className="text-white/60 text-sm">{filteredSeries.length} element(s)</span>
-              </div>
+              <h3 className="text-2xl font-semibold text-white">Séries populaires</h3>
 
               {filteredSeries.length > 0 ? (
                 <div className="space-y-4">
@@ -572,7 +522,6 @@ export function Home() {
                       ref={seriesCarouselRef}
                       onScroll={(event) => {
                         const container = event.currentTarget;
-                        updateCarouselProgress(container, setSeriesScrollProgress);
                         void maybeLoadMoreSeries(container);
                       }}
                       onWheel={handleCarouselWheel}
@@ -596,18 +545,6 @@ export function Home() {
                     >
                       <ChevronRight className="w-4 h-4" />
                     </Button>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-300 transition-all duration-200"
-                        style={{ width: `${Math.max(seriesScrollProgress, 8)}%` }}
-                      />
-                    </div>
-                    <span className="min-w-28 text-right text-xs text-white/50">
-                      {isLoadingMoreSeries ? "Chargement..." : `${seriesPage}/${seriesTotalPages}`}
-                    </span>
                   </div>
                 </div>
               ) : (
