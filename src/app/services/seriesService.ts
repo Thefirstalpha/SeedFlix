@@ -16,6 +16,18 @@ export interface SeriesPageResult {
   totalResults: number;
 }
 
+export interface SeriesGenreItem {
+  id: number;
+  name: string;
+}
+
+export interface SeriesDiscoverFilters {
+  genreId?: number;
+  yearFrom?: number;
+  yearTo?: number;
+  minRating?: number;
+}
+
 const TV_GENRE_MAP: { [key: number]: string } = {
   10759: "Action & Aventure",
   16: "Animation",
@@ -132,10 +144,31 @@ function getMockSeries(): Series[] {
   ];
 }
 
-export async function getPopularSeriesPage(page = 1): Promise<SeriesPageResult> {
+export async function getPopularSeriesPage(
+  page = 1,
+  filters: SeriesDiscoverFilters = {}
+): Promise<SeriesPageResult> {
+  const params = new URLSearchParams({
+    language: "fr-FR",
+    page: String(page),
+  });
+
+  if (Number.isFinite(filters.genreId)) {
+    params.set("with_genres", String(filters.genreId));
+  }
+  if (Number.isFinite(filters.yearFrom)) {
+    params.set("first_air_date_gte", `${filters.yearFrom}-01-01`);
+  }
+  if (Number.isFinite(filters.yearTo)) {
+    params.set("first_air_date_lte", `${filters.yearTo}-12-31`);
+  }
+  if (Number.isFinite(filters.minRating) && (filters.minRating || 0) > 0) {
+    params.set("vote_average_gte", String(filters.minRating));
+  }
+
   try {
     const response = await fetch(
-      `${API_BASE_URL}/series/popular?language=fr-FR&page=${page}`
+      `${API_BASE_URL}/series/popular?${params.toString()}`
     );
 
     if (!response.ok) {
@@ -157,6 +190,67 @@ export async function getPopularSeriesPage(page = 1): Promise<SeriesPageResult> 
       totalPages: 1,
       totalResults: page === 1 ? getMockSeries().length : 0,
     };
+  }
+}
+
+export async function getSeriesGenres(): Promise<SeriesGenreItem[]> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/series/genres?language=fr-FR`
+    );
+    if (!response.ok) {
+      throw new Error("Failed to fetch series genres");
+    }
+
+    const data = await response.json();
+    return Array.isArray(data?.genres) ? data.genres : [];
+  } catch (error) {
+    console.error("Error fetching series genres:", error);
+    return Object.entries(TV_GENRE_MAP).map(([id, name]) => ({
+      id: Number(id),
+      name,
+    }));
+  }
+}
+
+export async function discoverSeriesPage(
+  page = 1,
+  filters: SeriesDiscoverFilters = {}
+): Promise<SeriesPageResult> {
+  const params = new URLSearchParams({
+    language: "fr-FR",
+    page: String(page),
+  });
+
+  if (Number.isFinite(filters.genreId)) {
+    params.set("with_genres", String(filters.genreId));
+  }
+  if (Number.isFinite(filters.yearFrom)) {
+    params.set("first_air_date_gte", `${filters.yearFrom}-01-01`);
+  }
+  if (Number.isFinite(filters.yearTo)) {
+    params.set("first_air_date_lte", `${filters.yearTo}-12-31`);
+  }
+  if (Number.isFinite(filters.minRating) && (filters.minRating || 0) > 0) {
+    params.set("vote_average_gte", String(filters.minRating));
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/series/discover?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error("Failed to discover series");
+    }
+
+    const data: TMDBSeriesSearchResponse = await response.json();
+    return {
+      series: data.results.map(convertTMDBToSeries),
+      page: data.page,
+      totalPages: data.total_pages,
+      totalResults: data.total_results,
+    };
+  } catch (error) {
+    console.error("Error discovering series:", error);
+    return getPopularSeriesPage(page);
   }
 }
 

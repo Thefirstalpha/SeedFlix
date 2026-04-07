@@ -1,4 +1,5 @@
-import type { Movie, TMDBMovie, TMDBMovieDetails, TMDBSearchResponse, TMDB_GENRES } from "../types/movie";
+import type { Movie, TMDBMovie, TMDBMovieDetails, TMDBSearchResponse } from "../types/movie";
+import { TMDB_GENRES } from "../types/movie";
 import { API_BASE_URL, getTmdbImageUrl } from "../config/tmdb";
 
 export interface MoviePageResult {
@@ -6,6 +7,18 @@ export interface MoviePageResult {
   page: number;
   totalPages: number;
   totalResults: number;
+}
+
+export interface GenreItem {
+  id: number;
+  name: string;
+}
+
+export interface DiscoverFilters {
+  genreId?: number;
+  yearFrom?: number;
+  yearTo?: number;
+  minRating?: number;
 }
 
 const MOCK_PAGE_SIZE = 8;
@@ -73,10 +86,31 @@ function paginateMovies(movies: Movie[], page: number): MoviePageResult {
 }
 
 // Récupérer les films populaires
-export async function getPopularMoviesPage(page = 1): Promise<MoviePageResult> {
+export async function getPopularMoviesPage(
+  page = 1,
+  filters: DiscoverFilters = {}
+): Promise<MoviePageResult> {
+  const params = new URLSearchParams({
+    language: "fr-FR",
+    page: String(page),
+  });
+
+  if (Number.isFinite(filters.genreId)) {
+    params.set("with_genres", String(filters.genreId));
+  }
+  if (Number.isFinite(filters.yearFrom)) {
+    params.set("primary_release_date_gte", `${filters.yearFrom}-01-01`);
+  }
+  if (Number.isFinite(filters.yearTo)) {
+    params.set("primary_release_date_lte", `${filters.yearTo}-12-31`);
+  }
+  if (Number.isFinite(filters.minRating) && (filters.minRating || 0) > 0) {
+    params.set("vote_average_gte", String(filters.minRating));
+  }
+
   try {
     const response = await fetch(
-      `${API_BASE_URL}/movies/popular?language=fr-FR&page=${page}`
+      `${API_BASE_URL}/movies/popular?${params.toString()}`
     );
 
     if (!response.ok) {
@@ -93,6 +127,67 @@ export async function getPopularMoviesPage(page = 1): Promise<MoviePageResult> {
   } catch (error) {
     console.error('Error fetching popular movies:', error);
     return paginateMovies(getMockMovies(), page);
+  }
+}
+
+export async function getMovieGenres(): Promise<GenreItem[]> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/movies/genres?language=fr-FR`
+    );
+    if (!response.ok) {
+      throw new Error("Failed to fetch movie genres");
+    }
+
+    const data = await response.json();
+    return Array.isArray(data?.genres) ? data.genres : [];
+  } catch (error) {
+    console.error("Error fetching movie genres:", error);
+    return Object.entries(TMDB_GENRES).map(([id, name]) => ({
+      id: Number(id),
+      name,
+    }));
+  }
+}
+
+export async function discoverMoviesPage(
+  page = 1,
+  filters: DiscoverFilters = {}
+): Promise<MoviePageResult> {
+  const params = new URLSearchParams({
+    language: "fr-FR",
+    page: String(page),
+  });
+
+  if (Number.isFinite(filters.genreId)) {
+    params.set("with_genres", String(filters.genreId));
+  }
+  if (Number.isFinite(filters.yearFrom)) {
+    params.set("primary_release_date_gte", `${filters.yearFrom}-01-01`);
+  }
+  if (Number.isFinite(filters.yearTo)) {
+    params.set("primary_release_date_lte", `${filters.yearTo}-12-31`);
+  }
+  if (Number.isFinite(filters.minRating) && (filters.minRating || 0) > 0) {
+    params.set("vote_average_gte", String(filters.minRating));
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/movies/discover?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error("Failed to discover movies");
+    }
+
+    const data: TMDBSearchResponse = await response.json();
+    return {
+      movies: data.results.map(convertTMDBToMovie),
+      page: data.page,
+      totalPages: data.total_pages,
+      totalResults: data.total_results,
+    };
+  } catch (error) {
+    console.error("Error discovering movies:", error);
+    return getPopularMoviesPage(page);
   }
 }
 
