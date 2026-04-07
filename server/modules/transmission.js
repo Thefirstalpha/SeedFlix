@@ -192,6 +192,17 @@ function resolveTorrentSettings(auth, body) {
   };
 }
 
+function resolveDownloadDir(auth, mediaType) {
+  const torrentSettings = auth.user.settings?.placeholders?.torrent || {};
+  const normalizedMediaType = String(mediaType || "movie").trim().toLowerCase();
+
+  if (normalizedMediaType === "series") {
+    return String(torrentSettings.seriesFolder || "").trim();
+  }
+
+  return String(torrentSettings.moviesFolder || "").trim();
+}
+
 export function registerTransmissionRoutes(app) {
   app.post("/api/torrent/test", async (req, res) => {
     try {
@@ -268,6 +279,7 @@ export function registerTransmissionRoutes(app) {
 
       const settings = resolveTorrentSettings(auth, req.body);
       const torrentUrl = String(req.body?.torrentUrl || "").trim();
+      const mediaType = String(req.body?.mediaType || "movie").trim().toLowerCase();
       if (!settings.url) {
         res.status(400).json({ error: "L'URL Transmission est requise" });
         return;
@@ -278,7 +290,7 @@ export function registerTransmissionRoutes(app) {
         return;
       }
 
-      const downloadDir = String(auth.user.settings?.placeholders?.torrent?.moviesFolder || "").trim();
+      const downloadDir = resolveDownloadDir(auth, mediaType);
       const rpcUrl = buildTransmissionRpcUrl(settings.url, settings.port);
       const authHeaders = createAuthHeaders(
         settings.authRequired,

@@ -43,14 +43,17 @@ async function parseJson<T>(response: Response): Promise<T> {
   return data;
 }
 
-export async function addTorrentToClient(torrentUrl: string) {
+export async function addTorrentToClient(
+  torrentUrl: string,
+  mediaType: "movie" | "series" = "movie"
+) {
   const response = await fetch(`${API_BASE_URL}/torrent/add`, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ torrentUrl }),
+    body: JSON.stringify({ torrentUrl, mediaType }),
   });
 
   return parseJson<TorrentAddResponse>(response);

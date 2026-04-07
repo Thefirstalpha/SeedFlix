@@ -28,6 +28,30 @@ export interface SeriesDiscoverFilters {
   minRating?: number;
 }
 
+export interface TorznabSeriesResult {
+  title: string;
+  link: string;
+  downloadUrl?: string;
+  tmdbId?: string | null;
+  guid?: string;
+  pubDate?: string;
+  size?: number | null;
+  sizeHuman?: string | null;
+  seeders?: number | null;
+  leechers?: number | null;
+  quality?: string | null;
+  language?: string | null;
+  categories?: string[];
+  attributes?: Record<string, string>;
+}
+
+export interface TorznabSeriesSearchResponse {
+  ok: boolean;
+  query: string;
+  sourceTitle?: string | null;
+  items: TorznabSeriesResult[];
+}
+
 const TV_GENRE_MAP: { [key: number]: string } = {
   10759: "Action & Aventure",
   16: "Animation",
@@ -325,4 +349,33 @@ export async function getSeriesSeasonEpisodes(
     console.error("Error fetching season episodes:", error);
     return [];
   }
+}
+
+export async function searchSeriesReleases(
+  query: string,
+  limit = 12,
+  tmdbId?: number | string
+): Promise<TorznabSeriesSearchResponse> {
+  const tmdbPart = tmdbId !== undefined && tmdbId !== null
+    ? `&tmdbId=${encodeURIComponent(String(tmdbId))}`
+    : "";
+
+  const response = await fetch(
+    `${API_BASE_URL}/indexer/search?query=${encodeURIComponent(query)}&limit=${limit}${tmdbPart}`,
+    {
+      credentials: "include",
+    }
+  );
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data?.error || "Recherche tracker impossible");
+  }
+
+  return {
+    ok: Boolean(data?.ok),
+    query: String(data?.query || query),
+    sourceTitle: data?.sourceTitle ? String(data.sourceTitle) : null,
+    items: Array.isArray(data?.items) ? data.items : [],
+  };
 }

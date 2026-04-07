@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Calendar, Clapperboard, Heart, Star, Tv } from "lucide-react";
+import { ArrowLeft, Calendar, Clapperboard, Download, Heart, Loader2, Star, Tv } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import {
   getSeriesById,
   getSeriesSeasonEpisodes,
+  searchSeriesReleases,
+  type TorznabSeriesResult,
 } from "../services/seriesService";
 import {
   addToSeriesWishlist,
   getSeriesWishlistStatus,
   removeFromSeriesWishlist,
 } from "../services/seriesWishlistService";
+import { addTorrentToClient } from "../services/torrentService";
 import type { SeriesWishlistStatus } from "../types/seriesWishlist";
 import type {
   SeriesDetails as SeriesDetailsModel,
@@ -35,6 +38,12 @@ export function SeriesDetails() {
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
   const [wishlistStatus, setWishlistStatus] =
     useState<SeriesWishlistStatus>(EMPTY_STATUS);
+  const [releaseResults, setReleaseResults] = useState<TorznabSeriesResult[]>([]);
+  const [isReleaseLoading, setIsReleaseLoading] = useState(false);
+  const [releaseError, setReleaseError] = useState<string | null>(null);
+  const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
+  const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
+  const [torrentError, setTorrentError] = useState<string | null>(null);
 
   useEffect(() => {
     loadSeriesDetails();
@@ -70,6 +79,28 @@ export function SeriesDetails() {
           .sort((a, b) => a.seasonNumber - b.seasonNumber)[0];
         setSelectedSeason(defaultSeason ? defaultSeason.seasonNumber : null);
         setWishlistStatus(await getSeriesWishlistStatus(seriesData.id));
+
+        setIsReleaseLoading(true);
+        setReleaseError(null);
+        try {
+          const trackerResponse = await searchSeriesReleases(
+            seriesData.originalTitle || seriesData.title,
+            12,
+            seriesData.id
+          );
+          setReleaseResults(trackerResponse.items);
+        } catch (trackerLoadError) {
+          setReleaseError(
+            trackerLoadError instanceof Error
+              ? trackerLoadError.message
+              : "Recherche tracker impossible"
+          );
+          setReleaseResults([]);
+        } finally {
+          setIsReleaseLoading(false);
+        }
+      } else {
+        setReleaseResults([]);
       }
     } catch (error) {
       console.error("Error loading series details:", error);
@@ -95,6 +126,27 @@ export function SeriesDetails() {
   const refreshStatus = async () => {
     if (!series) return;
     setWishlistStatus(await getSeriesWishlistStatus(series.id));
+  };
+
+  const handleAddTorrent = async (torrentUrl: string) => {
+    setTorrentStatus(null);
+    setTorrentError(null);
+    setAddingTorrentLink(torrentUrl);
+
+    try {
+      const response = await addTorrentToClient(torrentUrl, "series");
+      setTorrentStatus(
+        response.duplicate
+          ? "Ce torrent existe déjà dans votre client."
+          : "Torrent série ajouté au client avec succès."
+      );
+    } catch (error) {
+      setTorrentError(
+        error instanceof Error ? error.message : "Impossible d'ajouter ce torrent"
+      );
+    } finally {
+      setAddingTorrentLink(null);
+    }
   };
 
   // ── Wishlist helpers ────────────────────────────────────────────────────────
@@ -312,6 +364,93 @@ export function SeriesDetails() {
 
           <Card className="bg-white/5 border-white/10">
             <CardContent className="p-6 space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold text-white">Résultats Tracker</h3>
+                <p className="text-sm text-white/60 mt-1">
+                  Versions détectées sur Torznab pour cette série.
+                </p>
+              </div>
+
+              {isReleaseLoading && (
+                <p className="text-sm text-white/60">Recherche en cours...</p>
+              )}
+
+              {releaseError && (
+                <p className="text-sm text-red-300">{releaseError}</p>
+              )}
+
+              {torrentStatus && !releaseError && (
+                <p className="text-sm text-emerald-300">{torrentStatus}</p>
+              )}
+
+              {torrentError && (
+                <p className="text-sm text-red-300">{torrentError}</p>
+              )}
+
+              {!isReleaseLoading && !releaseError && releaseResults.length === 0 && (
+                <p className="text-sm text-white/60">Aucune version trouvée pour cette série.</p>
+              )}
+
+              {releaseResults.length > 0 && (
+                <div className="space-y-3">
+                  {releaseResults.map((item, index) => (
+                    <div
+                      key={item.guid || item.link || `${item.title}_${index}`}
+                      className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
+                    >
+                      <p className="text-white font-medium line-clamp-2">{item.title}</p>
+
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <Button
+                          size="sm"
+                          onClick={() => handleAddTorrent(item.downloadUrl || item.link)}
+                          disabled={addingTorrentLink === (item.downloadUrl || item.link)}
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                        >
+                          {addingTorrentLink === (item.downloadUrl || item.link) ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Ajout...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4 mr-2" />
+                              Ajouter au client
+                            </>
+                          )}
+                        </Button>
+
+                        {item.quality && (
+                          <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
+                            Qualité: {item.quality}
+                          </Badge>
+                        )}
+                        {item.language && (
+                          <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
+                            Langue: {item.language}
+                          </Badge>
+                        )}
+                        {item.sizeHuman && (
+                          <Badge variant="outline" className="border-white/30 text-white/80">
+                            Taille: {item.sizeHuman}
+                          </Badge>
+                        )}
+                        {Number.isFinite(item.seeders || NaN) && (item.seeders || 0) >= 0 && (
+                          <Badge variant="outline" className="border-lime-500/40 text-lime-300">
+                            Seeders: {item.seeders}
+                          </Badge>
+                        )}
+                        {Number.isFinite(item.leechers || NaN) && (item.leechers || 0) >= 0 && (
+                          <Badge variant="outline" className="border-orange-500/40 text-orange-300">
+                            Peers: {item.leechers}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="flex items-center gap-2">
                 <Clapperboard className="w-5 h-5 text-cyan-300" />
                 <h3 className="text-xl font-semibold text-white">Saisons et épisodes</h3>
