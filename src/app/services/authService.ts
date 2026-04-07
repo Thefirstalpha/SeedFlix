@@ -23,6 +23,10 @@ export interface UserSettings {
       moviesFolder?: string;
       seriesFolder?: string;
     };
+    indexer?: {
+      url?: string;
+      token?: string;
+    };
   };
 }
 

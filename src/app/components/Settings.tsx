@@ -27,6 +27,11 @@ export function Settings() {
   const [torrentMessage, setTorrentMessage] = useState<string | null>(null);
   const [torrentError, setTorrentError] = useState<string | null>(null);
   const [isTorrentSaving, setIsTorrentSaving] = useState(false);
+  const [indexerUrl, setIndexerUrl] = useState("");
+  const [indexerToken, setIndexerToken] = useState("");
+  const [indexerMessage, setIndexerMessage] = useState<string | null>(null);
+  const [indexerError, setIndexerError] = useState<string | null>(null);
+  const [isIndexerSaving, setIsIndexerSaving] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -48,6 +53,11 @@ export function Settings() {
         setTorrentPassword("");
         setTorrentMoviesFolder(torrentSettings.moviesFolder || "");
         setTorrentSeriesFolder(torrentSettings.seriesFolder || "");
+        
+        // Load indexer settings
+        const indexerSettings = response.placeholders?.indexer || {};
+        setIndexerUrl(indexerSettings.url || "");
+        setIndexerToken("");
       } catch (loadError) {
         setError(
           loadError instanceof Error ? loadError.message : "Impossible de charger les paramètres"
@@ -119,6 +129,40 @@ export function Settings() {
     }
   };
 
+  const handleIndexerSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIndexerError(null);
+    setIndexerMessage(null);
+    setIsIndexerSaving(true);
+    try {
+      const updatedSettings: UserSettings = {
+        profile: settings?.profile || { username: user?.username || "admin" },
+        security: settings?.security || {
+          lastPasswordChangeAt: new Date().toISOString(),
+        },
+        placeholders: {
+          notifications: settings?.placeholders?.notifications || {},
+          preferences: settings?.placeholders?.preferences || {},
+          torrent: settings?.placeholders?.torrent,
+          indexer: {
+            url: indexerUrl,
+            token: indexerToken,
+          },
+        },
+      };
+      await updateSettings(updatedSettings);
+      setLocalSettings(updatedSettings);
+      setSettings(updatedSettings);
+      setIndexerMessage("Configuration indexer enregistrée.");
+    } catch (submitError) {
+      setIndexerError(
+        submitError instanceof Error ? submitError.message : "Mise à jour impossible"
+      );
+    } finally {
+      setIsIndexerSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -137,7 +181,7 @@ export function Settings() {
             Compte
           </TabsTrigger>
           <TabsTrigger value="future" className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white">
-            Plus tard
+            Téléchargements
           </TabsTrigger>
         </TabsList>
 
@@ -295,6 +339,48 @@ export function Settings() {
 
                 <Button type="submit" disabled={isTorrentSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
                   {isTorrentSaving ? "Enregistrement..." : "Enregistrer la configuration"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-white/5 text-white mt-6">
+            <CardHeader>
+              <CardTitle>Indexer</CardTitle>
+              <CardDescription className="text-white/60">
+                Configurez votre indexer pour la recherche de contenu.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleIndexerSave} className="space-y-4 max-w-lg">
+                <div className="space-y-2">
+                  <Label htmlFor="indexer-url">URL de l'indexer</Label>
+                  <Input
+                    id="indexer-url"
+                    placeholder="https://indexer.example.com"
+                    value={indexerUrl}
+                    onChange={(e) => setIndexerUrl(e.target.value)}
+                    className="bg-slate-900 border-white/10 text-white"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="indexer-token">Jeton API</Label>
+                  <Input
+                    id="indexer-token"
+                    type="password"
+                    placeholder="••••••••••••••••"
+                    value={indexerToken}
+                    onChange={(e) => setIndexerToken(e.target.value)}
+                    className="bg-slate-900 border-white/10 text-white"
+                  />
+                </div>
+
+                {indexerMessage && <p className="text-sm text-emerald-300">{indexerMessage}</p>}
+                {indexerError && <p className="text-sm text-red-300">{indexerError}</p>}
+
+                <Button type="submit" disabled={isIndexerSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                  {isIndexerSaving ? "Enregistrement..." : "Enregistrer la configuration"}
                 </Button>
               </form>
             </CardContent>
