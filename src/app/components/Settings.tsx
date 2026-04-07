@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { changePassword, getSettings, type UserSettings } from "../services/authService";
+import { changePassword, getSettings, updateSettings, type UserSettings } from "../services/authService";
 import { useAuth } from "../context/AuthContext";
 
 export function Settings() {
@@ -17,6 +17,16 @@ export function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [torrentUrl, setTorrentUrl] = useState("");
+  const [torrentPort, setTorrentPort] = useState("");
+  const [torrentAuthRequired, setTorrentAuthRequired] = useState(false);
+  const [torrentUsername, setTorrentUsername] = useState("");
+  const [torrentPassword, setTorrentPassword] = useState("");
+  const [torrentMoviesFolder, setTorrentMoviesFolder] = useState("");
+  const [torrentSeriesFolder, setTorrentSeriesFolder] = useState("");
+  const [torrentMessage, setTorrentMessage] = useState<string | null>(null);
+  const [torrentError, setTorrentError] = useState<string | null>(null);
+  const [isTorrentSaving, setIsTorrentSaving] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -28,6 +38,16 @@ export function Settings() {
         const response = await getSettings();
         setLocalSettings(response);
         setSettings(response);
+        
+        // Load torrent settings
+        const torrentSettings = response.placeholders?.torrent || {};
+        setTorrentUrl(torrentSettings.url || "");
+        setTorrentPort(torrentSettings.port || "");
+        setTorrentAuthRequired(torrentSettings.authRequired || false);
+        setTorrentUsername(torrentSettings.username || "");
+        setTorrentPassword("");
+        setTorrentMoviesFolder(torrentSettings.moviesFolder || "");
+        setTorrentSeriesFolder(torrentSettings.seriesFolder || "");
       } catch (loadError) {
         setError(
           loadError instanceof Error ? loadError.message : "Impossible de charger les paramètres"
@@ -59,6 +79,43 @@ export function Settings() {
       setError(submitError instanceof Error ? submitError.message : "Mise à jour impossible");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTorrentSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setTorrentError(null);
+    setTorrentMessage(null);
+    setIsTorrentSaving(true);
+    try {
+      const updatedSettings: UserSettings = {
+        profile: settings?.profile || { username: user?.username || "admin" },
+        security: settings?.security || {
+          lastPasswordChangeAt: new Date().toISOString(),
+        },
+        placeholders: {
+          notifications: settings?.placeholders?.notifications || {},
+          preferences: settings?.placeholders?.preferences || {},
+          torrent: {
+            url: torrentUrl,
+            port: torrentPort,
+            authRequired: torrentAuthRequired,
+            username: torrentAuthRequired ? torrentUsername : undefined,
+            moviesFolder: torrentMoviesFolder,
+            seriesFolder: torrentSeriesFolder,
+          },
+        },
+      };
+      await updateSettings(updatedSettings);
+      setLocalSettings(updatedSettings);
+      setSettings(updatedSettings);
+      setTorrentMessage("Configuration torrent enregistrée.");
+    } catch (submitError) {
+      setTorrentError(
+        submitError instanceof Error ? submitError.message : "Mise à jour impossible"
+      );
+    } finally {
+      setIsTorrentSaving(false);
     }
   };
 
@@ -141,15 +198,105 @@ export function Settings() {
         <TabsContent value="future">
           <Card className="border-white/10 bg-white/5 text-white">
             <CardHeader>
-              <CardTitle>Section réservée</CardTitle>
+              <CardTitle>Client torrent</CardTitle>
               <CardDescription className="text-white/60">
-                Espace vide pour de futurs paramètres.
+                Configurez vos paramètres de client torrent pour télécharger automatiquement films et séries.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-lg border border-dashed border-white/15 bg-white/[0.03] p-6 text-white/50">
-                Cette section sera complétée plus tard.
-              </div>
+              <form onSubmit={handleTorrentSave} className="space-y-4 max-w-lg">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="torrent-url">URL du client</Label>
+                    <Input
+                      id="torrent-url"
+                      placeholder="http://localhost"
+                      value={torrentUrl}
+                      onChange={(e) => setTorrentUrl(e.target.value)}
+                      className="bg-slate-900 border-white/10 text-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="torrent-port">Port</Label>
+                    <Input
+                      id="torrent-port"
+                      type="number"
+                      placeholder="6800"
+                      value={torrentPort}
+                      onChange={(e) => setTorrentPort(e.target.value)}
+                      className="bg-slate-900 border-white/10 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    id="torrent-auth"
+                    type="checkbox"
+                    checked={torrentAuthRequired}
+                    onChange={(e) => setTorrentAuthRequired(e.target.checked)}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                  <Label htmlFor="torrent-auth" className="cursor-pointer">
+                    Authentification requise
+                  </Label>
+                </div>
+
+                {torrentAuthRequired && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="torrent-username">Nom d'utilisateur</Label>
+                      <Input
+                        id="torrent-username"
+                        placeholder="admin"
+                        value={torrentUsername}
+                        onChange={(e) => setTorrentUsername(e.target.value)}
+                        className="bg-slate-900 border-white/10 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="torrent-password">Mot de passe</Label>
+                      <Input
+                        id="torrent-password"
+                        type="password"
+                        placeholder="••••••"
+                        value={torrentPassword}
+                        onChange={(e) => setTorrentPassword(e.target.value)}
+                        className="bg-slate-900 border-white/10 text-white"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="torrent-movies-folder">Dossier pour les films</Label>
+                  <Input
+                    id="torrent-movies-folder"
+                    placeholder="/downloads/movies"
+                    value={torrentMoviesFolder}
+                    onChange={(e) => setTorrentMoviesFolder(e.target.value)}
+                    className="bg-slate-900 border-white/10 text-white"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="torrent-series-folder">Dossier pour les séries</Label>
+                  <Input
+                    id="torrent-series-folder"
+                    placeholder="/downloads/series"
+                    value={torrentSeriesFolder}
+                    onChange={(e) => setTorrentSeriesFolder(e.target.value)}
+                    className="bg-slate-900 border-white/10 text-white"
+                  />
+                </div>
+
+                {torrentMessage && <p className="text-sm text-emerald-300">{torrentMessage}</p>}
+                {torrentError && <p className="text-sm text-red-300">{torrentError}</p>}
+
+                <Button type="submit" disabled={isTorrentSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                  {isTorrentSaving ? "Enregistrement..." : "Enregistrer la configuration"}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>

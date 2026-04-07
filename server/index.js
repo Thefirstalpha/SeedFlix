@@ -464,6 +464,33 @@ app.get("/api/settings", async (req, res) => {
   }
 });
 
+app.put("/api/settings", async (req, res) => {
+  try {
+    const auth = await requireAuth(req, res);
+    if (!auth) {
+      return;
+    }
+
+    const newSettings = req.body;
+    const users = await readUsers();
+    const nextUsers = users.map((user) => {
+      if (user.id !== auth.user.id) {
+        return user;
+      }
+
+      return {
+        ...user,
+        settings: newSettings,
+      };
+    });
+    await writeUsers(nextUsers);
+    res.json(newSettings);
+  } catch (error) {
+    console.error("Update settings failed:", error);
+    res.status(500).json({ error: "Failed to update settings" });
+  }
+});
+
 app.get("/api/wishlist", async (_req, res) => {
   try {
     const wishlist = await readWishlist();

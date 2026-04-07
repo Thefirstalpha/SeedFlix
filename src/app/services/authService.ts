@@ -15,6 +15,14 @@ export interface UserSettings {
   placeholders: {
     notifications?: Record<string, unknown>;
     preferences?: Record<string, unknown>;
+    torrent?: {
+      url?: string;
+      port?: string;
+      authRequired?: boolean;
+      username?: string;
+      moviesFolder?: string;
+      seriesFolder?: string;
+    };
   };
 }
 
@@ -77,6 +85,16 @@ export async function changePassword(currentPassword: string, newPassword: strin
 export async function getSettings() {
   const response = await fetch(SETTINGS_BASE, {
     credentials: "include",
+  });
+  return parseJson<UserSettings>(response);
+}
+
+export async function updateSettings(settings: UserSettings) {
+  const response = await fetch(SETTINGS_BASE, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
   });
   return parseJson<UserSettings>(response);
 }
