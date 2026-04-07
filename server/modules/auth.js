@@ -9,7 +9,6 @@ import {
   sessionsFilePath,
   usersFilePath,
 } from "../config.js";
-import { writeSeriesWishlist, writeWishlist } from "./wishlist.js";
 
 function hashPassword(password, salt = randomBytes(16).toString("hex")) {
   const hash = scryptSync(password, salt, 64).toString("hex");
@@ -266,7 +265,7 @@ async function requireAuth(req, res) {
   return auth;
 }
 
-export { requireAuth };
+export { getAuthenticatedUser, requireAuth };
 
 export function registerAuthRoutes(app) {
   app.get("/api/auth/me", async (req, res) => {
@@ -446,6 +445,8 @@ export function registerAuthRoutes(app) {
       if (!auth) {
         return;
       }
+
+      const { writeSeriesWishlist, writeWishlist } = await import("./wishlist.js");
 
       const defaults = await readDefaultSettings();
       const resetUser = {

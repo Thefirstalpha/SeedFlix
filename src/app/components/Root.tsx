@@ -1,8 +1,9 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { Heart, LogOut, Settings, User } from "lucide-react";
+import { Download, Heart, LogOut, Settings, User } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { getWishlistCount } from "../services/wishlistService";
 import { getSeriesWishlistCount } from "../services/seriesWishlistService";
+import { getTorrentDownloads } from "../services/torrentService";
 import { Button } from "./ui/button";
 import { useAuth } from "../context/AuthContext";
 
@@ -10,6 +11,7 @@ export function Root() {
   const location = useLocation();
   const navigate = useNavigate();
   const [wishlistCount, setWishlistCount] = useState(0);
+  const [downloadsCount, setDownloadsCount] = useState(0);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const wishlistTarget = location.pathname === "/wishlist" ? "/" : "/wishlist";
@@ -26,6 +28,29 @@ export function Root() {
     };
     loadCount();
   }, [location]);
+
+  useEffect(() => {
+    if (!isAuthenticated || isLoginPage || mustChangePassword) {
+      setDownloadsCount(0);
+      return;
+    }
+
+    const loadDownloadsCount = async () => {
+      try {
+        const response = await getTorrentDownloads();
+        setDownloadsCount(response.activeCount || 0);
+      } catch {
+        setDownloadsCount(0);
+      }
+    };
+
+    void loadDownloadsCount();
+    const interval = setInterval(() => {
+      void loadDownloadsCount();
+    }, 7000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, isLoginPage, mustChangePassword, location.pathname]);
 
   useEffect(() => {
     if (!isUserMenuOpen) {
@@ -86,6 +111,21 @@ export function Root() {
             </Link>
 
             <div className="flex items-center gap-3">
+              {isAuthenticated && !isLoginPage && !mustChangePassword && (
+                <Link
+                  to="/downloads"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+                >
+                  <Download className="w-5 h-5 text-cyan-300" />
+                  <span className="text-white font-medium">Téléchargements</span>
+                  {downloadsCount > 0 && (
+                    <span className="bg-cyan-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      {downloadsCount}
+                    </span>
+                  )}
+                </Link>
+              )}
+
               {isAuthenticated && !isLoginPage && !mustChangePassword && (
                 <Link
                   to={wishlistTarget}

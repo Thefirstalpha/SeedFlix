@@ -4,7 +4,9 @@ import { API_BASE_URL } from "../config/tmdb";
 // Récupérer la liste de souhaits
 export async function getWishlist(): Promise<Movie[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/wishlist`);
+    const response = await fetch(`${API_BASE_URL}/wishlist`, {
+      credentials: "include",
+    });
     if (!response.ok) {
       throw new Error("Failed to fetch wishlist");
     }
@@ -20,6 +22,7 @@ export async function getWishlist(): Promise<Movie[]> {
 export async function addToWishlist(movie: Movie): Promise<void> {
   await fetch(`${API_BASE_URL}/wishlist`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -31,6 +34,7 @@ export async function addToWishlist(movie: Movie): Promise<void> {
 export async function removeFromWishlist(movieId: number): Promise<void> {
   await fetch(`${API_BASE_URL}/wishlist/${movieId}`, {
     method: "DELETE",
+    credentials: "include",
   });
 }
 
@@ -38,6 +42,7 @@ export async function removeFromWishlist(movieId: number): Promise<void> {
 export async function removeMultipleFromWishlist(movieIds: number[]): Promise<void> {
   await fetch(`${API_BASE_URL}/wishlist`, {
     method: "DELETE",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -48,7 +53,9 @@ export async function removeMultipleFromWishlist(movieIds: number[]): Promise<vo
 // Vérifier si un film est dans la liste de souhaits
 export async function isInWishlist(movieId: number): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE_URL}/wishlist/${movieId}`);
+    const response = await fetch(`${API_BASE_URL}/wishlist/${movieId}`, {
+      credentials: "include",
+    });
     if (!response.ok) {
       return false;
     }

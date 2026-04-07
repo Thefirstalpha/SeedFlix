@@ -2,6 +2,15 @@ import { requireAuth } from "./auth.js";
 
 const transmissionTimeoutMs = 8000;
 const transmissionRpcPath = "/transmission/rpc";
+const transmissionStatusLabels = {
+  0: "Stopped",
+  1: "Queued to check files",
+  2: "Checking files",
+  3: "Queued to download",
+  4: "Downloading",
+  5: "Queued to seed",
+  6: "Seeding",
+};
 
 function buildTransmissionRpcUrl(rawUrl, rawPort) {
   let url;
@@ -41,7 +50,7 @@ function createAuthHeaders(authRequired, username, password) {
   };
 }
 
-async function postTransmissionRpc(url, headers, sessionId) {
+async function postTransmissionRpc(url, headers, sessionId, body) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), transmissionTimeoutMs);
 
@@ -54,7 +63,7 @@ async function postTransmissionRpc(url, headers, sessionId) {
         ...headers,
         ...(sessionId ? { "X-Transmission-Session-Id": sessionId } : {}),
       },
-      body: JSON.stringify({ method: "session-get" }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
   } finally {
@@ -62,8 +71,8 @@ async function postTransmissionRpc(url, headers, sessionId) {
   }
 }
 
-async function executeTransmissionSessionGet(url, headers) {
-  const firstResponse = await postTransmissionRpc(url, headers);
+async function executeTransmissionRpc(url, headers, payload) {
+  const firstResponse = await postTransmissionRpc(url, headers, undefined, payload);
 
   if (firstResponse.status === 409) {
     const sessionId = firstResponse.headers.get("X-Transmission-Session-Id");
@@ -71,7 +80,7 @@ async function executeTransmissionSessionGet(url, headers) {
       throw new Error("Transmission n'a pas fourni d'identifiant de session RPC");
     }
 
-    return postTransmissionRpc(url, headers, sessionId);
+    return postTransmissionRpc(url, headers, sessionId, payload);
   }
 
   return firstResponse;
@@ -114,7 +123,9 @@ export function registerTransmissionRoutes(app) {
         settings.password
       );
 
-      const response = await executeTransmissionSessionGet(rpcUrl, authHeaders);
+      const response = await executeTransmissionRpc(rpcUrl, authHeaders, {
+        method: "session-get",
+      });
 
       if (response.status === 401) {
         res.status(401).json({ error: "Identifiants Transmission invalides" });
@@ -154,6 +165,169 @@ export function registerTransmissionRoutes(app) {
       console.error("Transmission test failed:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Échec du test Transmission",
+      });
+    }
+  });
+
+  app.post("/api/torrent/add", async (req, res) => {
+    try {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
+
+      const settings = resolveTorrentSettings(auth, req.body);
+      const torrentUrl = String(req.body?.torrentUrl || "").trim();
+      if (!settings.url) {
+        res.status(400).json({ error: "L'URL Transmission est requise" });
+        return;
+      }
+
+      if (!torrentUrl) {
+        res.status(400).json({ error: "torrentUrl est requis" });
+        return;
+      }
+
+      const downloadDir = String(auth.user.settings?.placeholders?.torrent?.moviesFolder || "").trim();
+      const rpcUrl = buildTransmissionRpcUrl(settings.url, settings.port);
+      const authHeaders = createAuthHeaders(
+        settings.authRequired,
+        settings.username,
+        settings.password
+      );
+
+      const payload = {
+        method: "torrent-add",
+        arguments: {
+          filename: torrentUrl,
+          paused: false,
+          ...(downloadDir ? { "download-dir": downloadDir } : {}),
+        },
+      };
+
+      const response = await executeTransmissionRpc(rpcUrl, authHeaders, payload);
+      if (response.status === 401) {
+        res.status(401).json({ error: "Identifiants Transmission invalides" });
+        return;
+      }
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok || data?.result !== "success") {
+        res.status(response.ok ? 400 : response.status).json({
+          error: data?.result || `Ajout au client torrent impossible (${response.status})`,
+        });
+        return;
+      }
+
+      const added = data?.arguments?.["torrent-added"] || data?.arguments?.["torrent-duplicate"] || null;
+      res.json({
+        ok: true,
+        message: "Torrent ajouté au client",
+        duplicate: Boolean(data?.arguments?.["torrent-duplicate"]),
+        torrent: added,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        res.status(504).json({ error: "L'ajout du torrent a expiré" });
+        return;
+      }
+
+      console.error("Add torrent failed:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Échec de l'ajout torrent",
+      });
+    }
+  });
+
+  app.get("/api/torrent/downloads", async (req, res) => {
+    try {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
+
+      const settings = resolveTorrentSettings(auth, req.query);
+      if (!settings.url) {
+        res.status(400).json({ error: "L'URL Transmission est requise" });
+        return;
+      }
+
+      const rpcUrl = buildTransmissionRpcUrl(settings.url, settings.port);
+      const authHeaders = createAuthHeaders(
+        settings.authRequired,
+        settings.username,
+        settings.password
+      );
+
+      const response = await executeTransmissionRpc(rpcUrl, authHeaders, {
+        method: "torrent-get",
+        arguments: {
+          fields: [
+            "id",
+            "name",
+            "status",
+            "percentDone",
+            "rateDownload",
+            "eta",
+            "totalSize",
+            "downloadDir",
+            "addedDate",
+            "isFinished",
+            "leftUntilDone",
+            "error",
+            "errorString",
+            "peersConnected",
+          ],
+        },
+      });
+
+      if (response.status === 401) {
+        res.status(401).json({ error: "Identifiants Transmission invalides" });
+        return;
+      }
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok || data?.result !== "success") {
+        res.status(response.ok ? 400 : response.status).json({
+          error: data?.result || `Lecture des téléchargements impossible (${response.status})`,
+        });
+        return;
+      }
+
+      const torrents = Array.isArray(data?.arguments?.torrents)
+        ? data.arguments.torrents.map((torrent) => ({
+            id: torrent.id,
+            name: torrent.name,
+            status: torrent.status,
+            statusLabel: transmissionStatusLabels[torrent.status] || "Unknown",
+            progress: Math.round(Number(torrent.percentDone || 0) * 1000) / 10,
+            rateDownload: Number(torrent.rateDownload || 0),
+            eta: Number(torrent.eta || 0),
+            totalSize: Number(torrent.totalSize || 0),
+            downloadDir: torrent.downloadDir,
+            addedDate: torrent.addedDate,
+            isFinished: Boolean(torrent.isFinished),
+            leftUntilDone: Number(torrent.leftUntilDone || 0),
+            peersConnected: Number(torrent.peersConnected || 0),
+            error: Number(torrent.error || 0),
+            errorString: torrent.errorString || "",
+          }))
+        : [];
+
+      res.json({
+        ok: true,
+        torrents,
+        activeCount: torrents.filter((torrent) => [3, 4, 5, 6].includes(torrent.status)).length,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        res.status(504).json({ error: "La lecture des téléchargements a expiré" });
+        return;
+      }
+
+      console.error("Get downloads failed:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Échec de lecture des téléchargements",
       });
     }
   });

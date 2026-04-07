@@ -1,10 +1,11 @@
 import { useParams, Link, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Star, Calendar, Clock, User, Heart } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Star, Calendar, Clock, User, Heart } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Card, CardContent } from "./ui/card";
-import { getMovieById } from "../services/movieService";
+import { getMovieById, searchMovieReleases, type TorznabMovieResult } from "../services/movieService";
+import { addTorrentToClient } from "../services/torrentService";
 import { addToWishlist, removeFromWishlist, isInWishlist } from "../services/wishlistService";
 import type { Movie } from "../types/movie";
 
@@ -14,6 +15,12 @@ export function MovieDetails() {
   const [movie, setMovie] = useState<Movie | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [inWishlist, setInWishlist] = useState(false);
+  const [releaseResults, setReleaseResults] = useState<TorznabMovieResult[]>([]);
+  const [isReleaseLoading, setIsReleaseLoading] = useState(false);
+  const [releaseError, setReleaseError] = useState<string | null>(null);
+  const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
+  const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
+  const [torrentError, setTorrentError] = useState<string | null>(null);
 
   useEffect(() => {
     loadMovieDetails();
@@ -26,6 +33,27 @@ export function MovieDetails() {
       setMovie(movieData);
       if (movieData) {
         setInWishlist(await isInWishlist(movieData.id));
+
+        setIsReleaseLoading(true);
+        setReleaseError(null);
+        try {
+          const trackerResponse = await searchMovieReleases(
+            movieData.originalTitle || movieData.title,
+            12
+          );
+          setReleaseResults(trackerResponse.items);
+        } catch (trackerError) {
+          setReleaseError(
+            trackerError instanceof Error
+              ? trackerError.message
+              : "Recherche tracker impossible"
+          );
+          setReleaseResults([]);
+        } finally {
+          setIsReleaseLoading(false);
+        }
+      } else {
+        setReleaseResults([]);
       }
     } catch (error) {
       console.error('Error loading movie details:', error);
@@ -43,6 +71,27 @@ export function MovieDetails() {
     } else {
       await addToWishlist(movie);
       setInWishlist(true);
+    }
+  };
+
+  const handleAddTorrent = async (torrentUrl: string) => {
+    setTorrentStatus(null);
+    setTorrentError(null);
+    setAddingTorrentLink(torrentUrl);
+
+    try {
+      const response = await addTorrentToClient(torrentUrl);
+      setTorrentStatus(
+        response.duplicate
+          ? "Ce torrent existe déjà dans votre client."
+          : "Torrent ajouté au client avec succès."
+      );
+    } catch (error) {
+      setTorrentError(
+        error instanceof Error ? error.message : "Impossible d'ajouter ce torrent"
+      );
+    } finally {
+      setAddingTorrentLink(null);
     }
   };
 
@@ -199,6 +248,110 @@ export function MovieDetails() {
               </CardContent>
             </Card>
           )}
+
+          <Card className="bg-white/5 border-white/10">
+            <CardContent className="p-6 space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold text-white">Résultats Tracker</h3>
+                <p className="text-sm text-white/60 mt-1">
+                  Versions détectées sur Torznab: qualité, langues et métadonnées.
+                </p>
+              </div>
+
+              {isReleaseLoading && (
+                <p className="text-sm text-white/60">Recherche en cours...</p>
+              )}
+
+              {releaseError && (
+                <p className="text-sm text-red-300">{releaseError}</p>
+              )}
+
+              {torrentStatus && !releaseError && (
+                <p className="text-sm text-emerald-300">{torrentStatus}</p>
+              )}
+
+              {torrentError && (
+                <p className="text-sm text-red-300">{torrentError}</p>
+              )}
+
+              {!isReleaseLoading && !releaseError && releaseResults.length === 0 && (
+                <p className="text-sm text-white/60">Aucune version trouvée pour ce film.</p>
+              )}
+
+              {releaseResults.length > 0 && (
+                <div className="space-y-3">
+                  {releaseResults.map((item, index) => (
+                    <div
+                      key={item.guid || item.link || `${item.title}_${index}`}
+                      className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleAddTorrent(item.link)}
+                        disabled={addingTorrentLink === item.link}
+                        className="text-left text-white font-medium hover:text-cyan-300 underline underline-offset-2 line-clamp-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                      >
+                        {item.title}
+                      </button>
+
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <Button
+                          size="sm"
+                          onClick={() => handleAddTorrent(item.link)}
+                          disabled={addingTorrentLink === item.link}
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                        >
+                          {addingTorrentLink === item.link ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Ajout...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4 mr-2" />
+                              Ajouter au client
+                            </>
+                          )}
+                        </Button>
+
+                        {item.quality && (
+                          <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
+                            Qualité: {item.quality}
+                          </Badge>
+                        )}
+                        {item.language && (
+                          <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
+                            Langue: {item.language}
+                          </Badge>
+                        )}
+                        {item.sizeHuman && (
+                          <Badge variant="outline" className="border-white/30 text-white/80">
+                            Taille: {item.sizeHuman}
+                          </Badge>
+                        )}
+                        {Number.isFinite(item.seeders || NaN) && (item.seeders || 0) >= 0 && (
+                          <Badge variant="outline" className="border-lime-500/40 text-lime-300">
+                            Seeders: {item.seeders}
+                          </Badge>
+                        )}
+                        {Number.isFinite(item.leechers || NaN) && (item.leechers || 0) >= 0 && (
+                          <Badge variant="outline" className="border-orange-500/40 text-orange-300">
+                            Peers: {item.leechers}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {Array.isArray(item.categories) && item.categories.length > 0 && (
+                        <p className="text-xs text-white/50 line-clamp-1">
+                          Catégories: {item.categories.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <div>
             <Button

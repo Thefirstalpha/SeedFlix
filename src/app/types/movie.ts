@@ -1,3 +1,20 @@
+export interface TorznabSearchItem {
+  title: string;
+  link: string;
+  guid?: string;
+  pubDate?: string;
+  size?: number | null;
+  seeders?: number | null;
+}
+
+export interface TorznabSearchData {
+  query: string;
+  searchedAt: string;
+  status: "ok" | "error" | "skipped";
+  message: string;
+  items: TorznabSearchItem[];
+}
+
 export interface Movie {
   id: number;
   title: string;
@@ -13,6 +30,7 @@ export interface Movie {
   originalTitle?: string;
   releaseDate?: string;
   voteCount?: number;
+  torznab?: TorznabSearchData;
 }
 
 // TMDB API Response Types

@@ -14,6 +14,28 @@ export interface GenreItem {
   name: string;
 }
 
+export interface TorznabMovieResult {
+  title: string;
+  link: string;
+  guid?: string;
+  pubDate?: string;
+  size?: number | null;
+  sizeHuman?: string | null;
+  seeders?: number | null;
+  leechers?: number | null;
+  quality?: string | null;
+  language?: string | null;
+  categories?: string[];
+  attributes?: Record<string, string>;
+}
+
+export interface TorznabMovieSearchResponse {
+  ok: boolean;
+  query: string;
+  sourceTitle?: string | null;
+  items: TorznabMovieResult[];
+}
+
 export interface DiscoverFilters {
   genreId?: number;
   yearFrom?: number;
@@ -283,6 +305,27 @@ export async function getMovieById(id: number): Promise<Movie | null> {
     console.error('Error fetching movie details:', error);
     return null;
   }
+}
+
+export async function searchMovieReleases(query: string, limit = 12): Promise<TorznabMovieSearchResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/indexer/search?query=${encodeURIComponent(query)}&limit=${limit}`,
+    {
+      credentials: "include",
+    }
+  );
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data?.error || "Recherche tracker impossible");
+  }
+
+  return {
+    ok: Boolean(data?.ok),
+    query: String(data?.query || query),
+    sourceTitle: data?.sourceTitle ? String(data.sourceTitle) : null,
+    items: Array.isArray(data?.items) ? data.items : [],
+  };
 }
 
 // Données de secours (mock) pour quand l'API n'est pas configurée
