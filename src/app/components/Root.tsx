@@ -1,13 +1,20 @@
-import { Outlet, Link, useLocation } from "react-router";
-import { Film, Heart } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Outlet, Link, useLocation, useNavigate } from "react-router";
+import { Film, Heart, LogOut, Settings, User } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { getWishlistCount } from "../services/wishlistService";
 import { getSeriesWishlistCount } from "../services/seriesWishlistService";
+import { Button } from "./ui/button";
+import { useAuth } from "../context/AuthContext";
 
 export function Root() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [wishlistCount, setWishlistCount] = useState(0);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
   const wishlistTarget = location.pathname === "/wishlist" ? "/" : "/wishlist";
+  const { user, isAuthenticated, logout } = useAuth();
+  const isLoginPage = location.pathname === "/login";
 
   useEffect(() => {
     const loadCount = async () => {
@@ -19,6 +26,43 @@ export function Root() {
     };
     loadCount();
   }, [location]);
+
+  useEffect(() => {
+    if (!isUserMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!userMenuRef.current?.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isUserMenuOpen]);
+
+  const handleLogout = async () => {
+    setIsUserMenuOpen(false);
+    await logout();
+    navigate("/login", { replace: true });
+  };
+
+  const handleOpenSettings = () => {
+    setIsUserMenuOpen(false);
+    navigate("/settings");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -35,22 +79,81 @@ export function Root() {
               </h1>
             </Link>
 
-            <Link
-              to={wishlistTarget}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
-            >
-              <Heart
-                className={`w-5 h-5 ${wishlistCount > 0 ? "text-purple-400 fill-purple-400" : "text-white"}`}
-              />
-              <span className="text-white font-medium">
-                Ma liste
-              </span>
-              {wishlistCount > 0 && (
-                <span className="bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                  {wishlistCount}
-                </span>
+            <div className="flex items-center gap-3">
+              {isAuthenticated && !isLoginPage && (
+                <Link
+                  to={wishlistTarget}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+                >
+                  <Heart
+                    className={`w-5 h-5 ${wishlistCount > 0 ? "text-purple-400 fill-purple-400" : "text-white"}`}
+                  />
+                  <span className="text-white font-medium">
+                    Ma liste
+                  </span>
+                  {wishlistCount > 0 && (
+                    <span className="bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      {wishlistCount}
+                    </span>
+                  )}
+                </Link>
               )}
-            </Link>
+
+              {isAuthenticated ? (
+                <div ref={userMenuRef} className="relative">
+                  <Button
+                    variant="outline"
+                    className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    onClick={() => setIsUserMenuOpen((open) => !open)}
+                    aria-expanded={isUserMenuOpen}
+                    aria-haspopup="menu"
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    {user?.username}
+                  </Button>
+
+                  {isUserMenuOpen && (
+                    <div
+                      className="absolute right-0 top-full mt-2 min-w-[12rem] rounded-md border border-white/10 bg-slate-950/95 p-1 text-white shadow-2xl backdrop-blur-md z-[200]"
+                      role="menu"
+                    >
+                      <div className="px-2 py-1.5 text-sm font-medium">
+                        {user?.username}
+                      </div>
+                      <div className="mx-1 my-1 h-px bg-white/10" />
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-white transition-colors hover:bg-white/10"
+                        onClick={handleOpenSettings}
+                        role="menuitem"
+                      >
+                        <Settings className="w-4 h-4 text-white/70" />
+                        Paramètres
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-white transition-colors hover:bg-white/10"
+                        onClick={handleLogout}
+                        role="menuitem"
+                      >
+                        <LogOut className="w-4 h-4 text-white/70" />
+                        Déconnexion
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : isLoginPage ? null : (
+                <Link to="/login">
+                  <Button
+                    variant="outline"
+                    className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    Connexion
+                  </Button>
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </header>

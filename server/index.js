@@ -4,6 +4,7 @@ import cors from "cors";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -14,9 +15,171 @@ const __dirname = path.dirname(__filename);
 const dataDir = path.join(__dirname, "data");
 const wishlistFilePath = path.join(dataDir, "wishlist.json");
 const seriesWishlistFilePath = path.join(dataDir, "seriesWishlist.json");
+const usersFilePath = path.join(dataDir, "users.json");
+const sessionsFilePath = path.join(dataDir, "sessions.json");
+const authCookieName = "catalogfinder_session";
+const sessionDurationMs = 1000 * 60 * 60 * 24 * 7;
 
 app.use(cors());
 app.use(express.json());
+
+function hashPassword(password, salt = randomBytes(16).toString("hex")) {
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return { salt, hash };
+}
+
+function verifyPassword(password, salt, expectedHash) {
+  const calculatedHash = scryptSync(password, salt, 64);
+  const storedHash = Buffer.from(expectedHash, "hex");
+  return (
+    calculatedHash.length === storedHash.length &&
+    timingSafeEqual(calculatedHash, storedHash)
+  );
+}
+
+function defaultUserRecord() {
+  const { salt, hash } = hashPassword("admin123");
+  return {
+    id: 1,
+    username: "admin",
+    passwordSalt: salt,
+    passwordHash: hash,
+    settings: {
+      profile: {
+        username: "admin",
+      },
+      security: {
+        lastPasswordChangeAt: new Date().toISOString(),
+      },
+      placeholders: {
+        notifications: {},
+        preferences: {},
+      },
+    },
+  };
+}
+
+async function ensureJsonStore(filePath, fallback) {
+  await fs.mkdir(dataDir, { recursive: true });
+  try {
+    await fs.access(filePath);
+  } catch {
+    await fs.writeFile(filePath, JSON.stringify(fallback, null, 2), "utf-8");
+  }
+}
+
+async function ensureUsersStore() {
+  await ensureJsonStore(usersFilePath, [defaultUserRecord()]);
+  const users = await readUsers();
+  if (users.length === 0) {
+    await writeUsers([defaultUserRecord()]);
+  }
+}
+
+async function ensureSessionsStore() {
+  await ensureJsonStore(sessionsFilePath, []);
+}
+
+async function readUsers() {
+  await ensureJsonStore(usersFilePath, [defaultUserRecord()]);
+  const content = await fs.readFile(usersFilePath, "utf-8");
+  try {
+    const parsed = JSON.parse(content);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeUsers(users) {
+  await ensureUsersStore();
+  await fs.writeFile(usersFilePath, JSON.stringify(users, null, 2), "utf-8");
+}
+
+async function readSessions() {
+  await ensureSessionsStore();
+  const content = await fs.readFile(sessionsFilePath, "utf-8");
+  try {
+    const parsed = JSON.parse(content);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeSessions(sessions) {
+  await ensureSessionsStore();
+  await fs.writeFile(sessionsFilePath, JSON.stringify(sessions, null, 2), "utf-8");
+}
+
+function parseCookies(cookieHeader = "") {
+  return cookieHeader.split(";").reduce((cookies, part) => {
+    const [rawName, ...rawValue] = part.trim().split("=");
+    if (!rawName) {
+      return cookies;
+    }
+    cookies[rawName] = decodeURIComponent(rawValue.join("="));
+    return cookies;
+  }, {});
+}
+
+function setSessionCookie(res, token, expiresAt) {
+  res.setHeader(
+    "Set-Cookie",
+    `${authCookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Expires=${new Date(expiresAt).toUTCString()}`
+  );
+}
+
+function clearSessionCookie(res) {
+  res.setHeader(
+    "Set-Cookie",
+    `${authCookieName}=; Path=/; HttpOnly; SameSite=Lax; Expires=${new Date(0).toUTCString()}`
+  );
+}
+
+function sanitizeUser(user) {
+  return {
+    id: user.id,
+    username: user.username,
+  };
+}
+
+async function getAuthenticatedUser(req) {
+  const cookies = parseCookies(req.headers.cookie || "");
+  const sessionToken = cookies[authCookieName];
+  if (!sessionToken) {
+    return null;
+  }
+
+  const sessions = await readSessions();
+  const now = Date.now();
+  const activeSessions = sessions.filter((session) => Number(session.expiresAt) > now);
+  if (activeSessions.length !== sessions.length) {
+    await writeSessions(activeSessions);
+  }
+
+  const session = activeSessions.find((entry) => entry.token === sessionToken);
+  if (!session) {
+    return null;
+  }
+
+  const users = await readUsers();
+  const user = users.find((entry) => entry.id === session.userId);
+  if (!user) {
+    return null;
+  }
+
+  return { user, session, sessions: activeSessions };
+}
+
+async function requireAuth(req, res) {
+  const auth = await getAuthenticatedUser(req);
+  if (!auth) {
+    res.status(401).json({ error: "Authentication required" });
+    return null;
+  }
+  return auth;
+}
 
 async function ensureWishlistStore() {
   await fs.mkdir(dataDir, { recursive: true });
@@ -159,6 +322,146 @@ function hasActiveDiscoverFilters(filters, type) {
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/api/auth/me", async (req, res) => {
+  try {
+    const auth = await getAuthenticatedUser(req);
+    if (!auth) {
+      res.json({ authenticated: false });
+      return;
+    }
+
+    res.json({
+      authenticated: true,
+      user: sanitizeUser(auth.user),
+      settings: auth.user.settings,
+    });
+  } catch (error) {
+    console.error("Auth me failed:", error);
+    res.status(500).json({ error: "Failed to read session" });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    await ensureUsersStore();
+    const username = String(req.body?.username || "").trim();
+    const password = String(req.body?.password || "");
+
+    if (!username || !password) {
+      res.status(400).json({ error: "Username and password are required" });
+      return;
+    }
+
+    const users = await readUsers();
+    const user = users.find((entry) => entry.username === username);
+    if (!user || !verifyPassword(password, user.passwordSalt, user.passwordHash)) {
+      res.status(401).json({ error: "Identifiants invalides" });
+      return;
+    }
+
+    const sessions = await readSessions();
+    const token = randomBytes(24).toString("hex");
+    const expiresAt = Date.now() + sessionDurationMs;
+    const nextSessions = [
+      ...sessions.filter((session) => session.userId !== user.id),
+      { token, userId: user.id, expiresAt },
+    ];
+    await writeSessions(nextSessions);
+    setSessionCookie(res, token, expiresAt);
+
+    res.json({
+      user: sanitizeUser(user),
+      settings: user.settings,
+    });
+  } catch (error) {
+    console.error("Login failed:", error);
+    res.status(500).json({ error: "Failed to log in" });
+  }
+});
+
+app.post("/api/auth/logout", async (req, res) => {
+  try {
+    const cookies = parseCookies(req.headers.cookie || "");
+    const sessionToken = cookies[authCookieName];
+    if (sessionToken) {
+      const sessions = await readSessions();
+      await writeSessions(sessions.filter((session) => session.token !== sessionToken));
+    }
+    clearSessionCookie(res);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Logout failed:", error);
+    res.status(500).json({ error: "Failed to log out" });
+  }
+});
+
+app.post("/api/auth/change-password", async (req, res) => {
+  try {
+    const auth = await requireAuth(req, res);
+    if (!auth) {
+      return;
+    }
+
+    const currentPassword = String(req.body?.currentPassword || "");
+    const newPassword = String(req.body?.newPassword || "");
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: "Current and new passwords are required" });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      res.status(400).json({ error: "Le nouveau mot de passe doit contenir au moins 6 caractères" });
+      return;
+    }
+
+    if (!verifyPassword(currentPassword, auth.user.passwordSalt, auth.user.passwordHash)) {
+      res.status(401).json({ error: "Mot de passe actuel invalide" });
+      return;
+    }
+
+    const users = await readUsers();
+    const { salt, hash } = hashPassword(newPassword);
+    const nextUsers = users.map((user) => {
+      if (user.id !== auth.user.id) {
+        return user;
+      }
+
+      return {
+        ...user,
+        passwordSalt: salt,
+        passwordHash: hash,
+        settings: {
+          ...user.settings,
+          security: {
+            ...user.settings?.security,
+            lastPasswordChangeAt: new Date().toISOString(),
+          },
+        },
+      };
+    });
+    await writeUsers(nextUsers);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Change password failed:", error);
+    res.status(500).json({ error: "Failed to change password" });
+  }
+});
+
+app.get("/api/settings", async (req, res) => {
+  try {
+    const auth = await requireAuth(req, res);
+    if (!auth) {
+      return;
+    }
+
+    res.json(auth.user.settings || {});
+  } catch (error) {
+    console.error("Read settings failed:", error);
+    res.status(500).json({ error: "Failed to load settings" });
+  }
 });
 
 app.get("/api/wishlist", async (_req, res) => {
