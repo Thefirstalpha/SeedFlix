@@ -6,6 +6,7 @@ import { MovieCard } from "./MovieCard";
 import { Checkbox } from "./ui/checkbox";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { getWishlist, removeMultipleFromWishlist } from "../services/wishlistService";
 import {
   getSeriesWishlist,
@@ -15,6 +16,8 @@ import type { Movie } from "../types/movie";
 import type { SeriesWishlistEntry } from "../types/seriesWishlist";
 
 export function WishList() {
+  const [activeTab, setActiveTab] = useState("movies");
+
   const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -100,234 +103,338 @@ export function WishList() {
     setIsSeriesSelectionMode(false);
   };
 
-  // ── Series entry label ─────────────────────────────────────────────────────
+  const groupedSeries = seriesEntries.reduce<
+    Array<{
+      seriesId: number;
+      seriesTitle: string;
+      seriesPoster: string;
+      seriesEntry?: SeriesWishlistEntry;
+      seasons: SeriesWishlistEntry[];
+      episodes: SeriesWishlistEntry[];
+    }>
+  >((groups, entry) => {
+    const existing = groups.find((g) => g.seriesId === entry.seriesId);
+    const group =
+      existing ||
+      {
+        seriesId: entry.seriesId,
+        seriesTitle: entry.seriesTitle,
+        seriesPoster: entry.seriesPoster,
+        seasons: [],
+        episodes: [],
+      };
 
-  const entryLabel = (entry: SeriesWishlistEntry) => {
-    if (entry.type === "series") return "Série complète";
-    if (entry.type === "season")
-      return entry.seasonName ?? `Saison ${entry.seasonNumber}`;
-    return `S${entry.seasonNumber}E${entry.episodeNumber}${
-      entry.episodeName ? ` – ${entry.episodeName}` : ""
-    }`;
-  };
+    if (!existing) {
+      groups.push(group);
+    }
+
+    if (entry.type === "series") {
+      group.seriesEntry = entry;
+    } else if (entry.type === "season") {
+      group.seasons.push(entry);
+    } else {
+      group.episodes.push(entry);
+    }
+
+    return groups;
+  }, []);
+
+  groupedSeries.sort((a, b) => a.seriesTitle.localeCompare(b.seriesTitle, "fr"));
+  for (const group of groupedSeries) {
+    group.seasons.sort((a, b) => (a.seasonNumber || 0) - (b.seasonNumber || 0));
+    group.episodes.sort((a, b) => {
+      const seasonDelta = (a.seasonNumber || 0) - (b.seasonNumber || 0);
+      if (seasonDelta !== 0) return seasonDelta;
+      return (a.episodeNumber || 0) - (b.episodeNumber || 0);
+    });
+  }
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Heart className="w-8 h-8 text-purple-400 fill-purple-400" />
           <div>
             <h2 className="text-3xl font-bold text-white">Ma liste de souhaits</h2>
-            <p className="text-white/60">{movies.length} film{movies.length > 1 ? 's' : ''}</p>
+            <p className="text-white/60">
+              {movies.length} film{movies.length > 1 ? "s" : ""} • {seriesEntries.length} favori
+              {seriesEntries.length > 1 ? "s" : ""} série
+            </p>
           </div>
         </div>
-
-        {movies.length > 0 && (
-          <div className="flex gap-2">
-            {!isSelectionMode ? (
-              <Button
-                onClick={() => setIsSelectionMode(true)}
-                variant="outline"
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Gérer la liste
-              </Button>
-            ) : (
-              <>
-                <Button
-                  onClick={cancelSelection}
-                  variant="outline"
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Annuler
-                </Button>
-                <Button
-                  onClick={toggleSelectAll}
-                  variant="outline"
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
-                >
-                  {selectedIds.length === movies.length ? "Tout désélectionner" : "Tout sélectionner"}
-                </Button>
-                <Button
-                  onClick={handleRemoveSelected}
-                  disabled={selectedIds.length === 0}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Retirer ({selectedIds.length})
-                </Button>
-              </>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Movies Grid */}
-      {movies.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {movies.map((movie) => (
-            <div key={movie.id} className="relative">
-              {isSelectionMode && (
-                <div className="absolute top-2 left-2 z-10">
-                  <Card className="bg-white/90 border-none shadow-lg">
-                    <CardContent className="p-2">
-                      <Checkbox
-                        checked={selectedIds.includes(movie.id)}
-                        onCheckedChange={() => toggleSelection(movie.id)}
-                        className="border-slate-900"
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-              <MovieCard movie={movie} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <Heart className="w-16 h-16 text-white/20 mx-auto mb-4" />
-          <h3 className="text-2xl font-semibold text-white mb-2">
-            Votre liste de films est vide
-          </h3>
-          <p className="text-white/60 mb-6">
-            Ajoutez vos films préférés à votre liste de souhaits
-          </p>
-          <Link to="/">
-            <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-              Découvrir des films
-            </Button>
-          </Link>
-        </div>
-      )}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="bg-white/10 border border-white/10 w-full max-w-md">
+          <TabsTrigger
+            value="movies"
+            className="text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white"
+          >
+            Films ({movies.length})
+          </TabsTrigger>
+          <TabsTrigger
+            value="series"
+            className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white"
+          >
+            Séries ({seriesEntries.length})
+          </TabsTrigger>
+        </TabsList>
 
-      {/* ── Series wishlist section ───────────────────────────────────────── */}
-      <div className="space-y-6 pt-4 border-t border-white/10">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <Tv className="w-7 h-7 text-cyan-400" />
-            <div>
-              <h2 className="text-2xl font-bold text-white">Mes séries</h2>
-              <p className="text-white/60">
-                {seriesEntries.length} favori
-                {seriesEntries.length > 1 ? "s" : ""}
-              </p>
-            </div>
-          </div>
+        <TabsContent value="movies" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-2xl font-bold text-white">Mes films</h3>
 
-          {seriesEntries.length > 0 && (
-            <div className="flex gap-2 flex-wrap">
-              {!isSeriesSelectionMode ? (
-                <Button
-                  onClick={() => setIsSeriesSelectionMode(true)}
-                  variant="outline"
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Gérer la liste
-                </Button>
-              ) : (
-                <>
+            {movies.length > 0 && (
+              <div className="flex gap-2">
+                {!isSelectionMode ? (
                   <Button
-                    onClick={cancelSeriesSelection}
+                    onClick={() => setIsSelectionMode(true)}
                     variant="outline"
-                    className="bg-cyan-600 hover:bg-cyan-700 text-white"
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Annuler
-                  </Button>
-                  <Button
-                    onClick={toggleSelectAllSeries}
-                    variant="outline"
-                    className="bg-cyan-600 hover:bg-cyan-700 text-white"
-                  >
-                    {selectedEntryIds.length === seriesEntries.length
-                      ? "Tout désélectionner"
-                      : "Tout sélectionner"}
-                  </Button>
-                  <Button
-                    onClick={handleRemoveSelectedSeries}
-                    disabled={selectedEntryIds.length === 0}
-                    className="bg-red-600 hover:bg-red-700 text-white"
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Retirer ({selectedEntryIds.length})
+                    Gérer la liste
                   </Button>
-                </>
-              )}
+                ) : (
+                  <>
+                    <Button
+                      onClick={cancelSelection}
+                      variant="outline"
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Annuler
+                    </Button>
+                    <Button
+                      onClick={toggleSelectAll}
+                      variant="outline"
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      {selectedIds.length === movies.length
+                        ? "Tout désélectionner"
+                        : "Tout sélectionner"}
+                    </Button>
+                    <Button
+                      onClick={handleRemoveSelected}
+                      disabled={selectedIds.length === 0}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Retirer ({selectedIds.length})
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {movies.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {movies.map((movie) => (
+                <div key={movie.id} className="relative">
+                  {isSelectionMode && (
+                    <div className="absolute top-2 left-2 z-10">
+                      <Card className="bg-white/90 border-none shadow-lg">
+                        <CardContent className="p-2">
+                          <Checkbox
+                            checked={selectedIds.includes(movie.id)}
+                            onCheckedChange={() => toggleSelection(movie.id)}
+                            className="border-slate-900"
+                          />
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+                  <MovieCard movie={movie} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Heart className="w-16 h-16 text-white/20 mx-auto mb-4" />
+              <h3 className="text-2xl font-semibold text-white mb-2">
+                Votre liste de films est vide
+              </h3>
+              <p className="text-white/60 mb-6">
+                Ajoutez vos films préférés à votre liste de souhaits
+              </p>
+              <Link to="/">
+                <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                  Découvrir des films
+                </Button>
+              </Link>
             </div>
           )}
-        </div>
+        </TabsContent>
 
-        {seriesEntries.length > 0 ? (
-          <div className="space-y-3">
-            {seriesEntries.map((entry) => (
-              <div
-                key={entry.entryId}
-                className="flex items-center gap-4 rounded-lg border border-white/10 bg-white/5 p-4"
-              >
-                {isSeriesSelectionMode && (
-                  <Checkbox
-                    checked={selectedEntryIds.includes(entry.entryId)}
-                    onCheckedChange={() => toggleSeriesEntry(entry.entryId)}
-                    className="border-white/40"
-                  />
-                )}
+        <TabsContent value="series" className="space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <h3 className="text-2xl font-bold text-white">Mes séries</h3>
 
-                <Link to={`/series/${entry.seriesId}`} className="shrink-0">
-                  <img
-                    src={entry.seriesPoster}
-                    alt={entry.seriesTitle}
-                    className="w-12 h-18 rounded object-cover aspect-[2/3] w-12"
-                  />
-                </Link>
-
-                <div className="flex-1 min-w-0">
-                  <Link
-                    to={`/series/${entry.seriesId}`}
-                    className="text-white font-semibold hover:text-cyan-300 transition-colors line-clamp-1"
-                  >
-                    {entry.seriesTitle}
-                  </Link>
-                  <Badge
+            {seriesEntries.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {!isSeriesSelectionMode ? (
+                  <Button
+                    onClick={() => setIsSeriesSelectionMode(true)}
                     variant="outline"
-                    className={`mt-1 text-xs ${
-                      entry.type === "series"
-                        ? "border-cyan-500/50 text-cyan-300"
-                        : entry.type === "season"
-                        ? "border-purple-500/50 text-purple-300"
-                        : "border-white/20 text-white/60"
-                    }`}
+                    className="bg-cyan-600 hover:bg-cyan-700 text-white"
                   >
-                    {entry.type === "series" && (
-                      <Tv className="w-3 h-3 mr-1" />
-                    )}
-                    {entryLabel(entry)}
-                  </Badge>
-                </div>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Gérer la liste
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      onClick={cancelSeriesSelection}
+                      variant="outline"
+                      className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Annuler
+                    </Button>
+                    <Button
+                      onClick={toggleSelectAllSeries}
+                      variant="outline"
+                      className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                    >
+                      {selectedEntryIds.length === seriesEntries.length
+                        ? "Tout désélectionner"
+                        : "Tout sélectionner"}
+                    </Button>
+                    <Button
+                      onClick={handleRemoveSelectedSeries}
+                      disabled={selectedEntryIds.length === 0}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Retirer ({selectedEntryIds.length})
+                    </Button>
+                  </>
+                )}
               </div>
-            ))}
+            )}
           </div>
-        ) : (
-          <div className="text-center py-12">
-            <Tv className="w-16 h-16 text-white/20 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">
-              Aucune série en favoris
-            </h3>
-            <p className="text-white/60 mb-6">
-              Ajoutez des séries, saisons ou épisodes depuis leur page de détails
-            </p>
-            <Link to="/">
-              <Button className="bg-cyan-600 hover:bg-cyan-700 text-white">
-                Découvrir des séries
-              </Button>
-            </Link>
-          </div>
-        )}
-      </div>
+
+          {groupedSeries.length > 0 ? (
+            <div className="space-y-4">
+              {groupedSeries.map((group) => (
+                <Card
+                  key={group.seriesId}
+                  className="border-white/10 bg-white/5"
+                >
+                  <CardContent className="p-4 space-y-4">
+                    <div className="flex items-start gap-4">
+                      <Link to={`/series/${group.seriesId}`} className="shrink-0">
+                        <img
+                          src={group.seriesPoster}
+                          alt={group.seriesTitle}
+                          className="w-16 rounded object-cover aspect-[2/3]"
+                        />
+                      </Link>
+
+                      <div className="flex-1 min-w-0">
+                        <Link
+                          to={`/series/${group.seriesId}`}
+                          className="text-white font-semibold text-lg hover:text-cyan-300 transition-colors"
+                        >
+                          {group.seriesTitle}
+                        </Link>
+                        <p className="text-white/60 text-sm mt-1">
+                          {group.seriesEntry ? "Série complète favorite" : "Favoris partiels"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 pl-1">
+                      {group.seriesEntry && (
+                        <div className="flex items-center gap-2">
+                          {isSeriesSelectionMode && (
+                            <Checkbox
+                              checked={selectedEntryIds.includes(group.seriesEntry.entryId)}
+                              onCheckedChange={() => toggleSeriesEntry(group.seriesEntry!.entryId)}
+                              className="border-white/40"
+                            />
+                          )}
+                          <Badge className="bg-cyan-600/20 text-cyan-200 border-cyan-500/30">
+                            <Tv className="w-3 h-3 mr-1" />
+                            Série complète
+                          </Badge>
+                        </div>
+                      )}
+
+                      {group.seasons.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-white/60 text-xs uppercase tracking-wide">Saisons</p>
+                          <div className="flex flex-wrap gap-2">
+                            {group.seasons.map((season) => (
+                              <div key={season.entryId} className="flex items-center gap-2">
+                                {isSeriesSelectionMode && (
+                                  <Checkbox
+                                    checked={selectedEntryIds.includes(season.entryId)}
+                                    onCheckedChange={() => toggleSeriesEntry(season.entryId)}
+                                    className="border-white/40"
+                                  />
+                                )}
+                                <Badge
+                                  variant="outline"
+                                  className="border-purple-500/50 text-purple-300"
+                                >
+                                  {season.seasonName ?? `Saison ${season.seasonNumber}`}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {group.episodes.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-white/60 text-xs uppercase tracking-wide">Épisodes</p>
+                          <div className="flex flex-wrap gap-2">
+                            {group.episodes.map((episode) => (
+                              <div key={episode.entryId} className="flex items-center gap-2">
+                                {isSeriesSelectionMode && (
+                                  <Checkbox
+                                    checked={selectedEntryIds.includes(episode.entryId)}
+                                    onCheckedChange={() => toggleSeriesEntry(episode.entryId)}
+                                    className="border-white/40"
+                                  />
+                                )}
+                                <Badge
+                                  variant="outline"
+                                  className="border-white/20 text-white/70"
+                                >
+                                  S{episode.seasonNumber}E{episode.episodeNumber}
+                                  {episode.episodeName ? ` – ${episode.episodeName}` : ""}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Tv className="w-16 h-16 text-white/20 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-white mb-2">
+                Aucune série en favoris
+              </h3>
+              <p className="text-white/60 mb-6">
+                Ajoutez des séries, saisons ou épisodes depuis leur page de détails
+              </p>
+              <Link to="/">
+                <Button className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                  Découvrir des séries
+                </Button>
+              </Link>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
