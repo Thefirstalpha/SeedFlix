@@ -39,7 +39,8 @@ export function MovieDetails() {
         try {
           const trackerResponse = await searchMovieReleases(
             movieData.originalTitle || movieData.title,
-            12
+            12,
+            movieData.id
           );
           setReleaseResults(trackerResponse.items);
         } catch (trackerError) {

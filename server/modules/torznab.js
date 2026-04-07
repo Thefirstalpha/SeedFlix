@@ -68,7 +68,7 @@ function extractQualityFromTitle(title) {
   return null;
 }
 
-function buildTorznabSearchUrl(rawUrl, apiKey, query = "", limit = 1) {
+function buildTorznabSearchUrl(rawUrl, apiKey, query = "", limit = 1, tmdbId = "") {
   let url;
 
   try {
@@ -81,6 +81,10 @@ function buildTorznabSearchUrl(rawUrl, apiKey, query = "", limit = 1) {
   url.searchParams.set("limit", String(limit));
   if (query) {
     url.searchParams.set("q", query);
+  }
+  if (tmdbId) {
+    // Many Torznab indexers support tmdbid filtering.
+    url.searchParams.set("tmdbid", String(tmdbId));
   }
   if (apiKey) {
     url.searchParams.set("apikey", apiKey);
@@ -154,6 +158,14 @@ function parseTorznabItems(xmlText, maxItems = 5) {
       attributes.quality ||
       attributes.video ||
       null;
+    const lowerCaseAttributes = Object.fromEntries(
+      Object.entries(attributes).map(([key, value]) => [String(key || "").toLowerCase(), value])
+    );
+    const tmdbId = String(
+      lowerCaseAttributes.tmdbid ||
+      lowerCaseAttributes["tmdb-id"] ||
+      ""
+    ).trim();
     const quality = qualityFromAttributes || extractQualityFromTitle(title);
     const language =
       attributes.language ||
@@ -176,6 +188,7 @@ function parseTorznabItems(xmlText, maxItems = 5) {
       sizeHuman: size ? bytesToHuman(size) : null,
       seeders: Number(seedersMatch?.[1] || 0) || null,
       leechers: Number(leechersMatch?.[1] || 0) || null,
+      tmdbId: tmdbId || null,
       quality,
       language,
       categories: categoryMatches
@@ -232,7 +245,7 @@ function resolveIndexerSettings(auth, body) {
 }
 
 export async function searchTorznabForQuery(auth, query, options = {}) {
-  const { limit = 10 } = options;
+  const { limit = 10, tmdbId = "" } = options;
   const { url, token } = resolveIndexerSettings(auth, {});
 
   if (!url || !token) {
@@ -244,7 +257,14 @@ export async function searchTorznabForQuery(auth, query, options = {}) {
     };
   }
 
-  const searchUrl = buildTorznabSearchUrl(url, token, String(query || "").trim(), limit);
+  const normalizedTmdbId = String(tmdbId || "").trim();
+  const searchUrl = buildTorznabSearchUrl(
+    url,
+    token,
+    String(query || "").trim(),
+    limit,
+    normalizedTmdbId
+  );
   const response = await fetchWithTimeout(searchUrl);
   const xmlText = await response.text();
   const parsed = parseTorznabResponse(xmlText);
@@ -265,11 +285,16 @@ export async function searchTorznabForQuery(auth, query, options = {}) {
     };
   }
 
+  const parsedItems = parseTorznabItems(xmlText, limit);
+  const filteredItems = normalizedTmdbId
+    ? parsedItems.filter((item) => String(item.tmdbId || "").trim() === normalizedTmdbId)
+    : parsedItems;
+
   return {
     ok: true,
     message: "Recherche Torznab effectuée",
     sourceTitle: parsed.title || null,
-    items: parseTorznabItems(xmlText, limit),
+    items: filteredItems,
   };
 }
 
@@ -283,13 +308,14 @@ export function registerTorznabRoutes(app) {
 
       const query = String(req.query.query || "").trim();
       const limit = Math.min(20, Math.max(1, Number(req.query.limit || 10)));
+      const tmdbId = String(req.query.tmdbId || "").trim();
 
       if (!query) {
         res.status(400).json({ error: "Le paramètre query est requis" });
         return;
       }
 
-      const result = await searchTorznabForQuery(auth, query, { limit });
+      const result = await searchTorznabForQuery(auth, query, { limit, tmdbId });
       if (!result.ok) {
         res.status(400).json({
           ok: false,
@@ -303,6 +329,7 @@ export function registerTorznabRoutes(app) {
       res.json({
         ok: true,
         query,
+        tmdbId: tmdbId || null,
         sourceTitle: result.sourceTitle || null,
         items: result.items,
       });

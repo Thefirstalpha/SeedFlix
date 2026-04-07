@@ -18,6 +18,7 @@ export interface TorznabMovieResult {
   title: string;
   link: string;
   downloadUrl?: string;
+  tmdbId?: string | null;
   guid?: string;
   pubDate?: string;
   size?: number | null;
@@ -308,9 +309,17 @@ export async function getMovieById(id: number): Promise<Movie | null> {
   }
 }
 
-export async function searchMovieReleases(query: string, limit = 12): Promise<TorznabMovieSearchResponse> {
+export async function searchMovieReleases(
+  query: string,
+  limit = 12,
+  tmdbId?: number | string
+): Promise<TorznabMovieSearchResponse> {
+  const tmdbPart = tmdbId !== undefined && tmdbId !== null
+    ? `&tmdbId=${encodeURIComponent(String(tmdbId))}`
+    : "";
+
   const response = await fetch(
-    `${API_BASE_URL}/indexer/search?query=${encodeURIComponent(query)}&limit=${limit}`,
+    `${API_BASE_URL}/indexer/search?query=${encodeURIComponent(query)}&limit=${limit}${tmdbPart}`,
     {
       credentials: "include",
     }
