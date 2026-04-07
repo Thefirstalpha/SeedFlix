@@ -38,12 +38,13 @@ function verifyPassword(password, salt, expectedHash) {
 }
 
 function defaultUserRecord() {
-  const { salt, hash } = hashPassword("admin123");
+  const { salt, hash } = hashPassword("admin");
   return {
     id: 1,
     username: "admin",
     passwordSalt: salt,
     passwordHash: hash,
+    mustChangePassword: true,
     settings: {
       profile: {
         username: "admin",
@@ -59,6 +60,61 @@ function defaultUserRecord() {
   };
 }
 
+function isLegacyDefaultAdmin(user) {
+  return user?.username === "admin" && verifyPassword("admin123", user.passwordSalt, user.passwordHash);
+}
+
+function isCurrentDefaultAdmin(user) {
+  return user?.username === "admin" && verifyPassword("admin", user.passwordSalt, user.passwordHash);
+}
+
+async function normalizeUsersStore() {
+  const users = await readUsers();
+  let hasChanges = false;
+
+  const nextUsers = users.map((user) => {
+    if (!user || typeof user !== "object") {
+      return user;
+    }
+
+    if (isLegacyDefaultAdmin(user)) {
+      const { salt, hash } = hashPassword("admin");
+      hasChanges = true;
+      return {
+        ...user,
+        passwordSalt: salt,
+        passwordHash: hash,
+        mustChangePassword: true,
+      };
+    }
+
+    if (isCurrentDefaultAdmin(user) && user.mustChangePassword !== true) {
+      hasChanges = true;
+      return {
+        ...user,
+        mustChangePassword: true,
+      };
+    }
+
+    if (user.mustChangePassword === undefined) {
+      hasChanges = true;
+      return {
+        ...user,
+        mustChangePassword: false,
+      };
+    }
+
+    return user;
+  });
+
+  if (hasChanges) {
+    await writeUsers(nextUsers);
+    return nextUsers;
+  }
+
+  return users;
+}
+
 async function ensureJsonStore(filePath, fallback) {
   await fs.mkdir(dataDir, { recursive: true });
   try {
@@ -70,7 +126,7 @@ async function ensureJsonStore(filePath, fallback) {
 
 async function ensureUsersStore() {
   await ensureJsonStore(usersFilePath, [defaultUserRecord()]);
-  const users = await readUsers();
+  const users = await normalizeUsersStore();
   if (users.length === 0) {
     await writeUsers([defaultUserRecord()]);
   }
@@ -92,7 +148,7 @@ async function readUsers() {
 }
 
 async function writeUsers(users) {
-  await ensureUsersStore();
+  await ensureJsonStore(usersFilePath, [defaultUserRecord()]);
   await fs.writeFile(usersFilePath, JSON.stringify(users, null, 2), "utf-8");
 }
 
@@ -328,13 +384,14 @@ app.get("/api/auth/me", async (req, res) => {
   try {
     const auth = await getAuthenticatedUser(req);
     if (!auth) {
-      res.json({ authenticated: false });
+      res.json({ authenticated: false, mustChangePassword: false });
       return;
     }
 
     res.json({
       authenticated: true,
       user: sanitizeUser(auth.user),
+      mustChangePassword: Boolean(auth.user.mustChangePassword),
       settings: auth.user.settings,
     });
   } catch (error) {
@@ -373,6 +430,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     res.json({
       user: sanitizeUser(user),
+      mustChangePassword: Boolean(user.mustChangePassword),
       settings: user.settings,
     });
   } catch (error) {
@@ -433,6 +491,7 @@ app.post("/api/auth/change-password", async (req, res) => {
         ...user,
         passwordSalt: salt,
         passwordHash: hash,
+        mustChangePassword: false,
         settings: {
           ...user.settings,
           security: {

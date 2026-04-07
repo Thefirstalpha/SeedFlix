@@ -17,6 +17,7 @@ import {
 interface AuthContextValue {
   user: AuthUser | null;
   settings: UserSettings | null;
+  mustChangePassword: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
@@ -30,6 +31,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const refresh = async () => {
@@ -39,9 +41,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (auth.authenticated && auth.user) {
         setUser(auth.user);
         setSettings(auth.settings || null);
+        setMustChangePassword(auth.mustChangePassword);
       } else {
         setUser(null);
         setSettings(null);
+        setMustChangePassword(false);
       }
     } finally {
       setIsLoading(false);
@@ -55,21 +59,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(() => ({
     user,
     settings,
+    mustChangePassword,
     isAuthenticated: Boolean(user),
     isLoading,
     login: async (username: string, password: string) => {
       const response = await loginRequest(username, password);
-      setUser(response.user);
-      setSettings(response.settings);
+      setUser(response.user || null);
+      setSettings(response.settings || null);
+      setMustChangePassword(response.mustChangePassword);
     },
     logout: async () => {
       await logoutRequest();
       setUser(null);
       setSettings(null);
+      setMustChangePassword(false);
     },
     refresh,
     setSettings,
-  }), [user, settings, isLoading]);
+  }), [user, settings, mustChangePassword, isLoading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

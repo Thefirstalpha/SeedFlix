@@ -5,6 +5,13 @@ export interface AuthUser {
   username: string;
 }
 
+export interface AuthResponse {
+  authenticated?: boolean;
+  user?: AuthUser;
+  settings?: UserSettings;
+  mustChangePassword: boolean;
+}
+
 export interface UserSettings {
   profile: {
     username: string;
@@ -30,12 +37,6 @@ export interface UserSettings {
   };
 }
 
-interface AuthMeResponse {
-  authenticated: boolean;
-  user?: AuthUser;
-  settings?: UserSettings;
-}
-
 const AUTH_BASE = `${API_BASE_URL}/auth`;
 const SETTINGS_BASE = `${API_BASE_URL}/settings`;
 
@@ -47,14 +48,14 @@ async function parseJson<T>(response: Response): Promise<T> {
   return data;
 }
 
-export async function getCurrentAuth(): Promise<AuthMeResponse> {
+export async function getCurrentAuth(): Promise<AuthResponse> {
   try {
     const response = await fetch(`${AUTH_BASE}/me`, {
       credentials: "include",
     });
-    return await parseJson<AuthMeResponse>(response);
+    return await parseJson<AuthResponse>(response);
   } catch {
-    return { authenticated: false };
+    return { authenticated: false, mustChangePassword: false };
   }
 }
 
@@ -65,7 +66,7 @@ export async function login(username: string, password: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
   });
-  return parseJson<{ user: AuthUser; settings: UserSettings }>(response);
+  return parseJson<AuthResponse>(response);
 }
 
 export async function logout() {

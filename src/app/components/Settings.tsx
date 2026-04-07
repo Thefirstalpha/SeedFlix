@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, useLocation } from "react-router";
+import { Navigate, useLocation, useNavigate } from "react-router";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
@@ -10,7 +10,8 @@ import { useAuth } from "../context/AuthContext";
 
 export function Settings() {
   const location = useLocation();
-  const { isAuthenticated, isLoading, user, setSettings } = useAuth();
+  const navigate = useNavigate();
+  const { isAuthenticated, isLoading, user, setSettings, mustChangePassword, refresh } = useAuth();
   const [settings, setLocalSettings] = useState<UserSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -74,6 +75,7 @@ export function Settings() {
 
   const handlePasswordUpdate = async (event: React.FormEvent) => {
     event.preventDefault();
+    const wasForcedChange = mustChangePassword;
     setError(null);
     setMessage(null);
     setIsSaving(true);
@@ -82,9 +84,15 @@ export function Settings() {
       const refreshedSettings = await getSettings();
       setLocalSettings(refreshedSettings);
       setSettings(refreshedSettings);
+      await refresh();
       setCurrentPassword("");
       setNewPassword("");
       setMessage("Mot de passe mis à jour.");
+
+      if (wasForcedChange) {
+        const nextPath = (location.state as { from?: string } | null)?.from || "/";
+        navigate(nextPath, { replace: true });
+      }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Mise à jour impossible");
     } finally {
@@ -172,15 +180,21 @@ export function Settings() {
         </p>
       </div>
 
+      {mustChangePassword && (
+        <div className="rounded-lg border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+          Vous utilisez encore les identifiants par défaut. Changez le mot de passe avant d'accéder au reste du site.
+        </div>
+      )}
+
       <Tabs defaultValue="security" className="space-y-6">
         <TabsList className="bg-white/10 border border-white/10">
           <TabsTrigger value="security" className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white">
             Sécurité
           </TabsTrigger>
-          <TabsTrigger value="account" className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white">
+          <TabsTrigger value="account" disabled={mustChangePassword} className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
             Compte
           </TabsTrigger>
-          <TabsTrigger value="future" className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white">
+          <TabsTrigger value="future" disabled={mustChangePassword} className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
             Téléchargements
           </TabsTrigger>
         </TabsList>
@@ -195,6 +209,11 @@ export function Settings() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handlePasswordUpdate} className="space-y-4 max-w-lg">
+                {mustChangePassword && (
+                  <p className="text-sm text-white/70">
+                    Le compte `admin` doit définir un mot de passe personnalisé avant de continuer.
+                  </p>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="current-password">Mot de passe actuel</Label>
                   <Input

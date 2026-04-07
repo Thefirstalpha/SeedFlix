@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 
 export function RequireAuth() {
   const location = useLocation();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, mustChangePassword } = useAuth();
 
   if (isLoading) {
     return (
@@ -15,6 +15,10 @@ export function RequireAuth() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  if (mustChangePassword && location.pathname !== "/settings") {
+    return <Navigate to="/settings" replace state={{ from: location.pathname, forced: true }} />;
   }
 
   return <Outlet />;

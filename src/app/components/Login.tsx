@@ -10,13 +10,16 @@ import { useAuth } from "../context/AuthContext";
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, isLoading, login } = useAuth();
+  const { isAuthenticated, isLoading, login, mustChangePassword } = useAuth();
   const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin123");
+  const [password, setPassword] = useState("admin");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isLoading && isAuthenticated) {
+    if (mustChangePassword) {
+      return <Navigate to="/settings" replace state={{ forced: true }} />;
+    }
     const nextPath = (location.state as { from?: string } | null)?.from || "/";
     return <Navigate to={nextPath} replace />;
   }
@@ -27,6 +30,10 @@ export function Login() {
     setIsSubmitting(true);
     try {
       await login(username, password);
+      if (username === "admin" && password === "admin") {
+        navigate("/settings", { replace: true, state: { forced: true } });
+        return;
+      }
       const nextPath = (location.state as { from?: string } | null)?.from || "/";
       navigate(nextPath, { replace: true });
     } catch (submitError) {
@@ -44,7 +51,7 @@ export function Login() {
     <div className="min-h-[70vh] flex items-center justify-center">
       <Card className="w-full max-w-md border-white/10 bg-white/5 text-white backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="text-2xl">Connexion administrateur</CardTitle>
+          <CardTitle className="text-2xl">Connexion</CardTitle>
           <CardDescription className="text-white/60">
             L'application est privée. Connectez-vous avec le compte admin.
           </CardDescription>
@@ -89,7 +96,7 @@ export function Login() {
             </Button>
 
             <p className="text-xs text-white/45">
-              Compte par défaut: admin / admin123
+              Compte par défaut: admin / admin
             </p>
           </form>
         </CardContent>
