@@ -2,18 +2,20 @@ import { Outlet, Link, useLocation } from "react-router";
 import { Film, Heart } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getWishlistCount } from "../services/wishlistService";
+import { getSeriesWishlistCount } from "../services/seriesWishlistService";
 
 export function Root() {
   const location = useLocation();
   const [wishlistCount, setWishlistCount] = useState(0);
 
   useEffect(() => {
-    // Mettre à jour le compteur à chaque changement de route
     const loadCount = async () => {
-      const count = await getWishlistCount();
-      setWishlistCount(count);
+      const [movieCount, seriesCount] = await Promise.all([
+        getWishlistCount(),
+        getSeriesWishlistCount(),
+      ]);
+      setWishlistCount(movieCount + seriesCount);
     };
-
     loadCount();
   }, [location]);
 

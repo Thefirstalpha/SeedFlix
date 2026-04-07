@@ -13,6 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const dataDir = path.join(__dirname, "data");
 const wishlistFilePath = path.join(dataDir, "wishlist.json");
+const seriesWishlistFilePath = path.join(dataDir, "seriesWishlist.json");
 
 app.use(cors());
 app.use(express.json());
@@ -362,6 +363,203 @@ app.get("/api/series/:id/seasons/:seasonNumber", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch season details" });
   }
 });
+
+// ─── Series Wishlist helpers ─────────────────────────────────────────────────
+
+async function ensureSeriesWishlistStore() {
+  await fs.mkdir(dataDir, { recursive: true });
+  try {
+    await fs.access(seriesWishlistFilePath);
+  } catch {
+    await fs.writeFile(seriesWishlistFilePath, "[]", "utf-8");
+  }
+}
+
+async function readSeriesWishlist() {
+  await ensureSeriesWishlistStore();
+  const content = await fs.readFile(seriesWishlistFilePath, "utf-8");
+  try {
+    const parsed = JSON.parse(content);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeSeriesWishlist(wishlist) {
+  await ensureSeriesWishlistStore();
+  await fs.writeFile(
+    seriesWishlistFilePath,
+    JSON.stringify(wishlist, null, 2),
+    "utf-8"
+  );
+}
+
+function normalizeSeriesEntry(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const validTypes = ["series", "season", "episode"];
+  const type = String(entry.type || "");
+  if (!validTypes.includes(type)) return null;
+
+  const seriesId = Number(entry.seriesId);
+  if (!Number.isFinite(seriesId)) return null;
+
+  const normalized = {
+    type,
+    seriesId,
+    seriesTitle: String(entry.seriesTitle || ""),
+    seriesPoster: String(entry.seriesPoster || ""),
+  };
+
+  if (type === "season" || type === "episode") {
+    const seasonNumber = Number(entry.seasonNumber);
+    if (!Number.isFinite(seasonNumber)) return null;
+    normalized.seasonNumber = seasonNumber;
+    normalized.seasonName = String(entry.seasonName || `Saison ${seasonNumber}`);
+  }
+
+  if (type === "episode") {
+    const episodeNumber = Number(entry.episodeNumber);
+    if (!Number.isFinite(episodeNumber)) return null;
+    normalized.episodeNumber = episodeNumber;
+    normalized.episodeName = String(entry.episodeName || "");
+  }
+
+  // Stable string entryId (no special URL chars)
+  if (type === "series") {
+    normalized.entryId = `series_${seriesId}`;
+  } else if (type === "season") {
+    normalized.entryId = `season_${seriesId}_${normalized.seasonNumber}`;
+  } else {
+    normalized.entryId = `episode_${seriesId}_${normalized.seasonNumber}_${normalized.episodeNumber}`;
+  }
+
+  return normalized;
+}
+
+// ─── Series Wishlist routes ───────────────────────────────────────────────────
+
+app.get("/api/series-wishlist", async (_req, res) => {
+  try {
+    const wishlist = await readSeriesWishlist();
+    res.json(wishlist);
+  } catch (error) {
+    console.error("Read series wishlist failed:", error);
+    res.status(500).json({ error: "Failed to read series wishlist" });
+  }
+});
+
+app.get("/api/series-wishlist/series/:seriesId/status", async (req, res) => {
+  try {
+    const seriesId = Number(req.params.seriesId);
+    if (!Number.isFinite(seriesId)) {
+      res.status(400).json({ error: "Invalid seriesId" });
+      return;
+    }
+
+    const wishlist = await readSeriesWishlist();
+    const entries = wishlist.filter((e) => e.seriesId === seriesId);
+
+    res.json({
+      seriesInWishlist: entries.some((e) => e.type === "series"),
+      seasonsInWishlist: entries
+        .filter((e) => e.type === "season")
+        .map((e) => e.seasonNumber),
+      episodesInWishlist: entries
+        .filter((e) => e.type === "episode")
+        .map((e) => ({ seasonNumber: e.seasonNumber, episodeNumber: e.episodeNumber })),
+    });
+  } catch (error) {
+    console.error("Series wishlist status failed:", error);
+    res.status(500).json({ error: "Failed to get wishlist status" });
+  }
+});
+
+app.post("/api/series-wishlist", async (req, res) => {
+  try {
+    const entry = normalizeSeriesEntry(req.body);
+    if (!entry) {
+      res.status(400).json({ error: "Invalid series wishlist payload" });
+      return;
+    }
+
+    let wishlist = await readSeriesWishlist();
+
+    if (entry.type === "series") {
+      // Remove all existing entries for this series, then add the series itself
+      wishlist = wishlist.filter((e) => e.seriesId !== entry.seriesId);
+      wishlist.push(entry);
+    } else if (entry.type === "season") {
+      // Remove all episode entries for this series+season (episodes superseded by season)
+      wishlist = wishlist.filter(
+        (e) =>
+          !(
+            e.seriesId === entry.seriesId &&
+            e.type === "episode" &&
+            e.seasonNumber === entry.seasonNumber
+          )
+      );
+      // Only add if the series itself isn't already covering everything
+      const coveringSeriesExists = wishlist.some(
+        (e) => e.seriesId === entry.seriesId && e.type === "series"
+      );
+      if (!coveringSeriesExists) {
+        // Remove duplicate season entry if present, then add
+        wishlist = wishlist.filter((e) => e.entryId !== entry.entryId);
+        wishlist.push(entry);
+      }
+    } else {
+      // episode: only add if not already covered by series or season
+      const covered = wishlist.some(
+        (e) =>
+          e.seriesId === entry.seriesId &&
+          (e.type === "series" ||
+            (e.type === "season" && e.seasonNumber === entry.seasonNumber))
+      );
+      if (!covered) {
+        wishlist = wishlist.filter((e) => e.entryId !== entry.entryId);
+        wishlist.push(entry);
+      }
+    }
+
+    await writeSeriesWishlist(wishlist);
+    res.status(201).json({ ok: true });
+  } catch (error) {
+    console.error("Add series wishlist entry failed:", error);
+    res.status(500).json({ error: "Failed to add to series wishlist" });
+  }
+});
+
+app.delete("/api/series-wishlist/entry/:entryId", async (req, res) => {
+  try {
+    const entryId = req.params.entryId;
+    const wishlist = await readSeriesWishlist();
+    const updated = wishlist.filter((e) => e.entryId !== entryId);
+    await writeSeriesWishlist(updated);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Remove series wishlist entry failed:", error);
+    res.status(500).json({ error: "Failed to remove series wishlist entry" });
+  }
+});
+
+app.delete("/api/series-wishlist/bulk", async (req, res) => {
+  try {
+    const entryIds = Array.isArray(req.body?.entryIds)
+      ? req.body.entryIds.map((id) => String(id))
+      : [];
+    const entryIdsSet = new Set(entryIds);
+    const wishlist = await readSeriesWishlist();
+    const updated = wishlist.filter((e) => !entryIdsSet.has(e.entryId));
+    await writeSeriesWishlist(updated);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Bulk remove series wishlist entries failed:", error);
+    res.status(500).json({ error: "Failed to remove series wishlist entries" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.listen(port, () => {
   console.log(`API server running on http://localhost:${port}`);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Calendar, Clapperboard, Star, Tv } from "lucide-react";
+import { ArrowLeft, Calendar, Clapperboard, Heart, Star, Tv } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
@@ -8,10 +8,22 @@ import {
   getSeriesById,
   getSeriesSeasonEpisodes,
 } from "../services/seriesService";
+import {
+  addToSeriesWishlist,
+  getSeriesWishlistStatus,
+  removeFromSeriesWishlist,
+} from "../services/seriesWishlistService";
+import type { SeriesWishlistStatus } from "../types/seriesWishlist";
 import type {
   SeriesDetails as SeriesDetailsModel,
   SeriesEpisode,
 } from "../types/series";
+
+const EMPTY_STATUS: SeriesWishlistStatus = {
+  seriesInWishlist: false,
+  seasonsInWishlist: [],
+  episodesInWishlist: [],
+};
 
 export function SeriesDetails() {
   const { id } = useParams();
@@ -21,6 +33,8 @@ export function SeriesDetails() {
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
+  const [wishlistStatus, setWishlistStatus] =
+    useState<SeriesWishlistStatus>(EMPTY_STATUS);
 
   useEffect(() => {
     loadSeriesDetails();
@@ -54,8 +68,8 @@ export function SeriesDetails() {
         const defaultSeason = seriesData.seasons
           .filter((season) => season.seasonNumber > 0)
           .sort((a, b) => a.seasonNumber - b.seasonNumber)[0];
-
         setSelectedSeason(defaultSeason ? defaultSeason.seasonNumber : null);
+        setWishlistStatus(await getSeriesWishlistStatus(seriesData.id));
       }
     } catch (error) {
       console.error("Error loading series details:", error);
@@ -70,14 +84,97 @@ export function SeriesDetails() {
   ) => {
     setIsLoadingEpisodes(true);
     try {
-      const seasonEpisodes = await getSeriesSeasonEpisodes(seriesId, seasonNumber);
-      setEpisodes(seasonEpisodes);
-    } catch (error) {
-      console.error("Error loading season episodes:", error);
+      setEpisodes(await getSeriesSeasonEpisodes(seriesId, seasonNumber));
+    } catch {
       setEpisodes([]);
     } finally {
       setIsLoadingEpisodes(false);
     }
+  };
+
+  const refreshStatus = async () => {
+    if (!series) return;
+    setWishlistStatus(await getSeriesWishlistStatus(series.id));
+  };
+
+  // ── Wishlist helpers ────────────────────────────────────────────────────────
+
+  const isSeasonCoveredBySeries = wishlistStatus.seriesInWishlist;
+
+  const isSeasonDirectlyInWishlist = (seasonNumber: number) =>
+    wishlistStatus.seasonsInWishlist.includes(seasonNumber);
+
+  const isSeasonInWishlist = (seasonNumber: number) =>
+    wishlistStatus.seriesInWishlist ||
+    wishlistStatus.seasonsInWishlist.includes(seasonNumber);
+
+  const isEpisodeDirectlyInWishlist = (
+    seasonNumber: number,
+    episodeNumber: number
+  ) =>
+    wishlistStatus.episodesInWishlist.some(
+      (e) =>
+        e.seasonNumber === seasonNumber && e.episodeNumber === episodeNumber
+    );
+
+  // ── Wishlist actions ────────────────────────────────────────────────────────
+
+  const handleSeriesWishlist = async () => {
+    if (!series) return;
+    if (wishlistStatus.seriesInWishlist) {
+      await removeFromSeriesWishlist(`series_${series.id}`);
+    } else {
+      await addToSeriesWishlist({
+        type: "series",
+        seriesId: series.id,
+        seriesTitle: series.title,
+        seriesPoster: series.poster,
+      });
+    }
+    await refreshStatus();
+  };
+
+  const handleSeasonWishlist = async () => {
+    if (!series || selectedSeason === null) return;
+    const seasonData = availableSeasons.find(
+      (s) => s.seasonNumber === selectedSeason
+    );
+    if (isSeasonDirectlyInWishlist(selectedSeason)) {
+      await removeFromSeriesWishlist(`season_${series.id}_${selectedSeason}`);
+    } else {
+      await addToSeriesWishlist({
+        type: "season",
+        seriesId: series.id,
+        seriesTitle: series.title,
+        seriesPoster: series.poster,
+        seasonNumber: selectedSeason,
+        seasonName: seasonData?.name ?? `Saison ${selectedSeason}`,
+      });
+    }
+    await refreshStatus();
+  };
+
+  const handleEpisodeWishlist = async (episode: SeriesEpisode) => {
+    if (!series || selectedSeason === null) return;
+    if (isEpisodeDirectlyInWishlist(selectedSeason, episode.episodeNumber)) {
+      await removeFromSeriesWishlist(
+        `episode_${series.id}_${selectedSeason}_${episode.episodeNumber}`
+      );
+    } else {
+      await addToSeriesWishlist({
+        type: "episode",
+        seriesId: series.id,
+        seriesTitle: series.title,
+        seriesPoster: series.poster,
+        seasonNumber: selectedSeason,
+        seasonName:
+          availableSeasons.find((s) => s.seasonNumber === selectedSeason)
+            ?.name ?? `Saison ${selectedSeason}`,
+        episodeNumber: episode.episodeNumber,
+        episodeName: episode.name,
+      });
+    }
+    await refreshStatus();
   };
 
   if (isLoading) {
@@ -109,7 +206,8 @@ export function SeriesDetails() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      {/* Header bar */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <Button
           onClick={() => navigate(-1)}
           variant="outline"
@@ -119,10 +217,30 @@ export function SeriesDetails() {
           Retour
         </Button>
 
-        <Badge className="bg-cyan-600/20 text-cyan-100 border border-cyan-500/30 px-3 py-1">
-          <Tv className="w-4 h-4 mr-2" />
-          {series.status || "Statut inconnu"}
-        </Badge>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button
+            onClick={handleSeriesWishlist}
+            className={
+              wishlistStatus.seriesInWishlist
+                ? "bg-cyan-600 hover:bg-cyan-700 text-white"
+                : "bg-white/10 hover:bg-white/20 text-white border border-white/20"
+            }
+          >
+            <Heart
+              className={`w-5 h-5 mr-2 ${
+                wishlistStatus.seriesInWishlist ? "fill-current" : ""
+              }`}
+            />
+            {wishlistStatus.seriesInWishlist
+              ? "Retirer la série"
+              : "Ajouter la série"}
+          </Button>
+
+          <Badge className="bg-cyan-600/20 text-cyan-100 border border-cyan-500/30 px-3 py-1">
+            <Tv className="w-4 h-4 mr-2" />
+            {series.status || "Statut inconnu"}
+          </Badge>
+        </div>
       </div>
 
       {series.backdrop && (
@@ -201,63 +319,155 @@ export function SeriesDetails() {
 
               {availableSeasons.length > 0 ? (
                 <>
-                  <div className="flex items-center gap-3">
+                  {/* Season selector + season wishlist button */}
+                  <div className="flex items-center gap-3 flex-wrap">
                     <label htmlFor="season-select" className="text-white/80">
                       Saison
                     </label>
                     <select
                       id="season-select"
                       value={selectedSeason ?? ""}
-                      onChange={(event) => setSelectedSeason(Number(event.target.value))}
+                      onChange={(event) =>
+                        setSelectedSeason(Number(event.target.value))
+                      }
                       className="bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
                     >
                       {availableSeasons.map((season) => (
                         <option key={season.id} value={season.seasonNumber}>
-                          Saison {season.seasonNumber} - {season.name}
+                          Saison {season.seasonNumber} – {season.name}
+                          {isSeasonInWishlist(season.seasonNumber) ? " ♥" : ""}
                         </option>
                       ))}
                     </select>
+
+                    {/* Season-level wishlist button */}
+                    {selectedSeason !== null && (
+                      <Button
+                        size="sm"
+                        disabled={isSeasonCoveredBySeries}
+                        onClick={handleSeasonWishlist}
+                        className={
+                          isSeasonCoveredBySeries
+                            ? "bg-white/5 text-white/40 border border-white/10 cursor-not-allowed"
+                            : isSeasonDirectlyInWishlist(selectedSeason)
+                            ? "bg-cyan-600 hover:bg-cyan-700 text-white"
+                            : "bg-white/10 hover:bg-white/20 text-white border border-white/20"
+                        }
+                      >
+                        <Heart
+                          className={`w-4 h-4 mr-1 ${
+                            !isSeasonCoveredBySeries &&
+                            isSeasonDirectlyInWishlist(selectedSeason)
+                              ? "fill-current"
+                              : ""
+                          }`}
+                        />
+                        {isSeasonCoveredBySeries
+                          ? "Couvert par la série"
+                          : isSeasonDirectlyInWishlist(selectedSeason)
+                          ? "Retirer la saison"
+                          : "Ajouter la saison"}
+                      </Button>
+                    )}
                   </div>
 
+                  {/* Episodes list */}
                   {isLoadingEpisodes ? (
                     <div className="space-y-3">
-                      {[...Array(3)].map((_, index) => (
+                      {[...Array(3)].map((_, i) => (
                         <div
-                          key={index}
+                          key={i}
                           className="h-20 bg-white/5 rounded-lg animate-pulse"
                         />
                       ))}
                     </div>
                   ) : episodes.length > 0 ? (
                     <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                      {episodes.map((episode) => (
-                        <div
-                          key={episode.id}
-                          className="rounded-lg border border-white/10 bg-white/5 p-4"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <p className="text-white font-semibold">
-                                Episode {episode.episodeNumber}: {episode.name}
-                              </p>
-                              <p className="text-white/60 text-sm mt-1">
-                                {episode.airDate || "Date inconnue"}
-                                {episode.runtime ? ` - ${episode.runtime} min` : ""}
-                              </p>
+                      {episodes.map((episode) => {
+                        const coveredByParent =
+                          wishlistStatus.seriesInWishlist ||
+                          (selectedSeason !== null &&
+                            wishlistStatus.seasonsInWishlist.includes(
+                              selectedSeason
+                            ));
+                        const directlyInWishlist =
+                          selectedSeason !== null &&
+                          isEpisodeDirectlyInWishlist(
+                            selectedSeason,
+                            episode.episodeNumber
+                          );
+
+                        return (
+                          <div
+                            key={episode.id}
+                            className="rounded-lg border border-white/10 bg-white/5 p-4"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white font-semibold">
+                                  Épisode {episode.episodeNumber}
+                                  {episode.name ? `: ${episode.name}` : ""}
+                                </p>
+                                <p className="text-white/60 text-sm mt-0.5">
+                                  {episode.airDate || "Date inconnue"}
+                                  {episode.runtime
+                                    ? ` · ${episode.runtime} min`
+                                    : ""}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                {episode.rating > 0 && (
+                                  <span className="text-yellow-400 text-sm font-semibold">
+                                    {episode.rating}/10
+                                  </span>
+                                )}
+
+                                {coveredByParent ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-cyan-500/30 text-cyan-300 text-xs"
+                                  >
+                                    <Heart className="w-3 h-3 mr-1 fill-current" />
+                                    Couvert
+                                  </Badge>
+                                ) : (
+                                  <button
+                                    onClick={() =>
+                                      handleEpisodeWishlist(episode)
+                                    }
+                                    title={
+                                      directlyInWishlist
+                                        ? "Retirer l'épisode"
+                                        : "Ajouter l'épisode"
+                                    }
+                                    className="p-1.5 rounded-full hover:bg-white/10 transition-colors"
+                                  >
+                                    <Heart
+                                      className={`w-4 h-4 ${
+                                        directlyInWishlist
+                                          ? "fill-cyan-400 text-cyan-400"
+                                          : "text-white/50 hover:text-white"
+                                      }`}
+                                    />
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <span className="text-yellow-400 text-sm font-semibold">
-                              {episode.rating > 0 ? `${episode.rating}/10` : "N/A"}
-                            </span>
+
+                            {episode.overview && (
+                              <p className="text-white/75 mt-3 text-sm leading-relaxed">
+                                {episode.overview}
+                              </p>
+                            )}
                           </div>
-                          <p className="text-white/75 mt-3 text-sm leading-relaxed">
-                            {episode.overview || "Aucune description disponible."}
-                          </p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-white/60">
-                      Les détails d'épisodes ne sont pas disponibles pour cette saison.
+                      Les détails d'épisodes ne sont pas disponibles pour
+                      cette saison.
                     </p>
                   )}
                 </>
