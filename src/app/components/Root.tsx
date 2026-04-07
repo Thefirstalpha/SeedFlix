@@ -7,6 +7,7 @@ import { getSeriesWishlistCount } from "../services/seriesWishlistService";
 export function Root() {
   const location = useLocation();
   const [wishlistCount, setWishlistCount] = useState(0);
+  const wishlistTarget = location.pathname === "/wishlist" ? "/" : "/wishlist";
 
   useEffect(() => {
     const loadCount = async () => {
@@ -35,7 +36,7 @@ export function Root() {
             </Link>
 
             <Link
-              to="/wishlist"
+              to={wishlistTarget}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
             >
               <Heart

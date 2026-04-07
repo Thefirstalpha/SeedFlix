@@ -58,5 +58,5 @@ export async function removeMultipleFromSeriesWishlist(
 
 export async function getSeriesWishlistCount(): Promise<number> {
   const wishlist = await getSeriesWishlist();
-  return wishlist.length;
+  return new Set(wishlist.map((entry) => entry.seriesId)).size;
 }

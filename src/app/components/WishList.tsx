@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Heart, Trash2, Tv, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { MovieCard } from "./MovieCard";
@@ -16,6 +16,7 @@ import type { Movie } from "../types/movie";
 import type { SeriesWishlistEntry } from "../types/seriesWishlist";
 
 export function WishList() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("movies");
 
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -149,6 +150,49 @@ export function WishList() {
     });
   }
 
+  const uniqueSeriesCount = groupedSeries.length;
+
+  const getGroupEntryIds = (group: {
+    seriesEntry?: SeriesWishlistEntry;
+    seasons: SeriesWishlistEntry[];
+    episodes: SeriesWishlistEntry[];
+  }) => {
+    const ids: string[] = [];
+    if (group.seriesEntry) {
+      ids.push(group.seriesEntry.entryId);
+    }
+    ids.push(...group.seasons.map((season) => season.entryId));
+    ids.push(...group.episodes.map((episode) => episode.entryId));
+    return ids;
+  };
+
+  const isGroupFullySelected = (group: {
+    seriesEntry?: SeriesWishlistEntry;
+    seasons: SeriesWishlistEntry[];
+    episodes: SeriesWishlistEntry[];
+  }) => {
+    const ids = getGroupEntryIds(group);
+    if (ids.length === 0) return false;
+    return ids.every((id) => selectedEntryIds.includes(id));
+  };
+
+  const toggleSeriesGroup = (group: {
+    seriesEntry?: SeriesWishlistEntry;
+    seasons: SeriesWishlistEntry[];
+    episodes: SeriesWishlistEntry[];
+  }) => {
+    const ids = getGroupEntryIds(group);
+    if (ids.length === 0) return;
+
+    setSelectedEntryIds((prev) => {
+      const allSelected = ids.every((id) => prev.includes(id));
+      if (allSelected) {
+        return prev.filter((id) => !ids.includes(id));
+      }
+      return Array.from(new Set([...prev, ...ids]));
+    });
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -157,8 +201,8 @@ export function WishList() {
           <div>
             <h2 className="text-3xl font-bold text-white">Ma liste de souhaits</h2>
             <p className="text-white/60">
-              {movies.length} film{movies.length > 1 ? "s" : ""} • {seriesEntries.length} favori
-              {seriesEntries.length > 1 ? "s" : ""} série
+              {movies.length} film{movies.length > 1 ? "s" : ""} • {uniqueSeriesCount} série
+              {uniqueSeriesCount > 1 ? "s" : ""}
             </p>
           </div>
         </div>
@@ -176,7 +220,7 @@ export function WishList() {
             value="series"
             className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white"
           >
-            Séries ({seriesEntries.length})
+            Séries ({uniqueSeriesCount})
           </TabsTrigger>
         </TabsList>
 
@@ -320,34 +364,57 @@ export function WishList() {
               {groupedSeries.map((group) => (
                 <Card
                   key={group.seriesId}
-                  className="border-white/10 bg-white/5"
+                  onClick={() => {
+                    if (!isSeriesSelectionMode) {
+                      navigate(`/series/${group.seriesId}`);
+                    }
+                  }}
+                  className={`border-white/10 bg-white/5 transition-all ${
+                    isSeriesSelectionMode
+                      ? ""
+                      : "cursor-pointer hover:bg-white/10 hover:scale-[1.01]"
+                  }`}
                 >
                   <CardContent className="p-4 space-y-4">
                     <div className="flex items-start gap-4">
-                      <Link to={`/series/${group.seriesId}`} className="shrink-0">
-                        <img
-                          src={group.seriesPoster}
-                          alt={group.seriesTitle}
-                          className="w-16 rounded object-cover aspect-[2/3]"
-                        />
-                      </Link>
+                      <img
+                        src={group.seriesPoster}
+                        alt={group.seriesTitle}
+                        className="w-16 rounded object-cover aspect-[2/3]"
+                      />
 
                       <div className="flex-1 min-w-0">
-                        <Link
-                          to={`/series/${group.seriesId}`}
-                          className="text-white font-semibold text-lg hover:text-cyan-300 transition-colors"
-                        >
+                        <p className="text-white font-semibold text-lg hover:text-cyan-300 transition-colors">
                           {group.seriesTitle}
-                        </Link>
+                        </p>
                         <p className="text-white/60 text-sm mt-1">
                           {group.seriesEntry ? "Série complète favorite" : "Favoris partiels"}
                         </p>
+
+                        {isSeriesSelectionMode && (
+                          <div
+                            className="mt-2"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <label className="inline-flex items-center gap-2 text-sm text-white/80">
+                              <Checkbox
+                                checked={isGroupFullySelected(group)}
+                                onCheckedChange={() => toggleSeriesGroup(group)}
+                                className="border-white/40"
+                              />
+                              Sélectionner toute la série (saisons + épisodes)
+                            </label>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     <div className="space-y-3 pl-1">
                       {group.seriesEntry && (
-                        <div className="flex items-center gap-2">
+                        <div
+                          className="flex items-center gap-2"
+                          onClick={(event) => event.stopPropagation()}
+                        >
                           {isSeriesSelectionMode && (
                             <Checkbox
                               checked={selectedEntryIds.includes(group.seriesEntry.entryId)}
@@ -367,7 +434,11 @@ export function WishList() {
                           <p className="text-white/60 text-xs uppercase tracking-wide">Saisons</p>
                           <div className="flex flex-wrap gap-2">
                             {group.seasons.map((season) => (
-                              <div key={season.entryId} className="flex items-center gap-2">
+                              <div
+                                key={season.entryId}
+                                className="flex items-center gap-2"
+                                onClick={(event) => event.stopPropagation()}
+                              >
                                 {isSeriesSelectionMode && (
                                   <Checkbox
                                     checked={selectedEntryIds.includes(season.entryId)}
@@ -392,7 +463,11 @@ export function WishList() {
                           <p className="text-white/60 text-xs uppercase tracking-wide">Épisodes</p>
                           <div className="flex flex-wrap gap-2">
                             {group.episodes.map((episode) => (
-                              <div key={episode.entryId} className="flex items-center gap-2">
+                              <div
+                                key={episode.entryId}
+                                className="flex items-center gap-2"
+                                onClick={(event) => event.stopPropagation()}
+                              >
                                 {isSeriesSelectionMode && (
                                   <Checkbox
                                     checked={selectedEntryIds.includes(episode.entryId)}
