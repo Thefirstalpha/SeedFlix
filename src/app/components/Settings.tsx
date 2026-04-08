@@ -351,13 +351,7 @@ export function Settings() {
             Sécurité
           </TabsTrigger>
           <TabsTrigger value="api" disabled={mustChangePassword} className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
-            Configuration API
-          </TabsTrigger>
-          <TabsTrigger value="account" disabled={mustChangePassword || mustConfigureTmdb} className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
-            Compte
-          </TabsTrigger>
-          <TabsTrigger value="future" disabled={mustChangePassword || mustConfigureTmdb} className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
-            Téléchargements
+            Configuration
           </TabsTrigger>
           <TabsTrigger value="factory" disabled={mustChangePassword || mustConfigureTmdb} className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
             Réinitialisation
@@ -412,25 +406,9 @@ export function Settings() {
         <TabsContent value="api">
           <Card className={`border-white/10 text-white ${mustConfigureTmdb ? "bg-cyan-950/30 border-cyan-500/50" : "bg-white/5"}`}>
             <CardHeader>
-              <CardTitle>Clés API</CardTitle>
+              <CardTitle>Librairie TMDB</CardTitle>
               <CardDescription className="text-white/60">
-                Configuration des clés API externes requises pour l'application.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleTmdbSave} className="space-y-6 max-w-lg">
-                {mustConfigureTmdb && (
-                  <div className="bg-cyan-500/10 border border-cyan-500/50 rounded p-3">
-                    <p className="text-sm text-cyan-200">
-                      ⚠️ La clé API TMDB est requise pour utiliser l'application. Veuillez la configurer.
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="tmdb-api-key">Clé API TMDB</Label>
-                  <p className="text-xs text-white/50">
-                    SeedFlix accepte la clé API v3 et le Read Access Token v4. Obtenez-les sur{" "}
+                SeedFlix accepte le jeton API v3 et le Read Access Token v4. Obtenez-les sur{" "}
                     <a
                       href="https://www.themoviedb.org/settings/api"
                       target="_blank"
@@ -439,11 +417,24 @@ export function Settings() {
                     >
                       themoviedb.org
                     </a>
-                  </p>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleTmdbSave} className="space-y-6 max-w-lg">
+                {mustConfigureTmdb && (
+                  <div className="bg-cyan-500/10 border border-cyan-500/50 rounded p-3">
+                    <p className="text-sm text-cyan-200">
+                      ⚠️ Le jeton API TMDB est requis pour utiliser l'application. Veuillez le configurer.
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="tmdb-api-key">Jeton API</Label>
                   <Input
                     id="tmdb-api-key"
                     type="password"
-                    placeholder="Clé API v3 ou Read Access Token v4"
+                    placeholder="Jeton API v3 ou Read Access Token v4"
                     value={tmdbApiKey}
                     onChange={(event) => setTmdbApiKey(event.target.value)}
                     className="bg-slate-900 border-white/10 text-white"
@@ -463,72 +454,8 @@ export function Settings() {
               </form>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="account">
-          <Card className="border-white/10 bg-white/5 text-white">
-            <CardHeader>
-              <CardTitle>Compte actuel</CardTitle>
-              <CardDescription className="text-white/60">
-                Informations stockées côté backend.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-white/80">
-              <p>Nom d'utilisateur: {user?.username || settings?.profile?.username || "-"}</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="factory">
-          <Card className="border-red-500/30 bg-red-950/15 text-white">
-            <CardHeader>
-              <CardTitle className="text-red-200">Réinitialisation d'usine</CardTitle>
-              <CardDescription className="text-red-100/70">
-                Cette action réinitialise l'application: compte admin par défaut, paramètres, wishlist films/séries, puis déconnexion automatique.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {resetError && <p className="text-sm text-red-300">{resetError}</p>}
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    disabled={isResetting}
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    {isResetting ? "Réinitialisation..." : "Réinitialiser les paramètres"}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="border-red-500/30 bg-slate-950 text-white">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="text-red-200">
-                      Confirmer la réinitialisation d'usine
-                    </AlertDialogTitle>
-                    <AlertDialogDescription className="text-white/70">
-                      Toutes les données locales seront remises à zéro (utilisateur, paramètres, wishlist films/séries) puis votre session sera expirée. Cette action est irréversible.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
-                      Annuler
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleResetSettings}
-                      className="bg-red-600 text-white hover:bg-red-700"
-                    >
-                      Oui, réinitialiser
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="future">
-          <Card className="border-white/10 bg-white/5 text-white">
+          <Card className="border-white/10 bg-white/5 text-white mt-6">
             <CardHeader>
               <CardTitle>Client torrent</CardTitle>
               <CardDescription className="text-white/60">
@@ -690,6 +617,55 @@ export function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="factory">
+          <Card className="border-red-500/30 bg-red-950/15 text-white">
+            <CardHeader>
+              <CardTitle className="text-red-200">Réinitialisation d'usine</CardTitle>
+              <CardDescription className="text-red-100/70">
+                Cette action réinitialise l'application: compte admin par défaut, paramètres, wishlist films/séries, puis déconnexion automatique.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {resetError && <p className="text-sm text-red-300">{resetError}</p>}
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={isResetting}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {isResetting ? "Réinitialisation..." : "Réinitialiser les paramètres"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="border-red-500/30 bg-slate-950 text-white">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-red-200">
+                      Confirmer la réinitialisation d'usine
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-white/70">
+                      Toutes les données locales seront remises à zéro (utilisateur, paramètres, wishlist films/séries) puis votre session sera expirée. Cette action est irréversible.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                      Annuler
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleResetSettings}
+                      className="bg-red-600 text-white hover:bg-red-700"
+                    >
+                      Oui, réinitialiser
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
       </Tabs>
     </div>
   );
