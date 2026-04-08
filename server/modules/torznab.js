@@ -68,7 +68,39 @@ function extractQualityFromTitle(title) {
   return null;
 }
 
-function buildTorznabSearchUrl(rawUrl, apiKey, query = "", limit = 1, tmdbId = "") {
+function extractLanguageFromTitle(title) {
+  const normalized = String(title || "").toLowerCase();
+
+  if (/\bvostfr\b/i.test(normalized)) {
+    return "VOSTFR";
+  }
+  if (/\bvfq\b/i.test(normalized)) {
+    return "VFQ";
+  }
+  if (/\bvff\b/i.test(normalized)) {
+    return "VFF";
+  }
+  if (/\bmulti\b/i.test(normalized)) {
+    return "MULTI";
+  }
+  if (/\btruefrench\b|\bfrench\b|\bvf\b/i.test(normalized)) {
+    return "VF";
+  }
+  if (/\bvo\b/i.test(normalized)) {
+    return "VO";
+  }
+
+  return null;
+}
+
+function buildTorznabSearchUrl(
+  rawUrl,
+  apiKey,
+  query = "",
+  limit = 1,
+  tmdbId = "",
+  offset = 0
+) {
   let url;
 
   try {
@@ -79,6 +111,7 @@ function buildTorznabSearchUrl(rawUrl, apiKey, query = "", limit = 1, tmdbId = "
 
   url.searchParams.set("t", "search");
   url.searchParams.set("limit", String(limit));
+  url.searchParams.set("offset", String(Math.max(0, Number(offset) || 0)));
   if (query) {
     url.searchParams.set("q", query);
   }
@@ -153,14 +186,14 @@ function parseTorznabItems(xmlText, maxItems = 5) {
       return acc;
     }, {});
 
-    const qualityFromAttributes =
-      attributes.resolution ||
-      attributes.quality ||
-      attributes.video ||
-      null;
     const lowerCaseAttributes = Object.fromEntries(
       Object.entries(attributes).map(([key, value]) => [String(key || "").toLowerCase(), value])
     );
+    const qualityFromAttributes =
+      lowerCaseAttributes.resolution ||
+      lowerCaseAttributes.quality ||
+      lowerCaseAttributes.video ||
+      null;
     const tmdbId = String(
       lowerCaseAttributes.tmdbid ||
       lowerCaseAttributes["tmdb-id"] ||
@@ -168,11 +201,15 @@ function parseTorznabItems(xmlText, maxItems = 5) {
     ).trim();
     const quality = qualityFromAttributes || extractQualityFromTitle(title);
     const language =
-      attributes.language ||
-      attributes.lang ||
+      lowerCaseAttributes.language ||
+      lowerCaseAttributes.lang ||
+      lowerCaseAttributes.audio ||
+      lowerCaseAttributes.languages ||
+      lowerCaseAttributes["languagefrench"] ||
+      extractLanguageFromTitle(title) ||
       null;
     const downloadUrl =
-      attributes.magneturl ||
+      lowerCaseAttributes.magneturl ||
       decodeXmlEntities(enclosureUrlMatch?.[1] || "").trim() ||
       decodeXmlEntities(linkMatch?.[1]?.trim() || "");
 
@@ -258,43 +295,100 @@ export async function searchTorznabForQuery(auth, query, options = {}) {
   }
 
   const normalizedTmdbId = String(tmdbId || "").trim();
-  const searchUrl = buildTorznabSearchUrl(
-    url,
-    token,
-    String(query || "").trim(),
-    limit,
-    normalizedTmdbId
-  );
-  const response = await fetchWithTimeout(searchUrl);
-  const xmlText = await response.text();
-  const parsed = parseTorznabResponse(xmlText);
+  const normalizedLimit = Math.min(100, Math.max(1, Number(limit || 10)));
+  const pageRequestLimit = Math.min(normalizedLimit, 100);
+  const maxPages = 10;
 
-  debugLog("Torznab search response", {
-    url: redactTorznabUrl(searchUrl),
-    status: response.status,
-    ok: response.ok,
-    body: truncateForLogs(xmlText),
-  });
+  let offset = 0;
+  let pageCount = 0;
+  let detectedPageSize = 0;
+  const aggregatedItems = [];
+  let lastSourceTitle = null;
 
-  if (!response.ok || !parsed.ok) {
-    return {
-      ok: false,
-      message: parsed.message || `Erreur Torznab (${response.status})`,
-      code: parsed.code || null,
-      items: [],
-    };
+  while (aggregatedItems.length < normalizedLimit && pageCount < maxPages) {
+    const searchUrl = buildTorznabSearchUrl(
+      url,
+      token,
+      String(query || "").trim(),
+      pageRequestLimit,
+      normalizedTmdbId,
+      offset
+    );
+
+    const response = await fetchWithTimeout(searchUrl);
+    const xmlText = await response.text();
+    const parsed = parseTorznabResponse(xmlText);
+
+    debugLog("Torznab search response", {
+      page: pageCount + 1,
+      offset,
+      url: redactTorznabUrl(searchUrl),
+      status: response.status,
+      ok: response.ok,
+      body: truncateForLogs(xmlText),
+    });
+
+    if (!response.ok || !parsed.ok) {
+      if (pageCount === 0) {
+        return {
+          ok: false,
+          message: parsed.message || `Erreur Torznab (${response.status})`,
+          code: parsed.code || null,
+          items: [],
+        };
+      }
+      break;
+    }
+
+    lastSourceTitle = parsed.title || lastSourceTitle;
+
+    const pageItems = parseTorznabItems(xmlText, pageRequestLimit);
+    const filteredPageItems = normalizedTmdbId
+      ? pageItems.filter((item) => String(item.tmdbId || "").trim() === normalizedTmdbId)
+      : pageItems;
+
+    if (!filteredPageItems.length) {
+      break;
+    }
+
+    if (!detectedPageSize) {
+      detectedPageSize = filteredPageItems.length;
+    }
+
+    for (const item of filteredPageItems) {
+      const duplicate = aggregatedItems.some((existing) => {
+        if (item.guid && existing.guid) {
+          return item.guid === existing.guid;
+        }
+        if (item.downloadUrl && existing.downloadUrl) {
+          return item.downloadUrl === existing.downloadUrl;
+        }
+        return item.title === existing.title;
+      });
+
+      if (!duplicate) {
+        aggregatedItems.push(item);
+      }
+
+      if (aggregatedItems.length >= normalizedLimit) {
+        break;
+      }
+    }
+
+    const currentPageSize = filteredPageItems.length;
+    offset += currentPageSize;
+    pageCount += 1;
+
+    if (detectedPageSize && currentPageSize < detectedPageSize) {
+      break;
+    }
   }
-
-  const parsedItems = parseTorznabItems(xmlText, limit);
-  const filteredItems = normalizedTmdbId
-    ? parsedItems.filter((item) => String(item.tmdbId || "").trim() === normalizedTmdbId)
-    : parsedItems;
 
   return {
     ok: true,
     message: "Recherche Torznab effectuée",
-    sourceTitle: parsed.title || null,
-    items: filteredItems,
+    sourceTitle: lastSourceTitle || null,
+    items: aggregatedItems.slice(0, normalizedLimit),
   };
 }
 
@@ -307,7 +401,7 @@ export function registerTorznabRoutes(app) {
       }
 
       const query = String(req.query.query || "").trim();
-      const limit = Math.min(20, Math.max(1, Number(req.query.limit || 10)));
+      const limit = Math.min(100, Math.max(1, Number(req.query.limit || 10)));
       const tmdbId = String(req.query.tmdbId || "").trim();
 
       if (!query) {

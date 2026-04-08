@@ -71,6 +71,28 @@ const TV_GENRE_MAP: { [key: number]: string } = {
   37: "Western",
 };
 
+const TMDB_LANGUAGE_MAP: Record<string, string> = {
+  fr: "Francais",
+  en: "Anglais",
+  ja: "Japonais",
+  ko: "Coreen",
+  es: "Espagnol",
+  it: "Italien",
+  de: "Allemand",
+  pt: "Portugais",
+  ru: "Russe",
+  zh: "Chinois",
+};
+
+function mapTmdbLanguage(code: string | undefined) {
+  const normalized = String(code || "").toLowerCase().trim();
+  if (!normalized) {
+    return "Inconnu";
+  }
+
+  return TMDB_LANGUAGE_MAP[normalized] || normalized.toUpperCase();
+}
+
 function convertTMDBToSeries(tmdbSeries: TMDBSeries): Series {
   const year = tmdbSeries.first_air_date
     ? new Date(tmdbSeries.first_air_date).getFullYear()
@@ -85,6 +107,7 @@ function convertTMDBToSeries(tmdbSeries: TMDBSeries): Series {
     title: tmdbSeries.name,
     year,
     rating: Math.round(tmdbSeries.vote_average * 10) / 10,
+    language: mapTmdbLanguage(tmdbSeries.original_language),
     genre,
     poster: getTmdbImageUrl(tmdbSeries.poster_path),
   };
@@ -105,6 +128,7 @@ function convertTMDBToSeriesDetails(tmdbSeries: TMDBSeriesDetails): SeriesDetail
     originalTitle: tmdbSeries.original_name,
     year,
     rating: Math.round(tmdbSeries.vote_average * 10) / 10,
+    language: mapTmdbLanguage(tmdbSeries.original_language),
     genre,
     poster: getTmdbImageUrl(tmdbSeries.poster_path),
     backdrop: getTmdbImageUrl(tmdbSeries.backdrop_path, "original"),
@@ -152,6 +176,7 @@ function getMockSeries(): Series[] {
       title: "Chroniques du Néon",
       year: 2026,
       rating: 8.4,
+      language: "Anglais",
       genre: "Science-Fiction",
       poster:
         "https://images.unsplash.com/photo-1515630278258-407f66498911?auto=format&fit=crop&w=800&q=80",
@@ -161,6 +186,7 @@ function getMockSeries(): Series[] {
       title: "Brigade Nocturne",
       year: 2025,
       rating: 7.9,
+      language: "Francais",
       genre: "Crime",
       poster:
         "https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=800&q=80",

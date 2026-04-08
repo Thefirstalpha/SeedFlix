@@ -34,6 +34,7 @@ export interface UserSettings {
     indexer?: {
       url?: string;
       token?: string;
+      defaultQuality?: string;
     };
   };
 }

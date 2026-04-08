@@ -18,7 +18,8 @@
     },
     "indexer": {
       "url": "",
-      "token": ""
+      "token": "",
+      "defaultQuality": "all"
     }
   }
 }

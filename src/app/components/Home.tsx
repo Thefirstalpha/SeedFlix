@@ -37,6 +37,7 @@ export function Home() {
   const [query, setQuery] = useState("");
   const [contentFilter, setContentFilter] = useState<ContentFilter>("all");
   const [genreFilter, setGenreFilter] = useState("all");
+  const [languageFilter, setLanguageFilter] = useState("all");
   const [yearFrom, setYearFrom] = useState("");
   const [yearTo, setYearTo] = useState("");
   const [minRating, setMinRating] = useState("0");
@@ -297,40 +298,58 @@ export function Home() {
     return toSortedUnique([...namesFromMovies, ...namesFromSeries]);
   }, [movieGenres, seriesGenres, showMovies, showSeries]);
 
+  const availableLanguages = useMemo(() => {
+    const movieLanguages = showMovies ? baseMovies.map((movie) => movie.language || "Inconnu") : [];
+    const seriesLanguages = showSeries ? baseSeries.map((show) => show.language || "Inconnu") : [];
+    return toSortedUnique([...movieLanguages, ...seriesLanguages]);
+  }, [baseMovies, baseSeries, showMovies, showSeries]);
+
   useEffect(() => {
     if (genreFilter !== "all" && !availableGenres.includes(genreFilter)) {
       setGenreFilter("all");
     }
   }, [availableGenres, genreFilter]);
 
+  useEffect(() => {
+    if (languageFilter !== "all" && !availableLanguages.includes(languageFilter)) {
+      setLanguageFilter("all");
+    }
+  }, [availableLanguages, languageFilter]);
+
   const localYearStart = yearStart ?? 0;
   const localYearEnd = yearEnd ?? 9999;
 
   const filteredMovies = useMemo(() => {
-    if (!hasSearch) {
-      return baseMovies;
-    }
-
     return baseMovies.filter((movie) => {
+      const matchesLanguage =
+        languageFilter === "all" || (movie.language || "Inconnu") === languageFilter;
+
+      if (!hasSearch) {
+        return matchesLanguage;
+      }
+
       const matchesGenre = genreFilter === "all" || movie.genre === genreFilter;
       const matchesYear = movie.year >= localYearStart && movie.year <= localYearEnd;
       const matchesRating = movie.rating >= ratingThreshold;
-      return matchesGenre && matchesYear && matchesRating;
+      return matchesGenre && matchesYear && matchesRating && matchesLanguage;
     });
-  }, [baseMovies, genreFilter, hasSearch, localYearStart, localYearEnd, ratingThreshold]);
+  }, [baseMovies, genreFilter, hasSearch, languageFilter, localYearStart, localYearEnd, ratingThreshold]);
 
   const filteredSeries = useMemo(() => {
-    if (!hasSearch) {
-      return baseSeries;
-    }
-
     return baseSeries.filter((show) => {
+      const matchesLanguage =
+        languageFilter === "all" || (show.language || "Inconnu") === languageFilter;
+
+      if (!hasSearch) {
+        return matchesLanguage;
+      }
+
       const matchesGenre = genreFilter === "all" || show.genre === genreFilter;
       const matchesYear = show.year >= localYearStart && show.year <= localYearEnd;
       const matchesRating = show.rating >= ratingThreshold;
-      return matchesGenre && matchesYear && matchesRating;
+      return matchesGenre && matchesYear && matchesRating && matchesLanguage;
     });
-  }, [baseSeries, genreFilter, hasSearch, localYearStart, localYearEnd, ratingThreshold]);
+  }, [baseSeries, genreFilter, hasSearch, languageFilter, localYearStart, localYearEnd, ratingThreshold]);
 
   const emptyMessage = hasSearch
     ? "Aucun résultat trouvé pour cette recherche avec les filtres actifs."
@@ -390,7 +409,7 @@ export function Home() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <select
               value={genreFilter}
               onChange={(event) => setGenreFilter(event.target.value)}
@@ -400,6 +419,19 @@ export function Home() {
               {availableGenres.map((genre) => (
                 <option key={genre} value={genre}>
                   {genre}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={languageFilter}
+              onChange={(event) => setLanguageFilter(event.target.value)}
+              className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
+            >
+              <option value="all">Toutes les langues</option>
+              {availableLanguages.map((language) => (
+                <option key={language} value={language}>
+                  {language}
                 </option>
               ))}
             </select>

@@ -7,11 +7,40 @@ import { Card, CardContent } from "./ui/card";
 import { getMovieById, searchMovieReleases, type TorznabMovieResult } from "../services/movieService";
 import { addTorrentToClient } from "../services/torrentService";
 import { addToWishlist, removeFromWishlist, isInWishlist } from "../services/wishlistService";
+import { useAuth } from "../context/AuthContext";
 import type { Movie } from "../types/movie";
+
+const MOVIE_QUALITY_FILTERS = ["all", "2160p", "1080p", "720p", "480p", "bluray", "webdl", "hdtv"];
+
+function normalizeQuality(value: string | null | undefined) {
+  const raw = String(value || "").toLowerCase();
+  if (!raw) return "";
+  if (raw.includes("2160")) return "2160p";
+  if (raw.includes("1080")) return "1080p";
+  if (raw.includes("720")) return "720p";
+  if (raw.includes("480")) return "480p";
+  if (raw.includes("bluray") || raw.includes("brrip") || raw.includes("remux")) return "bluray";
+  if (raw.includes("webdl") || raw.includes("web-dl") || raw.includes("webrip")) return "webdl";
+  if (raw.includes("hdtv")) return "hdtv";
+  return raw;
+}
+
+function normalizeTrackerLanguage(value: string | null | undefined) {
+  const raw = String(value || "").toUpperCase();
+  if (!raw) return "";
+  if (raw.includes("VOSTFR")) return "VOSTFR";
+  if (raw.includes("VFF")) return "VFF";
+  if (raw.includes("VFQ")) return "VFQ";
+  if (raw.includes("MULTI")) return "MULTI";
+  if (raw === "VF" || raw.includes("FRENCH") || raw.includes("TRUEFRENCH")) return "VF";
+  if (raw === "VO") return "VO";
+  return raw;
+}
 
 export function MovieDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { settings } = useAuth();
   const [movie, setMovie] = useState<Movie | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [inWishlist, setInWishlist] = useState(false);
@@ -21,6 +50,32 @@ export function MovieDetails() {
   const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
   const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
   const [torrentError, setTorrentError] = useState<string | null>(null);
+  const [qualityFilter, setQualityFilter] = useState("all");
+  const [languageFilter, setLanguageFilter] = useState("all");
+
+  useEffect(() => {
+    const preferred = String(settings?.placeholders?.indexer?.defaultQuality || "all").toLowerCase();
+    setQualityFilter(MOVIE_QUALITY_FILTERS.includes(preferred) ? preferred : "all");
+  }, [settings?.placeholders?.indexer?.defaultQuality]);
+
+  const filteredReleaseResults = releaseResults.filter((item) => {
+    const languageOk =
+      languageFilter === "all" || normalizeTrackerLanguage(item.language) === languageFilter;
+
+    if (qualityFilter === "all") {
+      return languageOk;
+    }
+
+    return normalizeQuality(item.quality) === qualityFilter && languageOk;
+  });
+
+  const availableReleaseLanguages = Array.from(
+    new Set(
+      releaseResults
+        .map((item) => normalizeTrackerLanguage(item.language))
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "fr"));
 
   useEffect(() => {
     loadMovieDetails();
@@ -259,6 +314,48 @@ export function MovieDetails() {
                 </p>
               </div>
 
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label htmlFor="movie-quality-filter" className="text-sm text-white/80">
+                    Filtre qualité
+                  </label>
+                  <select
+                    id="movie-quality-filter"
+                    value={qualityFilter}
+                    onChange={(event) => setQualityFilter(event.target.value)}
+                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                  >
+                    <option value="all">Toutes qualités</option>
+                    <option value="2160p">2160p (4K)</option>
+                    <option value="1080p">1080p</option>
+                    <option value="720p">720p</option>
+                    <option value="480p">480p</option>
+                    <option value="bluray">BluRay</option>
+                    <option value="webdl">WEB-DL / WEBRip</option>
+                    <option value="hdtv">HDTV</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="movie-language-filter" className="text-sm text-white/80">
+                    Filtre langue
+                  </label>
+                  <select
+                    id="movie-language-filter"
+                    value={languageFilter}
+                    onChange={(event) => setLanguageFilter(event.target.value)}
+                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                  >
+                    <option value="all">Toutes langues</option>
+                    {availableReleaseLanguages.map((language) => (
+                      <option key={language} value={language}>
+                        {language}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {isReleaseLoading && (
                 <p className="text-sm text-white/60">Recherche en cours...</p>
               )}
@@ -275,13 +372,13 @@ export function MovieDetails() {
                 <p className="text-sm text-red-300">{torrentError}</p>
               )}
 
-              {!isReleaseLoading && !releaseError && releaseResults.length === 0 && (
+              {!isReleaseLoading && !releaseError && filteredReleaseResults.length === 0 && (
                 <p className="text-sm text-white/60">Aucune version trouvée pour ce film.</p>
               )}
 
-              {releaseResults.length > 0 && (
+              {filteredReleaseResults.length > 0 && (
                 <div className="space-y-3">
-                  {releaseResults.map((item, index) => (
+                  {filteredReleaseResults.map((item, index) => (
                     <div
                       key={item.guid || item.link || `${item.title}_${index}`}
                       className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"

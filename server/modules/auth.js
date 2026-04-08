@@ -49,6 +49,7 @@ function buildDefaultSettings(username = "admin") {
       indexer: {
         url: "",
         token: "",
+        defaultQuality: "all",
       },
     },
   };

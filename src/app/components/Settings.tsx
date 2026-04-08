@@ -27,6 +27,17 @@ import {
 } from "../services/authService";
 import { useAuth } from "../context/AuthContext";
 
+const QUALITY_OPTIONS = [
+  { value: "all", label: "Toutes qualités" },
+  { value: "2160p", label: "2160p (4K)" },
+  { value: "1080p", label: "1080p" },
+  { value: "720p", label: "720p" },
+  { value: "480p", label: "480p" },
+  { value: "bluray", label: "BluRay" },
+  { value: "webdl", label: "WEB-DL / WEBRip" },
+  { value: "hdtv", label: "HDTV" },
+];
+
 export function Settings() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -49,6 +60,7 @@ export function Settings() {
   const [isTorrentSaving, setIsTorrentSaving] = useState(false);
   const [indexerUrl, setIndexerUrl] = useState("");
   const [indexerToken, setIndexerToken] = useState("");
+  const [indexerDefaultQuality, setIndexerDefaultQuality] = useState("all");
   const [indexerMessage, setIndexerMessage] = useState<string | null>(null);
   const [indexerError, setIndexerError] = useState<string | null>(null);
   const [isIndexerSaving, setIsIndexerSaving] = useState(false);
@@ -67,6 +79,9 @@ export function Settings() {
 
     setIndexerUrl(incomingSettings.placeholders?.indexer?.url || "");
     setIndexerToken(incomingSettings.placeholders?.indexer?.token || "");
+    setIndexerDefaultQuality(
+      incomingSettings.placeholders?.indexer?.defaultQuality || "all"
+    );
   };
 
   const buildUpdatedSettings = (overrides: Partial<UserSettings["placeholders"]>): UserSettings => ({
@@ -197,6 +212,7 @@ export function Settings() {
       indexer: {
         url: indexerUrl,
         token: indexerToken,
+        defaultQuality: indexerDefaultQuality,
       },
     });
 
@@ -520,6 +536,22 @@ export function Settings() {
                     onChange={(e) => setIndexerToken(e.target.value)}
                     className="bg-slate-900 border-white/10 text-white"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="indexer-default-quality">Qualité par défaut</Label>
+                  <select
+                    id="indexer-default-quality"
+                    value={indexerDefaultQuality}
+                    onChange={(e) => setIndexerDefaultQuality(e.target.value)}
+                    className="w-full bg-slate-900 border border-white/10 text-white rounded-md px-3 py-2"
+                  >
+                    {QUALITY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {indexerMessage && <p className="text-sm text-emerald-300">{indexerMessage}</p>}

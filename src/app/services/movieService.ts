@@ -69,6 +69,28 @@ const GENRE_MAP: { [key: number]: string } = {
   37: "Western"
 };
 
+const TMDB_LANGUAGE_MAP: Record<string, string> = {
+  fr: "Francais",
+  en: "Anglais",
+  ja: "Japonais",
+  ko: "Coreen",
+  es: "Espagnol",
+  it: "Italien",
+  de: "Allemand",
+  pt: "Portugais",
+  ru: "Russe",
+  zh: "Chinois",
+};
+
+function mapTmdbLanguage(code: string | undefined) {
+  const normalized = String(code || "").toLowerCase().trim();
+  if (!normalized) {
+    return "Inconnu";
+  }
+
+  return TMDB_LANGUAGE_MAP[normalized] || normalized.toUpperCase();
+}
+
 // Convertir un film TMDB en notre format Movie
 function convertTMDBToMovie(tmdbMovie: TMDBMovie): Movie {
   const year = tmdbMovie.release_date ? new Date(tmdbMovie.release_date).getFullYear() : 0;
@@ -82,6 +104,7 @@ function convertTMDBToMovie(tmdbMovie: TMDBMovie): Movie {
     originalTitle: tmdbMovie.original_title,
     year,
     rating: Math.round(tmdbMovie.vote_average * 10) / 10,
+    language: mapTmdbLanguage(tmdbMovie.original_language),
     genre,
     poster: getTmdbImageUrl(tmdbMovie.poster_path),
     backdrop: getTmdbImageUrl(tmdbMovie.backdrop_path, 'original'),
@@ -293,6 +316,7 @@ export async function getMovieById(id: number): Promise<Movie | null> {
       originalTitle: data.original_title,
       year: data.release_date ? new Date(data.release_date).getFullYear() : 0,
       rating: Math.round(data.vote_average * 10) / 10,
+      language: mapTmdbLanguage(data.original_language),
       genre,
       poster: getTmdbImageUrl(data.poster_path),
       backdrop: getTmdbImageUrl(data.backdrop_path, 'original'),
@@ -346,6 +370,7 @@ function getMockMovies(): Movie[] {
       title: "Le Dernier Horizon",
       year: 2025,
       rating: 8.7,
+      language: "Anglais",
       genre: "Science-Fiction",
       poster: "https://images.unsplash.com/photo-1578374173713-32f6ae6f3971?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzY2llbmNlJTIwZmljdGlvbiUyMG1vdmllfGVufDF8fHx8MTc3NTQzMzE2OXww&ixlib=rb-4.1.0&q=80&w=1080",
       director: "Sarah Chen",
@@ -358,6 +383,7 @@ function getMockMovies(): Movie[] {
       title: "Ombres du Passé",
       year: 2024,
       rating: 7.9,
+      language: "Anglais",
       genre: "Thriller",
       poster: "https://images.unsplash.com/photo-1662937600299-7cb9ff0b1061?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0aHJpbGxlciUyMGRhcmslMjBjaW5lbWF8ZW58MXx8fHwxNzc1NDg3NTE0fDA&ixlib=rb-4.1.0&q=80&w=1080",
       director: "Michael Rodriguez",
@@ -370,6 +396,7 @@ function getMockMovies(): Movie[] {
       title: "L'Épopée Fantastique",
       year: 2026,
       rating: 9.1,
+      language: "Anglais",
       genre: "Aventure",
       poster: "https://images.unsplash.com/photo-1773518011746-4f1c46ddced1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZHZlbnR1cmUlMjBtb3ZpZSUyMGVwaWN8ZW58MXx8fHwxNzc1NDg3NTE0fDA&ixlib=rb-4.1.0&q=80&w=1080",
       director: "Peter Jackson",
@@ -382,6 +409,7 @@ function getMockMovies(): Movie[] {
       title: "Rires et Émotions",
       year: 2025,
       rating: 7.5,
+      language: "Francais",
       genre: "Comédie",
       poster: "https://images.unsplash.com/photo-1606397591059-2bc4e008bf60?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxyb21hbnRpYyUyMGNvbWVkeSUyMG1vdmllfGVufDF8fHx8MTc3NTQ0MjU1OHww&ixlib=rb-4.1.0&q=80&w=1080",
       director: "Judd Apatow",
@@ -394,6 +422,7 @@ function getMockMovies(): Movie[] {
       title: "Les Murmures de Minuit",
       year: 2024,
       rating: 8.3,
+      language: "Anglais",
       genre: "Horreur",
       poster: "https://images.unsplash.com/photo-1630338679229-99fb150fbf88?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3Jyb3IlMjBtb3ZpZSUyMGRhcmt8ZW58MXx8fHwxNzc1NDE3ODkzfDA&ixlib=rb-4.1.0&q=80&w=1080",
       director: "Ari Aster",
@@ -406,6 +435,7 @@ function getMockMovies(): Movie[] {
       title: "Le Cœur des Étoiles",
       year: 2025,
       rating: 8.0,
+      language: "Francais",
       genre: "Drame",
       poster: "https://images.unsplash.com/photo-1762356121454-877acbd554bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaW5lbWElMjBkcmFtYSUyMGZpbG18ZW58MXx8fHwxNzc1NDg3NTEzfDA&ixlib=rb-4.1.0&q=80&w=1080",
       director: "Greta Gerwig",
@@ -418,6 +448,7 @@ function getMockMovies(): Movie[] {
       title: "L'Envol Magique",
       year: 2026,
       rating: 8.8,
+      language: "Anglais",
       genre: "Animation",
       poster: "https://images.unsplash.com/photo-1767557125491-b3483567d843?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhbmltYXRpb24lMjBjYXJ0b29uJTIwY29sb3JmdWx8ZW58MXx8fHwxNzc1NDI0Nzc5fDA&ixlib=rb-4.1.0&q=80&w=1080",
       director: "Pete Docter",
