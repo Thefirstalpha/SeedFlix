@@ -67,6 +67,20 @@ async function getAppTorrentHashesForUser(userId) {
   );
 }
 
+async function removeAppTorrentForUser(userId, hash) {
+  const torrentHash = String(hash || "").trim().toLowerCase();
+  if (!torrentHash) {
+    return;
+  }
+
+  const store = await readAppTorrentsStore();
+  const key = String(userId);
+  const existing = Array.isArray(store[key]) ? store[key] : [];
+  const filtered = existing.filter((h) => String(h || "").trim().toLowerCase() !== torrentHash);
+  store[key] = filtered;
+  await writeAppTorrentsStore(store);
+}
+
 function buildTransmissionRpcUrl(rawUrl, rawPort) {
   let url;
 
@@ -443,6 +457,159 @@ export function registerTransmissionRoutes(app) {
       debugLog("Get downloads failed:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Échec de lecture des téléchargements",
+      });
+    }
+  });
+
+  app.post("/api/torrent/pause", async (req, res) => {
+    try {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
+
+      const torrentId = Number(req.body?.id);
+      if (!Number.isFinite(torrentId)) {
+        res.status(400).json({ error: "ID torrent invalide" });
+        return;
+      }
+
+      const settings = resolveTorrentSettings(auth, req.body);
+      if (!settings.url) {
+        res.status(400).json({ error: "L'URL Transmission est requise" });
+        return;
+      }
+
+      const rpcUrl = buildTransmissionRpcUrl(settings.url, settings.port);
+      const authHeaders = createAuthHeaders(
+        settings.authRequired,
+        settings.username,
+        settings.password
+      );
+
+      const response = await executeTransmissionRpc(rpcUrl, authHeaders, {
+        method: "torrent-set",
+        arguments: {
+          ids: [torrentId],
+        },
+      });
+
+      if (response.status === 401) {
+        res.status(401).json({ error: "Identifiants Transmission invalides" });
+        return;
+      }
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok || data?.result !== "success") {
+        res.status(response.ok ? 400 : response.status).json({
+          error: data?.result || "Impossible de mettre en pause le torrent",
+        });
+        return;
+      }
+
+      // Send torrent-stop command after setting fields
+      const stopResponse = await executeTransmissionRpc(rpcUrl, authHeaders, {
+        method: "torrent-stop",
+        arguments: {
+          ids: [torrentId],
+        },
+      });
+
+      if (stopResponse.status !== 200) {
+        const stopData = await stopResponse.json().catch(() => null);
+        if (stopData?.result !== "success") {
+          res.status(stopResponse.ok ? 400 : stopResponse.status).json({
+            error: stopData?.result || "Impossible de mettre en pause le torrent",
+          });
+          return;
+        }
+      }
+
+      res.json({ ok: true, message: "Torrent mis en pause" });
+    } catch (error) {
+      debugLog("Pause torrent failed:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Impossible de mettre en pause le torrent",
+      });
+    }
+  });
+
+  app.post("/api/torrent/resume", async (req, res) => {
+    try {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
+
+      const torrentId = Number(req.body?.id);
+      if (!Number.isFinite(torrentId)) {
+        res.status(400).json({ error: "ID torrent invalide" });
+        return;
+      }
+
+      const settings = resolveTorrentSettings(auth, req.body);
+      if (!settings.url) {
+        res.status(400).json({ error: "L'URL Transmission est requise" });
+        return;
+      }
+
+      const rpcUrl = buildTransmissionRpcUrl(settings.url, settings.port);
+      const authHeaders = createAuthHeaders(
+        settings.authRequired,
+        settings.username,
+        settings.password
+      );
+
+      const response = await executeTransmissionRpc(rpcUrl, authHeaders, {
+        method: "torrent-start",
+        arguments: {
+          ids: [torrentId],
+        },
+      });
+
+      if (response.status === 401) {
+        res.status(401).json({ error: "Identifiants Transmission invalides" });
+        return;
+      }
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok || data?.result !== "success") {
+        res.status(response.ok ? 400 : response.status).json({
+          error: data?.result || "Impossible de reprendre le torrent",
+        });
+        return;
+      }
+
+      res.json({ ok: true, message: "Torrent repris" });
+    } catch (error) {
+      debugLog("Resume torrent failed:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Impossible de reprendre le torrent",
+      });
+    }
+  });
+
+  app.post("/api/torrent/clean", async (req, res) => {
+    try {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
+
+      const torrentHash = String(req.body?.hash || "").trim().toLowerCase();
+      if (!torrentHash) {
+        res.status(400).json({ error: "Hash torrent invalide" });
+        return;
+      }
+
+      // Remove torrent from app store
+      await removeAppTorrentForUser(auth.user.id, torrentHash);
+
+      res.json({ ok: true, message: "Torrent supprimé de l'affichage" });
+    } catch (error) {
+      debugLog("Clean torrent failed:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Impossible de supprimer le torrent",
       });
     }
   });

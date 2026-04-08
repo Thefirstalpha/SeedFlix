@@ -27,6 +27,7 @@ export interface TorrentDownloadItem {
   peersConnected: number;
   error: number;
   errorString: string;
+  hashString: string;
 }
 
 export interface TorrentDownloadsResponse {
@@ -65,4 +66,43 @@ export async function getTorrentDownloads() {
   });
 
   return parseJson<TorrentDownloadsResponse>(response);
+}
+
+export async function pauseTorrent(id: number) {
+  const response = await fetch(`${API_BASE_URL}/torrent/pause`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ id }),
+  });
+
+  return parseJson<{ ok: boolean; message: string }>(response);
+}
+
+export async function resumeTorrent(id: number) {
+  const response = await fetch(`${API_BASE_URL}/torrent/resume`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ id }),
+  });
+
+  return parseJson<{ ok: boolean; message: string }>(response);
+}
+
+export async function cleanTorrent(hash: string) {
+  const response = await fetch(`${API_BASE_URL}/torrent/clean`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ hash }),
+  });
+
+  return parseJson<{ ok: boolean; message: string }>(response);
 }
