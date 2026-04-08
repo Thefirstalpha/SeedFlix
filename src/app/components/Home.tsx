@@ -33,6 +33,8 @@ function yearToDateBounds(yearFrom: string, yearTo: string) {
   return { safeFrom, safeTo };
 }
 
+
+
 export function Home() {
   const [query, setQuery] = useState("");
   const [contentFilter, setContentFilter] = useState<ContentFilter>("all");
@@ -355,6 +357,10 @@ export function Home() {
     ? "Aucun résultat trouvé pour cette recherche avec les filtres actifs."
     : "Aucun contenu disponible avec ces filtres.";
 
+
+
+
+
   return (
     <div className="space-y-8">
       <div className="text-center space-y-4 py-8">
@@ -510,7 +516,9 @@ export function Home() {
                       <div className="flex gap-4 pb-2 pr-4">
                         {filteredMovies.map((movie) => (
                           <div key={movie.id} className="min-w-[220px] max-w-[220px] shrink-0">
-                            <MovieCard movie={movie} />
+                            <MovieCard
+                              movie={movie}
+                            />
                           </div>
                         ))}
                       </div>
@@ -562,7 +570,9 @@ export function Home() {
                       <div className="flex gap-4 pb-2 pr-4">
                         {filteredSeries.map((show) => (
                           <div key={show.id} className="min-w-[220px] max-w-[220px] shrink-0">
-                            <SeriesCard series={show} />
+                            <SeriesCard
+                              series={show}
+                            />
                           </div>
                         ))}
                       </div>
@@ -597,7 +607,10 @@ export function Home() {
               {filteredMovies.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredMovies.map((movie) => (
-                    <MovieCard key={movie.id} movie={movie} />
+                    <MovieCard
+                      key={movie.id}
+                      movie={movie}
+                    />
                   ))}
                 </div>
               ) : (
@@ -612,7 +625,10 @@ export function Home() {
               {filteredSeries.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredSeries.map((show) => (
-                    <SeriesCard key={show.id} series={show} />
+                    <SeriesCard
+                      key={show.id}
+                      series={show}
+                    />
                   ))}
                 </div>
               ) : (
