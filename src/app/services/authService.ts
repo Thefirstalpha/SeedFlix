@@ -58,15 +58,39 @@ export interface TorrentTestResponse {
   endpoint?: string;
 }
 
+export interface TmdbApiKeyTestResponse {
+  ok: boolean;
+  message: string;
+}
+
 const AUTH_BASE = `${API_BASE_URL}/auth`;
 const SETTINGS_BASE = `${API_BASE_URL}/settings`;
 
-async function parseJson<T>(response: Response): Promise<T> {
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data?.error || "Request failed");
+async function parseJson<T>(response: Response, fallbackError = "Request failed"): Promise<T> {
+  const text = await response.text();
+  let data: unknown = null;
+
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      if (!response.ok) {
+        throw new Error(fallbackError);
+      }
+
+      throw new Error("Réponse invalide du serveur");
+    }
   }
-  return data;
+
+  if (!response.ok) {
+    const errorMessage =
+      data && typeof data === "object" && "error" in data && typeof data.error === "string"
+        ? data.error
+        : fallbackError;
+    throw new Error(errorMessage);
+  }
+
+  return data as T;
 }
 
 export async function getCurrentAuth(): Promise<AuthResponse> {
@@ -164,4 +188,14 @@ export async function testTorrentConnection(payload: {
     body: JSON.stringify(payload),
   });
   return parseJson<TorrentTestResponse>(response);
+}
+
+export async function testTmdbApiKey(apiKey: string) {
+  const response = await fetch(`${API_BASE_URL}/tmdb/test-key`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apiKey }),
+  });
+  return parseJson<TmdbApiKeyTestResponse>(response, "Clé API invalide");
 }

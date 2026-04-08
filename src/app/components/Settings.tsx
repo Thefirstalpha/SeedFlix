@@ -430,7 +430,7 @@ export function Settings() {
                 <div className="space-y-2">
                   <Label htmlFor="tmdb-api-key">Clé API TMDB</Label>
                   <p className="text-xs text-white/50">
-                    Obtenez une clé sur{" "}
+                    SeedFlix accepte la clé API v3 et le Read Access Token v4. Obtenez-les sur{" "}
                     <a
                       href="https://www.themoviedb.org/settings/api"
                       target="_blank"
@@ -443,7 +443,7 @@ export function Settings() {
                   <Input
                     id="tmdb-api-key"
                     type="password"
-                    placeholder="Entrez votre clé API TMDB"
+                    placeholder="Clé API v3 ou Read Access Token v4"
                     value={tmdbApiKey}
                     onChange={(event) => setTmdbApiKey(event.target.value)}
                     className="bg-slate-900 border-white/10 text-white"

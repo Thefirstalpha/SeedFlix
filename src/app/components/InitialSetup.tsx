@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
-import { Check, ChevronLeft, KeyRound, RadioTower, Server, ShieldCheck } from "lucide-react";
+import { Check, ExternalLink, KeyRound, RadioTower, Server, ShieldCheck } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import {
   changePassword,
   getSettings,
   testIndexerConnection,
+  testTmdbApiKey,
   testTorrentConnection,
   updateSettings,
   type UserSettings,
@@ -85,6 +86,7 @@ export function InitialSetup() {
 
   const [tmdbApiKey, setTmdbApiKey] = useState("");
   const [tmdbError, setTmdbError] = useState<string | null>(null);
+  const [tmdbMessage, setTmdbMessage] = useState<string | null>(null);
   const [isTmdbSaving, setIsTmdbSaving] = useState(false);
 
   const [torrentUrl, setTorrentUrl] = useState("");
@@ -155,12 +157,11 @@ export function InitialSetup() {
 
   useEffect(() => {
     if (!isLoading && !hasPendingSetup) {
-      const nextPath = (location.state as { from?: string } | null)?.from || "/";
-      navigate(nextPath, { replace: true });
+      navigate("/", { replace: true });
       return;
     }
 
-    if (firstIncompleteStep < TOTAL_STEPS) {
+    if (!isLoading && firstIncompleteStep < TOTAL_STEPS) {
       setActiveStep(firstIncompleteStep);
     }
   }, [firstIncompleteStep, hasPendingSetup, isLoading, location.state, navigate]);
@@ -209,8 +210,7 @@ export function InitialSetup() {
 
   const goToNextVisibleStep = () => {
     if (activeStep >= TOTAL_STEPS - 1) {
-      const nextPath = (location.state as { from?: string } | null)?.from || "/";
-      navigate(nextPath, { replace: true });
+      navigate("/", { replace: true });
       return;
     }
 
@@ -250,6 +250,7 @@ export function InitialSetup() {
   const handleTmdbSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setTmdbError(null);
+    setTmdbMessage(null);
 
     if (!tmdbApiKey.trim()) {
       setTmdbError("La clé API TMDB est requise.");
@@ -258,6 +259,7 @@ export function InitialSetup() {
 
     setIsTmdbSaving(true);
     try {
+      const testResponse = await testTmdbApiKey(tmdbApiKey.trim());
       const updatedSettings = buildUpdatedSettings({
         apiKeys: {
           tmdb: tmdbApiKey.trim(),
@@ -265,7 +267,19 @@ export function InitialSetup() {
       });
       await updateSettings(updatedSettings);
       setSettings(updatedSettings);
+      setTmdbMessage(testResponse.message);
       await refresh();
+
+      if (mustConfigureTorrent) {
+        setActiveStep(2);
+        return;
+      }
+
+      if (mustConfigureIndexer) {
+        setActiveStep(3);
+        return;
+      }
+
       goToNextVisibleStep();
     } catch (submitError) {
       setTmdbError(
@@ -352,8 +366,7 @@ export function InitialSetup() {
       setSettings(updatedSettings);
       await refresh();
 
-      const nextPath = (location.state as { from?: string } | null)?.from || "/";
-      navigate(nextPath, { replace: true });
+      navigate("/", { replace: true });
     } catch (submitError) {
       setIndexerError(
         submitError instanceof Error ? submitError.message : "Configuration du tracker impossible"
@@ -396,14 +409,8 @@ export function InitialSetup() {
               const isComplete = !step.required && index < firstIncompleteStep;
 
               return (
-                <button
+                <div
                   key={step.key}
-                  type="button"
-                  onClick={() => {
-                    if (index <= firstIncompleteStep) {
-                      setActiveStep(index);
-                    }
-                  }}
                   className={`rounded-xl border px-4 py-3 text-left transition ${
                     isActive
                       ? "border-cyan-400/60 bg-cyan-400/10"
@@ -422,7 +429,7 @@ export function InitialSetup() {
                     </div>
                     {isComplete ? <Check className="h-4 w-4 text-emerald-300" /> : null}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -484,27 +491,35 @@ export function InitialSetup() {
           <CardContent>
             <form onSubmit={handleTmdbSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="setup-tmdb-key">Clé API TMDB</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="setup-tmdb-key">Clé API TMDB</Label>
+                  <a
+                    href="https://developer.themoviedb.org/docs/getting-started"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-cyan-300 transition-colors hover:text-cyan-200"
+                  >
+                    Documentation TMDB
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </div>
                 <Input
                   id="setup-tmdb-key"
                   type="password"
                   value={tmdbApiKey}
                   onChange={(event) => setTmdbApiKey(event.target.value)}
-                  placeholder="Collez votre clé API TMDB"
+                  placeholder="Clé API v3 ou Read Access Token v4"
                   className="border-white/10 bg-slate-900 text-white"
                 />
+                <p className="text-xs text-white/55">
+                  SeedFlix accepte la clé API TMDB classique et le jeton de lecture v4.
+                </p>
               </div>
-              <p className="text-sm text-white/55">
-                Vous pouvez la générer depuis https://www.themoviedb.org/settings/api
-              </p>
+              {tmdbMessage ? <p className="text-sm text-emerald-300">{tmdbMessage}</p> : null}
               {tmdbError ? <p className="text-sm text-red-300">{tmdbError}</p> : null}
-              <div className="flex items-center justify-between gap-3">
-                <Button type="button" variant="outline" onClick={() => setActiveStep(0)} className="border-white/10 bg-white/5 text-white hover:bg-white/10">
-                  <ChevronLeft className="mr-2 h-4 w-4" />
-                  Retour
-                </Button>
+              <div className="flex items-center justify-end gap-3">
                 <Button type="submit" disabled={isTmdbSaving} className="bg-cyan-600 text-white hover:bg-cyan-700">
-                  {isTmdbSaving ? "Enregistrement..." : "Enregistrer et continuer"}
+                  {isTmdbSaving ? "Test en cours..." : "Tester, enregistrer et continuer"}
                 </Button>
               </div>
             </form>
@@ -602,11 +617,7 @@ export function InitialSetup() {
 
               {torrentError ? <p className="text-sm text-red-300">{torrentError}</p> : null}
 
-              <div className="flex items-center justify-between gap-3">
-                <Button type="button" variant="outline" onClick={() => setActiveStep(1)} className="border-white/10 bg-white/5 text-white hover:bg-white/10">
-                  <ChevronLeft className="mr-2 h-4 w-4" />
-                  Retour
-                </Button>
+              <div className="flex items-center justify-end gap-3">
                 <Button type="submit" disabled={isTorrentSaving} className="bg-cyan-600 text-white hover:bg-cyan-700">
                   {isTorrentSaving ? "Test en cours..." : "Tester et continuer"}
                 </Button>
@@ -670,13 +681,13 @@ export function InitialSetup() {
 
               {indexerError ? <p className="text-sm text-red-300">{indexerError}</p> : null}
 
-              <div className="flex items-center justify-between gap-3">
-                <Button type="button" variant="outline" onClick={() => setActiveStep(2)} className="border-white/10 bg-white/5 text-white hover:bg-white/10">
-                  <ChevronLeft className="mr-2 h-4 w-4" />
-                  Retour
-                </Button>
-                <Button type="submit" disabled={isIndexerSaving} className="bg-cyan-600 text-white hover:bg-cyan-700">
-                  {isIndexerSaving ? "Test en cours..." : "Terminer la configuration"}
+              <div className="flex items-center justify-end gap-3">
+                <Button
+                  type="submit"
+                  disabled={isIndexerSaving}
+                  className="bg-cyan-600 text-white hover:bg-cyan-700"
+                >
+                  {isIndexerSaving ? "Test et enregistrement..." : "Tester et terminer la configuration"}
                 </Button>
               </div>
             </form>
