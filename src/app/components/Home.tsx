@@ -363,15 +363,6 @@ export function Home() {
 
   return (
     <div className="space-y-8">
-      <div className="text-center space-y-4 py-8">
-        <h2 className="text-4xl md:text-5xl font-bold text-white">
-          Films et séries, au même endroit
-        </h2>
-        <p className="text-xl text-white/70 max-w-3xl mx-auto">
-          Utilisez une seule recherche, filtrez par type, genre, date et note, puis
-          explorez en mode carrousel ou en liste selon votre besoin.
-        </p>
-      </div>
 
       <div className="max-w-5xl mx-auto space-y-4">
         <div className="relative">

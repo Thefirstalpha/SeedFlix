@@ -120,13 +120,11 @@ export function Root() {
               to="/"
               className="flex items-center gap-3 hover:opacity-80 transition-opacity"
             >
-              <div className="brand-mark relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-sm border border-violet-400/40 bg-black shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
-                <span className="absolute inset-y-1 left-1 w-1 rounded-full bg-white/15" />
-                <span className="absolute inset-y-1 right-1 w-1 rounded-full bg-white/15" />
-                <span className="brand-monogram relative z-10 text-[1.9rem] leading-none text-violet-300">
-                  S
-                </span>
-              </div>
+              <img
+                src="/favicon.svg"
+                alt="SeedFlix"
+                className="h-11 w-11 rounded-sm"
+              />
               <h1 className="text-3xl font-black text-white tracking-tighter">
                 SeedFlix
               </h1>
@@ -231,7 +229,7 @@ export function Root() {
       <footer className="border-t border-white/10 mt-16 py-8">
         <div className="container mx-auto px-4 text-center text-white/60">
           <p>
-            © 2026 SeedFlix - Découvrez les meilleurs films
+            © 2026 SeedFlix - Obtenir un film ne devrait jamais dépasser sa durée.
           </p>
         </div>
       </footer>
