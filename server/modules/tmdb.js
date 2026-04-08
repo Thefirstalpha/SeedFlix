@@ -70,6 +70,7 @@ async function fetchTmdb(url, apiKey) {
 function readDiscoverFilters(query, type) {
   const withGenres = Number(query.with_genres);
   const voteAverageGte = Number(query.vote_average_gte);
+  const withOriginalLanguage = String(query.with_original_language || "").trim();
 
   const filters = {
     page: Number(query.page || 1),
@@ -83,6 +84,10 @@ function readDiscoverFilters(query, type) {
 
   if (Number.isFinite(voteAverageGte)) {
     filters.vote_average_gte = voteAverageGte;
+  }
+
+  if (withOriginalLanguage) {
+    filters.with_original_language = withOriginalLanguage;
   }
 
   if (type === "movie") {
@@ -116,6 +121,7 @@ function hasActiveDiscoverFilters(filters, type) {
   return Boolean(
     filters.with_genres ||
       filters.vote_average_gte ||
+      filters.with_original_language ||
       (type === "movie"
         ? filters.primary_release_date_gte || filters.primary_release_date_lte
         : filters.first_air_date_gte || filters.first_air_date_lte)
@@ -206,6 +212,7 @@ export function registerTmdbRoutes(app) {
       const page = Number(req.query.page || 1);
       const language = String(req.query.language || "fr-FR");
       const withGenres = Number(req.query.with_genres);
+      const withOriginalLanguage = String(req.query.with_original_language || "").trim();
       const primaryReleaseDateGte = String(req.query.primary_release_date_gte || "");
       const primaryReleaseDateLte = String(req.query.primary_release_date_lte || "");
       const voteAverageGte = Number(req.query.vote_average_gte);
@@ -218,6 +225,9 @@ export function registerTmdbRoutes(app) {
 
       if (Number.isFinite(withGenres)) {
         query.with_genres = withGenres;
+      }
+      if (withOriginalLanguage) {
+        query.with_original_language = withOriginalLanguage;
       }
       if (primaryReleaseDateGte) {
         query.primary_release_date_gte = primaryReleaseDateGte;
@@ -343,6 +353,7 @@ export function registerTmdbRoutes(app) {
       const page = Number(req.query.page || 1);
       const language = String(req.query.language || "fr-FR");
       const withGenres = Number(req.query.with_genres);
+      const withOriginalLanguage = String(req.query.with_original_language || "").trim();
       const firstAirDateGte = String(req.query.first_air_date_gte || "");
       const firstAirDateLte = String(req.query.first_air_date_lte || "");
       const voteAverageGte = Number(req.query.vote_average_gte);
@@ -355,6 +366,9 @@ export function registerTmdbRoutes(app) {
 
       if (Number.isFinite(withGenres)) {
         query.with_genres = withGenres;
+      }
+      if (withOriginalLanguage) {
+        query.with_original_language = withOriginalLanguage;
       }
       if (firstAirDateGte) {
         query.first_air_date_gte = firstAirDateGte;

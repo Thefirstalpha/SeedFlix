@@ -1,9 +1,10 @@
 import { useParams, Link, useNavigate } from "react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Download, Loader2, Star, Calendar, Clock, User, Heart } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Card, CardContent } from "./ui/card";
+import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import { getMovieById, searchMovieReleases, type TorznabMovieResult } from "../services/movieService";
 import { addTorrentToClient } from "../services/torrentService";
 import { addToWishlist, removeFromWishlist, isInWishlist } from "../services/wishlistService";
@@ -53,6 +54,8 @@ export function MovieDetails() {
   const [qualityFilter, setQualityFilter] = useState("all");
   const [languageFilter, setLanguageFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<"size" | "date">("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
@@ -60,16 +63,35 @@ export function MovieDetails() {
     setQualityFilter(MOVIE_QUALITY_FILTERS.includes(preferred) ? preferred : "all");
   }, [settings?.placeholders?.indexer?.defaultQuality]);
 
-  const filteredReleaseResults = releaseResults.filter((item) => {
-    const languageOk =
-      languageFilter === "all" || normalizeTrackerLanguage(item.language) === languageFilter;
+  const filteredReleaseResults = useMemo(() => {
+    let results = releaseResults.filter((item) => {
+      const languageOk =
+        languageFilter === "all" || normalizeTrackerLanguage(item.language) === languageFilter;
 
-    if (qualityFilter === "all") {
-      return languageOk;
+      if (qualityFilter === "all") {
+        return languageOk;
+      }
+
+      return normalizeQuality(item.quality) === qualityFilter && languageOk;
+    });
+
+    // Apply sorting
+    if (sortBy === "size") {
+      results.sort((a, b) => {
+        const sizeA = a.sizeBytes || 0;
+        const sizeB = b.sizeBytes || 0;
+        return sortOrder === "desc" ? sizeB - sizeA : sizeA - sizeB;
+      });
+    } else if (sortBy === "date") {
+      results.sort((a, b) => {
+        const dateA = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+        const dateB = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+        return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
+      });
     }
 
-    return normalizeQuality(item.quality) === qualityFilter && languageOk;
-  });
+    return results;
+  }, [releaseResults, qualityFilter, languageFilter, sortBy, sortOrder]);
 
   const totalPages = Math.ceil(filteredReleaseResults.length / ITEMS_PER_PAGE);
   const paginatedResults = filteredReleaseResults.slice(
@@ -80,7 +102,7 @@ export function MovieDetails() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [qualityFilter, languageFilter]);
+  }, [qualityFilter, languageFilter, sortBy, sortOrder]);
 
   const availableReleaseLanguages = Array.from(
     new Set(
@@ -327,45 +349,79 @@ export function MovieDetails() {
                 </p>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label htmlFor="movie-quality-filter" className="text-sm text-white/80">
-                    Filtre qualité
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <label htmlFor="movie-quality-filter" className="text-sm text-white/70 font-medium whitespace-nowrap">
+                    Qualité
                   </label>
                   <select
                     id="movie-quality-filter"
                     value={qualityFilter}
                     onChange={(event) => setQualityFilter(event.target.value)}
-                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                    className="bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
-                    <option value="all">Toutes qualités</option>
-                    <option value="2160p">2160p (4K)</option>
+                    <option value="all">Toutes</option>
+                    <option value="2160p">2160p</option>
                     <option value="1080p">1080p</option>
                     <option value="720p">720p</option>
                     <option value="480p">480p</option>
                     <option value="bluray">BluRay</option>
-                    <option value="webdl">WEB-DL / WEBRip</option>
+                    <option value="webdl">WEB-DL</option>
                     <option value="hdtv">HDTV</option>
                   </select>
                 </div>
 
-                <div className="space-y-2">
-                  <label htmlFor="movie-language-filter" className="text-sm text-white/80">
-                    Filtre langue
+                <div className="flex items-center gap-2">
+                  <label htmlFor="movie-language-filter" className="text-sm text-white/70 font-medium whitespace-nowrap">
+                    Langue
                   </label>
                   <select
                     id="movie-language-filter"
                     value={languageFilter}
                     onChange={(event) => setLanguageFilter(event.target.value)}
-                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                    className="bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
-                    <option value="all">Toutes langues</option>
+                    <option value="all">Toutes</option>
                     {availableReleaseLanguages.map((language) => (
                       <option key={language} value={language}>
                         {language}
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="text-sm text-white/70 font-medium">Trier:</span>
+                  <ToggleGroup
+                    type="single"
+                    value={sortBy}
+                    onValueChange={(value) => {
+                      if (value) setSortBy(value as "size" | "date");
+                    }}
+                    className="border border-white/20 rounded-md bg-slate-900/30"
+                  >
+                    <ToggleGroupItem 
+                      value="date" 
+                      aria-label="Sort by date" 
+                      className="text-sm data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
+                    >
+                      Date
+                    </ToggleGroupItem>
+                    <ToggleGroupItem 
+                      value="size" 
+                      aria-label="Sort by size" 
+                      className="text-sm data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
+                    >
+                      Taille
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                  <Button
+                    size="sm"
+                    onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+                    className="h-9 px-3 border border-white/20 text-white/80 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all"
+                  >
+                    {sortOrder === "desc" ? "↓" : "↑"}
+                  </Button>
                 </div>
               </div>
 
@@ -434,6 +490,12 @@ export function MovieDetails() {
                         {item.sizeHuman && (
                           <Badge variant="outline" className="border-white/30 text-white/80">
                             Taille: {item.sizeHuman}
+                          </Badge>
+                        )}
+                        {item.pubDate && (
+                          <Badge variant="outline" className="border-blue-500/40 text-blue-300">
+                            <Calendar className="w-3 h-3 mr-1 inline" />
+                            {new Date(item.pubDate).toLocaleDateString("fr-FR")}
                           </Badge>
                         )}
                         {Number.isFinite(item.seeders || NaN) && (item.seeders || 0) >= 0 && (

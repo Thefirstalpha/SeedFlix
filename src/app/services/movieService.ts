@@ -43,6 +43,7 @@ export interface DiscoverFilters {
   yearFrom?: number;
   yearTo?: number;
   minRating?: number;
+  originalLanguage?: string;
 }
 
 const MOCK_PAGE_SIZE = 8;
@@ -154,6 +155,9 @@ export async function getPopularMoviesPage(
   if (Number.isFinite(filters.minRating) && (filters.minRating || 0) > 0) {
     params.set("vote_average_gte", String(filters.minRating));
   }
+  if (filters.originalLanguage) {
+    params.set("with_original_language", filters.originalLanguage);
+  }
 
   try {
     const response = await fetch(
@@ -217,6 +221,9 @@ export async function discoverMoviesPage(
   }
   if (Number.isFinite(filters.minRating) && (filters.minRating || 0) > 0) {
     params.set("vote_average_gte", String(filters.minRating));
+  }
+  if (filters.originalLanguage) {
+    params.set("with_original_language", filters.originalLanguage);
   }
 
   try {

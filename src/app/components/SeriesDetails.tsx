@@ -5,6 +5,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
+import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import {
   getSeriesById,
   getSeriesSeasonEpisodes,
@@ -693,18 +694,18 @@ export function SeriesDetails() {
                 </p>
               </div>
 
-              <div className="grid sm:grid-cols-3 gap-3">
-                <div className="space-y-2">
-                  <label htmlFor="series-season-filter" className="text-sm text-white/80">
-                    Filtre saison
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <label htmlFor="series-season-filter" className="text-sm text-white/70 whitespace-nowrap font-medium">
+                    Saison
                   </label>
                   <select
                     id="series-season-filter"
                     value={seasonFilter}
                     onChange={(event) => setSeasonFilter(event.target.value)}
-                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                    className="bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
-                    <option value="all">Toutes saisons</option>
+                    <option value="all">Toutes</option>
                     {availableReleaseSeasons.map((season) => (
                       <option key={season} value={season}>
                         {season}
@@ -713,38 +714,38 @@ export function SeriesDetails() {
                   </select>
                 </div>
 
-                <div className="space-y-2">
-                  <label htmlFor="series-quality-filter" className="text-sm text-white/80">
-                    Filtre qualité
+                <div className="flex items-center gap-2">
+                  <label htmlFor="series-quality-filter" className="text-sm text-white/70 whitespace-nowrap font-medium">
+                    Qualité
                   </label>
                   <select
                     id="series-quality-filter"
                     value={qualityFilter}
                     onChange={(event) => setQualityFilter(event.target.value)}
-                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                    className="bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
-                    <option value="all">Toutes qualités</option>
-                    <option value="2160p">2160p (4K)</option>
+                    <option value="all">Toutes</option>
+                    <option value="2160p">2160p</option>
                     <option value="1080p">1080p</option>
                     <option value="720p">720p</option>
                     <option value="480p">480p</option>
                     <option value="bluray">BluRay</option>
-                    <option value="webdl">WEB-DL / WEBRip</option>
+                    <option value="webdl">WEB-DL</option>
                     <option value="hdtv">HDTV</option>
                   </select>
                 </div>
 
-                <div className="space-y-2">
-                  <label htmlFor="series-language-filter" className="text-sm text-white/80">
-                    Filtre langue
+                <div className="flex items-center gap-2">
+                  <label htmlFor="series-language-filter" className="text-sm text-white/70 whitespace-nowrap font-medium">
+                    Langue
                   </label>
                   <select
                     id="series-language-filter"
                     value={languageFilter}
                     onChange={(event) => setLanguageFilter(event.target.value)}
-                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                    className="bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
-                    <option value="all">Toutes langues</option>
+                    <option value="all">Toutes</option>
                     {availableReleaseLanguages.map((language) => (
                       <option key={language} value={language}>
                         {language}
@@ -753,36 +754,38 @@ export function SeriesDetails() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-2">
-                    <label htmlFor="series-sort-by" className="text-sm text-white/80">
-                      Trier par
-                    </label>
-                    <select
-                      id="series-sort-by"
-                      value={sortBy}
-                      onChange={(event) => setSortBy(event.target.value as "size" | "date")}
-                      className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="text-sm text-white/70 font-medium">Trier:</span>
+                  <ToggleGroup
+                    type="single"
+                    value={sortBy}
+                    onValueChange={(value) => {
+                      if (value) setSortBy(value as "size" | "date");
+                    }}
+                    className="border border-white/20 rounded-md bg-slate-900/30"
+                  >
+                    <ToggleGroupItem 
+                      value="date" 
+                      aria-label="Sort by date" 
+                      className="text-sm data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
                     >
-                      <option value="date">Date</option>
-                      <option value="size">Taille</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label htmlFor="series-sort-order" className="text-sm text-white/80">
-                      Ordre
-                    </label>
-                    <select
-                      id="series-sort-order"
-                      value={sortOrder}
-                      onChange={(event) => setSortOrder(event.target.value as "asc" | "desc")}
-                      className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                      Date
+                    </ToggleGroupItem>
+                    <ToggleGroupItem 
+                      value="size" 
+                      aria-label="Sort by size" 
+                      className="text-sm data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
                     >
-                      <option value="desc">Décroissant</option>
-                      <option value="asc">Croissant</option>
-                    </select>
-                  </div>
+                      Taille
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                  <Button
+                    size="sm"
+                    onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+                    className="h-9 px-3 border border-white/20 text-white/80 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all"
+                  >
+                    {sortOrder === "desc" ? "↓" : "↑"}
+                  </Button>
                 </div>
               </div>
 

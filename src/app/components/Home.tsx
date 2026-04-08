@@ -19,6 +19,20 @@ import type { Series } from "../types/series";
 
 type ContentFilter = "all" | "movie" | "series";
 
+const DEFAULT_LANGUAGE_OPTIONS = [
+  "Francais",
+  "Anglais",
+  "Japonais",
+  "Coreen",
+  "Espagnol",
+  "Italien",
+  "Allemand",
+  "Portugais",
+  "Russe",
+  "Chinois",
+  "Inconnu",
+];
+
 function toSortedUnique(items: string[]): string[] {
   return Array.from(new Set(items)).sort((a, b) => a.localeCompare(b, "fr"));
 }
@@ -31,6 +45,30 @@ function yearToDateBounds(yearFrom: string, yearTo: string) {
   const safeTo = Number.isFinite(parsedTo) && parsedTo > 0 ? parsedTo : undefined;
 
   return { safeFrom, safeTo };
+}
+
+function toTmdbOriginalLanguageCode(language: string): string | undefined {
+  const normalized = String(language || "").trim().toLowerCase();
+  if (!normalized || normalized === "all" || normalized === "inconnu") {
+    return undefined;
+  }
+
+  const map: Record<string, string> = {
+    francais: "fr",
+    français: "fr",
+    anglais: "en",
+    japonais: "ja",
+    coreen: "ko",
+    coréen: "ko",
+    espagnol: "es",
+    italien: "it",
+    allemand: "de",
+    portugais: "pt",
+    russe: "ru",
+    chinois: "zh",
+  };
+
+  return map[normalized] || undefined;
 }
 
 
@@ -82,6 +120,7 @@ export function Home() {
 
   const ratingThreshold = Number(minRating) || 0;
   const { safeFrom: yearStart, safeTo: yearEnd } = yearToDateBounds(yearFrom, yearTo);
+  const selectedOriginalLanguageCode = toTmdbOriginalLanguageCode(languageFilter);
 
   useEffect(() => {
     const loadGenres = async () => {
@@ -109,6 +148,7 @@ export function Home() {
       yearFrom: yearStart,
       yearTo: yearEnd,
       minRating: ratingThreshold,
+      originalLanguage: selectedOriginalLanguageCode,
     });
   };
 
@@ -118,6 +158,7 @@ export function Home() {
       yearFrom: yearStart,
       yearTo: yearEnd,
       minRating: ratingThreshold,
+      originalLanguage: selectedOriginalLanguageCode,
     });
   };
 
@@ -213,11 +254,13 @@ export function Home() {
     hasSearch,
     contentFilter,
     genreFilter,
+    languageFilter,
     yearFrom,
     yearTo,
     minRating,
     selectedMovieGenreId,
     selectedSeriesGenreId,
+    selectedOriginalLanguageCode,
   ]);
 
   useEffect(() => {
@@ -303,7 +346,7 @@ export function Home() {
   const availableLanguages = useMemo(() => {
     const movieLanguages = showMovies ? baseMovies.map((movie) => movie.language || "Inconnu") : [];
     const seriesLanguages = showSeries ? baseSeries.map((show) => show.language || "Inconnu") : [];
-    return toSortedUnique([...movieLanguages, ...seriesLanguages]);
+    return toSortedUnique([...DEFAULT_LANGUAGE_OPTIONS, ...movieLanguages, ...seriesLanguages]);
   }, [baseMovies, baseSeries, showMovies, showSeries]);
 
   useEffect(() => {
@@ -502,9 +545,9 @@ export function Home() {
                         void maybeLoadMoreMovies(container);
                       }}
                       onWheel={handleCarouselWheel}
-                      className="flex-1 overflow-x-auto no-scrollbar scroll-smooth touch-pan-y"
+                      className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-y"
                     >
-                      <div className="flex gap-4 pb-2 pr-4">
+                      <div className="flex gap-4 py-4 pr-4">
                         {filteredMovies.map((movie) => (
                           <div key={movie.id} className="min-w-[220px] max-w-[220px] shrink-0">
                             <MovieCard
@@ -556,9 +599,9 @@ export function Home() {
                         void maybeLoadMoreSeries(container);
                       }}
                       onWheel={handleCarouselWheel}
-                      className="flex-1 overflow-x-auto no-scrollbar scroll-smooth touch-pan-y"
+                      className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-y"
                     >
-                      <div className="flex gap-4 pb-2 pr-4">
+                      <div className="flex gap-4 py-4 pr-4">
                         {filteredSeries.map((show) => (
                           <div key={show.id} className="min-w-[220px] max-w-[220px] shrink-0">
                             <SeriesCard

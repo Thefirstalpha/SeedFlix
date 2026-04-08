@@ -26,6 +26,7 @@ export interface SeriesDiscoverFilters {
   yearFrom?: number;
   yearTo?: number;
   minRating?: number;
+  originalLanguage?: string;
 }
 
 export interface TorznabSeriesResult {
@@ -215,6 +216,9 @@ export async function getPopularSeriesPage(
   if (Number.isFinite(filters.minRating) && (filters.minRating || 0) > 0) {
     params.set("vote_average_gte", String(filters.minRating));
   }
+  if (filters.originalLanguage) {
+    params.set("with_original_language", filters.originalLanguage);
+  }
 
   try {
     const response = await fetch(
@@ -283,6 +287,9 @@ export async function discoverSeriesPage(
   }
   if (Number.isFinite(filters.minRating) && (filters.minRating || 0) > 0) {
     params.set("vote_average_gte", String(filters.minRating));
+  }
+  if (filters.originalLanguage) {
+    params.set("with_original_language", filters.originalLanguage);
   }
 
   try {
