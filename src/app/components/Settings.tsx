@@ -41,7 +41,7 @@ const QUALITY_OPTIONS = [
 export function Settings() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading, user, setSettings, mustChangePassword, mustConfigureTmdb, refresh } = useAuth();
+  const { isAuthenticated, isLoading, user, setSettings, refresh } = useAuth();
   const [settings, setLocalSettings] = useState<UserSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -70,6 +70,12 @@ export function Settings() {
   const [tmdbMessage, setTmdbMessage] = useState<string | null>(null);
   const [tmdbError, setTmdbError] = useState<string | null>(null);
   const [isTmdbSaving, setIsTmdbSaving] = useState(false);
+  const [discordWebhookUrl, setDiscordWebhookUrl] = useState("");
+  const [discordTested, setDiscordTested] = useState(false);
+  const [discordFormOpen, setDiscordFormOpen] = useState(false);
+  const [discordMessage, setDiscordMessage] = useState<string | null>(null);
+  const [discordError, setDiscordError] = useState<string | null>(null);
+  const [isDiscordSaving, setIsDiscordSaving] = useState(false);
 
   const applySettingsToForms = (incomingSettings: UserSettings) => {
     const torrentSettings = incomingSettings.placeholders?.torrent || {};
@@ -88,6 +94,13 @@ export function Settings() {
     );
 
     setTmdbApiKey(incomingSettings.apiKeys?.tmdb || "");
+
+    const notifSettings = incomingSettings.placeholders?.notifications || {};
+    setDiscordWebhookUrl((notifSettings as any).discord?.webhookUrl || "");
+    setDiscordTested(
+      (notifSettings as any).enabledChannels?.includes("discord") && 
+      Boolean((notifSettings as any).discord?.webhookUrl)
+    );
   };
 
   const buildUpdatedSettings = (overrides: Partial<UserSettings["placeholders"]>): UserSettings => ({
@@ -160,7 +173,6 @@ export function Settings() {
 
   const handlePasswordUpdate = async (event: React.FormEvent) => {
     event.preventDefault();
-    const wasForcedChange = mustChangePassword;
     setError(null);
     setMessage(null);
     setIsSaving(true);
@@ -173,11 +185,6 @@ export function Settings() {
       setCurrentPassword("");
       setNewPassword("");
       setMessage("Mot de passe mis à jour.");
-
-      if (wasForcedChange) {
-        const nextPath = (location.state as { from?: string } | null)?.from || "/";
-        navigate(nextPath, { replace: true });
-      }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Mise à jour impossible");
     } finally {
@@ -187,7 +194,6 @@ export function Settings() {
 
   const handleTmdbSave = async (event: React.FormEvent) => {
     event.preventDefault();
-    const wasForcedConfig = mustConfigureTmdb;
     setTmdbError(null);
     setTmdbMessage(null);
     setIsTmdbSaving(true);
@@ -205,11 +211,6 @@ export function Settings() {
       setSettings(updatedSettings);
       await refresh();
       setTmdbMessage("Clé API TMDB configurée avec succès.");
-
-      if (wasForcedConfig) {
-        const nextPath = (location.state as { from?: string } | null)?.from || "/";
-        navigate(nextPath, { replace: true });
-      }
     } catch (submitError) {
       setTmdbError(submitError instanceof Error ? submitError.message : "Configuration impossible");
     } finally {
@@ -309,6 +310,83 @@ export function Settings() {
     }
   };
 
+  const handleDiscordSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setDiscordError(null);
+    setDiscordMessage(null);
+    setIsDiscordSaving(true);
+
+    try {
+      // Validation
+      if (!discordWebhookUrl.trim()) {
+        setDiscordError("L'URL du webhook Discord est requise");
+        setIsDiscordSaving(false);
+        return;
+      }
+
+      // Test webhook
+      const testResponse = await fetch(discordWebhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          embeds: [
+            {
+              title: "Test de Configuration SeedFlix",
+              description: "Votre webhook Discord fonctionne correctement!",
+              color: 0x10b981,
+              timestamp: new Date().toISOString(),
+              footer: { text: "SeedFlix Notifications" },
+            },
+          ],
+        }),
+      });
+
+      if (!testResponse.ok) {
+        setDiscordError(
+          `Test échoué (${testResponse.status}). Vérifiez que l'URL est correcte et active.`
+        );
+        setIsDiscordSaving(false);
+        return;
+      }
+
+      // Save configuration
+      const enabledChannels = ["discord"];
+      const updatedSettings: UserSettings = {
+        profile: settings?.profile || { username: user?.username || "admin" },
+        security: settings?.security || { lastPasswordChangeAt: new Date().toISOString() },
+        apiKeys: settings?.apiKeys || { tmdb: "" },
+        placeholders: {
+          notifications: {
+            enabledChannels,
+            discord: {
+              webhookUrl: discordWebhookUrl,
+            },
+          },
+          preferences: settings?.placeholders?.preferences || {},
+          torrent: settings?.placeholders?.torrent || {},
+          indexer: settings?.placeholders?.indexer || {},
+        },
+      };
+
+      await updateSettings(updatedSettings);
+      setLocalSettings(updatedSettings);
+      setSettings(updatedSettings);
+      await refresh();
+      setDiscordTested(true);
+      setDiscordMessage("Webhook Discord configuré et testé avec succès!");
+      // Fermer le formulaire
+      setDiscordFormOpen(false);
+    } catch (submitError) {
+      setDiscordError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Configuration impossible"
+      );
+    } finally {
+      setIsDiscordSaving(false);
+    }
+  };
+
   const handleResetSettings = async () => {
     setResetError(null);
     setTorrentMessage(null);
@@ -334,45 +412,33 @@ export function Settings() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-white">Paramètres</h2>
-        <p className="text-white/60 mt-1">
-          Gérez votre compte et préparez les futures préférences de l'application.
-        </p>
       </div>
-
-      {mustChangePassword && (
-        <div className="rounded-lg border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-          Vous utilisez encore les identifiants par défaut. Changez le mot de passe avant d'accéder au reste du site.
-        </div>
-      )}
-
       <Tabs defaultValue="security" className="space-y-6">
         <TabsList className="bg-white/10 border border-white/10">
-          <TabsTrigger value="security" className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white">
+          <TabsTrigger value="security" className="text-white data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
             Sécurité
           </TabsTrigger>
-          <TabsTrigger value="api" disabled={mustChangePassword} className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
+          <TabsTrigger value="api" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             Configuration
           </TabsTrigger>
-          <TabsTrigger value="factory" disabled={mustChangePassword || mustConfigureTmdb} className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
+          <TabsTrigger value="notifications" className="text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger value="factory" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
             Réinitialisation
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="security">
-          <Card className="border-white/10 bg-white/5 text-white">
+          <Card className="border-emerald-500/30 bg-emerald-950/15 text-white">
             <CardHeader>
-              <CardTitle>Modifier le mot de passe</CardTitle>
-              <CardDescription className="text-white/60">
+              <CardTitle className="text-emerald-200">Modifier le mot de passe</CardTitle>
+              <CardDescription className="text-emerald-100/70">
                 Dernière modification: {settings?.security?.lastPasswordChangeAt ? new Date(settings.security.lastPasswordChangeAt).toLocaleString("fr-FR") : "inconnue"}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handlePasswordUpdate} className="space-y-4 max-w-lg">
-                {mustChangePassword && (
-                  <p className="text-sm text-white/70">
-                    Le compte `admin` doit définir un mot de passe personnalisé avant de continuer.
-                  </p>
-                )}
                 <div className="space-y-2">
                   <Label htmlFor="current-password">Mot de passe actuel</Label>
                   <Input
@@ -395,7 +461,7 @@ export function Settings() {
                 </div>
                 {message && <p className="text-sm text-emerald-300">{message}</p>}
                 {error && <p className="text-sm text-red-300">{error}</p>}
-                <Button type="submit" disabled={isSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                <Button type="submit" disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                   {isSaving ? "Enregistrement..." : "Mettre à jour"}
                 </Button>
               </form>
@@ -404,16 +470,16 @@ export function Settings() {
         </TabsContent>
 
         <TabsContent value="api">
-          <Card className={`border-white/10 text-white ${mustConfigureTmdb ? "bg-cyan-950/30 border-cyan-500/50" : "bg-white/5"}`}>
+          <Card className="border-blue-500/30 bg-blue-950/15 text-white">
             <CardHeader>
-              <CardTitle>Librairie TMDB</CardTitle>
-              <CardDescription className="text-white/60">
+              <CardTitle className="text-blue-200">Librairie TMDB</CardTitle>
+              <CardDescription className="text-blue-100/70">
                 SeedFlix accepte le jeton API v3 et le Read Access Token v4. Obtenez-les sur{" "}
                     <a
                       href="https://www.themoviedb.org/settings/api"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-cyan-400 hover:text-cyan-300"
+                      className="text-blue-300 hover:text-blue-200"
                     >
                       themoviedb.org
                     </a>
@@ -421,14 +487,6 @@ export function Settings() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleTmdbSave} className="space-y-6 max-w-lg">
-                {mustConfigureTmdb && (
-                  <div className="bg-cyan-500/10 border border-cyan-500/50 rounded p-3">
-                    <p className="text-sm text-cyan-200">
-                      ⚠️ Le jeton API TMDB est requis pour utiliser l'application. Veuillez le configurer.
-                    </p>
-                  </div>
-                )}
-
                 <div className="space-y-2">
                   <Label htmlFor="tmdb-api-key">Jeton API</Label>
                   <Input
@@ -447,7 +505,7 @@ export function Settings() {
                 <Button
                   type="submit"
                   disabled={isTmdbSaving}
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   {isTmdbSaving ? "Enregistrement..." : "Enregistrer la clé"}
                 </Button>
@@ -455,10 +513,10 @@ export function Settings() {
             </CardContent>
           </Card>
 
-          <Card className="border-white/10 bg-white/5 text-white mt-6">
+          <Card className="border-blue-500/30 bg-blue-950/15 text-white mt-6">
             <CardHeader>
-              <CardTitle>Client torrent</CardTitle>
-              <CardDescription className="text-white/60">
+              <CardTitle className="text-blue-200">Client torrent</CardTitle>
+              <CardDescription className="text-blue-100/70">
                 Configurez vos paramètres de client torrent pour télécharger automatiquement films et séries.
               </CardDescription>
             </CardHeader>
@@ -552,17 +610,17 @@ export function Settings() {
                 {torrentMessage && <p className="text-sm text-emerald-300">{torrentMessage}</p>}
                 {torrentError && <p className="text-sm text-red-300">{torrentError}</p>}
 
-                <Button type="submit" disabled={isTorrentSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                <Button type="submit" disabled={isTorrentSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
                   {isTorrentSaving ? "Enregistrement et test..." : "Enregistrer et tester la connexion"}
                 </Button>
               </form>
             </CardContent>
           </Card>
 
-          <Card className="border-white/10 bg-white/5 text-white mt-6">
+          <Card className="border-blue-500/30 bg-blue-950/15 text-white mt-6">
             <CardHeader>
-              <CardTitle>Indexer</CardTitle>
-              <CardDescription className="text-white/60">
+              <CardTitle className="text-blue-200">Indexer</CardTitle>
+              <CardDescription className="text-blue-100/70">
                 Configurez votre indexer pour la recherche de contenu.
               </CardDescription>
             </CardHeader>
@@ -610,9 +668,104 @@ export function Settings() {
                 {indexerMessage && <p className="text-sm text-emerald-300">{indexerMessage}</p>}
                 {indexerError && <p className="text-sm text-red-300">{indexerError}</p>}
 
-                <Button type="submit" disabled={isIndexerSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                <Button type="submit" disabled={isIndexerSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
                   {isIndexerSaving ? "Enregistrement et test..." : "Enregistrer et tester la connexion"}
                 </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <Card className="border-purple-500/30 bg-purple-950/15 text-white">
+            <CardHeader>
+              <CardTitle className="text-purple-200">Canaux de notification</CardTitle>
+              <CardDescription className="text-purple-100/70">
+                Configurez les services pour recevoir des notifications d'événements importants.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleDiscordSave} className="space-y-6 max-w-lg">
+                <div
+                  className={`space-y-4 p-4 bg-slate-800/50 rounded-md border border-purple-500/20 ${
+                    discordFormOpen ? "" : "cursor-pointer"
+                  }`}
+                  onClick={() => {
+                    if (!discordFormOpen) {
+                      setDiscordFormOpen(true);
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="font-medium text-white">Discord</h4>
+                      <p className="text-sm text-purple-200/70">Recevoir les notifications via un webhook Discord</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDiscordFormOpen(true)}
+                      className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${
+                        discordTested
+                          ? "bg-emerald-600 text-white hover:bg-blue-600"
+                          : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                      }`}
+                    >
+                      {discordTested ? "Activé" : "Configurer"}
+                    </button>
+                  </div>
+
+                  {discordFormOpen && (
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="discord-webhook">URL du Webhook Discord</Label>
+                        <Input
+                          id="discord-webhook"
+                          type="password"
+                          placeholder="https://discord.com/api/webhooks/..."
+                          value={discordWebhookUrl}
+                          onChange={(e) => setDiscordWebhookUrl(e.target.value)}
+                          className="bg-slate-900 border-white/10 text-white"
+                        />
+                        <p className="text-xs text-slate-400">
+                          Créez un webhook en allant sur les paramètres du serveur Discord → Webhooks
+                        </p>
+                      </div>
+
+                      {discordMessage && (
+                        <p className="text-sm text-purple-300 p-2 bg-purple-900/30 rounded">
+                          ✓ {discordMessage}
+                        </p>
+                      )}
+                      {discordError && (
+                        <p className="text-sm text-red-300 p-2 bg-red-900/30 rounded">
+                          ✗ {discordError}
+                        </p>
+                      )}
+
+                      <div className="flex gap-2">
+                        <Button
+                        type="submit"
+                        disabled={isDiscordSaving || !discordWebhookUrl.trim()}
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                      >
+                        {isDiscordSaving ? "Test en cours..." : "Tester & Sauvegarder"}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setDiscordFormOpen(false);
+                            setDiscordError(null);
+                          }}
+                          disabled={isDiscordSaving}
+                          variant="ghost"
+                          className="border border-white/10 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                        >
+                          Annuler
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </form>
             </CardContent>
           </Card>

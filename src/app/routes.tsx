@@ -8,6 +8,7 @@ import { NotFound } from "./components/NotFound";
 import { Login } from "./components/Login";
 import { Settings } from "./components/Settings";
 import { Downloads } from "./components/Downloads";
+import Notifications from "./components/Notifications";
 import { InitialSetup } from "./components/InitialSetup";
 import { RequireAuth } from "./components/RequireAuth";
 
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
           { path: "series/:id", Component: SeriesDetails },
           { path: "wishlist", Component: WishList },
           { path: "downloads", Component: Downloads },
+          { path: "notifications", Component: Notifications },
           { path: "setup", Component: InitialSetup },
           { path: "settings", Component: Settings },
         ],

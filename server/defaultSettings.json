@@ -9,7 +9,12 @@
     "tmdb": ""
   },
   "placeholders": {
-    "notifications": {},
+    "notifications": {
+      "enabledChannels": [],
+      "discord": {
+        "webhookUrl": ""
+      }
+    },
     "preferences": {},
     "torrent": {
       "url": "",

@@ -8,6 +8,7 @@ import { registerTransmissionRoutes } from "./modules/transmission.js";
 import { registerTorznabRoutes } from "./modules/torznab.js";
 import { registerTmdbRoutes } from "./modules/tmdb.js";
 import { registerWishlistRoutes } from "./modules/wishlist.js";
+import { registerNotificationRoutes } from "./modules/notifications.js";
 
 const app = express();
 
@@ -27,6 +28,7 @@ registerWishlistRoutes(app);
 registerTransmissionRoutes(app);
 registerTorznabRoutes(app);
 registerTmdbRoutes(app);
+registerNotificationRoutes(app);
 
 // ─────────────────────────────────────────────────────────────────────────────
 

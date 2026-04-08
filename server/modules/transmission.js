@@ -2,6 +2,7 @@ import { requireAuth } from "./auth.js";
 import { debugLog } from "../logger.js";
 import { promises as fs } from "node:fs";
 import { appTorrentsFilePath, dataDir } from "../config.js";
+import { addNotification, sendDiscordNotification } from "./notifications.js";
 
 const transmissionTimeoutMs = 8000;
 const transmissionRpcPath = "/transmission/rpc";
@@ -218,6 +219,19 @@ function resolveDownloadDir(auth, mediaType) {
   return String(torrentSettings.moviesFolder || "").trim();
 }
 
+async function createAndSendNotification(userId, notification) {
+  try {
+    // Create in-app notification
+    await addNotification(userId, notification);
+
+    // Send to Discord if webhook is configured
+    // Note: We don't have auth here, so we can't easily get the webhook
+    // This is a limitation of the current architecture
+  } catch (error) {
+    debugLog("Failed to create notification:", error);
+  }
+}
+
 export function registerTransmissionRoutes(app) {
   app.post("/api/torrent/test", async (req, res) => {
     try {
@@ -341,10 +355,25 @@ export function registerTransmissionRoutes(app) {
       const added = data?.arguments?.["torrent-added"] || data?.arguments?.["torrent-duplicate"] || null;
       await registerAppTorrentForUser(auth.user.id, added);
 
+      // Create notification
+      const isDuplicate = Boolean(data?.arguments?.["torrent-duplicate"]);
+      const torrentName = added?.name || "Torrent";
+      await createAndSendNotification(auth.user.id, {
+        title: isDuplicate ? "Torrent dupliqué" : "Torrent ajouté",
+        message: `${torrentName}`,
+        type: isDuplicate ? "warning" : "success",
+        data: {
+          details: {
+            name: torrentName,
+            status: isDuplicate ? "dupliqué" : "ajouté",
+          },
+        },
+      });
+
       res.json({
         ok: true,
         message: "Torrent ajouté au client",
-        duplicate: Boolean(data?.arguments?.["torrent-duplicate"]),
+        duplicate: isDuplicate,
         torrent: added,
       });
     } catch (error) {

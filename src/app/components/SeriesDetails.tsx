@@ -30,6 +30,7 @@ const EMPTY_STATUS: SeriesWishlistStatus = {
 };
 
 const SERIES_QUALITY_FILTERS = ["all", "2160p", "1080p", "720p", "480p", "bluray", "webdl", "hdtv"];
+const SERIES_RELEASE_SEARCH_LIMIT = 100;
 
 function normalizeQuality(value: string | null | undefined) {
   const raw = String(value || "").toLowerCase();
@@ -65,7 +66,8 @@ function detectSeasonFromRelease(item: TorznabSeriesResult): string {
     return `S${attrSeason.padStart(2, "0")}`;
   }
 
-  const seasonMatch = title.match(/\bS(\d{1,2})\b/i) || title.match(/\bSeason[ ._-]?(\d{1,2})\b/i);
+  // Matcher S##E## (épisodes individuels) ou S## seul
+  const seasonMatch = title.match(/S(\d{1,2})(?:E\d{1,2})?/i) || title.match(/\bSeason[ ._-]?(\d{1,2})\b/i);
   if (seasonMatch?.[1]) {
     return `S${String(seasonMatch[1]).padStart(2, "0")}`;
   }
@@ -93,6 +95,8 @@ export function SeriesDetails() {
   const [qualityFilter, setQualityFilter] = useState("all");
   const [seasonFilter, setSeasonFilter] = useState("all");
   const [languageFilter, setLanguageFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<"size" | "date">("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
     const preferred = String(settings?.placeholders?.indexer?.defaultQuality || "all").toLowerCase();
@@ -111,6 +115,40 @@ export function SeriesDetails() {
     loadSeasonEpisodes(series.id, selectedSeason);
   }, [series?.id, selectedSeason]);
 
+  // Recherche additionnelle quand on filtre sur une saison pour attraper les épisodes individuels
+  useEffect(() => {
+    if (!series || seasonFilter === "all") {
+      return;
+    }
+
+    const loadSeasonEpisodeReleases = async () => {
+      try {
+        // Recherche ciblée avec le format "Series S01E" pour attraper les épisodes individuels
+        const episodeQuery = `${series.originalTitle || series.title} ${seasonFilter}E`;
+        const trackerResponse = await searchSeriesReleases(episodeQuery, 50);
+        
+        // Fusionner avec les résultats existants en évitant les doublons
+        setReleaseResults((prev) => {
+          const existingGuids = new Set(prev.map(item => item.guid).filter(Boolean));
+          const existingUrls = new Set(prev.map(item => item.downloadUrl).filter(Boolean));
+          
+          const newItems = trackerResponse.items.filter(item => {
+            const guidExists = item.guid && existingGuids.has(item.guid);
+            const urlExists = item.downloadUrl && existingUrls.has(item.downloadUrl);
+            return !guidExists && !urlExists;
+          });
+          
+          return [...prev, ...newItems];
+        });
+      } catch (error) {
+        // Silencieusement ignorer les erreurs de recherche additionnelle
+        console.debug("Recherche épisodes additionnelle échouée:", error);
+      }
+    };
+
+    loadSeasonEpisodeReleases();
+  }, [series, seasonFilter]);
+
   const availableSeasons = useMemo(() => {
     if (!series) {
       return [];
@@ -126,13 +164,34 @@ export function SeriesDetails() {
     [availableSeasons]
   );
 
-  const filteredReleaseResults = releaseResults.filter((item) => {
-    const qualityOk = qualityFilter === "all" || normalizeQuality(item.quality) === qualityFilter;
-    const seasonOk = seasonFilter === "all" || detectSeasonFromRelease(item) === seasonFilter;
-    const languageOk =
-      languageFilter === "all" || normalizeTrackerLanguage(item.language) === languageFilter;
-    return qualityOk && seasonOk && languageOk;
-  });
+  const filteredReleaseResults = useMemo(() => {
+    let filtered = releaseResults.filter((item) => {
+      const qualityOk = qualityFilter === "all" || normalizeQuality(item.quality) === qualityFilter;
+      const seasonOk = seasonFilter === "all" || detectSeasonFromRelease(item) === seasonFilter;
+      const languageOk =
+        languageFilter === "all" || normalizeTrackerLanguage(item.language) === languageFilter;
+      return qualityOk && seasonOk && languageOk;
+    });
+
+    // Appliquer le tri
+    filtered.sort((a, b) => {
+      let comparison = 0;
+
+      if (sortBy === "size") {
+        const sizeA = Number(a.size || 0);
+        const sizeB = Number(b.size || 0);
+        comparison = sizeA - sizeB;
+      } else if (sortBy === "date") {
+        const dateA = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+        const dateB = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+        comparison = dateA - dateB;
+      }
+
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    return filtered;
+  }, [releaseResults, qualityFilter, seasonFilter, languageFilter, sortBy, sortOrder]);
 
   const availableReleaseLanguages = useMemo(() => {
     const values = Array.from(
@@ -164,7 +223,7 @@ export function SeriesDetails() {
         try {
           const trackerResponse = await searchSeriesReleases(
             seriesData.originalTitle || seriesData.title,
-            12,
+            SERIES_RELEASE_SEARCH_LIMIT,
             seriesData.id
           );
           setReleaseResults(trackerResponse.items);
@@ -443,154 +502,6 @@ export function SeriesDetails() {
 
           <Card className="bg-white/5 border-white/10">
             <CardContent className="p-6 space-y-4">
-              <div>
-                <h3 className="text-xl font-semibold text-white">Résultats Tracker</h3>
-                <p className="text-sm text-white/60 mt-1">
-                  Versions détectées sur Torznab pour cette série.
-                </p>
-              </div>
-
-              <div className="grid sm:grid-cols-3 gap-3">
-                <div className="space-y-2">
-                  <label htmlFor="series-season-filter" className="text-sm text-white/80">
-                    Filtre saison
-                  </label>
-                  <select
-                    id="series-season-filter"
-                    value={seasonFilter}
-                    onChange={(event) => setSeasonFilter(event.target.value)}
-                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
-                  >
-                    <option value="all">Toutes saisons</option>
-                    {availableReleaseSeasons.map((season) => (
-                      <option key={season} value={season}>
-                        {season}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="series-quality-filter" className="text-sm text-white/80">
-                    Filtre qualité
-                  </label>
-                  <select
-                    id="series-quality-filter"
-                    value={qualityFilter}
-                    onChange={(event) => setQualityFilter(event.target.value)}
-                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
-                  >
-                    <option value="all">Toutes qualités</option>
-                    <option value="2160p">2160p (4K)</option>
-                    <option value="1080p">1080p</option>
-                    <option value="720p">720p</option>
-                    <option value="480p">480p</option>
-                    <option value="bluray">BluRay</option>
-                    <option value="webdl">WEB-DL / WEBRip</option>
-                    <option value="hdtv">HDTV</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="series-language-filter" className="text-sm text-white/80">
-                    Filtre langue
-                  </label>
-                  <select
-                    id="series-language-filter"
-                    value={languageFilter}
-                    onChange={(event) => setLanguageFilter(event.target.value)}
-                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
-                  >
-                    <option value="all">Toutes langues</option>
-                    {availableReleaseLanguages.map((language) => (
-                      <option key={language} value={language}>
-                        {language}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {isReleaseLoading && (
-                <p className="text-sm text-white/60">Recherche en cours...</p>
-              )}
-
-              {releaseError && (
-                <p className="text-sm text-red-300">{releaseError}</p>
-              )}
-
-              {torrentStatus && !releaseError && (
-                <p className="text-sm text-emerald-300">{torrentStatus}</p>
-              )}
-
-              {torrentError && (
-                <p className="text-sm text-red-300">{torrentError}</p>
-              )}
-
-              {!isReleaseLoading && !releaseError && filteredReleaseResults.length === 0 && (
-                <p className="text-sm text-white/60">Aucune version trouvée pour cette série.</p>
-              )}
-
-              {filteredReleaseResults.length > 0 && (
-                <div className="space-y-3">
-                  {filteredReleaseResults.map((item, index) => (
-                    <div
-                      key={item.guid || item.link || `${item.title}_${index}`}
-                      className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
-                    >
-                      <p className="text-white font-medium line-clamp-2">{item.title}</p>
-
-                      <div className="flex flex-wrap gap-2 items-center">
-                        <Button
-                          size="sm"
-                          onClick={() => handleAddTorrent(item.downloadUrl || item.link)}
-                          disabled={addingTorrentLink === (item.downloadUrl || item.link)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white"
-                        >
-                          {addingTorrentLink === (item.downloadUrl || item.link) ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Ajout...
-                            </>
-                          ) : (
-                            <>
-                              <Download className="w-4 h-4 mr-2" />
-                              Ajouter au client
-                            </>
-                          )}
-                        </Button>
-
-                        {item.quality && (
-                          <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
-                            Qualité: {item.quality}
-                          </Badge>
-                        )}
-                        {item.language && (
-                          <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
-                            Langue: {item.language}
-                          </Badge>
-                        )}
-                        {item.sizeHuman && (
-                          <Badge variant="outline" className="border-white/30 text-white/80">
-                            Taille: {item.sizeHuman}
-                          </Badge>
-                        )}
-                        {Number.isFinite(item.seeders || NaN) && (item.seeders || 0) >= 0 && (
-                          <Badge variant="outline" className="border-lime-500/40 text-lime-300">
-                            Seeders: {item.seeders}
-                          </Badge>
-                        )}
-                        {Number.isFinite(item.leechers || NaN) && (item.leechers || 0) >= 0 && (
-                          <Badge variant="outline" className="border-orange-500/40 text-orange-300">
-                            Peers: {item.leechers}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
               <div className="flex items-center gap-2">
                 <Clapperboard className="w-5 h-5 text-cyan-300" />
                 <h3 className="text-xl font-semibold text-white">Saisons et épisodes</h3>
@@ -754,6 +665,196 @@ export function SeriesDetails() {
                 <p className="text-white/60">
                   Aucune information de saison disponible pour cette série.
                 </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/5 border-white/10">
+            <CardContent className="p-6 space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold text-white">Résultats Tracker</h3>
+                <p className="text-sm text-white/60 mt-1">
+                  Versions détectées sur Torznab pour cette série.
+                </p>
+              </div>
+
+              <div className="grid sm:grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <label htmlFor="series-season-filter" className="text-sm text-white/80">
+                    Filtre saison
+                  </label>
+                  <select
+                    id="series-season-filter"
+                    value={seasonFilter}
+                    onChange={(event) => setSeasonFilter(event.target.value)}
+                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                  >
+                    <option value="all">Toutes saisons</option>
+                    {availableReleaseSeasons.map((season) => (
+                      <option key={season} value={season}>
+                        {season}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="series-quality-filter" className="text-sm text-white/80">
+                    Filtre qualité
+                  </label>
+                  <select
+                    id="series-quality-filter"
+                    value={qualityFilter}
+                    onChange={(event) => setQualityFilter(event.target.value)}
+                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                  >
+                    <option value="all">Toutes qualités</option>
+                    <option value="2160p">2160p (4K)</option>
+                    <option value="1080p">1080p</option>
+                    <option value="720p">720p</option>
+                    <option value="480p">480p</option>
+                    <option value="bluray">BluRay</option>
+                    <option value="webdl">WEB-DL / WEBRip</option>
+                    <option value="hdtv">HDTV</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="series-language-filter" className="text-sm text-white/80">
+                    Filtre langue
+                  </label>
+                  <select
+                    id="series-language-filter"
+                    value={languageFilter}
+                    onChange={(event) => setLanguageFilter(event.target.value)}
+                    className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                  >
+                    <option value="all">Toutes langues</option>
+                    {availableReleaseLanguages.map((language) => (
+                      <option key={language} value={language}>
+                        {language}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <label htmlFor="series-sort-by" className="text-sm text-white/80">
+                      Trier par
+                    </label>
+                    <select
+                      id="series-sort-by"
+                      value={sortBy}
+                      onChange={(event) => setSortBy(event.target.value as "size" | "date")}
+                      className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                    >
+                      <option value="date">Date</option>
+                      <option value="size">Taille</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="series-sort-order" className="text-sm text-white/80">
+                      Ordre
+                    </label>
+                    <select
+                      id="series-sort-order"
+                      value={sortOrder}
+                      onChange={(event) => setSortOrder(event.target.value as "asc" | "desc")}
+                      className="w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                    >
+                      <option value="desc">Décroissant</option>
+                      <option value="asc">Croissant</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {isReleaseLoading && (
+                <p className="text-sm text-white/60">Recherche en cours...</p>
+              )}
+
+              {releaseError && (
+                <p className="text-sm text-red-300">{releaseError}</p>
+              )}
+
+              {torrentStatus && !releaseError && (
+                <p className="text-sm text-emerald-300">{torrentStatus}</p>
+              )}
+
+              {torrentError && (
+                <p className="text-sm text-red-300">{torrentError}</p>
+              )}
+
+              {!isReleaseLoading && !releaseError && filteredReleaseResults.length === 0 && (
+                <p className="text-sm text-white/60">Aucune version trouvée pour cette série.</p>
+              )}
+
+              {filteredReleaseResults.length > 0 && (
+                <div className="space-y-3">
+                  {filteredReleaseResults.map((item, index) => (
+                    <div
+                      key={item.guid || item.link || `${item.title}_${index}`}
+                      className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
+                    >
+                      <p className="text-white font-medium line-clamp-2">{item.title}</p>
+
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <Button
+                          size="sm"
+                          onClick={() => handleAddTorrent(item.downloadUrl || item.link)}
+                          disabled={addingTorrentLink === (item.downloadUrl || item.link)}
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                        >
+                          {addingTorrentLink === (item.downloadUrl || item.link) ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Ajout...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4 mr-2" />
+                              Ajouter au client
+                            </>
+                          )}
+                        </Button>
+
+                        {item.quality && (
+                          <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
+                            Qualité: {item.quality}
+                          </Badge>
+                        )}
+                        {item.language && (
+                          <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
+                            Langue: {item.language}
+                          </Badge>
+                        )}
+                        {item.sizeHuman && (
+                          <Badge variant="outline" className="border-white/30 text-white/80">
+                            Taille: {item.sizeHuman}
+                          </Badge>
+                        )}
+                        {item.pubDate && (
+                          <Badge variant="outline" className="border-blue-500/40 text-blue-300">
+                            <Calendar className="w-3 h-3 mr-1 inline" />
+                            {new Date(item.pubDate).toLocaleDateString("fr-FR")}
+                          </Badge>
+                        )}
+                        {Number.isFinite(item.seeders || NaN) && (item.seeders || 0) >= 0 && (
+                          <Badge variant="outline" className="border-lime-500/40 text-lime-300">
+                            Seeders: {item.seeders}
+                          </Badge>
+                        )}
+                        {Number.isFinite(item.leechers || NaN) && (item.leechers || 0) >= 0 && (
+                          <Badge variant="outline" className="border-orange-500/40 text-orange-300">
+                            Peers: {item.leechers}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>

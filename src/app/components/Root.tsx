@@ -1,9 +1,10 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { Download, Heart, LogOut, Settings, User } from "lucide-react";
+import { Download, Heart, LogOut, Settings, User, Bell } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { getWishlistCount } from "../services/wishlistService";
 import { getSeriesWishlistCount } from "../services/seriesWishlistService";
 import { getTorrentDownloads } from "../services/torrentService";
+import * as notificationService from "../services/notificationService";
 import { Button } from "./ui/button";
 import { useAuth } from "../context/AuthContext";
 
@@ -12,6 +13,7 @@ export function Root() {
   const navigate = useNavigate();
   const [wishlistCount, setWishlistCount] = useState(0);
   const [downloadsCount, setDownloadsCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const wishlistTarget = location.pathname === "/wishlist" ? "/" : "/wishlist";
@@ -25,7 +27,6 @@ export function Root() {
     mustConfigureTorrent,
     mustConfigureIndexer,
   } = useAuth();
-  const isLoginPage = location.pathname === "/login";
   const isSetupPage = location.pathname === "/setup";
   const hasPendingSetup =
     needsInitialSetup ||
@@ -33,8 +34,14 @@ export function Root() {
     mustConfigureTmdb ||
     mustConfigureTorrent ||
     mustConfigureIndexer;
+  const canShowNavigationActions = isAuthenticated && !isSetupPage && !hasPendingSetup;
 
   useEffect(() => {
+    if (!canShowNavigationActions) {
+      setWishlistCount(0);
+      return;
+    }
+
     const loadCount = async () => {
       const [movieCount, seriesCount] = await Promise.all([
         getWishlistCount(),
@@ -42,11 +49,11 @@ export function Root() {
       ]);
       setWishlistCount(movieCount + seriesCount);
     };
-    loadCount();
-  }, [location]);
+    void loadCount();
+  }, [canShowNavigationActions, location.pathname]);
 
   useEffect(() => {
-    if (!isAuthenticated || isLoginPage || isSetupPage || hasPendingSetup) {
+    if (!isAuthenticated || isSetupPage || hasPendingSetup) {
       setDownloadsCount(0);
       return;
     }
@@ -68,7 +75,34 @@ export function Root() {
     return () => clearInterval(interval);
   }, [
     isAuthenticated,
-    isLoginPage,
+    isSetupPage,
+    hasPendingSetup,
+    location.pathname,
+  ]);
+
+  useEffect(() => {
+    if (!isAuthenticated || isSetupPage || hasPendingSetup) {
+      setUnreadNotificationsCount(0);
+      return;
+    }
+
+    const loadUnreadCount = async () => {
+      try {
+        const data = await notificationService.getNotifications(1, true);
+        setUnreadNotificationsCount(data.unreadCount);
+      } catch {
+        setUnreadNotificationsCount(0);
+      }
+    };
+
+    void loadUnreadCount();
+    const interval = setInterval(() => {
+      void loadUnreadCount();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [
+    isAuthenticated,
     isSetupPage,
     hasPendingSetup,
     location.pathname,
@@ -131,7 +165,7 @@ export function Root() {
             </Link>
 
             <div className="flex items-center gap-3">
-              {isAuthenticated && !isLoginPage && !isSetupPage && !hasPendingSetup && (
+              {canShowNavigationActions && (
                 <Link
                   to="/downloads"
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
@@ -146,7 +180,22 @@ export function Root() {
                 </Link>
               )}
 
-              {isAuthenticated && !isLoginPage && !isSetupPage && !hasPendingSetup && (
+              {canShowNavigationActions && (
+                <Link
+                  to="/notifications"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+                >
+                  <Bell className="w-5 h-5 text-amber-300" />
+                  <span className="text-white font-medium">Notifications</span>
+                  {unreadNotificationsCount > 0 && (
+                    <span className="bg-amber-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      {unreadNotificationsCount}
+                    </span>
+                  )}
+                </Link>
+              )}
+
+              {canShowNavigationActions && (
                 <Link
                   to={wishlistTarget}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
@@ -183,10 +232,6 @@ export function Root() {
                       className="absolute right-0 top-full mt-2 min-w-[12rem] rounded-md border border-white/10 bg-slate-950/95 p-1 text-white shadow-2xl backdrop-blur-md z-[200]"
                       role="menu"
                     >
-                      <div className="px-2 py-1.5 text-sm font-medium">
-                        {user?.username}
-                      </div>
-                      <div className="mx-1 my-1 h-px bg-white/10" />
                       <button
                         type="button"
                         className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-white transition-colors hover:bg-white/10"
@@ -208,17 +253,7 @@ export function Root() {
                     </div>
                   )}
                 </div>
-              ) : isLoginPage ? null : (
-                <Link to="/login">
-                  <Button
-                    variant="outline"
-                    className="border-white/10 bg-white/5 text-white hover:bg-white/10"
-                  >
-                    <User className="w-4 h-4 mr-2" />
-                    Connexion
-                  </Button>
-                </Link>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
