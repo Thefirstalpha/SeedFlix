@@ -4,6 +4,7 @@ import { ArrowLeft, Calendar, Clapperboard, Download, Heart, Loader2, Star, Tv }
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
+import { ScrollArea } from "./ui/scroll-area";
 import {
   getSeriesById,
   getSeriesSeasonEpisodes,
@@ -97,6 +98,8 @@ export function SeriesDetails() {
   const [languageFilter, setLanguageFilter] = useState("all");
   const [sortBy, setSortBy] = useState<"size" | "date">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     const preferred = String(settings?.placeholders?.indexer?.defaultQuality || "all").toLowerCase();
@@ -192,6 +195,16 @@ export function SeriesDetails() {
 
     return filtered;
   }, [releaseResults, qualityFilter, seasonFilter, languageFilter, sortBy, sortOrder]);
+
+  const totalPages = Math.ceil(filteredReleaseResults.length / ITEMS_PER_PAGE);
+  const paginatedResults = filteredReleaseResults.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [qualityFilter, seasonFilter, languageFilter, sortBy, sortOrder]);
 
   const availableReleaseLanguages = useMemo(() => {
     const values = Array.from(
@@ -572,8 +585,9 @@ export function SeriesDetails() {
                       ))}
                     </div>
                   ) : episodes.length > 0 ? (
-                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                      {episodes.map((episode) => {
+                    <ScrollArea className="h-[500px] w-full rounded-lg border border-white/10">
+                      <div className="space-y-3 p-4">
+                        {episodes.map((episode) => {
                         const coveredByParent =
                           wishlistStatus.seriesInWishlist ||
                           (selectedSeason !== null &&
@@ -652,8 +666,9 @@ export function SeriesDetails() {
                             )}
                           </div>
                         );
-                      })}
-                    </div>
+                        })}
+                      </div>
+                    </ScrollArea>
                   ) : (
                     <p className="text-white/60">
                       Les détails d'épisodes ne sont pas disponibles pour
@@ -793,7 +808,7 @@ export function SeriesDetails() {
 
               {filteredReleaseResults.length > 0 && (
                 <div className="space-y-3">
-                  {filteredReleaseResults.map((item, index) => (
+                  {paginatedResults.map((item, index) => (
                     <div
                       key={item.guid || item.link || `${item.title}_${index}`}
                       className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
@@ -854,6 +869,42 @@ export function SeriesDetails() {
                       </div>
                     </div>
                   ))}
+
+                  <div className="flex items-center justify-center gap-2 flex-wrap pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                    >
+                      ← Précédent
+                    </Button>
+
+                    <span className="text-sm text-white/80">
+                      Page {currentPage} / {totalPages}
+                    </span>
+
+                    <select
+                      value={currentPage}
+                      onChange={(event) => setCurrentPage(Number(event.target.value))}
+                      className="bg-slate-900 border border-white/20 text-white rounded-md px-2 py-1 text-sm"
+                    >
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <option key={page} value={page}>
+                          Page {page}
+                        </option>
+                      ))}
+                    </select>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Suivant →
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>

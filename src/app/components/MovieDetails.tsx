@@ -52,6 +52,8 @@ export function MovieDetails() {
   const [torrentError, setTorrentError] = useState<string | null>(null);
   const [qualityFilter, setQualityFilter] = useState("all");
   const [languageFilter, setLanguageFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     const preferred = String(settings?.placeholders?.indexer?.defaultQuality || "all").toLowerCase();
@@ -68,6 +70,17 @@ export function MovieDetails() {
 
     return normalizeQuality(item.quality) === qualityFilter && languageOk;
   });
+
+  const totalPages = Math.ceil(filteredReleaseResults.length / ITEMS_PER_PAGE);
+  const paginatedResults = filteredReleaseResults.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [qualityFilter, languageFilter]);
 
   const availableReleaseLanguages = Array.from(
     new Set(
@@ -377,8 +390,9 @@ export function MovieDetails() {
               )}
 
               {filteredReleaseResults.length > 0 && (
-                <div className="space-y-3">
-                  {filteredReleaseResults.map((item, index) => (
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    {paginatedResults.map((item, index) => (
                     <div
                       key={item.guid || item.link || `${item.title}_${index}`}
                       className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
@@ -441,6 +455,43 @@ export function MovieDetails() {
                       )}
                     </div>
                   ))}
+                  </div>
+
+                  <div className="flex items-center justify-center gap-2 flex-wrap pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                    >
+                      ← Précédent
+                    </Button>
+
+                    <span className="text-sm text-white/80">
+                      Page {currentPage} / {totalPages}
+                    </span>
+
+                    <select
+                      value={currentPage}
+                      onChange={(event) => setCurrentPage(Number(event.target.value))}
+                      className="bg-slate-900 border border-white/20 text-white rounded-md px-2 py-1 text-sm"
+                    >
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <option key={page} value={page}>
+                          Page {page}
+                        </option>
+                      ))}
+                    </select>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Suivant →
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
