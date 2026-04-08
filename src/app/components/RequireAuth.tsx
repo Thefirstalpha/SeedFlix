@@ -3,7 +3,21 @@ import { useAuth } from "../context/AuthContext";
 
 export function RequireAuth() {
   const location = useLocation();
-  const { isAuthenticated, isLoading, mustChangePassword } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading,
+    needsInitialSetup,
+    mustChangePassword,
+    mustConfigureTmdb,
+    mustConfigureTorrent,
+    mustConfigureIndexer,
+  } = useAuth();
+  const hasPendingSetup =
+    needsInitialSetup ||
+    mustChangePassword ||
+    mustConfigureTmdb ||
+    mustConfigureTorrent ||
+    mustConfigureIndexer;
 
   if (isLoading) {
     return (
@@ -17,8 +31,8 @@ export function RequireAuth() {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  if (mustChangePassword && location.pathname !== "/settings") {
-    return <Navigate to="/settings" replace state={{ from: location.pathname, forced: true }} />;
+  if (hasPendingSetup && location.pathname !== "/setup") {
+    return <Navigate to="/setup" replace state={{ from: location.pathname, forced: true }} />;
   }
 
   return <Outlet />;

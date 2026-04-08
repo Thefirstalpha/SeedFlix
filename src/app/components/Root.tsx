@@ -15,8 +15,24 @@ export function Root() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const wishlistTarget = location.pathname === "/wishlist" ? "/" : "/wishlist";
-  const { user, isAuthenticated, logout, mustChangePassword } = useAuth();
+  const {
+    user,
+    isAuthenticated,
+    logout,
+    needsInitialSetup,
+    mustChangePassword,
+    mustConfigureTmdb,
+    mustConfigureTorrent,
+    mustConfigureIndexer,
+  } = useAuth();
   const isLoginPage = location.pathname === "/login";
+  const isSetupPage = location.pathname === "/setup";
+  const hasPendingSetup =
+    needsInitialSetup ||
+    mustChangePassword ||
+    mustConfigureTmdb ||
+    mustConfigureTorrent ||
+    mustConfigureIndexer;
 
   useEffect(() => {
     const loadCount = async () => {
@@ -30,7 +46,7 @@ export function Root() {
   }, [location]);
 
   useEffect(() => {
-    if (!isAuthenticated || isLoginPage || mustChangePassword) {
+    if (!isAuthenticated || isLoginPage || isSetupPage || hasPendingSetup) {
       setDownloadsCount(0);
       return;
     }
@@ -50,7 +66,13 @@ export function Root() {
     }, 7000);
 
     return () => clearInterval(interval);
-  }, [isAuthenticated, isLoginPage, mustChangePassword, location.pathname]);
+  }, [
+    isAuthenticated,
+    isLoginPage,
+    isSetupPage,
+    hasPendingSetup,
+    location.pathname,
+  ]);
 
   useEffect(() => {
     if (!isUserMenuOpen) {
@@ -111,7 +133,7 @@ export function Root() {
             </Link>
 
             <div className="flex items-center gap-3">
-              {isAuthenticated && !isLoginPage && !mustChangePassword && (
+              {isAuthenticated && !isLoginPage && !isSetupPage && !hasPendingSetup && (
                 <Link
                   to="/downloads"
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
@@ -126,7 +148,7 @@ export function Root() {
                 </Link>
               )}
 
-              {isAuthenticated && !isLoginPage && !mustChangePassword && (
+              {isAuthenticated && !isLoginPage && !isSetupPage && !hasPendingSetup && (
                 <Link
                   to={wishlistTarget}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"

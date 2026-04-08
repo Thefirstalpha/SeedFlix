@@ -204,6 +204,52 @@ function isTmdbConfigured(user) {
   return Boolean(user?.settings?.apiKeys?.tmdb?.trim());
 }
 
+function isTorrentConfigured(user) {
+  const torrentSettings = user?.settings?.placeholders?.torrent || {};
+  const hasEndpoint = Boolean(String(torrentSettings.url || "").trim());
+  const hasPort = Boolean(String(torrentSettings.port || "").trim());
+
+  if (!hasEndpoint || !hasPort) {
+    return false;
+  }
+
+  if (!torrentSettings.authRequired) {
+    return true;
+  }
+
+  return Boolean(
+    String(torrentSettings.username || "").trim() &&
+      String(torrentSettings.password || "").trim()
+  );
+}
+
+function isIndexerConfigured(user) {
+  const indexerSettings = user?.settings?.placeholders?.indexer || {};
+  return Boolean(
+    String(indexerSettings.url || "").trim() &&
+      String(indexerSettings.token || "").trim()
+  );
+}
+
+function buildSetupStatus(user) {
+  const mustChangePassword = Boolean(user?.mustChangePassword);
+  const mustConfigureTmdb = !isTmdbConfigured(user);
+  const mustConfigureTorrent = !isTorrentConfigured(user);
+  const mustConfigureIndexer = !isIndexerConfigured(user);
+
+  return {
+    mustChangePassword,
+    mustConfigureTmdb,
+    mustConfigureTorrent,
+    mustConfigureIndexer,
+    needsInitialSetup:
+      mustChangePassword ||
+      mustConfigureTmdb ||
+      mustConfigureTorrent ||
+      mustConfigureIndexer,
+  };
+}
+
 function parseCookies(cookieHeader = "") {
   return cookieHeader.split(";").reduce((cookies, part) => {
     const [rawName, ...rawValue] = part.trim().split("=");
@@ -282,15 +328,21 @@ export function registerAuthRoutes(app) {
     try {
       const auth = await getAuthenticatedUser(req);
       if (!auth) {
-        res.json({ authenticated: false, mustChangePassword: false });
+        res.json({
+          authenticated: false,
+          mustChangePassword: false,
+          mustConfigureTmdb: false,
+          mustConfigureTorrent: false,
+          mustConfigureIndexer: false,
+          needsInitialSetup: false,
+        });
         return;
       }
 
       res.json({
         authenticated: true,
         user: sanitizeUser(auth.user),
-        mustChangePassword: Boolean(auth.user.mustChangePassword),
-        mustConfigureTmdb: !isTmdbConfigured(auth.user),
+        ...buildSetupStatus(auth.user),
         settings: auth.user.settings,
       });
     } catch (error) {
@@ -329,8 +381,7 @@ export function registerAuthRoutes(app) {
 
       res.json({
         user: sanitizeUser(user),
-        mustChangePassword: Boolean(user.mustChangePassword),
-        mustConfigureTmdb: !isTmdbConfigured(user),
+        ...buildSetupStatus(user),
         settings: user.settings,
       });
     } catch (error) {

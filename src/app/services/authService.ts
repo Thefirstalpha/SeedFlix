@@ -11,6 +11,9 @@ export interface AuthResponse {
   settings?: UserSettings;
   mustChangePassword: boolean;
   mustConfigureTmdb: boolean;
+  mustConfigureTorrent: boolean;
+  mustConfigureIndexer: boolean;
+  needsInitialSetup: boolean;
 }
 
 export interface UserSettings {
@@ -73,7 +76,14 @@ export async function getCurrentAuth(): Promise<AuthResponse> {
     });
     return await parseJson<AuthResponse>(response);
   } catch {
-    return { authenticated: false, mustChangePassword: false };
+    return {
+      authenticated: false,
+      mustChangePassword: false,
+      mustConfigureTmdb: false,
+      mustConfigureTorrent: false,
+      mustConfigureIndexer: false,
+      needsInitialSetup: false,
+    };
   }
 }
 

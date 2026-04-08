@@ -10,15 +10,30 @@ import { useAuth } from "../context/AuthContext";
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, isLoading, login, mustChangePassword, mustConfigureTmdb } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading,
+    login,
+    needsInitialSetup,
+    mustChangePassword,
+    mustConfigureTmdb,
+    mustConfigureTorrent,
+    mustConfigureIndexer,
+  } = useAuth();
+  const hasPendingSetup =
+    needsInitialSetup ||
+    mustChangePassword ||
+    mustConfigureTmdb ||
+    mustConfigureTorrent ||
+    mustConfigureIndexer;
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isLoading && isAuthenticated) {
-    if (mustChangePassword || mustConfigureTmdb) {
-      return <Navigate to="/settings" replace state={{ forced: true }} />;
+    if (hasPendingSetup) {
+      return <Navigate to="/setup" replace state={{ from: (location.state as { from?: string } | null)?.from || "/", forced: true }} />;
     }
     const nextPath = (location.state as { from?: string } | null)?.from || "/";
     return <Navigate to={nextPath} replace />;
@@ -29,11 +44,26 @@ export function Login() {
     setError(null);
     setIsSubmitting(true);
     try {
-      await login(username, password);
-      if (username === "admin" && password === "admin") {
-        navigate("/settings", { replace: true, state: { forced: true } });
+      const response = await login(username, password);
+      const mustOpenSetup =
+        response.needsInitialSetup ||
+        response.mustChangePassword ||
+        response.mustConfigureTmdb ||
+        response.mustConfigureTorrent ||
+        response.mustConfigureIndexer ||
+        (username === "admin" && password === "admin");
+
+      if (mustOpenSetup) {
+        navigate("/setup", {
+          replace: true,
+          state: {
+            from: (location.state as { from?: string } | null)?.from || "/",
+            forced: true,
+          },
+        });
         return;
       }
+
       const nextPath = (location.state as { from?: string } | null)?.from || "/";
       navigate(nextPath, { replace: true });
     } catch (submitError) {
