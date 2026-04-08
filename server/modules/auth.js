@@ -10,6 +10,7 @@ import {
   sessionsFilePath,
   usersFilePath,
 } from "../config.js";
+import { debugLog } from "../logger.js";
 
 function hashPassword(password, salt = randomBytes(16).toString("hex")) {
   const hash = scryptSync(password, salt, 64).toString("hex");
@@ -33,6 +34,9 @@ function buildDefaultSettings(username = "admin") {
     },
     security: {
       lastPasswordChangeAt: new Date().toISOString(),
+    },
+    apiKeys: {
+      tmdb: "",
     },
     placeholders: {
       notifications: {},
@@ -196,6 +200,10 @@ async function ensureUsersStore() {
   }
 }
 
+function isTmdbConfigured(user) {
+  return Boolean(user?.settings?.apiKeys?.tmdb?.trim());
+}
+
 function parseCookies(cookieHeader = "") {
   return cookieHeader.split(";").reduce((cookies, part) => {
     const [rawName, ...rawValue] = part.trim().split("=");
@@ -282,10 +290,11 @@ export function registerAuthRoutes(app) {
         authenticated: true,
         user: sanitizeUser(auth.user),
         mustChangePassword: Boolean(auth.user.mustChangePassword),
+        mustConfigureTmdb: !isTmdbConfigured(auth.user),
         settings: auth.user.settings,
       });
     } catch (error) {
-      console.error("Auth me failed:", error);
+      debugLog("Auth me failed:", error);
       res.status(500).json({ error: "Failed to read session" });
     }
   });
@@ -321,10 +330,11 @@ export function registerAuthRoutes(app) {
       res.json({
         user: sanitizeUser(user),
         mustChangePassword: Boolean(user.mustChangePassword),
+        mustConfigureTmdb: !isTmdbConfigured(user),
         settings: user.settings,
       });
     } catch (error) {
-      console.error("Login failed:", error);
+      debugLog("Login failed:", error);
       res.status(500).json({ error: "Failed to log in" });
     }
   });
@@ -341,7 +351,7 @@ export function registerAuthRoutes(app) {
       clearSessionCookie(res);
       res.json({ ok: true });
     } catch (error) {
-      console.error("Logout failed:", error);
+      debugLog("Logout failed:", error);
       res.status(500).json({ error: "Failed to log out" });
     }
   });
@@ -395,7 +405,7 @@ export function registerAuthRoutes(app) {
       await writeUsers(nextUsers);
       res.json({ ok: true });
     } catch (error) {
-      console.error("Change password failed:", error);
+      debugLog("Change password failed:", error);
       res.status(500).json({ error: "Failed to change password" });
     }
   });
@@ -409,7 +419,7 @@ export function registerAuthRoutes(app) {
 
       res.json(auth.user.settings || {});
     } catch (error) {
-      console.error("Read settings failed:", error);
+      debugLog("Read settings failed:", error);
       res.status(500).json({ error: "Failed to load settings" });
     }
   });
@@ -436,7 +446,7 @@ export function registerAuthRoutes(app) {
       await writeUsers(nextUsers);
       res.json(newSettings);
     } catch (error) {
-      console.error("Update settings failed:", error);
+      debugLog("Update settings failed:", error);
       res.status(500).json({ error: "Failed to update settings" });
     }
   });
@@ -481,7 +491,7 @@ export function registerAuthRoutes(app) {
         },
       });
     } catch (error) {
-      console.error("Reset settings failed:", error);
+      debugLog("Reset settings failed:", error);
       res.status(500).json({ error: "Failed to reset settings" });
     }
   });

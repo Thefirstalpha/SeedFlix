@@ -10,6 +10,7 @@ export interface AuthResponse {
   user?: AuthUser;
   settings?: UserSettings;
   mustChangePassword: boolean;
+  mustConfigureTmdb: boolean;
 }
 
 export interface UserSettings {
@@ -18,6 +19,9 @@ export interface UserSettings {
   };
   security: {
     lastPasswordChangeAt?: string;
+  };
+  apiKeys?: {
+    tmdb?: string;
   };
   placeholders: {
     notifications?: Record<string, unknown>;

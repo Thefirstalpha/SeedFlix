@@ -1,4 +1,5 @@
 import { requireAuth } from "./auth.js";
+import { debugLog } from "../logger.js";
 import { promises as fs } from "node:fs";
 import { appTorrentsFilePath, dataDir } from "../config.js";
 
@@ -263,7 +264,7 @@ export function registerTransmissionRoutes(app) {
         return;
       }
 
-      console.error("Transmission test failed:", error);
+      debugLog("Transmission test failed:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Échec du test Transmission",
       });
@@ -338,7 +339,7 @@ export function registerTransmissionRoutes(app) {
         return;
       }
 
-      console.error("Add torrent failed:", error);
+      debugLog("Add torrent failed:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Échec de l'ajout torrent",
       });
@@ -439,7 +440,7 @@ export function registerTransmissionRoutes(app) {
         return;
       }
 
-      console.error("Get downloads failed:", error);
+      debugLog("Get downloads failed:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Échec de lecture des téléchargements",
       });

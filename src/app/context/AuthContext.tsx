@@ -18,6 +18,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   settings: UserSettings | null;
   mustChangePassword: boolean;
+  mustConfigureTmdb: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
@@ -32,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [mustConfigureTmdb, setMustConfigureTmdb] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const refresh = async () => {
@@ -42,10 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(auth.user);
         setSettings(auth.settings || null);
         setMustChangePassword(auth.mustChangePassword);
+        setMustConfigureTmdb(auth.mustConfigureTmdb);
       } else {
         setUser(null);
         setSettings(null);
         setMustChangePassword(false);
+        setMustConfigureTmdb(false);
       }
     } finally {
       setIsLoading(false);
@@ -60,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     settings,
     mustChangePassword,
+    mustConfigureTmdb,
     isAuthenticated: Boolean(user),
     isLoading,
     login: async (username: string, password: string) => {
@@ -67,16 +72,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(response.user || null);
       setSettings(response.settings || null);
       setMustChangePassword(response.mustChangePassword);
+      setMustConfigureTmdb(response.mustConfigureTmdb);
     },
     logout: async () => {
       await logoutRequest();
       setUser(null);
       setSettings(null);
       setMustChangePassword(false);
+      setMustConfigureTmdb(false);
     },
     refresh,
     setSettings,
-  }), [user, settings, mustChangePassword, isLoading]);
+  }), [user, settings, mustChangePassword, mustConfigureTmdb, isLoading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

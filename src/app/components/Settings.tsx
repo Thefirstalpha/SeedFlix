@@ -41,7 +41,7 @@ const QUALITY_OPTIONS = [
 export function Settings() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading, user, setSettings, mustChangePassword, refresh } = useAuth();
+  const { isAuthenticated, isLoading, user, setSettings, mustChangePassword, mustConfigureTmdb, refresh } = useAuth();
   const [settings, setLocalSettings] = useState<UserSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -66,6 +66,10 @@ export function Settings() {
   const [isIndexerSaving, setIsIndexerSaving] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
+  const [tmdbApiKey, setTmdbApiKey] = useState("");
+  const [tmdbMessage, setTmdbMessage] = useState<string | null>(null);
+  const [tmdbError, setTmdbError] = useState<string | null>(null);
+  const [isTmdbSaving, setIsTmdbSaving] = useState(false);
 
   const applySettingsToForms = (incomingSettings: UserSettings) => {
     const torrentSettings = incomingSettings.placeholders?.torrent || {};
@@ -82,6 +86,8 @@ export function Settings() {
     setIndexerDefaultQuality(
       incomingSettings.placeholders?.indexer?.defaultQuality || "all"
     );
+
+    setTmdbApiKey(incomingSettings.apiKeys?.tmdb || "");
   };
 
   const buildUpdatedSettings = (overrides: Partial<UserSettings["placeholders"]>): UserSettings => ({
@@ -89,12 +95,41 @@ export function Settings() {
     security: settings?.security || {
       lastPasswordChangeAt: new Date().toISOString(),
     },
+    apiKeys: settings?.apiKeys || { tmdb: "" },
     placeholders: {
       notifications: settings?.placeholders?.notifications || {},
       preferences: settings?.placeholders?.preferences || {},
       torrent: settings?.placeholders?.torrent,
       indexer: settings?.placeholders?.indexer,
       ...overrides,
+    },
+  });
+
+  const buildTmdbSettings = (): UserSettings => ({
+    profile: settings?.profile || { username: user?.username || "admin" },
+    security: settings?.security || {
+      lastPasswordChangeAt: new Date().toISOString(),
+    },
+    apiKeys: {
+      tmdb: tmdbApiKey.trim(),
+    },
+    placeholders: settings?.placeholders || {
+      notifications: {},
+      preferences: {},
+      torrent: {
+        url: "",
+        port: "",
+        authRequired: false,
+        username: "",
+        password: "",
+        moviesFolder: "",
+        seriesFolder: "",
+      },
+      indexer: {
+        url: "",
+        token: "",
+        defaultQuality: "all",
+      },
     },
   });
 
@@ -147,6 +182,38 @@ export function Settings() {
       setError(submitError instanceof Error ? submitError.message : "Mise à jour impossible");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTmdbSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const wasForcedConfig = mustConfigureTmdb;
+    setTmdbError(null);
+    setTmdbMessage(null);
+    setIsTmdbSaving(true);
+
+    if (!tmdbApiKey.trim()) {
+      setTmdbError("La clé API TMDB est requise");
+      setIsTmdbSaving(false);
+      return;
+    }
+
+    try {
+      const updatedSettings = buildTmdbSettings();
+      await updateSettings(updatedSettings);
+      setLocalSettings(updatedSettings);
+      setSettings(updatedSettings);
+      await refresh();
+      setTmdbMessage("Clé API TMDB configurée avec succès.");
+
+      if (wasForcedConfig) {
+        const nextPath = (location.state as { from?: string } | null)?.from || "/";
+        navigate(nextPath, { replace: true });
+      }
+    } catch (submitError) {
+      setTmdbError(submitError instanceof Error ? submitError.message : "Configuration impossible");
+    } finally {
+      setIsTmdbSaving(false);
     }
   };
 
@@ -283,13 +350,16 @@ export function Settings() {
           <TabsTrigger value="security" className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white">
             Sécurité
           </TabsTrigger>
-          <TabsTrigger value="account" disabled={mustChangePassword} className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
+          <TabsTrigger value="api" disabled={mustChangePassword} className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
+            Configuration API
+          </TabsTrigger>
+          <TabsTrigger value="account" disabled={mustChangePassword || mustConfigureTmdb} className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
             Compte
           </TabsTrigger>
-          <TabsTrigger value="future" disabled={mustChangePassword} className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
+          <TabsTrigger value="future" disabled={mustChangePassword || mustConfigureTmdb} className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
             Téléchargements
           </TabsTrigger>
-          <TabsTrigger value="factory" disabled={mustChangePassword} className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
+          <TabsTrigger value="factory" disabled={mustChangePassword || mustConfigureTmdb} className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white disabled:opacity-50 disabled:cursor-not-allowed">
             Réinitialisation
           </TabsTrigger>
         </TabsList>
@@ -333,6 +403,62 @@ export function Settings() {
                 {error && <p className="text-sm text-red-300">{error}</p>}
                 <Button type="submit" disabled={isSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
                   {isSaving ? "Enregistrement..." : "Mettre à jour"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="api">
+          <Card className={`border-white/10 text-white ${mustConfigureTmdb ? "bg-cyan-950/30 border-cyan-500/50" : "bg-white/5"}`}>
+            <CardHeader>
+              <CardTitle>Clés API</CardTitle>
+              <CardDescription className="text-white/60">
+                Configuration des clés API externes requises pour l'application.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleTmdbSave} className="space-y-6 max-w-lg">
+                {mustConfigureTmdb && (
+                  <div className="bg-cyan-500/10 border border-cyan-500/50 rounded p-3">
+                    <p className="text-sm text-cyan-200">
+                      ⚠️ La clé API TMDB est requise pour utiliser l'application. Veuillez la configurer.
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="tmdb-api-key">Clé API TMDB</Label>
+                  <p className="text-xs text-white/50">
+                    Obtenez une clé sur{" "}
+                    <a
+                      href="https://www.themoviedb.org/settings/api"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-400 hover:text-cyan-300"
+                    >
+                      themoviedb.org
+                    </a>
+                  </p>
+                  <Input
+                    id="tmdb-api-key"
+                    type="password"
+                    placeholder="Entrez votre clé API TMDB"
+                    value={tmdbApiKey}
+                    onChange={(event) => setTmdbApiKey(event.target.value)}
+                    className="bg-slate-900 border-white/10 text-white"
+                  />
+                </div>
+
+                {tmdbMessage && <p className="text-sm text-emerald-300">{tmdbMessage}</p>}
+                {tmdbError && <p className="text-sm text-red-300">{tmdbError}</p>}
+
+                <Button
+                  type="submit"
+                  disabled={isTmdbSaving}
+                  className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                >
+                  {isTmdbSaving ? "Enregistrement..." : "Enregistrer la clé"}
                 </Button>
               </form>
             </CardContent>

@@ -433,7 +433,7 @@ export function registerTorznabRoutes(app) {
         return;
       }
 
-      console.error("Torznab search failed:", error);
+      debugLog("Torznab search failed:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Échec de la recherche Torznab",
       });
@@ -501,7 +501,7 @@ export function registerTorznabRoutes(app) {
         return;
       }
 
-      console.error("Torznab test failed:", error);
+      debugLog("Torznab test failed:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Échec du test Torznab",
       });

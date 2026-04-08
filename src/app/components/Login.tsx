@@ -10,14 +10,14 @@ import { useAuth } from "../context/AuthContext";
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, isLoading, login, mustChangePassword } = useAuth();
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin");
+  const { isAuthenticated, isLoading, login, mustChangePassword, mustConfigureTmdb } = useAuth();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isLoading && isAuthenticated) {
-    if (mustChangePassword) {
+    if (mustChangePassword || mustConfigureTmdb) {
       return <Navigate to="/settings" replace state={{ forced: true }} />;
     }
     const nextPath = (location.state as { from?: string } | null)?.from || "/";
@@ -53,7 +53,7 @@ export function Login() {
         <CardHeader>
           <CardTitle className="text-2xl">Connexion</CardTitle>
           <CardDescription className="text-white/60">
-            L'application est privée. Connectez-vous avec le compte admin.
+            Identifiez-vous pour accéder à l'application.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -94,10 +94,6 @@ export function Login() {
             >
               {isSubmitting ? "Connexion..." : "Se connecter"}
             </Button>
-
-            <p className="text-xs text-white/45">
-              Compte par défaut: admin / admin
-            </p>
           </form>
         </CardContent>
       </Card>
