@@ -441,7 +441,7 @@ export function InitialSetup() {
           <CardHeader>
             <CardTitle>Changez le mot de passe par défaut</CardTitle>
             <CardDescription className="text-white/60">
-              Cette étape sécurise immédiatement le compte administrateur avec le mot de passe par défaut.
+              Cette étape sécurise immédiatement le compte administrateur
             </CardDescription>
           </CardHeader>
           <CardContent>

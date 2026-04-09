@@ -246,7 +246,7 @@ export function MovieDetails() {
 
       {/* Backdrop Image */}
       {movie.backdrop && (
-        <div className="relative w-full h-64 md:h-96 rounded-lg overflow-hidden">
+        <div className="relative w-full h-44 sm:h-56 md:h-80 lg:h-96 rounded-lg overflow-hidden">
           <img
             src={movie.backdrop}
             alt={movie.title}

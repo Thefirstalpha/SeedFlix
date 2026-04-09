@@ -1,11 +1,19 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
-import { Download, Heart, LogOut, Settings, User, Bell } from "lucide-react";
+import { Download, Heart, LogOut, Settings, User, Bell, Menu } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { getWishlistCount } from "../services/wishlistService";
 import { getSeriesWishlistCount } from "../services/seriesWishlistService";
 import { getTorrentDownloads } from "../services/torrentService";
 import * as notificationService from "../services/notificationService";
 import { Button } from "./ui/button";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "./ui/sheet";
 import { useAuth } from "../context/AuthContext";
 
 export function Root() {
@@ -164,8 +172,7 @@ export function Root() {
               </h1>
             </Link>
 
-            <div className="flex items-center gap-3">
-              {canShowNavigationActions && (
+            <div className="hidden items-center gap-3 md:flex">
                 <Link
                   to="/downloads"
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
@@ -178,24 +185,7 @@ export function Root() {
                     </span>
                   )}
                 </Link>
-              )}
 
-              {canShowNavigationActions && (
-                <Link
-                  to="/notifications"
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
-                >
-                  <Bell className="w-5 h-5 text-amber-300" />
-                  <span className="text-white font-medium">Notifications</span>
-                  {unreadNotificationsCount > 0 && (
-                    <span className="bg-amber-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                      {unreadNotificationsCount}
-                    </span>
-                  )}
-                </Link>
-              )}
-
-              {canShowNavigationActions && (
                 <Link
                   to={wishlistTarget}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
@@ -212,7 +202,19 @@ export function Root() {
                     </span>
                   )}
                 </Link>
-              )}
+
+                <Link
+                  to="/notifications"
+                  aria-label="Notifications"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+                >
+                  <Bell className="w-5 h-5 text-amber-300" />
+                  {unreadNotificationsCount > 0 && (
+                    <span className="bg-amber-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      {unreadNotificationsCount}
+                    </span>
+                  )}
+                </Link>
 
               {isAuthenticated ? (
                 <div ref={userMenuRef} className="relative">
@@ -254,6 +256,105 @@ export function Root() {
                   )}
                 </div>
               ) : null}
+            </div>
+
+            <div className="md:hidden">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20"
+                    aria-label="Ouvrir le menu"
+                  >
+                    <Menu className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="border-white/10 bg-slate-950 text-white">
+                  <SheetHeader className="pb-2">
+                    <SheetTitle className="text-white">Menu</SheetTitle>
+                  </SheetHeader>
+
+                  <div className="px-4 pb-4 space-y-2">
+                    {canShowNavigationActions && (
+                      <>
+                        <SheetClose asChild>
+                          <Link
+                            to="/downloads"
+                            className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Download className="w-4 h-4 text-cyan-300" />
+                              Téléchargements
+                            </span>
+                            {downloadsCount > 0 && (
+                              <span className="bg-cyan-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                {downloadsCount}
+                              </span>
+                            )}
+                          </Link>
+                        </SheetClose>
+
+                        <SheetClose asChild>
+                          <Link
+                            to={wishlistTarget}
+                            className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Heart
+                                className={`w-4 h-4 ${wishlistCount > 0 ? "text-purple-400 fill-purple-400" : "text-white"}`}
+                              />
+                              Ma liste
+                            </span>
+                            {wishlistCount > 0 && (
+                              <span className="bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                {wishlistCount}
+                              </span>
+                            )}
+                          </Link>
+                        </SheetClose>
+
+                        <SheetClose asChild>
+                          <Link
+                            to="/notifications"
+                            className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Bell className="w-4 h-4 text-amber-300" />
+                              Notifications
+                            </span>
+                            {unreadNotificationsCount > 0 && (
+                              <span className="bg-amber-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                {unreadNotificationsCount}
+                              </span>
+                            )}
+                          </Link>
+                        </SheetClose>
+                      </>
+                    )}
+                    <SheetClose asChild>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-left"
+                        onClick={handleOpenSettings}
+                      >
+                        <Settings className="w-4 h-4 text-white/80" />
+                        Paramètres
+                      </button>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-left text-red-100"
+                        onClick={handleLogout}
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Déconnexion
+                      </button>
+                    </SheetClose>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </div>

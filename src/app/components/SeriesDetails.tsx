@@ -448,17 +448,17 @@ export function SeriesDetails() {
       </div>
 
       {series.backdrop && (
-        <div className="relative w-full h-64 md:h-96 rounded-lg overflow-hidden">
+        <div className="relative w-full h-44 sm:h-56 md:h-80 lg:h-96 rounded-lg overflow-hidden">
           <img
             src={series.backdrop}
             alt={series.title}
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent" />
-          <div className="absolute bottom-0 left-0 p-6 md:p-8">
-            <h1 className="text-4xl font-bold text-white mb-2">{series.title}</h1>
+          <div className="absolute bottom-0 left-0 p-4 md:p-8">
+            <h1 className="text-2xl md:text-4xl font-bold text-white mb-1 md:mb-2 line-clamp-2">{series.title}</h1>
             {series.originalTitle && series.originalTitle !== series.title && (
-              <p className="text-white/70 text-lg">{series.originalTitle}</p>
+              <p className="text-white/70 text-sm md:text-lg line-clamp-1">{series.originalTitle}</p>
             )}
           </div>
         </div>
