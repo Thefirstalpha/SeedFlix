@@ -8,6 +8,7 @@ import { Badge } from "./ui/badge";
 import { X, Trash2, Check, CheckCircle, Clock } from "lucide-react";
 import type { Notification } from "../services/notificationService";
 import * as notificationService from "../services/notificationService";
+import { useI18n } from "../i18n/LanguageProvider";
 
 function emitUnreadNotificationsUpdated(count: number) {
   window.dispatchEvent(
@@ -20,6 +21,7 @@ function emitUnreadNotificationsUpdated(count: number) {
 export default function Notifications() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t, language } = useI18n();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -143,10 +145,15 @@ export default function Notifications() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-white">Notifications</h1>
+          <h1 className="text-3xl font-bold text-white">{t("root.notifications")}</h1>
           {unreadCount > 0 && (
             <p className="text-sm text-white/70 mt-2">
-              {unreadCount} notification{unreadCount !== 1 ? "s" : ""} non lue{unreadCount !== 1 ? "s" : ""}
+              {t(
+                unreadCount > 1
+                  ? "notificationsPage.unread_many"
+                  : "notificationsPage.unread_one",
+                { count: unreadCount }
+              )}
             </p>
           )}
         </div>
@@ -157,7 +164,7 @@ export default function Notifications() {
               variant="outline"
               className="text-sm border-white/20 bg-white/5 text-white hover:bg-white/10"
             >
-              Marquer tout comme lu
+              {t("notificationsPage.markAllRead")}
             </Button>
           )}
           {notifications.length > 0 && (
@@ -169,23 +176,23 @@ export default function Notifications() {
                   className="gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Vider tout
+                  {t("notificationsPage.clearAll")}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent className="border-white/15 bg-slate-950 text-white">
                 <AlertDialogHeader>
-                  <AlertDialogTitle className="text-red-200">Vider toutes les notifications</AlertDialogTitle>
+                  <AlertDialogTitle className="text-red-200">{t("notificationsPage.confirmClearTitle")}</AlertDialogTitle>
                   <AlertDialogDescription className="text-white/70">
-                    Cette action supprimera définitivement toutes vos notifications. Cette action ne peut pas être annulée.
+                    {t("notificationsPage.confirmClearDescription")}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="flex justify-end gap-3">
-                  <AlertDialogCancel className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">Annuler</AlertDialogCancel>
+                  <AlertDialogCancel className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">{t("common.cancel")}</AlertDialogCancel>
                   <AlertDialogAction
                     className="bg-red-600 hover:bg-red-700"
                     onClick={handleClearAll}
                   >
-                    Supprimer
+                    {t("common.remove")}
                   </AlertDialogAction>
                 </div>
               </AlertDialogContent>
@@ -196,11 +203,11 @@ export default function Notifications() {
 
       {loading ? (
         <div className="text-center py-12">
-          <p className="text-white/60">Chargement des notifications...</p>
+          <p className="text-white/60">{t("notificationsPage.loading")}</p>
         </div>
       ) : notifications.length === 0 ? (
         <Card className="p-8 text-center border-white/10 bg-white/5">
-          <p className="text-white/60">Aucune notification pour le moment</p>
+          <p className="text-white/60">{t("notificationsPage.empty")}</p>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -221,23 +228,23 @@ export default function Notifications() {
                       {getTypeIcon(notif.type)}
                       <span className="ml-1 text-xs">
                         {notif.type === "success"
-                          ? "complete"
+                          ? t("notificationsPage.types.success")
                           : notif.type === "error"
-                            ? "erreur"
+                            ? t("notificationsPage.types.error")
                             : notif.type === "warning"
-                              ? "attention"
-                              : "info"}
+                              ? t("notificationsPage.types.warning")
+                              : t("notificationsPage.types.info")}
                       </span>
                     </Badge>
                     {!notif.isRead && (
-                      <Badge className="bg-blue-600 text-white">Nouveau</Badge>
+                      <Badge className="bg-blue-600 text-white">{t("notificationsPage.new")}</Badge>
                     )}
                   </div>
                   <p className="text-sm text-white/85 mb-2">
                     {notif.message}
                   </p>
                   <p className="text-xs text-white/60">
-                    {new Date(notif.createdAt).toLocaleString("fr-FR")}
+                    {new Date(notif.createdAt).toLocaleString(language === "fr" ? "fr-FR" : "en-US")}
                   </p>
                 </div>
 
@@ -248,7 +255,7 @@ export default function Notifications() {
                       size="sm"
                       variant="outline"
                       className="gap-2 border-white/20 bg-white/5 text-white hover:bg-white/10"
-                      title="Marquer comme lu"
+                      title={t("notificationsPage.markAsRead")}
                     >
                       <Check className="w-4 h-4" />
                     </Button>
@@ -258,7 +265,7 @@ export default function Notifications() {
                     size="sm"
                     variant="ghost"
                     className="text-red-300 hover:text-red-200 hover:bg-red-500/15"
-                    title="Supprimer"
+                    title={t("common.remove")}
                   >
                     <X className="w-4 h-4" />
                   </Button>

@@ -19,6 +19,7 @@ import {
 } from "../services/seriesWishlistService";
 import { addTorrentToClient } from "../services/torrentService";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../i18n/LanguageProvider";
 import type { SeriesWishlistStatus } from "../types/seriesWishlist";
 import type {
   SeriesDetails as SeriesDetailsModel,
@@ -81,6 +82,7 @@ export function SeriesDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { settings } = useAuth();
+  const { t, language } = useI18n();
   const [series, setSeries] = useState<SeriesDetailsModel | null>(null);
   const [episodes, setEpisodes] = useState<SeriesEpisode[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
@@ -245,7 +247,7 @@ export function SeriesDetails() {
           setReleaseError(
             trackerLoadError instanceof Error
               ? trackerLoadError.message
-              : "Recherche tracker impossible"
+              : t("seriesDetails.errors.trackerSearchFailed")
           );
           setReleaseResults([]);
         } finally {
@@ -289,12 +291,12 @@ export function SeriesDetails() {
       const response = await addTorrentToClient(torrentUrl, "series");
       setTorrentStatus(
         response.duplicate
-          ? "Ce torrent existe déjà dans votre client."
-          : "Torrent série ajouté au client avec succès."
+          ? t("seriesDetails.messages.duplicateTorrent")
+          : t("seriesDetails.messages.torrentAdded")
       );
     } catch (error) {
       setTorrentError(
-        error instanceof Error ? error.message : "Impossible d'ajouter ce torrent"
+        error instanceof Error ? error.message : t("seriesDetails.errors.addTorrentFailed")
       );
     } finally {
       setAddingTorrentLink(null);
@@ -352,7 +354,7 @@ export function SeriesDetails() {
         seriesTitle: series.title,
         seriesPoster: series.poster,
         seasonNumber: selectedSeason,
-        seasonName: seasonData?.name ?? `Saison ${selectedSeason}`,
+        seasonName: seasonData?.name ?? t("seriesDetails.seasonNumber", { number: selectedSeason }),
       });
     }
     await refreshStatus();
@@ -373,7 +375,7 @@ export function SeriesDetails() {
         seasonNumber: selectedSeason,
         seasonName:
           availableSeasons.find((s) => s.seasonNumber === selectedSeason)
-            ?.name ?? `Saison ${selectedSeason}`,
+            ?.name ?? t("seriesDetails.seasonNumber", { number: selectedSeason }),
         episodeNumber: episode.episodeNumber,
         episodeName: episode.name,
       });
@@ -397,11 +399,11 @@ export function SeriesDetails() {
   if (!series) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-white mb-4">Série non trouvée</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">{t("seriesDetails.notFoundTitle")}</h2>
         <Link to="/">
           <Button className="bg-cyan-600 hover:bg-cyan-700 text-white">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Retour à l'accueil
+            {t("seriesDetails.backHome")}
           </Button>
         </Link>
       </div>
@@ -418,7 +420,7 @@ export function SeriesDetails() {
           className="border-cyan-500/40 bg-cyan-600/10 text-white hover:bg-cyan-600/20"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Retour
+          {t("seriesDetails.back")}
         </Button>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -436,13 +438,13 @@ export function SeriesDetails() {
               }`}
             />
             {wishlistStatus.seriesInWishlist
-              ? "Retirer la série"
-              : "Ajouter la série"}
+              ? t("seriesDetails.removeSeries")
+              : t("seriesDetails.addSeries")}
           </Button>
 
           <Badge className="bg-cyan-600/20 text-cyan-100 border border-cyan-500/30 px-3 py-1">
             <Tv className="w-4 h-4 mr-2" />
-            {series.status || "Statut inconnu"}
+            {series.status || t("seriesDetails.unknownStatus")}
           </Badge>
         </div>
       </div>
@@ -516,29 +518,29 @@ export function SeriesDetails() {
             </div>
             <Badge className="bg-cyan-600 text-white">{series.genre}</Badge>
             {series.voteCount && (
-              <span className="text-white/60">({series.voteCount.toLocaleString()} votes)</span>
+              <span className="text-white/60">{t("seriesDetails.votes", { count: series.voteCount.toLocaleString() })}</span>
             )}
             </div>
           </div>
 
           <div>
-            <h2 className="text-2xl font-semibold text-white mb-3">Synopsis</h2>
+            <h2 className="text-2xl font-semibold text-white mb-3">{t("seriesDetails.synopsis")}</h2>
             <p className="text-white/80 text-lg leading-relaxed break-words">{series.plot}</p>
           </div>
 
           <Card className="bg-white/5 border-white/10">
             <CardContent className="p-6 space-y-3">
-              <h3 className="text-xl font-semibold text-white">Créateurs et réseaux</h3>
+              <h3 className="text-xl font-semibold text-white">{t("seriesDetails.creatorsAndNetworks")}</h3>
               <p className="text-white/80 break-words">
-                <span className="text-white/60">Créateurs: </span>
-                {series.creators.length > 0 ? series.creators.join(", ") : "Non disponible"}
+                <span className="text-white/60">{t("seriesDetails.creatorsLabel")} </span>
+                {series.creators.length > 0 ? series.creators.join(", ") : t("seriesDetails.notAvailable")}
               </p>
               <p className="text-white/80 break-words">
-                <span className="text-white/60">Diffusion: </span>
-                {series.networks.length > 0 ? series.networks.join(", ") : "Non disponible"}
+                <span className="text-white/60">{t("seriesDetails.networksLabel")} </span>
+                {series.networks.length > 0 ? series.networks.join(", ") : t("seriesDetails.notAvailable")}
               </p>
               <p className="text-white/80">
-                <span className="text-white/60">Saisons: </span>
+                <span className="text-white/60">{t("seriesDetails.seasonsLabel")} </span>
                 {series.seasons.length}
               </p>
             </CardContent>
@@ -548,7 +550,7 @@ export function SeriesDetails() {
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center gap-2">
                 <Clapperboard className="w-5 h-5 text-cyan-300" />
-                <h3 className="text-xl font-semibold text-white">Saisons et épisodes</h3>
+                <h3 className="text-xl font-semibold text-white">{t("seriesDetails.seasonsAndEpisodes")}</h3>
               </div>
 
               {availableSeasons.length > 0 ? (
@@ -556,7 +558,7 @@ export function SeriesDetails() {
                   {/* Season selector + season wishlist button */}
                   <div className="flex items-center gap-3 flex-wrap">
                     <label htmlFor="season-select" className="text-white/80">
-                      Saison
+                      {t("seriesDetails.season")}
                     </label>
                     <select
                       id="season-select"
@@ -568,7 +570,7 @@ export function SeriesDetails() {
                     >
                       {availableSeasons.map((season) => (
                         <option key={season.id} value={season.seasonNumber}>
-                          Saison {season.seasonNumber} – {season.name}
+                          {t("seriesDetails.seasonWithName", { number: season.seasonNumber, name: season.name })}
                           {isSeasonInWishlist(season.seasonNumber) ? " ♥" : ""}
                         </option>
                       ))}
@@ -597,10 +599,10 @@ export function SeriesDetails() {
                           }`}
                         />
                         {isSeasonCoveredBySeries
-                          ? "Couvert par la série"
+                          ? t("seriesDetails.coveredBySeries")
                           : isSeasonDirectlyInWishlist(selectedSeason)
-                          ? "Retirer la saison"
-                          : "Ajouter la saison"}
+                          ? t("seriesDetails.removeSeason")
+                          : t("seriesDetails.addSeason")}
                       </Button>
                     )}
                   </div>
@@ -640,11 +642,11 @@ export function SeriesDetails() {
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex-1 min-w-0">
                                 <p className="text-white font-semibold">
-                                  Épisode {episode.episodeNumber}
+                                  {t("seriesDetails.episodeNumber", { number: episode.episodeNumber })}
                                   {episode.name ? `: ${episode.name}` : ""}
                                 </p>
                                 <p className="text-white/60 text-sm mt-0.5">
-                                  {episode.airDate || "Date inconnue"}
+                                  {episode.airDate || t("seriesDetails.unknownDate")}
                                   {episode.runtime
                                     ? ` · ${episode.runtime} min`
                                     : ""}
@@ -664,7 +666,7 @@ export function SeriesDetails() {
                                     className="border-cyan-500/30 text-cyan-300 text-xs"
                                   >
                                     <Heart className="w-3 h-3 mr-1 fill-current" />
-                                    Couvert
+                                    {t("seriesDetails.covered")}
                                   </Badge>
                                 ) : (
                                   <button
@@ -673,8 +675,8 @@ export function SeriesDetails() {
                                     }
                                     title={
                                       directlyInWishlist
-                                        ? "Retirer l'épisode"
-                                        : "Ajouter l'épisode"
+                                        ? t("seriesDetails.removeEpisode")
+                                        : t("seriesDetails.addEpisode")
                                     }
                                     className="p-1.5 rounded-full hover:bg-white/10 transition-colors"
                                   >
@@ -702,14 +704,13 @@ export function SeriesDetails() {
                     </ScrollArea>
                   ) : (
                     <p className="text-white/60">
-                      Les détails d'épisodes ne sont pas disponibles pour
-                      cette saison.
+                      {t("seriesDetails.episodesUnavailable")}
                     </p>
                   )}
                 </>
               ) : (
                 <p className="text-white/60">
-                  Aucune information de saison disponible pour cette série.
+                  {t("seriesDetails.noSeasonInfo")}
                 </p>
               )}
             </CardContent>
@@ -718,16 +719,16 @@ export function SeriesDetails() {
           <Card className="bg-white/5 border-white/10">
             <CardContent className="p-6 space-y-4">
               <div>
-                <h3 className="text-xl font-semibold text-white">Résultats Tracker</h3>
+                <h3 className="text-xl font-semibold text-white">{t("seriesDetails.tracker.title")}</h3>
                 <p className="text-sm text-white/60 mt-1">
-                  Versions détectées sur Torznab pour cette série.
+                  {t("seriesDetails.tracker.description")}
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                   <label htmlFor="series-season-filter" className="text-sm text-white/70 whitespace-nowrap font-medium">
-                    Saison
+                    {t("seriesDetails.season")}
                   </label>
                   <select
                     id="series-season-filter"
@@ -735,7 +736,7 @@ export function SeriesDetails() {
                     onChange={(event) => setSeasonFilter(event.target.value)}
                     className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
-                    <option value="all">Toutes</option>
+                    <option value="all">{t("seriesDetails.tracker.all")}</option>
                     {availableReleaseSeasons.map((season) => (
                       <option key={season} value={season}>
                         {season}
@@ -746,7 +747,7 @@ export function SeriesDetails() {
 
                 <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                   <label htmlFor="series-quality-filter" className="text-sm text-white/70 whitespace-nowrap font-medium">
-                    Qualité
+                    {t("seriesDetails.tracker.quality")}
                   </label>
                   <select
                     id="series-quality-filter"
@@ -754,7 +755,7 @@ export function SeriesDetails() {
                     onChange={(event) => setQualityFilter(event.target.value)}
                     className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
-                    <option value="all">Toutes</option>
+                    <option value="all">{t("seriesDetails.tracker.all")}</option>
                     <option value="2160p">2160p</option>
                     <option value="1080p">1080p</option>
                     <option value="720p">720p</option>
@@ -767,7 +768,7 @@ export function SeriesDetails() {
 
                 <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                   <label htmlFor="series-language-filter" className="text-sm text-white/70 whitespace-nowrap font-medium">
-                    Langue
+                    {t("seriesDetails.tracker.language")}
                   </label>
                   <select
                     id="series-language-filter"
@@ -775,7 +776,7 @@ export function SeriesDetails() {
                     onChange={(event) => setLanguageFilter(event.target.value)}
                     className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
-                    <option value="all">Toutes</option>
+                    <option value="all">{t("seriesDetails.tracker.all")}</option>
                     {availableReleaseLanguages.map((language) => (
                       <option key={language} value={language}>
                         {language}
@@ -785,7 +786,7 @@ export function SeriesDetails() {
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-                  <span className="text-sm text-white/70 font-medium">Trier:</span>
+                  <span className="text-sm text-white/70 font-medium">{t("seriesDetails.tracker.sort")}</span>
                   <ToggleGroup
                     type="single"
                     value={sortBy}
@@ -799,14 +800,14 @@ export function SeriesDetails() {
                       aria-label="Sort by date" 
                       className="text-sm data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
                     >
-                      Date
+                      {t("seriesDetails.tracker.date")}
                     </ToggleGroupItem>
                     <ToggleGroupItem 
                       value="size" 
                       aria-label="Sort by size" 
                       className="text-sm data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
                     >
-                      Taille
+                      {t("seriesDetails.tracker.size")}
                     </ToggleGroupItem>
                   </ToggleGroup>
                   <Button
@@ -820,7 +821,7 @@ export function SeriesDetails() {
               </div>
 
               {isReleaseLoading && (
-                <p className="text-sm text-white/60">Recherche en cours...</p>
+                <p className="text-sm text-white/60">{t("seriesDetails.tracker.searching")}</p>
               )}
 
               {releaseError && (
@@ -836,7 +837,7 @@ export function SeriesDetails() {
               )}
 
               {!isReleaseLoading && !releaseError && filteredReleaseResults.length === 0 && (
-                <p className="text-sm text-white/60">Aucune version trouvée pour cette série.</p>
+                <p className="text-sm text-white/60">{t("seriesDetails.tracker.empty")}</p>
               )}
 
               {filteredReleaseResults.length > 0 && (
@@ -858,45 +859,45 @@ export function SeriesDetails() {
                           {addingTorrentLink === (item.downloadUrl || item.link) ? (
                             <>
                               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Ajout...
+                              {t("seriesDetails.tracker.adding")}
                             </>
                           ) : (
                             <>
                               <Download className="w-4 h-4 mr-2" />
-                              Ajouter au client
+                              {t("seriesDetails.tracker.addToClient")}
                             </>
                           )}
                         </Button>
 
                         {item.quality && (
                           <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
-                            Qualité: {item.quality}
+                            {t("seriesDetails.tracker.qualityBadge", { value: item.quality })}
                           </Badge>
                         )}
                         {item.language && (
                           <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
-                            Langue: {item.language}
+                            {t("seriesDetails.tracker.languageBadge", { value: item.language })}
                           </Badge>
                         )}
                         {item.sizeHuman && (
                           <Badge variant="outline" className="border-white/30 text-white/80">
-                            Taille: {item.sizeHuman}
+                            {t("seriesDetails.tracker.sizeBadge", { value: item.sizeHuman })}
                           </Badge>
                         )}
                         {item.pubDate && (
                           <Badge variant="outline" className="border-blue-500/40 text-blue-300">
                             <Calendar className="w-3 h-3 mr-1 inline" />
-                            {new Date(item.pubDate).toLocaleDateString("fr-FR")}
+                            {new Date(item.pubDate).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US")}
                           </Badge>
                         )}
                         {Number.isFinite(item.seeders || NaN) && (item.seeders || 0) >= 0 && (
                           <Badge variant="outline" className="border-lime-500/40 text-lime-300">
-                            Seeders: {item.seeders}
+                            {t("seriesDetails.tracker.seeders", { count: item.seeders || 0 })}
                           </Badge>
                         )}
                         {Number.isFinite(item.leechers || NaN) && (item.leechers || 0) >= 0 && (
                           <Badge variant="outline" className="border-orange-500/40 text-orange-300">
-                            Peers: {item.leechers}
+                            {t("seriesDetails.tracker.peers", { count: item.leechers || 0 })}
                           </Badge>
                         )}
                       </div>
@@ -910,11 +911,11 @@ export function SeriesDetails() {
                       onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
                     >
-                      ← Précédent
+                      {t("seriesDetails.pagination.previous")}
                     </Button>
 
                     <span className="text-sm text-white/80">
-                      Page {currentPage} / {totalPages}
+                      {t("seriesDetails.pagination.current", { current: currentPage, total: totalPages })}
                     </span>
 
                     <select
@@ -924,7 +925,7 @@ export function SeriesDetails() {
                     >
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                         <option key={page} value={page}>
-                          Page {page}
+                          {t("seriesDetails.pagination.page", { page })}
                         </option>
                       ))}
                     </select>
@@ -935,7 +936,7 @@ export function SeriesDetails() {
                       onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                       disabled={currentPage === totalPages}
                     >
-                      Suivant →
+                      {t("seriesDetails.pagination.next")}
                     </Button>
                   </div>
                 </div>

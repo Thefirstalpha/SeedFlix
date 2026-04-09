@@ -9,6 +9,7 @@ import { getMovieById, searchMovieReleases, type TorznabMovieResult } from "../s
 import { addTorrentToClient } from "../services/torrentService";
 import { addToWishlist, removeFromWishlist, isInWishlist } from "../services/wishlistService";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../i18n/LanguageProvider";
 import type { Movie } from "../types/movie";
 
 const MOVIE_QUALITY_FILTERS = ["all", "2160p", "1080p", "720p", "480p", "bluray", "webdl", "hdtv"];
@@ -42,6 +43,7 @@ export function MovieDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { settings } = useAuth();
+  const { t, language } = useI18n();
   const [movie, setMovie] = useState<Movie | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [inWishlist, setInWishlist] = useState(false);
@@ -137,7 +139,7 @@ export function MovieDetails() {
           setReleaseError(
             trackerError instanceof Error
               ? trackerError.message
-              : "Recherche tracker impossible"
+              : t("movieDetails.errors.trackerSearchFailed")
           );
           setReleaseResults([]);
         } finally {
@@ -174,12 +176,12 @@ export function MovieDetails() {
       const response = await addTorrentToClient(torrentUrl);
       setTorrentStatus(
         response.duplicate
-          ? "Ce torrent existe déjà dans votre client."
-          : "Torrent ajouté au client avec succès."
+          ? t("movieDetails.messages.duplicateTorrent")
+          : t("movieDetails.messages.torrentAdded")
       );
     } catch (error) {
       setTorrentError(
-        error instanceof Error ? error.message : "Impossible d'ajouter ce torrent"
+        error instanceof Error ? error.message : t("movieDetails.errors.addTorrentFailed")
       );
     } finally {
       setAddingTorrentLink(null);
@@ -207,11 +209,11 @@ export function MovieDetails() {
   if (!movie) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-white mb-4">Film non trouvé</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">{t("movieDetails.notFoundTitle")}</h2>
         <Link to="/">
           <Button className="bg-purple-600 hover:bg-purple-700 text-white">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Retour à l'accueil
+            {t("movieDetails.backHome")}
           </Button>
         </Link>
       </div>
@@ -228,7 +230,7 @@ export function MovieDetails() {
           className="border-purple-500/30 bg-purple-600/10 text-white hover:bg-purple-600/20 hover:border-purple-500/50"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Retour
+          {t("movieDetails.back")}
         </Button>
 
         <Button
@@ -240,7 +242,7 @@ export function MovieDetails() {
           }`}
         >
           <Heart className={`w-5 h-5 mr-2 ${inWishlist ? 'fill-current' : ''}`} />
-          {inWishlist ? 'Retirer de ma liste' : 'Ajouter à ma liste'}
+          {inWishlist ? t("movieDetails.removeFromWishlist") : t("movieDetails.addToWishlist")}
         </Button>
       </div>
 
@@ -328,13 +330,13 @@ export function MovieDetails() {
               <span className="text-white/60">/10</span>
             </div>
             {movie.voteCount && (
-              <span className="text-white/60">({movie.voteCount.toLocaleString()} votes)</span>
+              <span className="text-white/60">{t("movieDetails.votes", { count: movie.voteCount.toLocaleString() })}</span>
             )}
           </div>
 
           {/* Plot */}
           <div>
-            <h2 className="text-2xl font-semibold text-white mb-3">Synopsis</h2>
+            <h2 className="text-2xl font-semibold text-white mb-3">{t("movieDetails.synopsis")}</h2>
             <p className="text-white/80 text-lg leading-relaxed break-words">{movie.plot}</p>
           </div>
 
@@ -343,7 +345,7 @@ export function MovieDetails() {
             <CardContent className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <User className="w-5 h-5 text-purple-400" />
-                <h3 className="text-xl font-semibold text-white">Réalisateur</h3>
+                <h3 className="text-xl font-semibold text-white">{t("movieDetails.director")}</h3>
               </div>
               <p className="text-white/80 text-lg break-words">{movie.director}</p>
             </CardContent>
@@ -353,7 +355,7 @@ export function MovieDetails() {
           {movie.actors.length > 0 && (
             <Card className="bg-white/5 border-white/10">
               <CardContent className="p-6">
-                <h3 className="text-xl font-semibold text-white mb-4">Distribution</h3>
+                <h3 className="text-xl font-semibold text-white mb-4">{t("movieDetails.cast")}</h3>
                 <div className="flex flex-wrap gap-2">
                   {movie.actors.map((actor, index) => (
                     <Badge 
@@ -372,16 +374,16 @@ export function MovieDetails() {
           <Card className="bg-white/5 border-white/10">
             <CardContent className="p-6 space-y-4">
               <div>
-                <h3 className="text-xl font-semibold text-white">Résultats Tracker</h3>
+                <h3 className="text-xl font-semibold text-white">{t("movieDetails.tracker.title")}</h3>
                 <p className="text-sm text-white/60 mt-1">
-                  Versions détectées sur Torznab: qualité, langues et métadonnées.
+                  {t("movieDetails.tracker.description")}
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                   <label htmlFor="movie-quality-filter" className="text-sm text-white/70 font-medium whitespace-nowrap">
-                    Qualité
+                    {t("movieDetails.tracker.quality")}
                   </label>
                   <select
                     id="movie-quality-filter"
@@ -389,7 +391,7 @@ export function MovieDetails() {
                     onChange={(event) => setQualityFilter(event.target.value)}
                     className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
-                    <option value="all">Toutes</option>
+                    <option value="all">{t("movieDetails.tracker.all")}</option>
                     <option value="2160p">2160p</option>
                     <option value="1080p">1080p</option>
                     <option value="720p">720p</option>
@@ -402,7 +404,7 @@ export function MovieDetails() {
 
                 <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                   <label htmlFor="movie-language-filter" className="text-sm text-white/70 font-medium whitespace-nowrap">
-                    Langue
+                    {t("movieDetails.tracker.language")}
                   </label>
                   <select
                     id="movie-language-filter"
@@ -410,7 +412,7 @@ export function MovieDetails() {
                     onChange={(event) => setLanguageFilter(event.target.value)}
                     className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
-                    <option value="all">Toutes</option>
+                    <option value="all">{t("movieDetails.tracker.all")}</option>
                     {availableReleaseLanguages.map((language) => (
                       <option key={language} value={language}>
                         {language}
@@ -420,7 +422,7 @@ export function MovieDetails() {
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-                  <span className="text-sm text-white/70 font-medium">Trier:</span>
+                  <span className="text-sm text-white/70 font-medium">{t("movieDetails.tracker.sort")}</span>
                   <ToggleGroup
                     type="single"
                     value={sortBy}
@@ -434,14 +436,14 @@ export function MovieDetails() {
                       aria-label="Sort by date" 
                       className="text-sm data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
                     >
-                      Date
+                      {t("movieDetails.tracker.date")}
                     </ToggleGroupItem>
                     <ToggleGroupItem 
                       value="size" 
                       aria-label="Sort by size" 
                       className="text-sm data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
                     >
-                      Taille
+                      {t("movieDetails.tracker.size")}
                     </ToggleGroupItem>
                   </ToggleGroup>
                   <Button
@@ -455,7 +457,7 @@ export function MovieDetails() {
               </div>
 
               {isReleaseLoading && (
-                <p className="text-sm text-white/60">Recherche en cours...</p>
+                <p className="text-sm text-white/60">{t("movieDetails.tracker.searching")}</p>
               )}
 
               {releaseError && (
@@ -471,7 +473,7 @@ export function MovieDetails() {
               )}
 
               {!isReleaseLoading && !releaseError && filteredReleaseResults.length === 0 && (
-                <p className="text-sm text-white/60">Aucune version trouvée pour ce film.</p>
+                <p className="text-sm text-white/60">{t("movieDetails.tracker.empty")}</p>
               )}
 
               {filteredReleaseResults.length > 0 && (
@@ -496,52 +498,52 @@ export function MovieDetails() {
                           {addingTorrentLink === (item.downloadUrl || item.link) ? (
                             <>
                               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Ajout...
+                              {t("movieDetails.tracker.adding")}
                             </>
                           ) : (
                             <>
                               <Download className="w-4 h-4 mr-2" />
-                              Ajouter au client
+                              {t("movieDetails.tracker.addToClient")}
                             </>
                           )}
                         </Button>
 
                         {item.quality && (
                           <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
-                            Qualité: {item.quality}
+                            {t("movieDetails.tracker.qualityBadge", { value: item.quality })}
                           </Badge>
                         )}
                         {item.language && (
                           <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
-                            Langue: {item.language}
+                            {t("movieDetails.tracker.languageBadge", { value: item.language })}
                           </Badge>
                         )}
                         {item.sizeHuman && (
                           <Badge variant="outline" className="border-white/30 text-white/80">
-                            Taille: {item.sizeHuman}
+                            {t("movieDetails.tracker.sizeBadge", { value: item.sizeHuman })}
                           </Badge>
                         )}
                         {item.pubDate && (
                           <Badge variant="outline" className="border-blue-500/40 text-blue-300">
                             <Calendar className="w-3 h-3 mr-1 inline" />
-                            {new Date(item.pubDate).toLocaleDateString("fr-FR")}
+                            {new Date(item.pubDate).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US")}
                           </Badge>
                         )}
                         {Number.isFinite(item.seeders || NaN) && (item.seeders || 0) >= 0 && (
                           <Badge variant="outline" className="border-lime-500/40 text-lime-300">
-                            Seeders: {item.seeders}
+                            {t("movieDetails.tracker.seeders", { count: item.seeders || 0 })}
                           </Badge>
                         )}
                         {Number.isFinite(item.leechers || NaN) && (item.leechers || 0) >= 0 && (
                           <Badge variant="outline" className="border-orange-500/40 text-orange-300">
-                            Peers: {item.leechers}
+                            {t("movieDetails.tracker.peers", { count: item.leechers || 0 })}
                           </Badge>
                         )}
                       </div>
 
                       {Array.isArray(item.categories) && item.categories.length > 0 && (
                         <p className="text-xs text-white/50 line-clamp-1 break-all">
-                          Catégories: {item.categories.join(", ")}
+                          {t("movieDetails.tracker.categories", { value: item.categories.join(", ") })}
                         </p>
                       )}
                     </div>
@@ -555,11 +557,11 @@ export function MovieDetails() {
                       onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
                     >
-                      ← Précédent
+                      {t("movieDetails.pagination.previous")}
                     </Button>
 
                     <span className="text-sm text-white/80">
-                      Page {currentPage} / {totalPages}
+                      {t("movieDetails.pagination.current", { current: currentPage, total: totalPages })}
                     </span>
 
                     <select
@@ -569,7 +571,7 @@ export function MovieDetails() {
                     >
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                         <option key={page} value={page}>
-                          Page {page}
+                          {t("movieDetails.pagination.page", { page })}
                         </option>
                       ))}
                     </select>
@@ -580,7 +582,7 @@ export function MovieDetails() {
                       onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                       disabled={currentPage === totalPages}
                     >
-                      Suivant →
+                      {t("movieDetails.pagination.next")}
                     </Button>
                   </div>
                 </div>
@@ -598,7 +600,7 @@ export function MovieDetails() {
               }`}
             >
               <Heart className={`w-5 h-5 mr-2 ${inWishlist ? 'fill-current' : ''}`} />
-              {inWishlist ? 'Retirer de ma liste' : 'Ajouter à ma liste'}
+              {inWishlist ? t("movieDetails.removeFromWishlist") : t("movieDetails.addToWishlist")}
             </Button>
           </div>
         </div>

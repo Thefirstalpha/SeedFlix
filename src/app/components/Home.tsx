@@ -21,22 +21,77 @@ import type { Series } from "../types/series";
 type ContentFilter = "all" | "movie" | "series";
 const CAROUSEL_WHEEL_SPEED = 3.8;
 
-const DEFAULT_LANGUAGE_OPTIONS = [
-  "Francais",
-  "Anglais",
-  "Japonais",
-  "Coreen",
-  "Espagnol",
-  "Italien",
-  "Allemand",
-  "Portugais",
-  "Russe",
-  "Chinois",
-  "Inconnu",
-];
+const DEFAULT_LANGUAGE_OPTIONS = ["fr", "en", "ja", "ko", "es", "it", "de", "pt", "ru", "zh", "unknown"];
 
 function toSortedUnique(items: string[]): string[] {
   return Array.from(new Set(items)).sort((a, b) => a.localeCompare(b, "fr"));
+}
+
+function normalizeLanguageCode(language: string | null | undefined): string {
+  const normalized = String(language || "").trim().toLowerCase();
+
+  if (!normalized) {
+    return "unknown";
+  }
+
+  const map: Record<string, string> = {
+    fr: "fr",
+    francais: "fr",
+    "français": "fr",
+    french: "fr",
+    en: "en",
+    anglais: "en",
+    english: "en",
+    ja: "ja",
+    japonais: "ja",
+    japanese: "ja",
+    ko: "ko",
+    coreen: "ko",
+    "coréen": "ko",
+    korean: "ko",
+    es: "es",
+    espagnol: "es",
+    spanish: "es",
+    it: "it",
+    italien: "it",
+    italian: "it",
+    de: "de",
+    allemand: "de",
+    german: "de",
+    pt: "pt",
+    portugais: "pt",
+    portuguese: "pt",
+    ru: "ru",
+    russe: "ru",
+    russian: "ru",
+    zh: "zh",
+    chinois: "zh",
+    chinese: "zh",
+    inconnu: "unknown",
+    unknown: "unknown",
+  };
+
+  return map[normalized] || normalized;
+}
+
+function getLanguageLabel(language: string, t: (key: string, vars?: Record<string, string | number>) => string): string {
+  const normalized = normalizeLanguageCode(language);
+
+  const map: Record<string, string> = {
+    fr: t("home.languages.french"),
+    en: t("home.languages.english"),
+    ja: t("home.languages.japanese"),
+    ko: t("home.languages.korean"),
+    es: t("home.languages.spanish"),
+    it: t("home.languages.italian"),
+    de: t("home.languages.german"),
+    pt: t("home.languages.portuguese"),
+    ru: t("home.languages.russian"),
+    zh: t("home.languages.chinese"),
+    unknown: t("home.languages.unknown"),
+  };
+
+  return map[normalized] || language;
 }
 
 function yearToDateBounds(yearFrom: string, yearTo: string) {
@@ -50,27 +105,12 @@ function yearToDateBounds(yearFrom: string, yearTo: string) {
 }
 
 function toTmdbOriginalLanguageCode(language: string): string | undefined {
-  const normalized = String(language || "").trim().toLowerCase();
-  if (!normalized || normalized === "all" || normalized === "inconnu") {
+  const normalized = normalizeLanguageCode(language);
+  if (!normalized || normalized === "all" || normalized === "unknown") {
     return undefined;
   }
 
-  const map: Record<string, string> = {
-    francais: "fr",
-    français: "fr",
-    anglais: "en",
-    japonais: "ja",
-    coreen: "ko",
-    coréen: "ko",
-    espagnol: "es",
-    italien: "it",
-    allemand: "de",
-    portugais: "pt",
-    russe: "ru",
-    chinois: "zh",
-  };
-
-  return map[normalized] || undefined;
+  return normalized;
 }
 
 
@@ -392,8 +432,8 @@ export function Home() {
   }, [movieGenres, seriesGenres, showMovies, showSeries]);
 
   const availableLanguages = useMemo(() => {
-    const movieLanguages = showMovies ? baseMovies.map((movie) => movie.language || "Inconnu") : [];
-    const seriesLanguages = showSeries ? baseSeries.map((show) => show.language || "Inconnu") : [];
+    const movieLanguages = showMovies ? baseMovies.map((movie) => normalizeLanguageCode(movie.language)) : [];
+    const seriesLanguages = showSeries ? baseSeries.map((show) => normalizeLanguageCode(show.language)) : [];
     return toSortedUnique([...DEFAULT_LANGUAGE_OPTIONS, ...movieLanguages, ...seriesLanguages]);
   }, [baseMovies, baseSeries, showMovies, showSeries]);
 
@@ -415,7 +455,7 @@ export function Home() {
   const filteredMovies = useMemo(() => {
     return baseMovies.filter((movie) => {
       const matchesLanguage =
-        languageFilter === "all" || (movie.language || "Inconnu") === languageFilter;
+        languageFilter === "all" || normalizeLanguageCode(movie.language) === languageFilter;
 
       if (!hasSearch) {
         return matchesLanguage;
@@ -431,7 +471,7 @@ export function Home() {
   const filteredSeries = useMemo(() => {
     return baseSeries.filter((show) => {
       const matchesLanguage =
-        languageFilter === "all" || (show.language || "Inconnu") === languageFilter;
+        languageFilter === "all" || normalizeLanguageCode(show.language) === languageFilter;
 
       if (!hasSearch) {
         return matchesLanguage;
@@ -532,7 +572,7 @@ export function Home() {
                   <option value="all">{t("home.allLanguages")}</option>
                   {availableLanguages.map((language) => (
                     <option key={language} value={language}>
-                      {language}
+                      {getLanguageLabel(language, t)}
                     </option>
                   ))}
                 </select>
@@ -563,10 +603,10 @@ export function Home() {
                   className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
                 >
                   <option value="0">{t("home.allRatings")}</option>
-                  <option value="6">Note {">="} 6</option>
-                  <option value="7">Note {">="} 7</option>
-                  <option value="8">Note {">="} 8</option>
-                  <option value="9">Note {">="} 9</option>
+                  <option value="6">{t("home.minRating", { value: 6 })}</option>
+                  <option value="7">{t("home.minRating", { value: 7 })}</option>
+                  <option value="8">{t("home.minRating", { value: 8 })}</option>
+                  <option value="9">{t("home.minRating", { value: 9 })}</option>
                 </select>
               </div>
             </>
@@ -740,7 +780,7 @@ export function Home() {
         <div className="space-y-8">
           {showMovies && (
             <section className="space-y-4">
-              <h4 className="text-xl font-semibold text-white">Films</h4>
+              <h4 className="text-xl font-semibold text-white">{t("home.movies")}</h4>
               {filteredMovies.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredMovies.map((movie) => (
@@ -751,14 +791,14 @@ export function Home() {
                   ))}
                 </div>
               ) : (
-                <p className="text-white/60">Aucun film ne correspond.</p>
+                <p className="text-white/60">{t("home.noMoviesMatch")}</p>
               )}
             </section>
           )}
 
           {showSeries && (
             <section className="space-y-4">
-              <h4 className="text-xl font-semibold text-white">Series</h4>
+              <h4 className="text-xl font-semibold text-white">{t("home.series")}</h4>
               {filteredSeries.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredSeries.map((show) => (
@@ -769,7 +809,7 @@ export function Home() {
                   ))}
                 </div>
               ) : (
-                <p className="text-white/60">Aucune serie ne correspond.</p>
+                <p className="text-white/60">{t("home.noSeriesMatch")}</p>
               )}
             </section>
           )}

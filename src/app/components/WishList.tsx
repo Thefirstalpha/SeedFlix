@@ -12,11 +12,13 @@ import {
   getSeriesWishlist,
   removeMultipleFromSeriesWishlist,
 } from "../services/seriesWishlistService";
+import { useI18n } from "../i18n/LanguageProvider";
 import type { Movie } from "../types/movie";
 import type { SeriesWishlistEntry } from "../types/seriesWishlist";
 
 export function WishList() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("movies");
 
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -151,6 +153,14 @@ export function WishList() {
   }
 
   const uniqueSeriesCount = groupedSeries.length;
+  const movieCountLabel = t(
+    movies.length > 1 ? "wishlistPage.summary.movies_many" : "wishlistPage.summary.movies_one",
+    { count: movies.length }
+  );
+  const seriesCountLabel = t(
+    uniqueSeriesCount > 1 ? "wishlistPage.summary.series_many" : "wishlistPage.summary.series_one",
+    { count: uniqueSeriesCount }
+  );
 
   const getGroupEntryIds = (group: {
     seriesEntry?: SeriesWishlistEntry;
@@ -199,10 +209,9 @@ export function WishList() {
         <div className="flex items-center gap-3">
           <Heart className="w-8 h-8 text-purple-400 fill-purple-400" />
           <div>
-            <h2 className="text-3xl font-bold text-white">Ma liste de souhaits</h2>
+            <h2 className="text-3xl font-bold text-white">{t("wishlistPage.title")}</h2>
             <p className="text-white/60">
-              {movies.length} film{movies.length > 1 ? "s" : ""} • {uniqueSeriesCount} série
-              {uniqueSeriesCount > 1 ? "s" : ""}
+              {movieCountLabel} • {seriesCountLabel}
             </p>
           </div>
         </div>
@@ -214,19 +223,19 @@ export function WishList() {
             value="movies"
             className="text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white"
           >
-            Films ({movies.length})
+            {t("wishlistPage.tabs.movies", { count: movies.length })}
           </TabsTrigger>
           <TabsTrigger
             value="series"
             className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white"
           >
-            Séries ({uniqueSeriesCount})
+            {t("wishlistPage.tabs.series", { count: uniqueSeriesCount })}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="movies" className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-bold text-white">Mes films</h3>
+            <h3 className="text-2xl font-bold text-white">{t("wishlistPage.movies.title")}</h3>
 
             {movies.length > 0 && (
               <div className="flex gap-2">
@@ -237,7 +246,7 @@ export function WishList() {
                     className="bg-purple-600 hover:bg-purple-700 text-white"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Gérer la liste
+                    {t("wishlistPage.actions.manage")}
                   </Button>
                 ) : (
                   <>
@@ -247,7 +256,7 @@ export function WishList() {
                       className="bg-purple-600 hover:bg-purple-700 text-white"
                     >
                       <X className="w-4 h-4 mr-2" />
-                      Annuler
+                      {t("common.cancel")}
                     </Button>
                     <Button
                       onClick={toggleSelectAll}
@@ -255,8 +264,8 @@ export function WishList() {
                       className="bg-purple-600 hover:bg-purple-700 text-white"
                     >
                       {selectedIds.length === movies.length
-                        ? "Tout désélectionner"
-                        : "Tout sélectionner"}
+                        ? t("wishlistPage.actions.deselectAll")
+                        : t("wishlistPage.actions.selectAll")}
                     </Button>
                     <Button
                       onClick={handleRemoveSelected}
@@ -264,7 +273,7 @@ export function WishList() {
                       className="bg-red-600 hover:bg-red-700 text-white"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      Retirer ({selectedIds.length})
+                      {t("wishlistPage.actions.removeCount", { count: selectedIds.length })}
                     </Button>
                   </>
                 )}
@@ -297,14 +306,14 @@ export function WishList() {
             <div className="text-center py-12">
               <Heart className="w-16 h-16 text-white/20 mx-auto mb-4" />
               <h3 className="text-2xl font-semibold text-white mb-2">
-                Votre liste de films est vide
+                {t("wishlistPage.movies.emptyTitle")}
               </h3>
               <p className="text-white/60 mb-6">
-                Ajoutez vos films préférés à votre liste de souhaits
+                {t("wishlistPage.movies.emptyDescription")}
               </p>
               <Link to="/">
                 <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-                  Découvrir des films
+                  {t("wishlistPage.movies.discover")}
                 </Button>
               </Link>
             </div>
@@ -313,7 +322,7 @@ export function WishList() {
 
         <TabsContent value="series" className="space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <h3 className="text-2xl font-bold text-white">Mes séries</h3>
+            <h3 className="text-2xl font-bold text-white">{t("wishlistPage.series.title")}</h3>
 
             {seriesEntries.length > 0 && (
               <div className="flex gap-2 flex-wrap">
@@ -324,7 +333,7 @@ export function WishList() {
                     className="bg-cyan-600 hover:bg-cyan-700 text-white"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Gérer la liste
+                    {t("wishlistPage.actions.manage")}
                   </Button>
                 ) : (
                   <>
@@ -334,7 +343,7 @@ export function WishList() {
                       className="bg-cyan-600 hover:bg-cyan-700 text-white"
                     >
                       <X className="w-4 h-4 mr-2" />
-                      Annuler
+                      {t("common.cancel")}
                     </Button>
                     <Button
                       onClick={toggleSelectAllSeries}
@@ -342,8 +351,8 @@ export function WishList() {
                       className="bg-cyan-600 hover:bg-cyan-700 text-white"
                     >
                       {selectedEntryIds.length === seriesEntries.length
-                        ? "Tout désélectionner"
-                        : "Tout sélectionner"}
+                        ? t("wishlistPage.actions.deselectAll")
+                        : t("wishlistPage.actions.selectAll")}
                     </Button>
                     <Button
                       onClick={handleRemoveSelectedSeries}
@@ -351,7 +360,7 @@ export function WishList() {
                       className="bg-red-600 hover:bg-red-700 text-white"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      Retirer ({selectedEntryIds.length})
+                      {t("wishlistPage.actions.removeCount", { count: selectedEntryIds.length })}
                     </Button>
                   </>
                 )}
@@ -388,7 +397,7 @@ export function WishList() {
                           {group.seriesTitle}
                         </p>
                         <p className="text-white/60 text-sm mt-1">
-                          {group.seriesEntry ? "Série complète favorite" : "Favoris partiels"}
+                          {group.seriesEntry ? t("wishlistPage.series.fullFavorite") : t("wishlistPage.series.partialFavorite")}
                         </p>
 
                         {isSeriesSelectionMode && (
@@ -402,7 +411,7 @@ export function WishList() {
                                 onCheckedChange={() => toggleSeriesGroup(group)}
                                 className="border-white/40"
                               />
-                              Sélectionner toute la série (saisons + épisodes)
+                              {t("wishlistPage.series.selectWhole")}
                             </label>
                           </div>
                         )}
@@ -424,14 +433,14 @@ export function WishList() {
                           )}
                           <Badge className="bg-cyan-600/20 text-cyan-200 border-cyan-500/30">
                             <Tv className="w-3 h-3 mr-1" />
-                            Série complète
+                            {t("wishlistPage.series.fullSeries")}
                           </Badge>
                         </div>
                       )}
 
                       {group.seasons.length > 0 && (
                         <div className="space-y-2">
-                          <p className="text-white/60 text-xs uppercase tracking-wide">Saisons</p>
+                          <p className="text-white/60 text-xs uppercase tracking-wide">{t("wishlistPage.series.seasons")}</p>
                           <div className="flex flex-wrap gap-2">
                             {group.seasons.map((season) => (
                               <div
@@ -450,7 +459,7 @@ export function WishList() {
                                   variant="outline"
                                   className="border-purple-500/50 text-purple-300"
                                 >
-                                  {season.seasonName ?? `Saison ${season.seasonNumber}`}
+                                  {season.seasonName ?? t("wishlistPage.series.seasonNumber", { number: season.seasonNumber || 0 })}
                                 </Badge>
                               </div>
                             ))}
@@ -460,7 +469,7 @@ export function WishList() {
 
                       {group.episodes.length > 0 && (
                         <div className="space-y-2">
-                          <p className="text-white/60 text-xs uppercase tracking-wide">Épisodes</p>
+                          <p className="text-white/60 text-xs uppercase tracking-wide">{t("wishlistPage.series.episodes")}</p>
                           <div className="flex flex-wrap gap-2">
                             {group.episodes.map((episode) => (
                               <div
@@ -496,14 +505,14 @@ export function WishList() {
             <div className="text-center py-12">
               <Tv className="w-16 h-16 text-white/20 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-white mb-2">
-                Aucune série en favoris
+                {t("wishlistPage.series.emptyTitle")}
               </h3>
               <p className="text-white/60 mb-6">
-                Ajoutez des séries, saisons ou épisodes depuis leur page de détails
+                {t("wishlistPage.series.emptyDescription")}
               </p>
               <Link to="/">
                 <Button className="bg-cyan-600 hover:bg-cyan-700 text-white">
-                  Découvrir des séries
+                  {t("wishlistPage.series.discover")}
                 </Button>
               </Link>
             </div>
