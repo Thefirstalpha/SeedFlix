@@ -26,6 +26,12 @@ import {
   type UserSettings,
 } from "../services/authService";
 import * as notificationService from "../services/notificationService";
+import {
+  getDefaultBrowserDeviceName,
+  getOrCreateBrowserDeviceId,
+  parseBrowserDevices,
+  type BrowserNotificationDevice,
+} from "../services/browserNotificationChannel";
 import { useAuth } from "../context/AuthContext";
 
 const QUALITY_OPTIONS = [
@@ -85,6 +91,12 @@ export function Settings() {
   const [discordMessage, setDiscordMessage] = useState<string | null>(null);
   const [discordError, setDiscordError] = useState<string | null>(null);
   const [isDiscordSaving, setIsDiscordSaving] = useState(false);
+  const [browserDevices, setBrowserDevices] = useState<BrowserNotificationDevice[]>([]);
+  const [browserDeviceName, setBrowserDeviceName] = useState(getDefaultBrowserDeviceName);
+  const [browserMessage, setBrowserMessage] = useState<string | null>(null);
+  const [browserError, setBrowserError] = useState<string | null>(null);
+  const [isBrowserSaving, setIsBrowserSaving] = useState(false);
+  const [browserDeviceId] = useState(getOrCreateBrowserDeviceId);
   const [testNotifMessage, setTestNotifMessage] = useState<string | null>(null);
   const [testNotifError, setTestNotifError] = useState<string | null>(null);
   const [isSendingTestNotif, setIsSendingTestNotif] = useState(false);
@@ -124,10 +136,64 @@ export function Settings() {
     const notifSettings = incomingSettings.placeholders?.notifications || {};
     setDiscordWebhookUrl((notifSettings as any).discord?.webhookUrl || "");
     setDiscordTested(
-      (notifSettings as any).enabledChannels?.includes("discord") && 
+      (notifSettings as any).enabledChannels?.includes("discord") &&
       Boolean((notifSettings as any).discord?.webhookUrl)
     );
+    setBrowserDevices(parseBrowserDevices((notifSettings as any).browser?.devices));
   };
+
+  const buildNotificationSettingsPayload = (params: {
+    discordWebhookUrl?: string;
+    browserDevices?: BrowserNotificationDevice[];
+    includeDiscord?: boolean;
+    includeBrowser?: boolean;
+  }) => {
+    const current = (settings?.placeholders?.notifications as Record<string, unknown>) || {};
+    const currentChannels = Array.isArray(current.enabledChannels)
+      ? (current.enabledChannels as string[])
+      : [];
+
+    const nextDiscordWebhookUrl =
+      params.discordWebhookUrl ?? String((current as any).discord?.webhookUrl || "");
+    const nextBrowserDevices = params.browserDevices ?? parseBrowserDevices((current as any).browser?.devices);
+
+    const nextChannels = new Set(currentChannels);
+
+    if (params.includeDiscord === true || (params.includeDiscord !== false && Boolean(nextDiscordWebhookUrl.trim()))) {
+      nextChannels.add("discord");
+    } else {
+      nextChannels.delete("discord");
+    }
+
+    if (params.includeBrowser === true || (params.includeBrowser !== false && nextBrowserDevices.length > 0)) {
+      nextChannels.add("browser");
+    } else {
+      nextChannels.delete("browser");
+    }
+
+    return {
+      ...(current || {}),
+      enabledChannels: Array.from(nextChannels),
+      discord: {
+        webhookUrl: nextDiscordWebhookUrl,
+      },
+      browser: {
+        devices: nextBrowserDevices,
+      },
+    };
+  };
+
+  const buildSettingsWithNotifications = (notificationsPayload: Record<string, unknown>): UserSettings => ({
+    profile: settings?.profile || { username: user?.username || "admin" },
+    security: settings?.security || { lastPasswordChangeAt: new Date().toISOString() },
+    apiKeys: settings?.apiKeys || { tmdb: "" },
+    placeholders: {
+      notifications: notificationsPayload,
+      preferences: settings?.placeholders?.preferences || {},
+      torrent: settings?.placeholders?.torrent || {},
+      indexer: settings?.placeholders?.indexer || {},
+    },
+  });
 
   const buildUpdatedSettings = (overrides: Partial<UserSettings["placeholders"]>): UserSettings => ({
     profile: settings?.profile || { username: user?.username || "admin" },
@@ -376,23 +442,12 @@ export function Settings() {
       }
 
       // Save configuration
-      const enabledChannels = ["discord"];
-      const updatedSettings: UserSettings = {
-        profile: settings?.profile || { username: user?.username || "admin" },
-        security: settings?.security || { lastPasswordChangeAt: new Date().toISOString() },
-        apiKeys: settings?.apiKeys || { tmdb: "" },
-        placeholders: {
-          notifications: {
-            enabledChannels,
-            discord: {
-              webhookUrl: discordWebhookUrl,
-            },
-          },
-          preferences: settings?.placeholders?.preferences || {},
-          torrent: settings?.placeholders?.torrent || {},
-          indexer: settings?.placeholders?.indexer || {},
-        },
-      };
+      const notificationsPayload = buildNotificationSettingsPayload({
+        discordWebhookUrl,
+        browserDevices,
+        includeDiscord: true,
+      });
+      const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
 
       await updateSettings(updatedSettings);
       setLocalSettings(updatedSettings);
@@ -410,6 +465,95 @@ export function Settings() {
       );
     } finally {
       setIsDiscordSaving(false);
+    }
+  };
+
+  const handleAddBrowserChannel = async () => {
+    setBrowserError(null);
+    setBrowserMessage(null);
+    setIsBrowserSaving(true);
+
+    try {
+      if (typeof window === "undefined" || !("Notification" in window)) {
+        setBrowserError("Ce navigateur ne supporte pas les notifications web.");
+        setIsBrowserSaving(false);
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setBrowserError("Autorisation refusée. Activez les notifications pour ce site.");
+        setIsBrowserSaving(false);
+        return;
+      }
+
+      const nextName = browserDeviceName.trim() || getDefaultBrowserDeviceName();
+      const existingIndex = browserDevices.findIndex((device) => device.id === browserDeviceId);
+      const nextDevices = [...browserDevices];
+
+      if (existingIndex >= 0) {
+        nextDevices[existingIndex] = {
+          ...nextDevices[existingIndex],
+          name: nextName,
+        };
+      } else {
+        nextDevices.push({
+          id: browserDeviceId,
+          name: nextName,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      const notificationsPayload = buildNotificationSettingsPayload({
+        browserDevices: nextDevices,
+        includeBrowser: true,
+      });
+      const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
+
+      await updateSettings(updatedSettings);
+      setLocalSettings(updatedSettings);
+      setSettings(updatedSettings);
+      await refresh();
+      setBrowserDevices(nextDevices);
+      setBrowserMessage("Canal navigateur enregistré avec succès.");
+    } catch (submitError) {
+      setBrowserError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Configuration du navigateur impossible"
+      );
+    } finally {
+      setIsBrowserSaving(false);
+    }
+  };
+
+  const handleRemoveBrowserDevice = async (deviceId: string) => {
+    setBrowserError(null);
+    setBrowserMessage(null);
+    setIsBrowserSaving(true);
+
+    try {
+      const nextDevices = browserDevices.filter((device) => device.id !== deviceId);
+      const notificationsPayload = buildNotificationSettingsPayload({
+        browserDevices: nextDevices,
+        includeBrowser: nextDevices.length > 0,
+      });
+      const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
+
+      await updateSettings(updatedSettings);
+      setLocalSettings(updatedSettings);
+      setSettings(updatedSettings);
+      await refresh();
+      setBrowserDevices(nextDevices);
+      setBrowserMessage("Navigateur supprimé.");
+    } catch (submitError) {
+      setBrowserError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Suppression du navigateur impossible"
+      );
+    } finally {
+      setIsBrowserSaving(false);
     }
   };
 
@@ -820,6 +964,73 @@ export function Settings() {
                         </Button>
                       </div>
                     </div>
+                  )}
+                </div>
+
+                <div className="space-y-4 p-4 bg-slate-800/50 rounded-md border border-purple-500/20">
+                  <div>
+                    <h4 className="font-medium text-white">Navigateur internet</h4>
+                    <p className="text-sm text-purple-200/70">
+                      Enregistrez plusieurs navigateurs pour recevoir les notifications natives.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      value={browserDeviceName}
+                      onChange={(e) => setBrowserDeviceName(e.target.value)}
+                      placeholder="Nom du navigateur (ex: Chrome bureau)"
+                      className="bg-slate-900 border-white/10 text-white"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleAddBrowserChannel}
+                      disabled={isBrowserSaving}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {isBrowserSaving ? "Enregistrement..." : "Ajouter ce navigateur"}
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {browserDevices.length === 0 ? (
+                      <p className="text-sm text-white/60">Aucun navigateur enregistré.</p>
+                    ) : (
+                      browserDevices.map((device) => (
+                        <div
+                          key={device.id}
+                          className="flex items-center justify-between gap-3 rounded border border-white/10 bg-slate-900/50 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm text-white">{device.name}</p>
+                            <p className="text-xs text-white/50">
+                              {device.id === browserDeviceId ? "Navigateur actuel" : "Navigateur enregistré"}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => void handleRemoveBrowserDevice(device.id)}
+                            disabled={isBrowserSaving}
+                            className="text-red-300 hover:text-red-200 hover:bg-red-500/15"
+                          >
+                            Supprimer
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {browserMessage && (
+                    <p className="text-sm text-blue-300 p-2 bg-blue-900/20 rounded">
+                      ✓ {browserMessage}
+                    </p>
+                  )}
+
+                  {browserError && (
+                    <p className="text-sm text-red-300 p-2 bg-red-900/30 rounded">
+                      ✗ {browserError}
+                    </p>
                   )}
                 </div>
 

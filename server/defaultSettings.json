@@ -13,6 +13,9 @@
       "enabledChannels": [],
       "discord": {
         "webhookUrl": ""
+      },
+      "browser": {
+        "devices": []
       }
     },
     "preferences": {},

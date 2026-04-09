@@ -7,6 +7,10 @@ import { getSeriesWishlistCount } from "../services/seriesWishlistService";
 import { getTorrentDownloads } from "../services/torrentService";
 import * as notificationService from "../services/notificationService";
 import type { Notification } from "../services/notificationService";
+import {
+  getOrCreateBrowserDeviceId,
+  parseBrowserDevices,
+} from "../services/browserNotificationChannel";
 import { Button } from "./ui/button";
 import {
   Sheet,
@@ -38,6 +42,46 @@ function showNotificationToast(type: Notification["type"], title: string, descri
   }
 }
 
+function canUseBrowserNotificationChannel(
+  notificationsSettings: unknown,
+  browserDeviceId: string
+): boolean {
+  const settings =
+    notificationsSettings && typeof notificationsSettings === "object"
+      ? (notificationsSettings as Record<string, unknown>)
+      : {};
+  const enabledChannels = Array.isArray(settings.enabledChannels)
+    ? (settings.enabledChannels as string[])
+    : [];
+
+  if (!enabledChannels.includes("browser")) {
+    return false;
+  }
+
+  const browser = settings.browser;
+  const browserDevices =
+    browser && typeof browser === "object"
+      ? parseBrowserDevices((browser as Record<string, unknown>).devices)
+      : [];
+
+  return browserDevices.some((device) => device.id === browserDeviceId);
+}
+
+function showBrowserNotification(title: string, message: string) {
+  if (typeof window === "undefined" || typeof Notification === "undefined") {
+    return;
+  }
+
+  if (Notification.permission !== "granted") {
+    return;
+  }
+
+  new Notification(title, {
+    body: message,
+    icon: "/favicon.svg",
+  });
+}
+
 export function Root() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -46,11 +90,13 @@ export function Root() {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const hasHydratedUnreadRef = useRef(false);
   const previousUnreadCountRef = useRef(0);
+  const [browserDeviceId] = useState(getOrCreateBrowserDeviceId);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const wishlistTarget = location.pathname === "/wishlist" ? "/" : "/wishlist";
   const {
     user,
+    settings,
     isAuthenticated,
     logout,
     needsInitialSetup,
@@ -60,6 +106,8 @@ export function Root() {
     mustConfigureIndexer,
   } = useAuth();
   const isSetupPage = location.pathname === "/setup";
+  const isLoginPage = location.pathname === "/login";
+  const shouldShowHeader = !isLoginPage && !isSetupPage;
   const hasPendingSetup =
     needsInitialSetup ||
     mustChangePassword ||
@@ -134,13 +182,23 @@ export function Root() {
         ) {
           const delta = nextUnreadCount - previousUnreadCount;
           if (latestUnread) {
-            showNotificationToast(
-              latestUnread.type,
-              delta > 1 ? `${delta} nouvelles notifications` : latestUnread.title,
+            const toastTitle =
+              delta > 1 ? `${delta} nouvelles notifications` : latestUnread.title;
+            const toastDescription =
               delta > 1
                 ? `${latestUnread.message} (et ${delta - 1} autre${delta - 1 > 1 ? "s" : ""})`
-                : latestUnread.message
-            );
+                : latestUnread.message;
+
+            showNotificationToast(latestUnread.type, toastTitle, toastDescription);
+
+            if (
+              canUseBrowserNotificationChannel(
+                settings?.placeholders?.notifications,
+                browserDeviceId
+              )
+            ) {
+              showBrowserNotification(latestUnread.title, latestUnread.message);
+            }
           } else {
             toast.info(
               delta > 1 ? `${delta} nouvelles notifications` : "Nouvelle notification",
@@ -183,6 +241,8 @@ export function Root() {
     isSetupPage,
     hasPendingSetup,
     location.pathname,
+    settings,
+    browserDeviceId,
   ]);
 
   useEffect(() => {
@@ -240,6 +300,7 @@ export function Root() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      {shouldShowHeader && (
       <header className="border-b border-white/10 backdrop-blur-sm bg-black/20 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -444,6 +505,7 @@ export function Root() {
           </div>
         </div>
       </header>
+      )}
       <main className="container mx-auto px-4 py-8">
         <Outlet />
       </main>

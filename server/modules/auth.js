@@ -39,7 +39,15 @@ function buildDefaultSettings(username = "admin") {
       tmdb: "",
     },
     placeholders: {
-      notifications: {},
+      notifications: {
+        enabledChannels: [],
+        discord: {
+          webhookUrl: "",
+        },
+        browser: {
+          devices: [],
+        },
+      },
       preferences: {},
       torrent: {
         url: "",

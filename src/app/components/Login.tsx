@@ -78,7 +78,17 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center">
+    <div className="min-h-[70vh] flex flex-col items-center justify-center px-4">
+      <div className="mb-8 flex items-center gap-3">
+        <img
+          src="/favicon.svg"
+          alt="SeedFlix"
+          className="h-12 w-12 rounded-sm"
+        />
+        <h1 className="text-4xl font-black text-white tracking-tighter">
+          SeedFlix
+        </h1>
+      </div>
       <Card className="w-full max-w-md border-white/10 bg-white/5 text-white backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="text-2xl">Connexion</CardTitle>

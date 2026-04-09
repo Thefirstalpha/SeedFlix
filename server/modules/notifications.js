@@ -457,7 +457,7 @@ export function registerNotificationRoutes(app) {
         data: {
           source: "manual-test",
           details: {
-            Canal: "Interne + Discord (si actif)",
+            Canal: "Interne + canaux actifs (Discord/Navigateur)",
             Horodatage: new Date().toLocaleString("fr-FR"),
           },
         },
