@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Calendar, Clapperboard, Download, Heart, Loader2, Star, Tv } from "lucide-react";
+import { ArrowLeft, Calendar, Clapperboard, Heart, Star, Tv } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
-import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
+import { TorrentResultsPanel } from "./TorrentResultsPanel";
 import {
   getSeriesById,
   getSeriesSeasonEpisodes,
@@ -716,233 +716,59 @@ export function SeriesDetails() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/5 border-white/10">
-            <CardContent className="p-6 space-y-4">
-              <div>
-                <h3 className="text-xl font-semibold text-white">{t("seriesDetails.tracker.title")}</h3>
-                <p className="text-sm text-white/60 mt-1">
-                  {t("seriesDetails.tracker.description")}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-                  <label htmlFor="series-season-filter" className="text-sm text-white/70 whitespace-nowrap font-medium">
-                    {t("seriesDetails.season")}
-                  </label>
-                  <select
-                    id="series-season-filter"
-                    value={seasonFilter}
-                    onChange={(event) => setSeasonFilter(event.target.value)}
-                    className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="all">{t("seriesDetails.tracker.all")}</option>
-                    {availableReleaseSeasons.map((season) => (
-                      <option key={season} value={season}>
-                        {season}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-                  <label htmlFor="series-quality-filter" className="text-sm text-white/70 whitespace-nowrap font-medium">
-                    {t("seriesDetails.tracker.quality")}
-                  </label>
-                  <select
-                    id="series-quality-filter"
-                    value={qualityFilter}
-                    onChange={(event) => setQualityFilter(event.target.value)}
-                    className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="all">{t("seriesDetails.tracker.all")}</option>
-                    <option value="2160p">2160p</option>
-                    <option value="1080p">1080p</option>
-                    <option value="720p">720p</option>
-                    <option value="480p">480p</option>
-                    <option value="bluray">BluRay</option>
-                    <option value="webdl">WEB-DL</option>
-                    <option value="hdtv">HDTV</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-                  <label htmlFor="series-language-filter" className="text-sm text-white/70 whitespace-nowrap font-medium">
-                    {t("seriesDetails.tracker.language")}
-                  </label>
-                  <select
-                    id="series-language-filter"
-                    value={languageFilter}
-                    onChange={(event) => setLanguageFilter(event.target.value)}
-                    className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="all">{t("seriesDetails.tracker.all")}</option>
-                    {availableReleaseLanguages.map((language) => (
-                      <option key={language} value={language}>
-                        {language}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-                  <span className="text-sm text-white/70 font-medium">{t("seriesDetails.tracker.sort")}</span>
-                  <ToggleGroup
-                    type="single"
-                    value={sortBy}
-                    onValueChange={(value) => {
-                      if (value) setSortBy(value as "size" | "date");
-                    }}
-                    className="border border-white/20 rounded-md bg-slate-900/30"
-                  >
-                    <ToggleGroupItem 
-                      value="date" 
-                      aria-label="Sort by date" 
-                      className="text-sm data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
-                    >
-                      {t("seriesDetails.tracker.date")}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem 
-                      value="size" 
-                      aria-label="Sort by size" 
-                      className="text-sm data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
-                    >
-                      {t("seriesDetails.tracker.size")}
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                  <Button
-                    size="sm"
-                    onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
-                    className="h-9 px-3 border border-white/20 text-white/80 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all"
-                  >
-                    {sortOrder === "desc" ? "↓" : "↑"}
-                  </Button>
-                </div>
-              </div>
-
-              {isReleaseLoading && (
-                <p className="text-sm text-white/60">{t("seriesDetails.tracker.searching")}</p>
-              )}
-
-              {releaseError && (
-                <p className="text-sm text-red-300">{releaseError}</p>
-              )}
-
-              {torrentStatus && !releaseError && (
-                <p className="text-sm text-emerald-300">{torrentStatus}</p>
-              )}
-
-              {torrentError && (
-                <p className="text-sm text-red-300">{torrentError}</p>
-              )}
-
-              {!isReleaseLoading && !releaseError && filteredReleaseResults.length === 0 && (
-                <p className="text-sm text-white/60">{t("seriesDetails.tracker.empty")}</p>
-              )}
-
-              {filteredReleaseResults.length > 0 && (
-                <div className="space-y-3">
-                  {paginatedResults.map((item, index) => (
-                    <div
-                      key={item.guid || item.link || `${item.title}_${index}`}
-                      className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
-                    >
-                      <p className="text-white font-medium line-clamp-2 break-all">{item.title}</p>
-
-                      <div className="flex flex-wrap gap-2 items-center">
-                        <Button
-                          size="sm"
-                          onClick={() => handleAddTorrent(item.downloadUrl || item.link)}
-                          disabled={addingTorrentLink === (item.downloadUrl || item.link)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white w-full sm:w-auto"
-                        >
-                          {addingTorrentLink === (item.downloadUrl || item.link) ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              {t("seriesDetails.tracker.adding")}
-                            </>
-                          ) : (
-                            <>
-                              <Download className="w-4 h-4 mr-2" />
-                              {t("seriesDetails.tracker.addToClient")}
-                            </>
-                          )}
-                        </Button>
-
-                        {item.quality && (
-                          <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
-                            {t("seriesDetails.tracker.qualityBadge", { value: item.quality })}
-                          </Badge>
-                        )}
-                        {item.language && (
-                          <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
-                            {t("seriesDetails.tracker.languageBadge", { value: item.language })}
-                          </Badge>
-                        )}
-                        {item.sizeHuman && (
-                          <Badge variant="outline" className="border-white/30 text-white/80">
-                            {t("seriesDetails.tracker.sizeBadge", { value: item.sizeHuman })}
-                          </Badge>
-                        )}
-                        {item.pubDate && (
-                          <Badge variant="outline" className="border-blue-500/40 text-blue-300">
-                            <Calendar className="w-3 h-3 mr-1 inline" />
-                            {new Date(item.pubDate).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US")}
-                          </Badge>
-                        )}
-                        {Number.isFinite(item.seeders || NaN) && (item.seeders || 0) >= 0 && (
-                          <Badge variant="outline" className="border-lime-500/40 text-lime-300">
-                            {t("seriesDetails.tracker.seeders", { count: item.seeders || 0 })}
-                          </Badge>
-                        )}
-                        {Number.isFinite(item.leechers || NaN) && (item.leechers || 0) >= 0 && (
-                          <Badge variant="outline" className="border-orange-500/40 text-orange-300">
-                            {t("seriesDetails.tracker.peers", { count: item.leechers || 0 })}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  <div className="flex items-center justify-center gap-2 flex-wrap pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                      disabled={currentPage === 1}
-                    >
-                      {t("seriesDetails.pagination.previous")}
-                    </Button>
-
-                    <span className="text-sm text-white/80">
-                      {t("seriesDetails.pagination.current", { current: currentPage, total: totalPages })}
-                    </span>
-
-                    <select
-                      value={currentPage}
-                      onChange={(event) => setCurrentPage(Number(event.target.value))}
-                      className="bg-slate-900 border border-white/20 text-white rounded-md px-2 py-1 text-sm"
-                    >
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <option key={page} value={page}>
-                          {t("seriesDetails.pagination.page", { page })}
-                        </option>
-                      ))}
-                    </select>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages}
-                    >
-                      {t("seriesDetails.pagination.next")}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <TorrentResultsPanel
+            title={t("seriesDetails.tracker.title")}
+            description={t("seriesDetails.tracker.description")}
+            qualityFilter={qualityFilter}
+            onQualityFilterChange={setQualityFilter}
+            languageFilter={languageFilter}
+            onLanguageFilterChange={setLanguageFilter}
+            seasonFilter={seasonFilter}
+            onSeasonFilterChange={setSeasonFilter}
+            availableReleaseSeasons={availableReleaseSeasons}
+            availableReleaseLanguages={availableReleaseLanguages}
+            sortBy={sortBy}
+            onSortByChange={setSortBy}
+            sortOrder={sortOrder}
+            onSortOrderToggle={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+            isReleaseLoading={isReleaseLoading}
+            releaseError={releaseError}
+            torrentStatus={torrentStatus}
+            torrentError={torrentError}
+            filteredResults={filteredReleaseResults}
+            paginatedResults={paginatedResults}
+            addingTorrentLink={addingTorrentLink}
+            onAddTorrent={handleAddTorrent}
+            currentPage={currentPage}
+            onCurrentPageChange={setCurrentPage}
+            totalPages={totalPages}
+            locale={language === "fr" ? "fr-FR" : "en-US"}
+            labels={{
+              season: t("seriesDetails.season"),
+              quality: t("seriesDetails.tracker.quality"),
+              language: t("seriesDetails.tracker.language"),
+              all: t("seriesDetails.tracker.all"),
+              sort: t("seriesDetails.tracker.sort"),
+              date: t("seriesDetails.tracker.date"),
+              size: t("seriesDetails.tracker.size"),
+              searching: t("seriesDetails.tracker.searching"),
+              empty: t("seriesDetails.tracker.empty"),
+              adding: t("seriesDetails.tracker.adding"),
+              addToClient: t("seriesDetails.tracker.addToClient"),
+              qualityBadge: (value) => t("seriesDetails.tracker.qualityBadge", { value }),
+              languageBadge: (value) => t("seriesDetails.tracker.languageBadge", { value }),
+              sizeBadge: (value) => t("seriesDetails.tracker.sizeBadge", { value }),
+              seeders: (count) => t("seriesDetails.tracker.seeders", { count }),
+              peers: (count) => t("seriesDetails.tracker.peers", { count }),
+              categories: (value) => t("seriesDetails.tracker.categories", { value }),
+              previous: t("seriesDetails.pagination.previous"),
+              current: (current, total) => t("seriesDetails.pagination.current", { current, total }),
+              page: (page) => t("seriesDetails.pagination.page", { page }),
+              next: t("seriesDetails.pagination.next"),
+              sortByDateAria: "Sort by date",
+              sortBySizeAria: "Sort by size",
+            }}
+          />
         </div>
       </div>
     </div>

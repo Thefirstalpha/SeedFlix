@@ -1,10 +1,10 @@
 import { useParams, Link, useNavigate } from "react-router";
 import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Download, Loader2, Star, Calendar, Clock, User, Heart } from "lucide-react";
+import { ArrowLeft, Star, Calendar, Clock, User, Heart } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Card, CardContent } from "./ui/card";
-import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
+import { TorrentResultsPanel } from "./TorrentResultsPanel";
 import { getMovieById, searchMovieReleases, type TorznabMovieResult } from "../services/movieService";
 import { addTorrentToClient } from "../services/torrentService";
 import { addToWishlist, removeFromWishlist, isInWishlist } from "../services/wishlistService";
@@ -371,221 +371,54 @@ export function MovieDetails() {
             </Card>
           )}
 
-          <Card className="bg-white/5 border-white/10">
-            <CardContent className="p-6 space-y-4">
-              <div>
-                <h3 className="text-xl font-semibold text-white">{t("movieDetails.tracker.title")}</h3>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-                  <label htmlFor="movie-quality-filter" className="text-sm text-white/70 font-medium whitespace-nowrap">
-                    {t("movieDetails.tracker.quality")}
-                  </label>
-                  <select
-                    id="movie-quality-filter"
-                    value={qualityFilter}
-                    onChange={(event) => setQualityFilter(event.target.value)}
-                    className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="all">{t("movieDetails.tracker.all")}</option>
-                    <option value="2160p">2160p</option>
-                    <option value="1080p">1080p</option>
-                    <option value="720p">720p</option>
-                    <option value="480p">480p</option>
-                    <option value="bluray">BluRay</option>
-                    <option value="webdl">WEB-DL</option>
-                    <option value="hdtv">HDTV</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-                  <label htmlFor="movie-language-filter" className="text-sm text-white/70 font-medium whitespace-nowrap">
-                    {t("movieDetails.tracker.language")}
-                  </label>
-                  <select
-                    id="movie-language-filter"
-                    value={languageFilter}
-                    onChange={(event) => setLanguageFilter(event.target.value)}
-                    className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
-                  >
-                    <option value="all">{t("movieDetails.tracker.all")}</option>
-                    {availableReleaseLanguages.map((language) => (
-                      <option key={language} value={language}>
-                        {language}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-                  <span className="text-sm text-white/70 font-medium">{t("movieDetails.tracker.sort")}</span>
-                  <ToggleGroup
-                    type="single"
-                    value={sortBy}
-                    onValueChange={(value) => {
-                      if (value) setSortBy(value as "size" | "date");
-                    }}
-                    className="border border-white/20 rounded-md bg-slate-900/30"
-                  >
-                    <ToggleGroupItem 
-                      value="date" 
-                      aria-label="Sort by date" 
-                      className="text-sm data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
-                    >
-                      {t("movieDetails.tracker.date")}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem 
-                      value="size" 
-                      aria-label="Sort by size" 
-                      className="text-sm data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
-                    >
-                      {t("movieDetails.tracker.size")}
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                  <Button
-                    size="sm"
-                    onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
-                    className="h-9 px-3 border border-white/20 text-white/80 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all"
-                  >
-                    {sortOrder === "desc" ? "↓" : "↑"}
-                  </Button>
-                </div>
-              </div>
-
-              {isReleaseLoading && (
-                <p className="text-sm text-white/60">{t("movieDetails.tracker.searching")}</p>
-              )}
-
-              {releaseError && (
-                <p className="text-sm text-red-300">{releaseError}</p>
-              )}
-
-              {torrentStatus && !releaseError && (
-                <p className="text-sm text-emerald-300">{torrentStatus}</p>
-              )}
-
-              {torrentError && (
-                <p className="text-sm text-red-300">{torrentError}</p>
-              )}
-
-              {!isReleaseLoading && !releaseError && filteredReleaseResults.length === 0 && (
-                <p className="text-sm text-white/60">{t("movieDetails.tracker.empty")}</p>
-              )}
-
-              {filteredReleaseResults.length > 0 && (
-                <div className="space-y-4">
-                  <div className="space-y-3">
-                    {paginatedResults.map((item, index) => (
-                    <div
-                      key={item.guid || item.link || `${item.title}_${index}`}
-                      className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
-                    >
-                      <p className="text-white font-medium line-clamp-2 break-all">
-                        {item.title}
-                      </p>
-
-                      <div className="flex flex-wrap gap-2 items-center">
-                        <Button
-                          size="sm"
-                          onClick={() => handleAddTorrent(item.downloadUrl || item.link)}
-                          disabled={addingTorrentLink === (item.downloadUrl || item.link)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white w-full sm:w-auto"
-                        >
-                          {addingTorrentLink === (item.downloadUrl || item.link) ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              {t("movieDetails.tracker.adding")}
-                            </>
-                          ) : (
-                            <>
-                              <Download className="w-4 h-4 mr-2" />
-                              {t("movieDetails.tracker.addToClient")}
-                            </>
-                          )}
-                        </Button>
-
-                        {item.quality && (
-                          <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
-                            {t("movieDetails.tracker.qualityBadge", { value: item.quality })}
-                          </Badge>
-                        )}
-                        {item.language && (
-                          <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
-                            {t("movieDetails.tracker.languageBadge", { value: item.language })}
-                          </Badge>
-                        )}
-                        {item.sizeHuman && (
-                          <Badge variant="outline" className="border-white/30 text-white/80">
-                            {t("movieDetails.tracker.sizeBadge", { value: item.sizeHuman })}
-                          </Badge>
-                        )}
-                        {item.pubDate && (
-                          <Badge variant="outline" className="border-blue-500/40 text-blue-300">
-                            <Calendar className="w-3 h-3 mr-1 inline" />
-                            {new Date(item.pubDate).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US")}
-                          </Badge>
-                        )}
-                        {Number.isFinite(item.seeders || NaN) && (item.seeders || 0) >= 0 && (
-                          <Badge variant="outline" className="border-lime-500/40 text-lime-300">
-                            {t("movieDetails.tracker.seeders", { count: item.seeders || 0 })}
-                          </Badge>
-                        )}
-                        {Number.isFinite(item.leechers || NaN) && (item.leechers || 0) >= 0 && (
-                          <Badge variant="outline" className="border-orange-500/40 text-orange-300">
-                            {t("movieDetails.tracker.peers", { count: item.leechers || 0 })}
-                          </Badge>
-                        )}
-                      </div>
-
-                      {Array.isArray(item.categories) && item.categories.length > 0 && (
-                        <p className="text-xs text-white/50 line-clamp-1 break-all">
-                          {t("movieDetails.tracker.categories", { value: item.categories.join(", ") })}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                  </div>
-
-                  <div className="flex items-center justify-center gap-2 flex-wrap pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                      disabled={currentPage === 1}
-                    >
-                      {t("movieDetails.pagination.previous")}
-                    </Button>
-
-                    <span className="text-sm text-white/80">
-                      {t("movieDetails.pagination.current", { current: currentPage, total: totalPages })}
-                    </span>
-
-                    <select
-                      value={currentPage}
-                      onChange={(event) => setCurrentPage(Number(event.target.value))}
-                      className="bg-slate-900 border border-white/20 text-white rounded-md px-2 py-1 text-sm"
-                    >
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <option key={page} value={page}>
-                          {t("movieDetails.pagination.page", { page })}
-                        </option>
-                      ))}
-                    </select>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages}
-                    >
-                      {t("movieDetails.pagination.next")}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <TorrentResultsPanel
+            title={t("movieDetails.tracker.title")}
+            qualityFilter={qualityFilter}
+            onQualityFilterChange={setQualityFilter}
+            languageFilter={languageFilter}
+            onLanguageFilterChange={setLanguageFilter}
+            availableReleaseLanguages={availableReleaseLanguages}
+            sortBy={sortBy}
+            onSortByChange={setSortBy}
+            sortOrder={sortOrder}
+            onSortOrderToggle={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+            isReleaseLoading={isReleaseLoading}
+            releaseError={releaseError}
+            torrentStatus={torrentStatus}
+            torrentError={torrentError}
+            filteredResults={filteredReleaseResults}
+            paginatedResults={paginatedResults}
+            addingTorrentLink={addingTorrentLink}
+            onAddTorrent={handleAddTorrent}
+            currentPage={currentPage}
+            onCurrentPageChange={setCurrentPage}
+            totalPages={totalPages}
+            locale={language === "fr" ? "fr-FR" : "en-US"}
+            labels={{
+              quality: t("movieDetails.tracker.quality"),
+              language: t("movieDetails.tracker.language"),
+              all: t("movieDetails.tracker.all"),
+              sort: t("movieDetails.tracker.sort"),
+              date: t("movieDetails.tracker.date"),
+              size: t("movieDetails.tracker.size"),
+              searching: t("movieDetails.tracker.searching"),
+              empty: t("movieDetails.tracker.empty"),
+              adding: t("movieDetails.tracker.adding"),
+              addToClient: t("movieDetails.tracker.addToClient"),
+              qualityBadge: (value) => t("movieDetails.tracker.qualityBadge", { value }),
+              languageBadge: (value) => t("movieDetails.tracker.languageBadge", { value }),
+              sizeBadge: (value) => t("movieDetails.tracker.sizeBadge", { value }),
+              seeders: (count) => t("movieDetails.tracker.seeders", { count }),
+              peers: (count) => t("movieDetails.tracker.peers", { count }),
+              categories: (value) => t("movieDetails.tracker.categories", { value }),
+              previous: t("movieDetails.pagination.previous"),
+              current: (current, total) => t("movieDetails.pagination.current", { current, total }),
+              page: (page) => t("movieDetails.pagination.page", { page }),
+              next: t("movieDetails.pagination.next"),
+              sortByDateAria: "Sort by date",
+              sortBySizeAria: "Sort by size",
+            }}
+          />
 
           <div>
             <Button
