@@ -76,8 +76,11 @@ jobs:
       - name: Trivy filesystem vulnerability scan
         uses: aquasecurity/trivy-action@v0.33.1
         with:
+          version: latest
           scan-type: fs
           scan-ref: .
+          hide-progress: true
+          skip-dirs: node_modules,dist,.git
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           format: table
@@ -86,7 +89,9 @@ jobs:
       - name: Trivy Docker image vulnerability scan
         uses: aquasecurity/trivy-action@v0.33.1
         with:
+          version: latest
           image-ref: local/seedflix:ci
+          hide-progress: true
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           format: table
