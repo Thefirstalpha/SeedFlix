@@ -219,9 +219,9 @@ export function MovieDetails() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 overflow-x-hidden">
       {/* Back Button and Wishlist */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <Button 
           onClick={() => navigate(-1)}
           variant="outline" 
@@ -246,20 +246,38 @@ export function MovieDetails() {
 
       {/* Backdrop Image */}
       {movie.backdrop && (
-        <div className="relative w-full h-44 sm:h-56 md:h-80 lg:h-96 rounded-lg overflow-hidden">
-          <img
-            src={movie.backdrop}
-            alt={movie.title}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent" />
+        <div className="relative mb-20 lg:mb-0">
+          <div className="relative w-full h-44 sm:h-56 md:h-80 lg:h-96 rounded-lg overflow-hidden">
+            <img
+              src={movie.backdrop}
+              alt={movie.title}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent" />
+            <div className="hidden lg:block absolute bottom-0 left-0 p-8">
+              <h1 className="text-4xl font-bold text-white mb-2 line-clamp-2">{movie.title}</h1>
+              {movie.originalTitle && movie.originalTitle !== movie.title && (
+                <p className="text-white/70 text-lg line-clamp-1">{movie.originalTitle}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 w-40 sm:w-44 md:w-48 lg:hidden">
+            <Card className="overflow-hidden bg-white/5 border-white/20 shadow-2xl shadow-black/50">
+              <img
+                src={movie.poster}
+                alt={movie.title}
+                className="w-full aspect-[2/3] object-cover"
+              />
+            </Card>
+          </div>
         </div>
       )}
 
       {/* Movie Header */}
-      <div className="grid lg:grid-cols-3 gap-8">
+      <div className="grid lg:grid-cols-3 gap-8 justify-items-center lg:justify-items-stretch">
         {/* Poster */}
-        <div className="lg:col-span-1">
+        <div className={`lg:col-span-1 max-w-[280px] sm:max-w-sm lg:max-w-none mx-auto lg:mx-0 w-full ${movie.backdrop ? "hidden lg:block" : ""}`}>
           <Card className="overflow-hidden bg-white/5 border-white/10">
             <img
               src={movie.poster}
@@ -270,11 +288,22 @@ export function MovieDetails() {
         </div>
 
         {/* Details */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className={`lg:col-span-2 space-y-6 ${movie.backdrop ? "lg:pt-4" : ""}`}>
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2">{movie.title}</h1>
-            {movie.originalTitle && movie.originalTitle !== movie.title && (
-              <p className="text-lg text-white/50 mb-2">{movie.originalTitle}</p>
+            {movie.backdrop ? (
+              <div className="lg:hidden">
+                <h1 className="text-3xl font-bold text-white mb-2">{movie.title}</h1>
+                {movie.originalTitle && movie.originalTitle !== movie.title && (
+                  <p className="text-base text-white/50 mb-2">{movie.originalTitle}</p>
+                )}
+              </div>
+            ) : (
+              <>
+                <h1 className="text-4xl font-bold text-white mb-2">{movie.title}</h1>
+                {movie.originalTitle && movie.originalTitle !== movie.title && (
+                  <p className="text-lg text-white/50 mb-2">{movie.originalTitle}</p>
+                )}
+              </>
             )}
             <div className="flex flex-wrap items-center gap-4 text-white/70">
               <div className="flex items-center gap-2">
@@ -306,7 +335,7 @@ export function MovieDetails() {
           {/* Plot */}
           <div>
             <h2 className="text-2xl font-semibold text-white mb-3">Synopsis</h2>
-            <p className="text-white/80 text-lg leading-relaxed">{movie.plot}</p>
+            <p className="text-white/80 text-lg leading-relaxed break-words">{movie.plot}</p>
           </div>
 
           {/* Director */}
@@ -316,7 +345,7 @@ export function MovieDetails() {
                 <User className="w-5 h-5 text-purple-400" />
                 <h3 className="text-xl font-semibold text-white">Réalisateur</h3>
               </div>
-              <p className="text-white/80 text-lg">{movie.director}</p>
+              <p className="text-white/80 text-lg break-words">{movie.director}</p>
             </CardContent>
           </Card>
 
@@ -330,7 +359,7 @@ export function MovieDetails() {
                     <Badge 
                       key={index} 
                       variant="outline" 
-                      className="border-white/20 text-white bg-white/5 px-3 py-1"
+                      className="max-w-full border-white/20 text-white bg-white/5 px-3 py-1 break-words"
                     >
                       {actor}
                     </Badge>
@@ -350,7 +379,7 @@ export function MovieDetails() {
               </div>
 
               <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                   <label htmlFor="movie-quality-filter" className="text-sm text-white/70 font-medium whitespace-nowrap">
                     Qualité
                   </label>
@@ -358,7 +387,7 @@ export function MovieDetails() {
                     id="movie-quality-filter"
                     value={qualityFilter}
                     onChange={(event) => setQualityFilter(event.target.value)}
-                    className="bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
+                    className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
                     <option value="all">Toutes</option>
                     <option value="2160p">2160p</option>
@@ -371,7 +400,7 @@ export function MovieDetails() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                   <label htmlFor="movie-language-filter" className="text-sm text-white/70 font-medium whitespace-nowrap">
                     Langue
                   </label>
@@ -379,7 +408,7 @@ export function MovieDetails() {
                     id="movie-language-filter"
                     value={languageFilter}
                     onChange={(event) => setLanguageFilter(event.target.value)}
-                    className="bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
+                    className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
                     <option value="all">Toutes</option>
                     {availableReleaseLanguages.map((language) => (
@@ -390,7 +419,7 @@ export function MovieDetails() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2 ml-auto">
+                <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
                   <span className="text-sm text-white/70 font-medium">Trier:</span>
                   <ToggleGroup
                     type="single"
@@ -453,7 +482,7 @@ export function MovieDetails() {
                       key={item.guid || item.link || `${item.title}_${index}`}
                       className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
                     >
-                      <p className="text-white font-medium line-clamp-2">
+                      <p className="text-white font-medium line-clamp-2 break-all">
                         {item.title}
                       </p>
 
@@ -462,7 +491,7 @@ export function MovieDetails() {
                           size="sm"
                           onClick={() => handleAddTorrent(item.downloadUrl || item.link)}
                           disabled={addingTorrentLink === (item.downloadUrl || item.link)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white w-full sm:w-auto"
                         >
                           {addingTorrentLink === (item.downloadUrl || item.link) ? (
                             <>
@@ -511,7 +540,7 @@ export function MovieDetails() {
                       </div>
 
                       {Array.isArray(item.categories) && item.categories.length > 0 && (
-                        <p className="text-xs text-white/50 line-clamp-1">
+                        <p className="text-xs text-white/50 line-clamp-1 break-all">
                           Catégories: {item.categories.join(", ")}
                         </p>
                       )}

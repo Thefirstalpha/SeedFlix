@@ -409,7 +409,7 @@ export function SeriesDetails() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 overflow-x-hidden">
       {/* Header bar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Button
@@ -448,24 +448,36 @@ export function SeriesDetails() {
       </div>
 
       {series.backdrop && (
-        <div className="relative w-full h-44 sm:h-56 md:h-80 lg:h-96 rounded-lg overflow-hidden">
-          <img
-            src={series.backdrop}
-            alt={series.title}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent" />
-          <div className="absolute bottom-0 left-0 p-4 md:p-8">
-            <h1 className="text-2xl md:text-4xl font-bold text-white mb-1 md:mb-2 line-clamp-2">{series.title}</h1>
-            {series.originalTitle && series.originalTitle !== series.title && (
-              <p className="text-white/70 text-sm md:text-lg line-clamp-1">{series.originalTitle}</p>
-            )}
+        <div className="relative mb-20 lg:mb-0">
+          <div className="relative w-full h-44 sm:h-56 md:h-80 lg:h-96 rounded-lg overflow-hidden">
+            <img
+              src={series.backdrop}
+              alt={series.title}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent" />
+            <div className="hidden lg:block absolute bottom-0 left-0 p-8">
+              <h1 className="text-4xl font-bold text-white mb-2 line-clamp-2">{series.title}</h1>
+              {series.originalTitle && series.originalTitle !== series.title && (
+                <p className="text-white/70 text-lg line-clamp-1">{series.originalTitle}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 w-40 sm:w-44 md:w-48 lg:hidden">
+            <Card className="overflow-hidden bg-white/5 border-white/20 shadow-2xl shadow-black/50">
+              <img
+                src={series.poster}
+                alt={series.title}
+                className="w-full aspect-[2/3] object-cover"
+              />
+            </Card>
           </div>
         </div>
       )}
 
-      <div className="grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1">
+      <div className="grid lg:grid-cols-3 gap-8 justify-items-center lg:justify-items-stretch">
+        <div className={`lg:col-span-1 max-w-[280px] sm:max-w-sm lg:max-w-none mx-auto lg:mx-0 w-full ${series.backdrop ? "hidden lg:block" : ""}`}>
           <Card className="overflow-hidden bg-white/5 border-white/10">
             <img
               src={series.poster}
@@ -475,8 +487,25 @@ export function SeriesDetails() {
           </Card>
         </div>
 
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex flex-wrap items-center gap-4 text-white/80">
+        <div className={`lg:col-span-2 space-y-6 ${series.backdrop ? "lg:pt-4" : ""}`}>
+          <div>
+            {series.backdrop ? (
+              <div className="lg:hidden mb-3">
+                <h1 className="text-3xl font-bold text-white mb-2">{series.title}</h1>
+                {series.originalTitle && series.originalTitle !== series.title && (
+                  <p className="text-base text-white/50">{series.originalTitle}</p>
+                )}
+              </div>
+            ) : (
+              <div className="mb-3">
+                <h1 className="text-4xl font-bold text-white mb-2">{series.title}</h1>
+                {series.originalTitle && series.originalTitle !== series.title && (
+                  <p className="text-lg text-white/50">{series.originalTitle}</p>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-4 text-white/80">
             <div className="flex items-center gap-2">
               <Calendar className="w-5 h-5" />
               <span>{series.year || "N/A"}</span>
@@ -489,21 +518,22 @@ export function SeriesDetails() {
             {series.voteCount && (
               <span className="text-white/60">({series.voteCount.toLocaleString()} votes)</span>
             )}
+            </div>
           </div>
 
           <div>
             <h2 className="text-2xl font-semibold text-white mb-3">Synopsis</h2>
-            <p className="text-white/80 text-lg leading-relaxed">{series.plot}</p>
+            <p className="text-white/80 text-lg leading-relaxed break-words">{series.plot}</p>
           </div>
 
           <Card className="bg-white/5 border-white/10">
             <CardContent className="p-6 space-y-3">
               <h3 className="text-xl font-semibold text-white">Créateurs et réseaux</h3>
-              <p className="text-white/80">
+              <p className="text-white/80 break-words">
                 <span className="text-white/60">Créateurs: </span>
                 {series.creators.length > 0 ? series.creators.join(", ") : "Non disponible"}
               </p>
-              <p className="text-white/80">
+              <p className="text-white/80 break-words">
                 <span className="text-white/60">Diffusion: </span>
                 {series.networks.length > 0 ? series.networks.join(", ") : "Non disponible"}
               </p>
@@ -534,7 +564,7 @@ export function SeriesDetails() {
                       onChange={(event) =>
                         setSelectedSeason(Number(event.target.value))
                       }
-                      className="bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                      className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
                     >
                       {availableSeasons.map((season) => (
                         <option key={season.id} value={season.seasonNumber}>
@@ -661,7 +691,7 @@ export function SeriesDetails() {
                             </div>
 
                             {episode.overview && (
-                              <p className="text-white/75 mt-3 text-sm leading-relaxed">
+                              <p className="text-white/75 mt-3 text-sm leading-relaxed break-words">
                                 {episode.overview}
                               </p>
                             )}
@@ -695,7 +725,7 @@ export function SeriesDetails() {
               </div>
 
               <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                   <label htmlFor="series-season-filter" className="text-sm text-white/70 whitespace-nowrap font-medium">
                     Saison
                   </label>
@@ -703,7 +733,7 @@ export function SeriesDetails() {
                     id="series-season-filter"
                     value={seasonFilter}
                     onChange={(event) => setSeasonFilter(event.target.value)}
-                    className="bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
+                    className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
                     <option value="all">Toutes</option>
                     {availableReleaseSeasons.map((season) => (
@@ -714,7 +744,7 @@ export function SeriesDetails() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                   <label htmlFor="series-quality-filter" className="text-sm text-white/70 whitespace-nowrap font-medium">
                     Qualité
                   </label>
@@ -722,7 +752,7 @@ export function SeriesDetails() {
                     id="series-quality-filter"
                     value={qualityFilter}
                     onChange={(event) => setQualityFilter(event.target.value)}
-                    className="bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
+                    className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
                     <option value="all">Toutes</option>
                     <option value="2160p">2160p</option>
@@ -735,7 +765,7 @@ export function SeriesDetails() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
                   <label htmlFor="series-language-filter" className="text-sm text-white/70 whitespace-nowrap font-medium">
                     Langue
                   </label>
@@ -743,7 +773,7 @@ export function SeriesDetails() {
                     id="series-language-filter"
                     value={languageFilter}
                     onChange={(event) => setLanguageFilter(event.target.value)}
-                    className="bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
+                    className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
                   >
                     <option value="all">Toutes</option>
                     {availableReleaseLanguages.map((language) => (
@@ -754,7 +784,7 @@ export function SeriesDetails() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2 ml-auto">
+                <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
                   <span className="text-sm text-white/70 font-medium">Trier:</span>
                   <ToggleGroup
                     type="single"
@@ -816,14 +846,14 @@ export function SeriesDetails() {
                       key={item.guid || item.link || `${item.title}_${index}`}
                       className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
                     >
-                      <p className="text-white font-medium line-clamp-2">{item.title}</p>
+                      <p className="text-white font-medium line-clamp-2 break-all">{item.title}</p>
 
                       <div className="flex flex-wrap gap-2 items-center">
                         <Button
                           size="sm"
                           onClick={() => handleAddTorrent(item.downloadUrl || item.link)}
                           disabled={addingTorrentLink === (item.downloadUrl || item.link)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white w-full sm:w-auto"
                         >
                           {addingTorrentLink === (item.downloadUrl || item.link) ? (
                             <>
