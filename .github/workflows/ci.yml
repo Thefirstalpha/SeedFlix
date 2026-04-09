@@ -71,7 +71,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Build Docker image
-        run: docker build . --build-arg IMAGE_TAG=ci-${{ github.sha }} -t local/seedflix:ci
+        run: docker build --pull . --build-arg IMAGE_TAG=ci-${{ github.sha }} -t local/seedflix:ci
 
       - name: Trivy filesystem vulnerability scan
         uses: aquasecurity/trivy-action@v0.33.1

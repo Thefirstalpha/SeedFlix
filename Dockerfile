@@ -19,6 +19,9 @@ LABEL org.opencontainers.image.title="SeedFlix"
 LABEL org.opencontainers.image.description="SeedFlix full-stack app (React + Express)"
 LABEL org.opencontainers.image.version="${IMAGE_TAG}"
 
+# Pull in latest Alpine security fixes available at build time.
+RUN apk upgrade --no-cache
+
 COPY package*.json ./
 RUN npm ci --omit=dev
 
