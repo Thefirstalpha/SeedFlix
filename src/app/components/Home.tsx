@@ -606,7 +606,7 @@ export function Home() {
                         void maybeLoadMoreMovies(container);
                       }}
                       onWheelCapture={handleCarouselWheel}
-                      className="-mx-4 lg:mx-0 flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-x overscroll-contain"
+                      className="-mx-4 lg:mx-0 flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-auto overscroll-x-contain"
                     >
                       <div className="flex gap-3 sm:gap-4 py-4 pr-4 lg:pr-4 pl-4 lg:pl-0">
                         {filteredMovies.map((movie) => (
@@ -681,7 +681,7 @@ export function Home() {
                         void maybeLoadMoreSeries(container);
                       }}
                       onWheelCapture={handleCarouselWheel}
-                      className="-mx-4 lg:mx-0 flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-x overscroll-contain"
+                      className="-mx-4 lg:mx-0 flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-auto overscroll-x-contain"
                     >
                       <div className="flex gap-3 sm:gap-4 py-4 pr-4 lg:pr-4 pl-4 lg:pl-0">
                         {filteredSeries.map((show) => (
