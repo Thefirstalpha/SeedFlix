@@ -6,10 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../i18n/LanguageProvider";
 
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useI18n();
   const {
     isAuthenticated,
     isLoading,
@@ -70,7 +72,7 @@ export function Login() {
       setError(
         submitError instanceof Error
           ? submitError.message
-          : "Connexion impossible"
+          : t("login.failed")
       );
     } finally {
       setIsSubmitting(false);
@@ -82,24 +84,24 @@ export function Login() {
       <div className="mb-8 flex items-center gap-3">
         <img
           src="/favicon.svg"
-          alt="SeedFlix"
+          alt={t("common.appName")}
           className="h-12 w-12 rounded-sm"
         />
         <h1 className="text-4xl font-black text-white tracking-tighter">
-          SeedFlix
+          {t("common.appName")}
         </h1>
       </div>
       <Card className="w-full max-w-md border-white/10 bg-white/5 text-white backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="text-2xl">Connexion</CardTitle>
+          <CardTitle className="text-2xl">{t("login.title")}</CardTitle>
           <CardDescription className="text-white/60">
-            Identifiez-vous pour accéder à l'application.
+            {t("login.description")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Nom d'utilisateur</Label>
+              <Label htmlFor="username">{t("login.username")}</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-white/40" />
                 <Input
@@ -112,7 +114,7 @@ export function Login() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
+              <Label htmlFor="password">{t("login.password")}</Label>
               <div className="relative">
                 <LockKeyhole className="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-white/40" />
                 <Input
@@ -132,7 +134,7 @@ export function Login() {
               disabled={isSubmitting}
               className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
             >
-              {isSubmitting ? "Connexion..." : "Se connecter"}
+              {isSubmitting ? t("login.submitting") : t("login.submit")}
             </Button>
           </form>
         </CardContent>

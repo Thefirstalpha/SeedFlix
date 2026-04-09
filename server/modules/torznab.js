@@ -1,5 +1,6 @@
 import { requireAuth } from "./auth.js";
 import { debugLog } from "../logger.js";
+import { getTranslator } from "../i18n.js";
 
 const torznabTimeoutMs = 8000;
 
@@ -99,14 +100,15 @@ function buildTorznabSearchUrl(
   query = "",
   limit = 1,
   tmdbId = "",
-  offset = 0
+  offset = 0,
+  invalidUrlMessage = "URL Torznab invalide"
 ) {
   let url;
 
   try {
     url = new URL(String(rawUrl || "").trim());
   } catch {
-    throw new Error("URL Torznab invalide");
+    throw new Error(invalidUrlMessage);
   }
 
   url.searchParams.set("t", "search");
@@ -126,7 +128,7 @@ function buildTorznabSearchUrl(
   return url;
 }
 
-function parseTorznabResponse(xmlText) {
+function parseTorznabResponse(xmlText, invalidSearchResponseMessage) {
   const errorMatch = xmlText.match(
     /<error[^>]*code="([^"]+)"[^>]*description="([^"]+)"/i
   );
@@ -144,7 +146,7 @@ function parseTorznabResponse(xmlText) {
   if (!hasRss) {
     return {
       ok: false,
-      message: "La réponse reçue n'est pas une réponse Torznab de recherche valide",
+      message: invalidSearchResponseMessage,
     };
   }
 
@@ -283,13 +285,14 @@ function resolveIndexerSettings(auth, body) {
 
 export async function searchTorznabForQuery(auth, query, options = {}) {
   const { limit = 10, tmdbId = "" } = options;
+  const t = options.t || ((key) => key);
   const { url, token } = resolveIndexerSettings(auth, {});
 
   if (!url || !token) {
     return {
       ok: false,
       skipped: true,
-      message: "Indexer Torznab non configuré",
+      message: t("torznab.indexerNotConfigured"),
       items: [],
     };
   }
@@ -312,12 +315,13 @@ export async function searchTorznabForQuery(auth, query, options = {}) {
       String(query || "").trim(),
       pageRequestLimit,
       normalizedTmdbId,
-      offset
+      offset,
+      t("torznab.invalidUrl")
     );
 
     const response = await fetchWithTimeout(searchUrl);
     const xmlText = await response.text();
-    const parsed = parseTorznabResponse(xmlText);
+    const parsed = parseTorznabResponse(xmlText, t("torznab.invalidSearchResponse"));
 
     debugLog("Torznab search response", {
       page: pageCount + 1,
@@ -332,7 +336,7 @@ export async function searchTorznabForQuery(auth, query, options = {}) {
       if (pageCount === 0) {
         return {
           ok: false,
-          message: parsed.message || `Erreur Torznab (${response.status})`,
+          message: parsed.message || t("torznab.genericError", { status: response.status }),
           code: parsed.code || null,
           items: [],
         };
@@ -386,7 +390,7 @@ export async function searchTorznabForQuery(auth, query, options = {}) {
 
   return {
     ok: true,
-    message: "Recherche Torznab effectuée",
+    message: t("torznab.searchDone"),
     sourceTitle: lastSourceTitle || null,
     items: aggregatedItems.slice(0, normalizedLimit),
   };
@@ -399,17 +403,18 @@ export function registerTorznabRoutes(app) {
       if (!auth) {
         return;
       }
+      const t = getTranslator(req, auth.user);
 
       const query = String(req.query.query || "").trim();
       const limit = Math.min(100, Math.max(1, Number(req.query.limit || 10)));
       const tmdbId = String(req.query.tmdbId || "").trim();
 
       if (!query) {
-        res.status(400).json({ error: "Le paramètre query est requis" });
+        res.status(400).json({ error: t("torznab.queryRequired") });
         return;
       }
 
-      const result = await searchTorznabForQuery(auth, query, { limit, tmdbId });
+      const result = await searchTorznabForQuery(auth, query, { limit, tmdbId, t });
       if (!result.ok) {
         res.status(400).json({
           ok: false,
@@ -428,14 +433,15 @@ export function registerTorznabRoutes(app) {
         items: result.items,
       });
     } catch (error) {
+      const t = getTranslator(req);
       if (error instanceof Error && error.name === "AbortError") {
-        res.status(504).json({ error: "La recherche Torznab a expiré" });
+        res.status(504).json({ error: t("torznab.searchTimeout") });
         return;
       }
 
       debugLog("Torznab search failed:", error);
       res.status(500).json({
-        error: error instanceof Error ? error.message : "Échec de la recherche Torznab",
+        error: t("torznab.searchFailed"),
       });
     }
   });
@@ -446,20 +452,21 @@ export function registerTorznabRoutes(app) {
       if (!auth) {
         return;
       }
+      const t = getTranslator(req, auth.user);
 
       const { url, token } = resolveIndexerSettings(auth, req.body);
 
       if (!url) {
-        res.status(400).json({ error: "L'URL Torznab est requise" });
+        res.status(400).json({ error: t("torznab.urlRequired") });
         return;
       }
 
       if (!token) {
-        res.status(400).json({ error: "Le jeton API Torznab est requis" });
+        res.status(400).json({ error: t("torznab.tokenRequired") });
         return;
       }
 
-      const searchUrl = buildTorznabSearchUrl(url, token, "", 1);
+      const searchUrl = buildTorznabSearchUrl(url, token, "", 1, "", 0, t("torznab.invalidUrl"));
       debugLog("Torznab test request", {
         url: redactTorznabUrl(searchUrl),
       });
@@ -472,12 +479,12 @@ export function registerTorznabRoutes(app) {
         body: truncateForLogs(xmlText),
       });
 
-      const parsed = parseTorznabResponse(xmlText);
+      const parsed = parseTorznabResponse(xmlText, t("torznab.invalidSearchResponse"));
 
       if (!response.ok) {
         res.status(response.status).json({
           ok: false,
-          error: parsed.message || `Connexion Torznab impossible (${response.status})`,
+          error: parsed.message || t("torznab.connectFailed", { status: response.status }),
         });
         return;
       }
@@ -490,20 +497,21 @@ export function registerTorznabRoutes(app) {
       res.json({
         ok: true,
         message: parsed.title
-          ? `Connexion Torznab OK: ${parsed.title}`
-          : "Connexion Torznab OK",
+          ? t("torznab.connectOkWithTitle", { title: parsed.title })
+          : t("torznab.connectOk"),
         endpoint: searchUrl.origin,
       });
     } catch (error) {
+      const t = getTranslator(req);
       if (error instanceof Error && error.name === "AbortError") {
         debugLog("Torznab test timeout", { timeoutMs: torznabTimeoutMs });
-        res.status(504).json({ error: "Le test Torznab a expiré" });
+        res.status(504).json({ error: t("torznab.testTimeout") });
         return;
       }
 
       debugLog("Torznab test failed:", error);
       res.status(500).json({
-        error: error instanceof Error ? error.message : "Échec du test Torznab",
+        error: t("torznab.testFailed"),
       });
     }
   });

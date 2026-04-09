@@ -6,6 +6,7 @@ import { dataDir, usersFilePath } from "../config.js";
 import { readSeriesWishlist, readWishlist } from "./wishlist.js";
 import { searchTorznabForQuery } from "./torznab.js";
 import { debugLog } from "../logger.js";
+import { getTranslator } from "../i18n.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -209,7 +210,6 @@ async function pollTrackerForWishlist() {
           continue;
         }
 
-        const mediaLabel = target.type === "movie" ? "Film" : "Série";
         const details = {};
         if (match.quality) {
           details.Qualite = match.quality;
@@ -226,8 +226,15 @@ async function pollTrackerForWishlist() {
 
         await notifyUser(user, {
           type: "success",
-          title: `${mediaLabel} disponible sur tracker`,
-          message: `${target.title}: une version semble disponible (${match.title}).`,
+          title: getTranslator(undefined, user)(
+            target.type === "movie"
+              ? "notifications.trackerMovieAvailable"
+              : "notifications.trackerSeriesAvailable"
+          ),
+          message: getTranslator(undefined, user)("notifications.trackerReleaseMessage", {
+            title: target.title,
+            release: match.title,
+          }),
           data: {
             source: "tracker-rss",
             mediaType: target.type,
@@ -449,25 +456,29 @@ export function registerNotificationRoutes(app) {
       if (!auth) {
         return;
       }
+      const t = getTranslator(req, auth.user);
 
       const notification = {
         type: "info",
-        title: "Notification de test",
-        message: "SeedFlix: la chaîne de notification fonctionne correctement.",
+        title: t("notifications.testTitle"),
+        message: t("notifications.testMessage"),
         data: {
           source: "manual-test",
           details: {
-            Canal: "Interne + canaux actifs (Discord/Navigateur)",
-            Horodatage: new Date().toLocaleString("fr-FR"),
+            [t("notifications.testChannelLabel")]: t("notifications.testChannel"),
+            [t("notifications.testTimestamp")]: new Date().toLocaleString(
+              auth.user?.settings?.placeholders?.preferences?.language === "fr" ? "fr-FR" : "en-US"
+            ),
           },
         },
       };
 
       await notifyUser(auth.user, notification);
-      res.json({ ok: true, message: "Notification de test envoyée" });
+      res.json({ ok: true, message: t("notifications.testSent") });
     } catch (error) {
+      const t = getTranslator(req);
       console.error("Error sending test notification:", error);
-      res.status(500).json({ error: error.message || "Notification de test impossible" });
+      res.status(500).json({ error: error.message || t("notifications.testFailed") });
     }
   });
 
@@ -510,7 +521,8 @@ export function registerNotificationRoutes(app) {
       const notif = await markAsRead(userId, notificationId);
 
       if (!notif) {
-        return res.status(404).json({ error: "Notification not found" });
+        const t = getTranslator(req, auth.user);
+        return res.status(404).json({ error: t("notifications.notFound") });
       }
 
       res.json(notif);
@@ -551,7 +563,8 @@ export function registerNotificationRoutes(app) {
       const success = await deleteNotification(userId, notificationId);
 
       if (!success) {
-        return res.status(404).json({ error: "Notification not found" });
+        const t = getTranslator(req, auth.user);
+        return res.status(404).json({ error: t("notifications.notFound") });
       }
 
       res.json({ success: true });

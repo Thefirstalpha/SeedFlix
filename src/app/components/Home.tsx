@@ -14,6 +14,7 @@ import {
   getSeriesGenres,
   searchSeriesPage,
 } from "../services/seriesService";
+import { useI18n } from "../i18n/LanguageProvider";
 import type { Movie } from "../types/movie";
 import type { Series } from "../types/series";
 
@@ -75,6 +76,7 @@ function toTmdbOriginalLanguageCode(language: string): string | undefined {
 
 
 export function Home() {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [contentFilter, setContentFilter] = useState<ContentFilter>("all");
   const [genreFilter, setGenreFilter] = useState("all");
@@ -443,8 +445,8 @@ export function Home() {
   }, [baseSeries, genreFilter, hasSearch, languageFilter, localYearStart, localYearEnd, ratingThreshold]);
 
   const emptyMessage = hasSearch
-    ? "Aucun résultat trouvé pour cette recherche avec les filtres actifs."
-    : "Aucun contenu disponible avec ces filtres.";
+    ? t("home.emptySearch")
+    : t("home.emptyFilters");
 
 
 
@@ -458,7 +460,7 @@ export function Home() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
           <Input
             type="text"
-            placeholder="Rechercher un film ou une série..."
+            placeholder={t("home.searchPlaceholder")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             className="pl-10 h-12 bg-white/10 border-white/20 text-white placeholder:text-white/50"
@@ -474,10 +476,10 @@ export function Home() {
           >
             <span className="flex items-center gap-2 text-sm font-semibold">
               <SlidersHorizontal className="w-4 h-4" />
-              Filtres
+              {t("home.filters")}
             </span>
             <span className="flex items-center gap-2 text-xs text-white/70">
-              {filtersOpen ? "Masquer" : "Afficher"}
+              {filtersOpen ? t("home.hide") : t("home.show")}
               <ChevronDown className={`w-4 h-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
             </span>
           </Button>
@@ -490,21 +492,21 @@ export function Home() {
                   onClick={() => setContentFilter("all")}
                   className={contentFilter === "all" ? "bg-white text-slate-900 hover:bg-white/90" : "bg-white/10 text-white hover:bg-white/20"}
                 >
-                  Tout
+                  {t("home.all")}
                 </Button>
                 <Button
                   size="sm"
                   onClick={() => setContentFilter("movie")}
                   className={contentFilter === "movie" ? "bg-purple-500 text-white hover:bg-purple-600" : "bg-white/10 text-white hover:bg-white/20"}
                 >
-                  Films
+                  {t("home.movies")}
                 </Button>
                 <Button
                   size="sm"
                   onClick={() => setContentFilter("series")}
                   className={contentFilter === "series" ? "bg-cyan-500 text-slate-900 hover:bg-cyan-400" : "bg-white/10 text-white hover:bg-white/20"}
                 >
-                  Séries
+                  {t("home.series")}
                 </Button>
               </div>
 
@@ -514,7 +516,7 @@ export function Home() {
                   onChange={(event) => setGenreFilter(event.target.value)}
                   className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
                 >
-                  <option value="all">Tous les genres</option>
+                  <option value="all">{t("home.allGenres")}</option>
                   {availableGenres.map((genre) => (
                     <option key={genre} value={genre}>
                       {genre}
@@ -527,7 +529,7 @@ export function Home() {
                   onChange={(event) => setLanguageFilter(event.target.value)}
                   className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
                 >
-                  <option value="all">Toutes les langues</option>
+                  <option value="all">{t("home.allLanguages")}</option>
                   {availableLanguages.map((language) => (
                     <option key={language} value={language}>
                       {language}
@@ -539,7 +541,7 @@ export function Home() {
                   type="number"
                   min={1900}
                   max={2100}
-                  placeholder="Date min (annee)"
+                  placeholder={t("home.minYear")}
                   value={yearFrom}
                   onChange={(event) => setYearFrom(event.target.value)}
                   className="h-10 bg-slate-900 border-white/20 text-white"
@@ -549,7 +551,7 @@ export function Home() {
                   type="number"
                   min={1900}
                   max={2100}
-                  placeholder="Date max (annee)"
+                  placeholder={t("home.maxYear")}
                   value={yearTo}
                   onChange={(event) => setYearTo(event.target.value)}
                   className="h-10 bg-slate-900 border-white/20 text-white"
@@ -560,7 +562,7 @@ export function Home() {
                   onChange={(event) => setMinRating(event.target.value)}
                   className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
                 >
-                  <option value="0">Toutes les notes</option>
+                  <option value="0">{t("home.allRatings")}</option>
                   <option value="6">Note {">="} 6</option>
                   <option value="7">Note {">="} 7</option>
                   <option value="8">Note {">="} 8</option>
@@ -584,7 +586,7 @@ export function Home() {
         <div className="space-y-8">
           {showMovies && (
             <section className="space-y-4">
-              <h3 className="text-2xl font-semibold text-white">Films populaires</h3>
+              <h3 className="text-2xl font-semibold text-white">{t("home.popularMovies")}</h3>
 
               {filteredMovies.length > 0 ? (
                 <div className="space-y-4">
@@ -659,7 +661,7 @@ export function Home() {
 
           {showSeries && (
             <section className="space-y-4">
-              <h3 className="text-2xl font-semibold text-white">Séries populaires</h3>
+              <h3 className="text-2xl font-semibold text-white">{t("home.popularSeries")}</h3>
 
               {filteredSeries.length > 0 ? (
                 <div className="space-y-4">

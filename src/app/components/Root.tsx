@@ -11,6 +11,7 @@ import {
   getOrCreateBrowserDeviceId,
   parseBrowserDevices,
 } from "../services/browserNotificationChannel";
+import { useI18n } from "../i18n/LanguageProvider";
 import { Button } from "./ui/button";
 import {
   Sheet,
@@ -85,6 +86,8 @@ function showBrowserNotification(title: string, message: string) {
 export function Root() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useI18n();
+  const currentYear = new Date().getFullYear();
   const [wishlistCount, setWishlistCount] = useState(0);
   const [downloadsCount, setDownloadsCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
@@ -201,9 +204,9 @@ export function Root() {
             }
           } else {
             toast.info(
-              delta > 1 ? `${delta} nouvelles notifications` : "Nouvelle notification",
+              delta > 1 ? t("root.toasts.manyNew", { count: delta }) : t("root.toasts.oneNew"),
               {
-                description: "Une mise a jour est disponible dans l'onglet Notifications.",
+                description: t("root.toasts.updatesAvailable"),
               }
             );
           }
@@ -324,7 +327,7 @@ export function Root() {
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
                 >
                   <Download className="w-5 h-5 text-cyan-300" />
-                  <span className="text-white font-medium">Téléchargements</span>
+                  <span className="text-white font-medium">{t("root.downloads")}</span>
                   {downloadsCount > 0 && (
                     <span className="bg-cyan-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                       {downloadsCount}
@@ -340,7 +343,7 @@ export function Root() {
                     className={`w-5 h-5 ${wishlistCount > 0 ? "text-purple-400 fill-purple-400" : "text-white"}`}
                   />
                   <span className="text-white font-medium">
-                    Ma liste
+                    {t("root.wishlist")}
                   </span>
                   {wishlistCount > 0 && (
                     <span className="bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
@@ -351,7 +354,7 @@ export function Root() {
 
                 <Link
                   to="/notifications"
-                  aria-label="Notifications"
+                  aria-label={t("root.notifications")}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
                 >
                   <Bell className="w-5 h-5 text-amber-300" />
@@ -387,7 +390,7 @@ export function Root() {
                         role="menuitem"
                       >
                         <Settings className="w-4 h-4 text-white/70" />
-                        Paramètres
+                        {t("root.settings")}
                       </button>
                       <button
                         type="button"
@@ -396,7 +399,7 @@ export function Root() {
                         role="menuitem"
                       >
                         <LogOut className="w-4 h-4 text-white/70" />
-                        Déconnexion
+                        {t("root.logout")}
                       </button>
                     </div>
                   )}
@@ -411,14 +414,14 @@ export function Root() {
                     variant="outline"
                     size="icon"
                     className="rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20"
-                    aria-label="Ouvrir le menu"
+                    aria-label={t("root.openMenu")}
                   >
                     <Menu className="w-5 h-5" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="border-white/10 bg-slate-950 text-white">
                   <SheetHeader className="pb-2">
-                    <SheetTitle className="text-white">Menu</SheetTitle>
+                    <SheetTitle className="text-white">{t("root.openMenu")}</SheetTitle>
                   </SheetHeader>
 
                   <div className="px-4 pb-4 space-y-2">
@@ -431,7 +434,7 @@ export function Root() {
                           >
                             <span className="flex items-center gap-2">
                               <Download className="w-4 h-4 text-cyan-300" />
-                              Téléchargements
+                              {t("root.downloads")}
                             </span>
                             {downloadsCount > 0 && (
                               <span className="bg-cyan-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
@@ -450,7 +453,7 @@ export function Root() {
                               <Heart
                                 className={`w-4 h-4 ${wishlistCount > 0 ? "text-purple-400 fill-purple-400" : "text-white"}`}
                               />
-                              Ma liste
+                              {t("root.wishlist")}
                             </span>
                             {wishlistCount > 0 && (
                               <span className="bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
@@ -467,7 +470,7 @@ export function Root() {
                           >
                             <span className="flex items-center gap-2">
                               <Bell className="w-4 h-4 text-amber-300" />
-                              Notifications
+                              {t("root.notifications")}
                             </span>
                             {unreadNotificationsCount > 0 && (
                               <span className="bg-amber-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
@@ -485,7 +488,7 @@ export function Root() {
                         onClick={handleOpenSettings}
                       >
                         <Settings className="w-4 h-4 text-white/80" />
-                        Paramètres
+                        {t("root.settings")}
                       </button>
                     </SheetClose>
                     <SheetClose asChild>
@@ -495,7 +498,7 @@ export function Root() {
                         onClick={handleLogout}
                       >
                         <LogOut className="w-4 h-4" />
-                        Déconnexion
+                        {t("root.logout")}
                       </button>
                     </SheetClose>
                   </div>
@@ -512,7 +515,7 @@ export function Root() {
       <footer className="border-t border-white/10 mt-16 py-8">
         <div className="container mx-auto px-4 text-center text-white/60">
           <p>
-            © 2026 SeedFlix - Obtenir un film ne devrait jamais dépasser sa durée.
+            {t("root.copyright", { year: currentYear, appName: t("common.appName") })} - {t("root.footer")}
           </p>
         </div>
       </footer>

@@ -1,5 +1,6 @@
 import { tmdbApiKey as defaultTmdbApiKey, tmdbBaseUrl } from "../config.js";
 import { debugLog } from "../logger.js";
+import { getTranslator } from "../i18n.js";
 import { getAuthenticatedUser, requireAuth } from "./auth.js";
 
 async function getTmdbApiKey(req) {
@@ -13,10 +14,10 @@ async function getTmdbApiKey(req) {
   return defaultTmdbApiKey || "";
 }
 
-function assertTmdbKey(apiKey, res) {
+function assertTmdbKey(apiKey, res, t) {
   if (!apiKey) {
     res.status(500).json({
-      error: "TMDB_API_KEY is not configured. Please set it in Settings.",
+      error: t("tmdb.apiKeyNotConfigured"),
     });
     return false;
   }
@@ -42,7 +43,7 @@ function buildTmdbUrl(path, apiKey, query = {}) {
   return url;
 }
 
-async function fetchTmdb(url, apiKey) {
+async function fetchTmdb(url, apiKey, invalidResponseMessage) {
   const headers = {};
 
   if (apiKey && !isTmdbApiKey(apiKey)) {
@@ -58,7 +59,7 @@ async function fetchTmdb(url, apiKey) {
       data = JSON.parse(text);
     } catch {
       data = {
-        error: "Réponse invalide de TMDB",
+        error: invalidResponseMessage,
         raw: text,
       };
     }
@@ -130,6 +131,7 @@ function hasActiveDiscoverFilters(filters, type) {
 
 export function registerTmdbRoutes(app) {
   app.post("/api/tmdb/test-key", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const auth = await requireAuth(req, res);
       if (!auth) {
@@ -138,34 +140,35 @@ export function registerTmdbRoutes(app) {
 
       const apiKey = String(req.body?.apiKey || "").trim();
       if (!apiKey) {
-        res.status(400).json({ error: "La clé API TMDB est requise" });
+        res.status(400).json({ error: t("tmdb.apiKeyRequired") });
         return;
       }
 
       const url = buildTmdbUrl("/configuration", apiKey);
-      const { response, data } = await fetchTmdb(url, apiKey);
+      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
 
       if (!response.ok) {
         res.status(response.status).json({
           ok: false,
-          error: data?.status_message || data?.error || "Clé API TMDB invalide",
+          error: data?.status_message || data?.error || t("tmdb.invalidApiKey"),
         });
         return;
       }
 
       res.json({
         ok: true,
-        message: "Clé API TMDB valide",
+        message: t("tmdb.validApiKey"),
       });
     } catch (error) {
       debugLog("TMDB key test failed:", error);
-      res.status(500).json({ error: "Impossible de tester la clé API TMDB" });
+      res.status(500).json({ error: t("tmdb.testApiKeyFailed") });
     }
   });
 
   app.get("/api/movies/popular", async (req, res) => {
+    const t = getTranslator(req);
     const apiKey = await getTmdbApiKey(req);
-    if (!assertTmdbKey(apiKey, res)) {
+    if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
 
@@ -177,34 +180,36 @@ export function registerTmdbRoutes(app) {
             page: filters.page,
             language: filters.language,
           });
-      const { response, data } = await fetchTmdb(url, apiKey);
+      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
       res.status(response.status).json(data);
     } catch (error) {
       debugLog("Popular movies proxy failed:", error);
-      res.status(500).json({ error: "Failed to fetch popular movies" });
+      res.status(500).json({ error: t("tmdb.fetchPopularMoviesFailed") });
     }
   });
 
   app.get("/api/movies/genres", async (req, res) => {
+    const t = getTranslator(req);
     const apiKey = await getTmdbApiKey(req);
-    if (!assertTmdbKey(apiKey, res)) {
+    if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
 
     try {
       const language = String(req.query.language || "fr-FR");
       const url = buildTmdbUrl("/genre/movie/list", apiKey, { language });
-      const { response, data } = await fetchTmdb(url, apiKey);
+      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
       res.status(response.status).json(data);
     } catch (error) {
       debugLog("Movie genres proxy failed:", error);
-      res.status(500).json({ error: "Failed to fetch movie genres" });
+      res.status(500).json({ error: t("tmdb.fetchMovieGenresFailed") });
     }
   });
 
   app.get("/api/movies/discover", async (req, res) => {
+    const t = getTranslator(req);
     const apiKey = await getTmdbApiKey(req);
-    if (!assertTmdbKey(apiKey, res)) {
+    if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
 
@@ -240,17 +245,18 @@ export function registerTmdbRoutes(app) {
       }
 
       const url = buildTmdbUrl("/discover/movie", apiKey, query);
-      const { response, data } = await fetchTmdb(url, apiKey);
+      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
       res.status(response.status).json(data);
     } catch (error) {
       debugLog("Discover movies proxy failed:", error);
-      res.status(500).json({ error: "Failed to discover movies" });
+      res.status(500).json({ error: t("tmdb.discoverMoviesFailed") });
     }
   });
 
   app.get("/api/movies/search", async (req, res) => {
+    const t = getTranslator(req);
     const apiKey = await getTmdbApiKey(req);
-    if (!assertTmdbKey(apiKey, res)) {
+    if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
 
@@ -260,7 +266,7 @@ export function registerTmdbRoutes(app) {
       const language = String(req.query.language || "fr-FR");
 
       if (!query) {
-        res.status(400).json({ error: "query is required" });
+        res.status(400).json({ error: t("tmdb.queryRequired") });
         return;
       }
 
@@ -269,17 +275,18 @@ export function registerTmdbRoutes(app) {
         page,
         language,
       });
-      const { response, data } = await fetchTmdb(url, apiKey);
+      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
       res.status(response.status).json(data);
     } catch (error) {
       debugLog("Search movies proxy failed:", error);
-      res.status(500).json({ error: "Failed to search movies" });
+      res.status(500).json({ error: t("tmdb.searchMoviesFailed") });
     }
   });
 
   app.get("/api/movies/:id", async (req, res) => {
+    const t = getTranslator(req);
     const apiKey = await getTmdbApiKey(req);
-    if (!assertTmdbKey(apiKey, res)) {
+    if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
 
@@ -288,7 +295,7 @@ export function registerTmdbRoutes(app) {
       const language = String(req.query.language || "fr-FR");
 
       if (!Number.isFinite(id)) {
-        res.status(400).json({ error: "Invalid movie id" });
+        res.status(400).json({ error: t("tmdb.invalidMovieId") });
         return;
       }
 
@@ -296,17 +303,18 @@ export function registerTmdbRoutes(app) {
         language,
         append_to_response: "credits",
       });
-      const { response, data } = await fetchTmdb(url, apiKey);
+      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
       res.status(response.status).json(data);
     } catch (error) {
       debugLog("Movie details proxy failed:", error);
-      res.status(500).json({ error: "Failed to fetch movie details" });
+      res.status(500).json({ error: t("tmdb.fetchMovieDetailsFailed") });
     }
   });
 
   app.get("/api/series/popular", async (req, res) => {
+    const t = getTranslator(req);
     const apiKey = await getTmdbApiKey(req);
-    if (!assertTmdbKey(apiKey, res)) {
+    if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
 
@@ -318,34 +326,36 @@ export function registerTmdbRoutes(app) {
             page: filters.page,
             language: filters.language,
           });
-      const { response, data } = await fetchTmdb(url, apiKey);
+      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
       res.status(response.status).json(data);
     } catch (error) {
       debugLog("Popular series proxy failed:", error);
-      res.status(500).json({ error: "Failed to fetch popular series" });
+      res.status(500).json({ error: t("tmdb.fetchPopularSeriesFailed") });
     }
   });
 
   app.get("/api/series/genres", async (req, res) => {
+    const t = getTranslator(req);
     const apiKey = await getTmdbApiKey(req);
-    if (!assertTmdbKey(apiKey, res)) {
+    if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
 
     try {
       const language = String(req.query.language || "fr-FR");
       const url = buildTmdbUrl("/genre/tv/list", apiKey, { language });
-      const { response, data } = await fetchTmdb(url, apiKey);
+      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
       res.status(response.status).json(data);
     } catch (error) {
       debugLog("Series genres proxy failed:", error);
-      res.status(500).json({ error: "Failed to fetch series genres" });
+      res.status(500).json({ error: t("tmdb.fetchSeriesGenresFailed") });
     }
   });
 
   app.get("/api/series/discover", async (req, res) => {
+    const t = getTranslator(req);
     const apiKey = await getTmdbApiKey(req);
-    if (!assertTmdbKey(apiKey, res)) {
+    if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
 
@@ -381,17 +391,18 @@ export function registerTmdbRoutes(app) {
       }
 
       const url = buildTmdbUrl("/discover/tv", apiKey, query);
-      const { response, data } = await fetchTmdb(url, apiKey);
+      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
       res.status(response.status).json(data);
     } catch (error) {
       debugLog("Discover series proxy failed:", error);
-      res.status(500).json({ error: "Failed to discover series" });
+      res.status(500).json({ error: t("tmdb.discoverSeriesFailed") });
     }
   });
 
   app.get("/api/series/search", async (req, res) => {
+    const t = getTranslator(req);
     const apiKey = await getTmdbApiKey(req);
-    if (!assertTmdbKey(apiKey, res)) {
+    if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
 
@@ -401,7 +412,7 @@ export function registerTmdbRoutes(app) {
       const language = String(req.query.language || "fr-FR");
 
       if (!query) {
-        res.status(400).json({ error: "query is required" });
+        res.status(400).json({ error: t("tmdb.queryRequired") });
         return;
       }
 
@@ -410,17 +421,18 @@ export function registerTmdbRoutes(app) {
         page,
         language,
       });
-      const { response, data } = await fetchTmdb(url, apiKey);
+      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
       res.status(response.status).json(data);
     } catch (error) {
       debugLog("Search series proxy failed:", error);
-      res.status(500).json({ error: "Failed to search series" });
+      res.status(500).json({ error: t("tmdb.searchSeriesFailed") });
     }
   });
 
   app.get("/api/series/:id", async (req, res) => {
+    const t = getTranslator(req);
     const apiKey = await getTmdbApiKey(req);
-    if (!assertTmdbKey(apiKey, res)) {
+    if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
 
@@ -429,7 +441,7 @@ export function registerTmdbRoutes(app) {
       const language = String(req.query.language || "fr-FR");
 
       if (!Number.isFinite(id)) {
-        res.status(400).json({ error: "Invalid series id" });
+        res.status(400).json({ error: t("tmdb.invalidSeriesId") });
         return;
       }
 
@@ -437,17 +449,18 @@ export function registerTmdbRoutes(app) {
         language,
         append_to_response: "credits",
       });
-      const { response, data } = await fetchTmdb(url, apiKey);
+      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
       res.status(response.status).json(data);
     } catch (error) {
       debugLog("Series details proxy failed:", error);
-      res.status(500).json({ error: "Failed to fetch series details" });
+      res.status(500).json({ error: t("tmdb.fetchSeriesDetailsFailed") });
     }
   });
 
   app.get("/api/series/:id/seasons/:seasonNumber", async (req, res) => {
+    const t = getTranslator(req);
     const apiKey = await getTmdbApiKey(req);
-    if (!assertTmdbKey(apiKey, res)) {
+    if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
 
@@ -457,18 +470,18 @@ export function registerTmdbRoutes(app) {
       const language = String(req.query.language || "fr-FR");
 
       if (!Number.isFinite(id) || !Number.isFinite(seasonNumber)) {
-        res.status(400).json({ error: "Invalid series id or season number" });
+        res.status(400).json({ error: t("tmdb.invalidSeriesIdOrSeason") });
         return;
       }
 
       const url = buildTmdbUrl(`/tv/${id}/season/${seasonNumber}`, apiKey, {
         language,
       });
-      const { response, data } = await fetchTmdb(url, apiKey);
+      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
       res.status(response.status).json(data);
     } catch (error) {
       debugLog("Season details proxy failed:", error);
-      res.status(500).json({ error: "Failed to fetch season details" });
+      res.status(500).json({ error: t("tmdb.fetchSeasonDetailsFailed") });
     }
   });
 }

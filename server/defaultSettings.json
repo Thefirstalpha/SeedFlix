@@ -18,7 +18,9 @@
         "devices": []
       }
     },
-    "preferences": {},
+    "preferences": {
+      "language": "fr"
+    },
     "torrent": {
       "url": "",
       "port": "",

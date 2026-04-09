@@ -3,6 +3,7 @@ import { debugLog } from "../logger.js";
 import { promises as fs } from "node:fs";
 import { appTorrentsFilePath, dataDir } from "../config.js";
 import { addNotification, sendDiscordNotification } from "./notifications.js";
+import { getTranslator } from "../i18n.js";
 
 const transmissionTimeoutMs = 8000;
 const transmissionRpcPath = "/transmission/rpc";
@@ -239,10 +240,11 @@ export function registerTransmissionRoutes(app) {
       if (!auth) {
         return;
       }
+      const t = getTranslator(req, auth.user);
 
       const settings = resolveTorrentSettings(auth, req.body);
       if (!settings.url) {
-        res.status(400).json({ error: "L'URL Transmission est requise" });
+        res.status(400).json({ error: t("transmission.urlRequired") });
         return;
       }
 
@@ -258,7 +260,7 @@ export function registerTransmissionRoutes(app) {
       });
 
       if (response.status === 401) {
-        res.status(401).json({ error: "Identifiants Transmission invalides" });
+        res.status(401).json({ error: t("transmission.invalidCredentials") });
         return;
       }
 
@@ -266,15 +268,14 @@ export function registerTransmissionRoutes(app) {
 
       if (!response.ok) {
         res.status(response.status).json({
-          error:
-            data?.result || `Connexion Transmission impossible (${response.status})`,
+          error: data?.result || t("transmission.connectFailed", { status: response.status }),
         });
         return;
       }
 
       if (data?.result !== "success") {
         res.status(400).json({
-          error: data?.result || "Réponse Transmission invalide",
+          error: data?.result || t("transmission.invalidResponse"),
         });
         return;
       }
@@ -282,19 +283,20 @@ export function registerTransmissionRoutes(app) {
       res.json({
         ok: true,
         message: data?.arguments?.version
-          ? `Connexion Transmission OK: ${data.arguments.version}`
-          : "Connexion Transmission OK",
+          ? t("transmission.connectOkWithVersion", { version: data.arguments.version })
+          : t("transmission.connectOk"),
         endpoint: rpcUrl.origin,
       });
     } catch (error) {
+      const t = getTranslator(req);
       if (error instanceof Error && error.name === "AbortError") {
-        res.status(504).json({ error: "Le test Transmission a expiré" });
+        res.status(504).json({ error: t("transmission.testTimeout") });
         return;
       }
 
       debugLog("Transmission test failed:", error);
       res.status(500).json({
-        error: error instanceof Error ? error.message : "Échec du test Transmission",
+        error: t("transmission.testFailed"),
       });
     }
   });
@@ -305,17 +307,18 @@ export function registerTransmissionRoutes(app) {
       if (!auth) {
         return;
       }
+      const t = getTranslator(req, auth.user);
 
       const settings = resolveTorrentSettings(auth, req.body);
       const torrentUrl = String(req.body?.torrentUrl || "").trim();
       const mediaType = String(req.body?.mediaType || "movie").trim().toLowerCase();
       if (!settings.url) {
-        res.status(400).json({ error: "L'URL Transmission est requise" });
+        res.status(400).json({ error: t("transmission.urlRequired") });
         return;
       }
 
       if (!torrentUrl) {
-        res.status(400).json({ error: "torrentUrl est requis" });
+        res.status(400).json({ error: t("transmission.torrentUrlRequired") });
         return;
       }
 
@@ -340,14 +343,14 @@ export function registerTransmissionRoutes(app) {
 
       const response = await executeTransmissionRpc(rpcUrl, authHeaders, payload);
       if (response.status === 401) {
-        res.status(401).json({ error: "Identifiants Transmission invalides" });
+        res.status(401).json({ error: t("transmission.invalidCredentials") });
         return;
       }
 
       const data = await response.json().catch(() => null);
       if (!response.ok || data?.result !== "success") {
         res.status(response.ok ? 400 : response.status).json({
-          error: data?.result || `Ajout au client torrent impossible (${response.status})`,
+          error: data?.result || t("transmission.addToClientFailed", { status: response.status }),
         });
         return;
       }
@@ -359,32 +362,33 @@ export function registerTransmissionRoutes(app) {
       const isDuplicate = Boolean(data?.arguments?.["torrent-duplicate"]);
       const torrentName = added?.name || "Torrent";
       await createAndSendNotification(auth.user.id, {
-        title: isDuplicate ? "Torrent dupliqué" : "Torrent ajouté",
+        title: isDuplicate ? t("transmission.duplicateTitle") : t("transmission.addedTitle"),
         message: `${torrentName}`,
         type: isDuplicate ? "warning" : "success",
         data: {
           details: {
             name: torrentName,
-            status: isDuplicate ? "dupliqué" : "ajouté",
+            status: isDuplicate ? t("transmission.duplicateStatus") : t("transmission.addedStatus"),
           },
         },
       });
 
       res.json({
         ok: true,
-        message: "Torrent ajouté au client",
+        message: t("transmission.addedToClient"),
         duplicate: isDuplicate,
         torrent: added,
       });
     } catch (error) {
+      const t = getTranslator(req);
       if (error instanceof Error && error.name === "AbortError") {
-        res.status(504).json({ error: "L'ajout du torrent a expiré" });
+        res.status(504).json({ error: t("transmission.addTimeout") });
         return;
       }
 
       debugLog("Add torrent failed:", error);
       res.status(500).json({
-        error: error instanceof Error ? error.message : "Échec de l'ajout torrent",
+        error: t("transmission.addFailed"),
       });
     }
   });
@@ -395,10 +399,11 @@ export function registerTransmissionRoutes(app) {
       if (!auth) {
         return;
       }
+      const t = getTranslator(req, auth.user);
 
       const settings = resolveTorrentSettings(auth, req.query);
       if (!settings.url) {
-        res.status(400).json({ error: "L'URL Transmission est requise" });
+        res.status(400).json({ error: t("transmission.urlRequired") });
         return;
       }
 
@@ -433,14 +438,14 @@ export function registerTransmissionRoutes(app) {
       });
 
       if (response.status === 401) {
-        res.status(401).json({ error: "Identifiants Transmission invalides" });
+        res.status(401).json({ error: t("transmission.invalidCredentials") });
         return;
       }
 
       const data = await response.json().catch(() => null);
       if (!response.ok || data?.result !== "success") {
         res.status(response.ok ? 400 : response.status).json({
-          error: data?.result || `Lecture des téléchargements impossible (${response.status})`,
+          error: data?.result || t("transmission.readDownloadsFailed", { status: response.status }),
         });
         return;
       }
@@ -478,14 +483,15 @@ export function registerTransmissionRoutes(app) {
         activeCount: torrents.filter((torrent) => [3, 4, 5, 6].includes(torrent.status)).length,
       });
     } catch (error) {
+      const t = getTranslator(req);
       if (error instanceof Error && error.name === "AbortError") {
-        res.status(504).json({ error: "La lecture des téléchargements a expiré" });
+        res.status(504).json({ error: t("transmission.downloadsTimeout") });
         return;
       }
 
       debugLog("Get downloads failed:", error);
       res.status(500).json({
-        error: error instanceof Error ? error.message : "Échec de lecture des téléchargements",
+        error: t("transmission.downloadsFailed"),
       });
     }
   });
@@ -496,16 +502,17 @@ export function registerTransmissionRoutes(app) {
       if (!auth) {
         return;
       }
+      const t = getTranslator(req, auth.user);
 
       const torrentId = Number(req.body?.id);
       if (!Number.isFinite(torrentId)) {
-        res.status(400).json({ error: "ID torrent invalide" });
+        res.status(400).json({ error: t("transmission.invalidTorrentId") });
         return;
       }
 
       const settings = resolveTorrentSettings(auth, req.body);
       if (!settings.url) {
-        res.status(400).json({ error: "L'URL Transmission est requise" });
+        res.status(400).json({ error: t("transmission.urlRequired") });
         return;
       }
 
@@ -524,14 +531,14 @@ export function registerTransmissionRoutes(app) {
       });
 
       if (response.status === 401) {
-        res.status(401).json({ error: "Identifiants Transmission invalides" });
+        res.status(401).json({ error: t("transmission.invalidCredentials") });
         return;
       }
 
       const data = await response.json().catch(() => null);
       if (!response.ok || data?.result !== "success") {
         res.status(response.ok ? 400 : response.status).json({
-          error: data?.result || "Impossible de mettre en pause le torrent",
+          error: data?.result || t("transmission.pauseFailed"),
         });
         return;
       }
@@ -548,17 +555,18 @@ export function registerTransmissionRoutes(app) {
         const stopData = await stopResponse.json().catch(() => null);
         if (stopData?.result !== "success") {
           res.status(stopResponse.ok ? 400 : stopResponse.status).json({
-            error: stopData?.result || "Impossible de mettre en pause le torrent",
+            error: stopData?.result || t("transmission.pauseFailed"),
           });
           return;
         }
       }
 
-      res.json({ ok: true, message: "Torrent mis en pause" });
+      res.json({ ok: true, message: t("transmission.paused") });
     } catch (error) {
+      const t = getTranslator(req);
       debugLog("Pause torrent failed:", error);
       res.status(500).json({
-        error: error instanceof Error ? error.message : "Impossible de mettre en pause le torrent",
+        error: t("transmission.pauseFailed"),
       });
     }
   });
@@ -569,16 +577,17 @@ export function registerTransmissionRoutes(app) {
       if (!auth) {
         return;
       }
+      const t = getTranslator(req, auth.user);
 
       const torrentId = Number(req.body?.id);
       if (!Number.isFinite(torrentId)) {
-        res.status(400).json({ error: "ID torrent invalide" });
+        res.status(400).json({ error: t("transmission.invalidTorrentId") });
         return;
       }
 
       const settings = resolveTorrentSettings(auth, req.body);
       if (!settings.url) {
-        res.status(400).json({ error: "L'URL Transmission est requise" });
+        res.status(400).json({ error: t("transmission.urlRequired") });
         return;
       }
 
@@ -597,23 +606,24 @@ export function registerTransmissionRoutes(app) {
       });
 
       if (response.status === 401) {
-        res.status(401).json({ error: "Identifiants Transmission invalides" });
+        res.status(401).json({ error: t("transmission.invalidCredentials") });
         return;
       }
 
       const data = await response.json().catch(() => null);
       if (!response.ok || data?.result !== "success") {
         res.status(response.ok ? 400 : response.status).json({
-          error: data?.result || "Impossible de reprendre le torrent",
+          error: data?.result || t("transmission.resumeFailed"),
         });
         return;
       }
 
-      res.json({ ok: true, message: "Torrent repris" });
+      res.json({ ok: true, message: t("transmission.resumed") });
     } catch (error) {
+      const t = getTranslator(req);
       debugLog("Resume torrent failed:", error);
       res.status(500).json({
-        error: error instanceof Error ? error.message : "Impossible de reprendre le torrent",
+        error: t("transmission.resumeFailed"),
       });
     }
   });
@@ -624,21 +634,23 @@ export function registerTransmissionRoutes(app) {
       if (!auth) {
         return;
       }
+      const t = getTranslator(req, auth.user);
 
       const torrentHash = String(req.body?.hash || "").trim().toLowerCase();
       if (!torrentHash) {
-        res.status(400).json({ error: "Hash torrent invalide" });
+        res.status(400).json({ error: t("transmission.invalidHash") });
         return;
       }
 
       // Remove torrent from app store
       await removeAppTorrentForUser(auth.user.id, torrentHash);
 
-      res.json({ ok: true, message: "Torrent supprimé de l'affichage" });
+      res.json({ ok: true, message: t("transmission.cleaned") });
     } catch (error) {
+      const t = getTranslator(req);
       debugLog("Clean torrent failed:", error);
       res.status(500).json({
-        error: error instanceof Error ? error.message : "Impossible de supprimer le torrent",
+        error: t("transmission.cleanFailed"),
       });
     }
   });

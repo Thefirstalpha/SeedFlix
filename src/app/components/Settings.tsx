@@ -33,20 +33,25 @@ import {
   type BrowserNotificationDevice,
 } from "../services/browserNotificationChannel";
 import { useAuth } from "../context/AuthContext";
+import { useI18n, type SupportedLanguage } from "../i18n/LanguageProvider";
 
 const QUALITY_OPTIONS = [
-  { value: "all", label: "Toutes qualités" },
-  { value: "2160p", label: "2160p (4K)" },
-  { value: "1080p", label: "1080p" },
-  { value: "720p", label: "720p" },
-  { value: "480p", label: "480p" },
-  { value: "bluray", label: "BluRay" },
-  { value: "webdl", label: "WEB-DL / WEBRip" },
-  { value: "hdtv", label: "HDTV" },
+  { value: "all", labelKey: "settings.quality.all" },
+  { value: "2160p", labelKey: "settings.quality.2160p" },
+  { value: "1080p", labelKey: "settings.quality.1080p" },
+  { value: "720p", labelKey: "settings.quality.720p" },
+  { value: "480p", labelKey: "settings.quality.480p" },
+  { value: "bluray", labelKey: "settings.quality.bluray" },
+  { value: "webdl", labelKey: "settings.quality.webdl" },
+  { value: "hdtv", labelKey: "settings.quality.hdtv" },
 ];
 
 const SETTINGS_TABS = ["security", "api", "notifications", "factory"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+function parseSupportedLanguage(input: unknown): SupportedLanguage {
+  return input === "en" ? "en" : "fr";
+}
 
 function isValidSettingsTab(value: string): value is SettingsTab {
   return SETTINGS_TABS.includes(value as SettingsTab);
@@ -57,6 +62,7 @@ export function Settings() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { isAuthenticated, isLoading, user, setSettings, refresh } = useAuth();
+  const { t, availableLanguages, setLanguage } = useI18n();
   const [settings, setLocalSettings] = useState<UserSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -97,6 +103,10 @@ export function Settings() {
   const [browserError, setBrowserError] = useState<string | null>(null);
   const [isBrowserSaving, setIsBrowserSaving] = useState(false);
   const [browserDeviceId] = useState(getOrCreateBrowserDeviceId);
+  const [languageCode, setLanguageCode] = useState<SupportedLanguage>("fr");
+  const [languageMessage, setLanguageMessage] = useState<string | null>(null);
+  const [languageError, setLanguageError] = useState<string | null>(null);
+  const [isLanguageSaving, setIsLanguageSaving] = useState(false);
   const [testNotifMessage, setTestNotifMessage] = useState<string | null>(null);
   const [testNotifError, setTestNotifError] = useState<string | null>(null);
   const [isSendingTestNotif, setIsSendingTestNotif] = useState(false);
@@ -140,6 +150,7 @@ export function Settings() {
       Boolean((notifSettings as any).discord?.webhookUrl)
     );
     setBrowserDevices(parseBrowserDevices((notifSettings as any).browser?.devices));
+    setLanguageCode(parseSupportedLanguage((incomingSettings.placeholders?.preferences as any)?.language));
   };
 
   const buildNotificationSettingsPayload = (params: {
@@ -251,7 +262,7 @@ export function Settings() {
         applySettingsToForms(response);
       } catch (loadError) {
         setError(
-          loadError instanceof Error ? loadError.message : "Impossible de charger les paramètres"
+          loadError instanceof Error ? loadError.message : t("settings.messages.loadFailed")
         );
       }
     };
@@ -276,9 +287,9 @@ export function Settings() {
       await refresh();
       setCurrentPassword("");
       setNewPassword("");
-      setMessage("Mot de passe mis à jour.");
+      setMessage(t("settings.messages.passwordUpdated"));
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Mise à jour impossible");
+      setError(submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed"));
     } finally {
       setIsSaving(false);
     }
@@ -291,7 +302,7 @@ export function Settings() {
     setIsTmdbSaving(true);
 
     if (!tmdbApiKey.trim()) {
-      setTmdbError("La clé API TMDB est requise");
+      setTmdbError(t("settings.messages.tmdbKeyRequired"));
       setIsTmdbSaving(false);
       return;
     }
@@ -302,9 +313,9 @@ export function Settings() {
       setLocalSettings(updatedSettings);
       setSettings(updatedSettings);
       await refresh();
-      setTmdbMessage("Clé API TMDB configurée avec succès.");
+      setTmdbMessage(t("settings.messages.tmdbSaved"));
     } catch (submitError) {
-      setTmdbError(submitError instanceof Error ? submitError.message : "Configuration impossible");
+      setTmdbError(submitError instanceof Error ? submitError.message : t("settings.messages.configFailed"));
     } finally {
       setIsTmdbSaving(false);
     }
@@ -335,7 +346,7 @@ export function Settings() {
       setSettings(updatedSettings);
     } catch (submitError) {
       setTorrentError(
-        submitError instanceof Error ? submitError.message : "Mise à jour impossible"
+        submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
       );
       setIsTorrentSaving(false);
       return;
@@ -349,12 +360,12 @@ export function Settings() {
         username: torrentUsername,
         password: torrentPassword,
       });
-      setTorrentMessage(`Configuration enregistrée. ${response.message}`);
+      setTorrentMessage(t("settings.messages.configurationSavedWithResponse", { response: response.message }));
     } catch (submitError) {
       setTorrentError(
         submitError instanceof Error
-          ? `Configuration enregistrée, mais le test a échoué: ${submitError.message}`
-          : "Configuration enregistrée, mais le test de connexion a échoué"
+          ? t("settings.messages.savedButTestFailedWithReason", { reason: submitError.message })
+          : t("settings.messages.savedButTestFailed")
       );
     } finally {
       setIsTorrentSaving(false);
@@ -382,7 +393,7 @@ export function Settings() {
       setSettings(updatedSettings);
     } catch (submitError) {
       setIndexerError(
-        submitError instanceof Error ? submitError.message : "Mise à jour impossible"
+        submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
       );
       setIsIndexerSaving(false);
       return;
@@ -390,12 +401,12 @@ export function Settings() {
 
     try {
       const response = await testIndexerConnection(indexerUrl, indexerToken);
-      setIndexerMessage(`Configuration enregistrée. ${response.message}`);
+      setIndexerMessage(t("settings.messages.configurationSavedWithResponse", { response: response.message }));
     } catch (submitError) {
       setIndexerError(
         submitError instanceof Error
-          ? `Configuration enregistrée, mais le test a échoué: ${submitError.message}`
-          : "Configuration enregistrée, mais le test de connexion a échoué"
+          ? t("settings.messages.savedButTestFailedWithReason", { reason: submitError.message })
+          : t("settings.messages.savedButTestFailed")
       );
     } finally {
       setIsIndexerSaving(false);
@@ -411,7 +422,7 @@ export function Settings() {
     try {
       // Validation
       if (!discordWebhookUrl.trim()) {
-        setDiscordError("L'URL du webhook Discord est requise");
+        setDiscordError(t("settings.messages.discordWebhookRequired"));
         setIsDiscordSaving(false);
         return;
       }
@@ -423,11 +434,11 @@ export function Settings() {
         body: JSON.stringify({
           embeds: [
             {
-              title: "Test de Configuration SeedFlix",
-              description: "Votre webhook Discord fonctionne correctement!",
+              title: t("settings.notifications.discord.testTitle"),
+              description: t("settings.notifications.discord.testDescription"),
               color: 0x10b981,
               timestamp: new Date().toISOString(),
-              footer: { text: "SeedFlix Notifications" },
+              footer: { text: t("settings.notifications.discord.testFooter") },
             },
           ],
         }),
@@ -454,14 +465,14 @@ export function Settings() {
       setSettings(updatedSettings);
       await refresh();
       setDiscordTested(true);
-      setDiscordMessage("Webhook Discord configuré et testé avec succès!");
+      setDiscordMessage(t("settings.messages.discordConfigured"));
       // Fermer le formulaire
       setDiscordFormOpen(false);
     } catch (submitError) {
       setDiscordError(
         submitError instanceof Error
           ? submitError.message
-          : "Configuration impossible"
+          : t("settings.messages.configFailed")
       );
     } finally {
       setIsDiscordSaving(false);
@@ -475,14 +486,14 @@ export function Settings() {
 
     try {
       if (typeof window === "undefined" || !("Notification" in window)) {
-        setBrowserError("Ce navigateur ne supporte pas les notifications web.");
+        setBrowserError(t("settings.messages.browserUnsupported"));
         setIsBrowserSaving(false);
         return;
       }
 
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
-        setBrowserError("Autorisation refusée. Activez les notifications pour ce site.");
+        setBrowserError(t("settings.messages.browserPermissionDenied"));
         setIsBrowserSaving(false);
         return;
       }
@@ -515,12 +526,12 @@ export function Settings() {
       setSettings(updatedSettings);
       await refresh();
       setBrowserDevices(nextDevices);
-      setBrowserMessage("Canal navigateur enregistré avec succès.");
+      setBrowserMessage(t("settings.messages.browserSaved"));
     } catch (submitError) {
       setBrowserError(
         submitError instanceof Error
           ? submitError.message
-          : "Configuration du navigateur impossible"
+          : t("settings.messages.browserConfigFailed")
       );
     } finally {
       setIsBrowserSaving(false);
@@ -545,12 +556,12 @@ export function Settings() {
       setSettings(updatedSettings);
       await refresh();
       setBrowserDevices(nextDevices);
-      setBrowserMessage("Navigateur supprimé.");
+      setBrowserMessage(t("settings.messages.browserRemoved"));
     } catch (submitError) {
       setBrowserError(
         submitError instanceof Error
           ? submitError.message
-          : "Suppression du navigateur impossible"
+          : t("settings.messages.browserRemoveFailed")
       );
     } finally {
       setIsBrowserSaving(false);
@@ -571,7 +582,7 @@ export function Settings() {
       navigate("/login", { replace: true, state: { reset: true } });
     } catch (submitError) {
       setResetError(
-        submitError instanceof Error ? submitError.message : "Réinitialisation impossible"
+        submitError instanceof Error ? submitError.message : t("settings.messages.resetFailed")
       );
     } finally {
       setIsResetting(false);
@@ -585,23 +596,54 @@ export function Settings() {
 
     try {
       const response = await notificationService.sendTestNotification();
-      setTestNotifMessage(response.message || "Notification de test envoyée");
+      setTestNotifMessage(response.message || t("settings.messages.testNotificationSent"));
       window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
     } catch (submitError) {
       setTestNotifError(
         submitError instanceof Error
           ? submitError.message
-          : "Impossible d'envoyer la notification de test"
+          : t("settings.messages.testNotificationFailed")
       );
     } finally {
       setIsSendingTestNotif(false);
     }
   };
 
+  const handleLanguageSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLanguageMessage(null);
+    setLanguageError(null);
+    setIsLanguageSaving(true);
+
+    try {
+      const updatedSettings = buildUpdatedSettings({
+        preferences: {
+          ...(settings?.placeholders?.preferences || {}),
+          language: languageCode,
+        },
+      });
+
+      await updateSettings(updatedSettings);
+      setLocalSettings(updatedSettings);
+      setSettings(updatedSettings);
+      await refresh();
+      setLanguage(languageCode);
+      setLanguageMessage(t("settings.language.success"));
+    } catch (submitError) {
+      setLanguageError(
+        submitError instanceof Error
+          ? submitError.message
+          : t("settings.language.failed")
+      );
+    } finally {
+      setIsLanguageSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-white">Paramètres</h2>
+        <h2 className="text-3xl font-bold text-white">{t("settings.title")}</h2>
       </div>
       <Tabs
         value={activeTab}
@@ -616,31 +658,66 @@ export function Settings() {
       >
         <TabsList className="bg-white/10 border border-white/10">
           <TabsTrigger value="security" className="text-white data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
-            Sécurité
+            {t("settings.tabs.security")}
           </TabsTrigger>
           <TabsTrigger value="api" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            Configuration
+            {t("settings.tabs.configuration")}
           </TabsTrigger>
           <TabsTrigger value="notifications" className="text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white">
-            Notifications
+            {t("settings.tabs.notifications")}
           </TabsTrigger>
           <TabsTrigger value="factory" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
-            Réinitialisation
+            {t("settings.tabs.factory")}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="security">
+          <Card className="border-blue-500/30 bg-blue-950/15 text-white mb-6">
+            <CardHeader>
+              <CardTitle className="text-blue-200">{t("settings.language.title")}</CardTitle>
+              <CardDescription className="text-blue-100/70">
+                {t("settings.language.description")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleLanguageSave} className="space-y-4 max-w-lg">
+                <div className="space-y-2">
+                  <Label htmlFor="settings-language">{t("settings.language.field")}</Label>
+                  <select
+                    id="settings-language"
+                    value={languageCode}
+                    onChange={(event) => setLanguageCode(parseSupportedLanguage(event.target.value))}
+                    className="w-full bg-slate-900 border border-white/10 text-white rounded-md px-3 py-2"
+                  >
+                    {availableLanguages.map((language) => (
+                      <option key={language.code} value={language.code}>
+                        {language.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {languageMessage && <p className="text-sm text-emerald-300">{languageMessage}</p>}
+                {languageError && <p className="text-sm text-red-300">{languageError}</p>}
+
+                <Button type="submit" disabled={isLanguageSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  {isLanguageSaving ? t("common.saving") : t("settings.language.save")}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
           <Card className="border-emerald-500/30 bg-emerald-950/15 text-white">
             <CardHeader>
-              <CardTitle className="text-emerald-200">Modifier le mot de passe</CardTitle>
+              <CardTitle className="text-emerald-200">{t("settings.security.title")}</CardTitle>
               <CardDescription className="text-emerald-100/70">
-                Dernière modification: {settings?.security?.lastPasswordChangeAt ? new Date(settings.security.lastPasswordChangeAt).toLocaleString("fr-FR") : "inconnue"}
+                {t("settings.security.lastChange")}: {settings?.security?.lastPasswordChangeAt ? new Date(settings.security.lastPasswordChangeAt).toLocaleString(languageCode === "fr" ? "fr-FR" : "en-US") : t("settings.security.unknown")}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handlePasswordUpdate} className="space-y-4 max-w-lg">
                 <div className="space-y-2">
-                  <Label htmlFor="current-password">Mot de passe actuel</Label>
+                  <Label htmlFor="current-password">{t("settings.security.currentPassword")}</Label>
                   <Input
                     id="current-password"
                     type="password"
@@ -650,7 +727,7 @@ export function Settings() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="new-password">Nouveau mot de passe</Label>
+                  <Label htmlFor="new-password">{t("settings.security.newPassword")}</Label>
                   <Input
                     id="new-password"
                     type="password"
@@ -662,7 +739,7 @@ export function Settings() {
                 {message && <p className="text-sm text-emerald-300">{message}</p>}
                 {error && <p className="text-sm text-red-300">{error}</p>}
                 <Button type="submit" disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                  {isSaving ? "Enregistrement..." : "Mettre à jour"}
+                  {isSaving ? t("common.saving") : t("settings.security.update")}
                 </Button>
               </form>
             </CardContent>
@@ -672,9 +749,9 @@ export function Settings() {
         <TabsContent value="api">
           <Card className="border-blue-500/30 bg-blue-950/15 text-white">
             <CardHeader>
-              <CardTitle className="text-blue-200">Librairie TMDB</CardTitle>
+              <CardTitle className="text-blue-200">{t("settings.api.tmdb.title")}</CardTitle>
               <CardDescription className="text-blue-100/70">
-                SeedFlix accepte le jeton API v3 et le Read Access Token v4. Obtenez-les sur{" "}
+                {t("settings.api.tmdb.description")} {" "}
                     <a
                       href="https://www.themoviedb.org/settings/api"
                       target="_blank"
@@ -688,11 +765,11 @@ export function Settings() {
             <CardContent>
               <form onSubmit={handleTmdbSave} className="space-y-6 max-w-lg">
                 <div className="space-y-2">
-                  <Label htmlFor="tmdb-api-key">Jeton API</Label>
+                  <Label htmlFor="tmdb-api-key">{t("settings.api.tmdb.apiToken")}</Label>
                   <Input
                     id="tmdb-api-key"
                     type="password"
-                    placeholder="Jeton API v3 ou Read Access Token v4"
+                    placeholder={t("settings.api.tmdb.placeholder")}
                     value={tmdbApiKey}
                     onChange={(event) => setTmdbApiKey(event.target.value)}
                     className="bg-slate-900 border-white/10 text-white"
@@ -707,7 +784,7 @@ export function Settings() {
                   disabled={isTmdbSaving}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  {isTmdbSaving ? "Enregistrement..." : "Enregistrer la clé"}
+                  {isTmdbSaving ? t("common.saving") : t("settings.api.tmdb.save")}
                 </Button>
               </form>
             </CardContent>
@@ -715,16 +792,16 @@ export function Settings() {
 
           <Card className="border-blue-500/30 bg-blue-950/15 text-white mt-6">
             <CardHeader>
-              <CardTitle className="text-blue-200">Client torrent</CardTitle>
+              <CardTitle className="text-blue-200">{t("settings.api.torrent.title")}</CardTitle>
               <CardDescription className="text-blue-100/70">
-                Configurez vos paramètres de client torrent pour télécharger automatiquement films et séries.
+                {t("settings.api.torrent.description")}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleTorrentSave} className="space-y-4 max-w-lg">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="torrent-url">URL du client</Label>
+                    <Label htmlFor="torrent-url">{t("settings.api.torrent.url")}</Label>
                     <Input
                       id="torrent-url"
                       placeholder="http://localhost"
@@ -734,7 +811,7 @@ export function Settings() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="torrent-port">Port</Label>
+                    <Label htmlFor="torrent-port">{t("settings.api.torrent.port")}</Label>
                     <Input
                       id="torrent-port"
                       type="number"
@@ -755,14 +832,14 @@ export function Settings() {
                     className="w-4 h-4 cursor-pointer"
                   />
                   <Label htmlFor="torrent-auth" className="cursor-pointer">
-                    Authentification requise
+                    {t("settings.api.torrent.authRequired")}
                   </Label>
                 </div>
 
                 {torrentAuthRequired && (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="torrent-username">Nom d'utilisateur</Label>
+                      <Label htmlFor="torrent-username">{t("settings.api.torrent.username")}</Label>
                       <Input
                         id="torrent-username"
                         placeholder="admin"
@@ -772,7 +849,7 @@ export function Settings() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="torrent-password">Mot de passe</Label>
+                      <Label htmlFor="torrent-password">{t("settings.api.torrent.password")}</Label>
                       <Input
                         id="torrent-password"
                         type="password"
@@ -786,7 +863,7 @@ export function Settings() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="torrent-movies-folder">Dossier pour les films</Label>
+                  <Label htmlFor="torrent-movies-folder">{t("settings.api.torrent.moviesFolder")}</Label>
                   <Input
                     id="torrent-movies-folder"
                     placeholder="/downloads/movies"
@@ -797,7 +874,7 @@ export function Settings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="torrent-series-folder">Dossier pour les séries</Label>
+                  <Label htmlFor="torrent-series-folder">{t("settings.api.torrent.seriesFolder")}</Label>
                   <Input
                     id="torrent-series-folder"
                     placeholder="/downloads/series"
@@ -811,7 +888,7 @@ export function Settings() {
                 {torrentError && <p className="text-sm text-red-300">{torrentError}</p>}
 
                 <Button type="submit" disabled={isTorrentSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  {isTorrentSaving ? "Enregistrement et test..." : "Enregistrer et tester la connexion"}
+                  {isTorrentSaving ? t("settings.api.common.savingAndTesting") : t("settings.api.common.saveAndTest")}
                 </Button>
               </form>
             </CardContent>
@@ -819,15 +896,15 @@ export function Settings() {
 
           <Card className="border-blue-500/30 bg-blue-950/15 text-white mt-6">
             <CardHeader>
-              <CardTitle className="text-blue-200">Indexer</CardTitle>
+              <CardTitle className="text-blue-200">{t("settings.api.indexer.title")}</CardTitle>
               <CardDescription className="text-blue-100/70">
-                Configurez votre indexer pour la recherche de contenu.
+                {t("settings.api.indexer.description")}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleIndexerSave} className="space-y-4 max-w-lg">
                 <div className="space-y-2">
-                  <Label htmlFor="indexer-url">URL de l'indexer</Label>
+                  <Label htmlFor="indexer-url">{t("settings.api.indexer.url")}</Label>
                   <Input
                     id="indexer-url"
                     placeholder="https://indexer.example.com"
@@ -838,7 +915,7 @@ export function Settings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="indexer-token">Jeton API</Label>
+                  <Label htmlFor="indexer-token">{t("settings.api.indexer.token")}</Label>
                   <Input
                     id="indexer-token"
                     type="password"
@@ -850,7 +927,7 @@ export function Settings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="indexer-default-quality">Qualité par défaut</Label>
+                  <Label htmlFor="indexer-default-quality">{t("settings.api.indexer.defaultQuality")}</Label>
                   <select
                     id="indexer-default-quality"
                     value={indexerDefaultQuality}
@@ -859,7 +936,7 @@ export function Settings() {
                   >
                     {QUALITY_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
-                        {option.label}
+                        {t(option.labelKey)}
                       </option>
                     ))}
                   </select>
@@ -869,7 +946,7 @@ export function Settings() {
                 {indexerError && <p className="text-sm text-red-300">{indexerError}</p>}
 
                 <Button type="submit" disabled={isIndexerSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  {isIndexerSaving ? "Enregistrement et test..." : "Enregistrer et tester la connexion"}
+                  {isIndexerSaving ? t("settings.api.common.savingAndTesting") : t("settings.api.common.saveAndTest")}
                 </Button>
               </form>
             </CardContent>
@@ -879,9 +956,9 @@ export function Settings() {
         <TabsContent value="notifications">
           <Card className="border-purple-500/30 bg-purple-950/15 text-white">
             <CardHeader>
-              <CardTitle className="text-purple-200">Canaux de notification</CardTitle>
+              <CardTitle className="text-purple-200">{t("settings.notifications.title")}</CardTitle>
               <CardDescription className="text-purple-100/70">
-                Configurez les services pour recevoir des notifications d'événements importants.
+                {t("settings.notifications.description")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -898,8 +975,8 @@ export function Settings() {
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h4 className="font-medium text-white">Discord</h4>
-                      <p className="text-sm text-purple-200/70">Recevoir les notifications via un webhook Discord</p>
+                      <h4 className="font-medium text-white">{t("settings.notifications.discord.title")}</h4>
+                      <p className="text-sm text-purple-200/70">{t("settings.notifications.discord.description")}</p>
                     </div>
                     <button
                       type="button"
@@ -910,14 +987,14 @@ export function Settings() {
                           : "bg-slate-700 text-slate-300 hover:bg-slate-600"
                       }`}
                     >
-                      {discordTested ? "Activé" : "Configurer"}
+                      {discordTested ? t("settings.notifications.discord.enabled") : t("settings.notifications.discord.configure")}
                     </button>
                   </div>
 
                   {discordFormOpen && (
                     <div className="space-y-3">
                       <div className="space-y-2">
-                        <Label htmlFor="discord-webhook">URL du Webhook Discord</Label>
+                        <Label htmlFor="discord-webhook">{t("settings.notifications.discord.webhookLabel")}</Label>
                         <Input
                           id="discord-webhook"
                           type="password"
@@ -927,7 +1004,7 @@ export function Settings() {
                           className="bg-slate-900 border-white/10 text-white"
                         />
                         <p className="text-xs text-slate-400">
-                          Créez un webhook en allant sur les paramètres du serveur Discord → Webhooks
+                          {t("settings.notifications.discord.webhookHelp")}
                         </p>
                       </div>
 
@@ -948,7 +1025,7 @@ export function Settings() {
                         disabled={isDiscordSaving || !discordWebhookUrl.trim()}
                         className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
                       >
-                        {isDiscordSaving ? "Test en cours..." : "Tester & Sauvegarder"}
+                        {isDiscordSaving ? t("settings.notifications.discord.testing") : t("settings.notifications.discord.testAndSave")}
                         </Button>
                         <Button
                           type="button"
@@ -960,7 +1037,7 @@ export function Settings() {
                           variant="ghost"
                           className="border border-white/10 bg-transparent text-white hover:bg-white/10 hover:text-white"
                         >
-                          Annuler
+                          {t("common.cancel")}
                         </Button>
                       </div>
                     </div>
@@ -969,9 +1046,9 @@ export function Settings() {
 
                 <div className="space-y-4 p-4 bg-slate-800/50 rounded-md border border-purple-500/20">
                   <div>
-                    <h4 className="font-medium text-white">Navigateur internet</h4>
+                    <h4 className="font-medium text-white">{t("settings.notifications.browser.title")}</h4>
                     <p className="text-sm text-purple-200/70">
-                      Enregistrez plusieurs navigateurs pour recevoir les notifications natives.
+                      {t("settings.notifications.browser.description")}
                     </p>
                   </div>
 
@@ -979,22 +1056,31 @@ export function Settings() {
                     <Input
                       value={browserDeviceName}
                       onChange={(e) => setBrowserDeviceName(e.target.value)}
-                      placeholder="Nom du navigateur (ex: Chrome bureau)"
-                      className="bg-slate-900 border-white/10 text-white"
+                      placeholder={t("settings.notifications.browser.devicePlaceholder")}
+                      disabled={browserDevices.some((device) => device.id === browserDeviceId)}
+                      className="bg-slate-900 border-white/10 text-white disabled:opacity-60 disabled:cursor-not-allowed"
                     />
                     <Button
                       type="button"
                       onClick={handleAddBrowserChannel}
-                      disabled={isBrowserSaving}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      disabled={isBrowserSaving || browserDevices.some((device) => device.id === browserDeviceId)}
+                      className={`${
+                        browserDevices.some((device) => device.id === browserDeviceId)
+                          ? "bg-emerald-600 hover:bg-emerald-600 text-white"
+                          : "bg-blue-600 hover:bg-blue-700 text-white"
+                      }`}
                     >
-                      {isBrowserSaving ? "Enregistrement..." : "Ajouter ce navigateur"}
+                      {isBrowserSaving
+                        ? t("common.saving")
+                        : browserDevices.some((device) => device.id === browserDeviceId)
+                          ? t("settings.notifications.discord.enabled")
+                          : t("settings.notifications.browser.add")}
                     </Button>
                   </div>
 
                   <div className="space-y-2">
                     {browserDevices.length === 0 ? (
-                      <p className="text-sm text-white/60">Aucun navigateur enregistré.</p>
+                      <p className="text-sm text-white/60">{t("settings.notifications.browser.none")}</p>
                     ) : (
                       browserDevices.map((device) => (
                         <div
@@ -1004,7 +1090,7 @@ export function Settings() {
                           <div className="min-w-0">
                             <p className="truncate text-sm text-white">{device.name}</p>
                             <p className="text-xs text-white/50">
-                              {device.id === browserDeviceId ? "Navigateur actuel" : "Navigateur enregistré"}
+                              {device.id === browserDeviceId ? t("settings.notifications.browser.current") : t("settings.notifications.browser.registered")}
                             </p>
                           </div>
                           <Button
@@ -1014,7 +1100,7 @@ export function Settings() {
                             disabled={isBrowserSaving}
                             className="text-red-300 hover:text-red-200 hover:bg-red-500/15"
                           >
-                            Supprimer
+                            {t("common.remove")}
                           </Button>
                         </div>
                       ))
@@ -1036,9 +1122,9 @@ export function Settings() {
 
                 <div className="space-y-3 p-4 bg-slate-800/50 rounded-md border border-purple-500/20">
                   <div>
-                    <h4 className="font-medium text-white">Notification de test</h4>
+                    <h4 className="font-medium text-white">{t("settings.notifications.test.title")}</h4>
                     <p className="text-sm text-purple-200/70">
-                      Génère une notification de test
+                      {t("settings.notifications.test.description")}
                     </p>
                   </div>
 
@@ -1048,7 +1134,7 @@ export function Settings() {
                     disabled={isSendingTestNotif}
                     className="bg-purple-600 hover:bg-purple-700 text-white"
                   >
-                    {isSendingTestNotif ? "Envoi en cours..." : "Notification de test"}
+                    {isSendingTestNotif ? t("settings.notifications.test.sending") : t("settings.notifications.test.trigger")}
                   </Button>
 
                   {testNotifMessage && (
@@ -1071,9 +1157,9 @@ export function Settings() {
         <TabsContent value="factory">
           <Card className="border-red-500/30 bg-red-950/15 text-white">
             <CardHeader>
-              <CardTitle className="text-red-200">Réinitialisation d'usine</CardTitle>
+              <CardTitle className="text-red-200">{t("settings.factory.title")}</CardTitle>
               <CardDescription className="text-red-100/70">
-                Cette action réinitialise l'application: compte admin par défaut, paramètres, wishlist films/séries, puis déconnexion automatique.
+                {t("settings.factory.description")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1087,27 +1173,27 @@ export function Settings() {
                     disabled={isResetting}
                     className="bg-red-600 hover:bg-red-700 text-white"
                   >
-                    {isResetting ? "Réinitialisation..." : "Réinitialiser les paramètres"}
+                    {isResetting ? t("settings.factory.resetting") : t("settings.factory.reset")}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent className="border-red-500/30 bg-slate-950 text-white">
                   <AlertDialogHeader>
                     <AlertDialogTitle className="text-red-200">
-                      Confirmer la réinitialisation d'usine
+                      {t("settings.factory.confirmTitle")}
                     </AlertDialogTitle>
                     <AlertDialogDescription className="text-white/70">
-                      Toutes les données locales seront remises à zéro (utilisateur, paramètres, wishlist films/séries) puis votre session sera expirée. Cette action est irréversible.
+                      {t("settings.factory.confirmDescription")}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
-                      Annuler
+                      {t("common.cancel")}
                     </AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleResetSettings}
                       className="bg-red-600 text-white hover:bg-red-700"
                     >
-                      Oui, réinitialiser
+                      {t("settings.factory.confirmAction")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

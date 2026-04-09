@@ -5,6 +5,7 @@ import {
   seriesWishlistFilePath,
   wishlistFilePath,
 } from "../config.js";
+import { getTranslator } from "../i18n.js";
 
 async function ensureJsonArrayStore(filePath) {
   await fs.mkdir(dataDir, { recursive: true });
@@ -138,20 +139,22 @@ function normalizeSeriesEntry(entry) {
 
 export function registerWishlistRoutes(app) {
   app.get("/api/wishlist", async (_req, res) => {
+    const t = getTranslator(_req);
     try {
       const wishlist = await readWishlist();
       res.json(wishlist);
     } catch (error) {
       console.error("Read wishlist failed:", error);
-      res.status(500).json({ error: "Failed to read wishlist" });
+      res.status(500).json({ error: t("wishlist.readWishlistFailed") });
     }
   });
 
   app.post("/api/wishlist", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const movie = normalizeMovie(req.body);
       if (!movie) {
-        res.status(400).json({ error: "Invalid movie payload" });
+        res.status(400).json({ error: t("wishlist.invalidMoviePayload") });
         return;
       }
 
@@ -165,15 +168,16 @@ export function registerWishlistRoutes(app) {
       res.status(201).json({ ok: true, exists: alreadyExists });
     } catch (error) {
       console.error("Add wishlist movie failed:", error);
-      res.status(500).json({ error: "Failed to add movie to wishlist" });
+      res.status(500).json({ error: t("wishlist.addMovieFailed") });
     }
   });
 
   app.delete("/api/wishlist/:id", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const movieId = Number(req.params.id);
       if (!Number.isFinite(movieId)) {
-        res.status(400).json({ error: "Invalid movie id" });
+        res.status(400).json({ error: t("wishlist.invalidMovieId") });
         return;
       }
 
@@ -183,11 +187,12 @@ export function registerWishlistRoutes(app) {
       res.json({ ok: true });
     } catch (error) {
       console.error("Remove wishlist movie failed:", error);
-      res.status(500).json({ error: "Failed to remove movie from wishlist" });
+      res.status(500).json({ error: t("wishlist.removeMovieFailed") });
     }
   });
 
   app.delete("/api/wishlist", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const ids = Array.isArray(req.body?.ids)
         ? req.body.ids.map((id) => Number(id)).filter((id) => Number.isFinite(id))
@@ -201,15 +206,16 @@ export function registerWishlistRoutes(app) {
       res.json({ ok: true });
     } catch (error) {
       console.error("Remove multiple wishlist movies failed:", error);
-      res.status(500).json({ error: "Failed to remove wishlist movies" });
+      res.status(500).json({ error: t("wishlist.removeMoviesFailed") });
     }
   });
 
   app.get("/api/wishlist/:id", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const movieId = Number(req.params.id);
       if (!Number.isFinite(movieId)) {
-        res.status(400).json({ error: "Invalid movie id" });
+        res.status(400).json({ error: t("wishlist.invalidMovieId") });
         return;
       }
 
@@ -218,25 +224,27 @@ export function registerWishlistRoutes(app) {
       res.json({ exists });
     } catch (error) {
       console.error("Check wishlist movie failed:", error);
-      res.status(500).json({ error: "Failed to check wishlist movie" });
+      res.status(500).json({ error: t("wishlist.checkMovieFailed") });
     }
   });
 
   app.get("/api/series-wishlist", async (_req, res) => {
+    const t = getTranslator(_req);
     try {
       const wishlist = await readSeriesWishlist();
       res.json(wishlist);
     } catch (error) {
       console.error("Read series wishlist failed:", error);
-      res.status(500).json({ error: "Failed to read series wishlist" });
+      res.status(500).json({ error: t("wishlist.readSeriesWishlistFailed") });
     }
   });
 
   app.get("/api/series-wishlist/series/:seriesId/status", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const seriesId = Number(req.params.seriesId);
       if (!Number.isFinite(seriesId)) {
-        res.status(400).json({ error: "Invalid seriesId" });
+        res.status(400).json({ error: t("wishlist.invalidSeriesId") });
         return;
       }
 
@@ -257,15 +265,16 @@ export function registerWishlistRoutes(app) {
       });
     } catch (error) {
       console.error("Series wishlist status failed:", error);
-      res.status(500).json({ error: "Failed to get wishlist status" });
+      res.status(500).json({ error: t("wishlist.getSeriesStatusFailed") });
     }
   });
 
   app.post("/api/series-wishlist", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const entry = normalizeSeriesEntry(req.body);
       if (!entry) {
-        res.status(400).json({ error: "Invalid series wishlist payload" });
+        res.status(400).json({ error: t("wishlist.invalidSeriesPayload") });
         return;
       }
 
@@ -310,11 +319,12 @@ export function registerWishlistRoutes(app) {
       res.status(201).json({ ok: true });
     } catch (error) {
       console.error("Add series wishlist entry failed:", error);
-      res.status(500).json({ error: "Failed to add to series wishlist" });
+      res.status(500).json({ error: t("wishlist.addSeriesFailed") });
     }
   });
 
   app.delete("/api/series-wishlist/entry/:entryId", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const entryId = req.params.entryId;
       const wishlist = await readSeriesWishlist();
@@ -323,11 +333,12 @@ export function registerWishlistRoutes(app) {
       res.json({ ok: true });
     } catch (error) {
       console.error("Remove series wishlist entry failed:", error);
-      res.status(500).json({ error: "Failed to remove series wishlist entry" });
+      res.status(500).json({ error: t("wishlist.removeSeriesEntryFailed") });
     }
   });
 
   app.delete("/api/series-wishlist/bulk", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const entryIds = Array.isArray(req.body?.entryIds)
         ? req.body.entryIds.map((id) => String(id))
@@ -339,7 +350,7 @@ export function registerWishlistRoutes(app) {
       res.json({ ok: true });
     } catch (error) {
       console.error("Bulk remove series wishlist entries failed:", error);
-      res.status(500).json({ error: "Failed to remove series wishlist entries" });
+      res.status(500).json({ error: t("wishlist.removeSeriesEntriesFailed") });
     }
   });
 }

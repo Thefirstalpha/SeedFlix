@@ -11,6 +11,7 @@ import {
   usersFilePath,
 } from "../config.js";
 import { debugLog } from "../logger.js";
+import { getTranslator } from "../i18n.js";
 
 function hashPassword(password, salt = randomBytes(16).toString("hex")) {
   const hash = scryptSync(password, salt, 64).toString("hex");
@@ -48,7 +49,9 @@ function buildDefaultSettings(username = "admin") {
           devices: [],
         },
       },
-      preferences: {},
+      preferences: {
+        language: "fr",
+      },
       torrent: {
         url: "",
         port: "",
@@ -320,9 +323,10 @@ async function getAuthenticatedUser(req) {
 }
 
 async function requireAuth(req, res) {
+  const t = getTranslator(req);
   const auth = await getAuthenticatedUser(req);
   if (!auth) {
-    res.status(401).json({ error: "Authentication required" });
+    res.status(401).json({ error: t("common.authRequired") });
     return null;
   }
 
@@ -333,6 +337,7 @@ export { getAuthenticatedUser, requireAuth };
 
 export function registerAuthRoutes(app) {
   app.get("/api/auth/me", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const auth = await getAuthenticatedUser(req);
       if (!auth) {
@@ -355,25 +360,26 @@ export function registerAuthRoutes(app) {
       });
     } catch (error) {
       debugLog("Auth me failed:", error);
-      res.status(500).json({ error: "Failed to read session" });
+      res.status(500).json({ error: t("auth.failedReadSession") });
     }
   });
 
   app.post("/api/auth/login", async (req, res) => {
+    const t = getTranslator(req);
     try {
       await ensureUsersStore();
       const username = String(req.body?.username || "").trim();
       const password = String(req.body?.password || "");
 
       if (!username || !password) {
-        res.status(400).json({ error: "Username and password are required" });
+        res.status(400).json({ error: t("auth.usernamePasswordRequired") });
         return;
       }
 
       const users = await readUsers();
       const user = users.find((entry) => entry.username === username);
       if (!user || !verifyPassword(password, user.passwordSalt, user.passwordHash)) {
-        res.status(401).json({ error: "Identifiants invalides" });
+        res.status(401).json({ error: t("auth.invalidCredentials") });
         return;
       }
 
@@ -395,11 +401,12 @@ export function registerAuthRoutes(app) {
       });
     } catch (error) {
       debugLog("Login failed:", error);
-      res.status(500).json({ error: "Failed to log in" });
+      res.status(500).json({ error: t("auth.failedLogin") });
     }
   });
 
   app.post("/api/auth/logout", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const cookies = parseCookies(req.headers.cookie || "");
       const sessionToken = cookies[authCookieName];
@@ -412,7 +419,7 @@ export function registerAuthRoutes(app) {
       res.json({ ok: true });
     } catch (error) {
       debugLog("Logout failed:", error);
-      res.status(500).json({ error: "Failed to log out" });
+      res.status(500).json({ error: t("auth.failedLogout") });
     }
   });
 
@@ -422,22 +429,23 @@ export function registerAuthRoutes(app) {
       if (!auth) {
         return;
       }
+      const t = getTranslator(req, auth.user);
 
       const currentPassword = String(req.body?.currentPassword || "");
       const newPassword = String(req.body?.newPassword || "");
 
       if (!currentPassword || !newPassword) {
-        res.status(400).json({ error: "Current and new passwords are required" });
+        res.status(400).json({ error: t("auth.currentNewPasswordRequired") });
         return;
       }
 
       if (newPassword.length < 6) {
-        res.status(400).json({ error: "Le nouveau mot de passe doit contenir au moins 6 caractères" });
+        res.status(400).json({ error: t("auth.newPasswordTooShort") });
         return;
       }
 
       if (!verifyPassword(currentPassword, auth.user.passwordSalt, auth.user.passwordHash)) {
-        res.status(401).json({ error: "Mot de passe actuel invalide" });
+        res.status(401).json({ error: t("auth.invalidCurrentPassword") });
         return;
       }
 
@@ -465,12 +473,14 @@ export function registerAuthRoutes(app) {
       await writeUsers(nextUsers);
       res.json({ ok: true });
     } catch (error) {
+      const t = getTranslator(req);
       debugLog("Change password failed:", error);
-      res.status(500).json({ error: "Failed to change password" });
+      res.status(500).json({ error: t("auth.failedChangePassword") });
     }
   });
 
   app.get("/api/settings", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const auth = await requireAuth(req, res);
       if (!auth) {
@@ -480,11 +490,12 @@ export function registerAuthRoutes(app) {
       res.json(auth.user.settings || {});
     } catch (error) {
       debugLog("Read settings failed:", error);
-      res.status(500).json({ error: "Failed to load settings" });
+      res.status(500).json({ error: t("auth.failedLoadSettings") });
     }
   });
 
   app.put("/api/settings", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const auth = await requireAuth(req, res);
       if (!auth) {
@@ -507,11 +518,12 @@ export function registerAuthRoutes(app) {
       res.json(newSettings);
     } catch (error) {
       debugLog("Update settings failed:", error);
-      res.status(500).json({ error: "Failed to update settings" });
+      res.status(500).json({ error: t("auth.failedUpdateSettings") });
     }
   });
 
   app.post("/api/settings/reset", async (req, res) => {
+    const t = getTranslator(req);
     try {
       const auth = await requireAuth(req, res);
       if (!auth) {
@@ -552,7 +564,7 @@ export function registerAuthRoutes(app) {
       });
     } catch (error) {
       debugLog("Reset settings failed:", error);
-      res.status(500).json({ error: "Failed to reset settings" });
+      res.status(500).json({ error: t("auth.failedResetSettings") });
     }
   });
 }

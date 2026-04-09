@@ -12,6 +12,7 @@ import {
   cleanTorrent,
   type TorrentDownloadItem,
 } from "../services/torrentService";
+import { useI18n } from "../i18n/LanguageProvider";
 
 function formatRate(bytesPerSec: number) {
   if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) {
@@ -29,12 +30,12 @@ function formatRate(bytesPerSec: number) {
   return `${value.toFixed(value >= 100 ? 0 : 1)} ${units[index]}`;
 }
 
-function formatEta(seconds: number) {
+function formatEta(seconds: number, unknownLabel: string, finishedLabel: string) {
   if (!Number.isFinite(seconds) || seconds < 0) {
-    return "Inconnu";
+    return unknownLabel;
   }
   if (seconds === 0) {
-    return "Terminé";
+    return finishedLabel;
   }
 
   const h = Math.floor(seconds / 3600);
@@ -52,6 +53,7 @@ function formatEta(seconds: number) {
 }
 
 export function Downloads() {
+  const { t } = useI18n();
   const [downloads, setDownloads] = useState<TorrentDownloadItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +65,7 @@ export function Downloads() {
       setDownloads(response.torrents);
       setError(null);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Impossible de charger les téléchargements");
+      setError(loadError instanceof Error ? loadError.message : t("downloads.loadFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -124,15 +126,15 @@ export function Downloads() {
       <div className="flex items-center gap-3">
         <Download className="w-7 h-7 text-cyan-300" />
         <div>
-          <h2 className="text-3xl font-bold text-white">Téléchargements</h2>
-          <p className="text-white/60">{activeCount} actif(s) sur {downloads.length} torrent(s)</p>
+          <h2 className="text-3xl font-bold text-white">{t("downloads.title")}</h2>
+          <p className="text-white/60">{t("downloads.activeSummary", { active: activeCount, total: downloads.length })}</p>
         </div>
       </div>
 
       {isLoading ? (
         <div className="flex items-center gap-2 text-white/70">
           <Loader2 className="w-4 h-4 animate-spin" />
-          Chargement des téléchargements...
+          {t("downloads.loading")}
         </div>
       ) : null}
 
@@ -141,7 +143,7 @@ export function Downloads() {
       {!isLoading && !error && downloads.length === 0 ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardContent className="p-6 text-white/70">
-            Aucun téléchargement en cours.
+            {t("downloads.empty")}
           </CardContent>
         </Card>
       ) : null}
@@ -181,7 +183,7 @@ export function Downloads() {
                   )}
                   {isFinished && (
                     <Badge className="border-emerald-500/50 bg-emerald-600/40 text-emerald-200">
-                      ✓ Terminé
+                      ✓ {t("downloads.finished")}
                     </Badge>
                   )}
                   <Badge variant="outline" className="border-white/30 text-white/80">
@@ -190,20 +192,20 @@ export function Downloads() {
                   {!isFinished && (
                     <>
                       <Badge variant="outline" className="border-lime-500/40 text-lime-300">
-                        Débit: {formatRate(item.rateDownload)}
+                        {t("downloads.rate")}: {formatRate(item.rateDownload)}
                       </Badge>
                       <Badge variant="outline" className="border-amber-500/40 text-amber-300">
-                        ETA: {formatEta(item.eta)}
+                        {t("downloads.eta")}: {formatEta(item.eta, t("downloads.unknown"), t("downloads.finished"))}
                       </Badge>
                     </>
                   )}
                   <Badge variant="outline" className="border-purple-500/40 text-purple-300">
-                    Peers: {item.peersConnected}
+                    {t("downloads.peers")}: {item.peersConnected}
                   </Badge>
                 </div>
 
                 {item.error > 0 && item.errorString ? (
-                  <p className="text-sm text-red-300">Erreur: {item.errorString}</p>
+                  <p className="text-sm text-red-300">{t("downloads.errorPrefix")}: {item.errorString}</p>
                 ) : null}
 
                 {/* Action buttons */}
@@ -216,7 +218,7 @@ export function Downloads() {
                       className="bg-amber-600/40 hover:bg-amber-600/60 text-amber-200 border border-amber-500/30"
                     >
                       <Pause className="w-4 h-4 mr-1" />
-                      {actionInProgress === `pause-${item.id}` ? "..." : "Pause"}
+                      {actionInProgress === `pause-${item.id}` ? "..." : t("downloads.pause")}
                     </Button>
                   )}
                   {!isFinished && isPaused && (
@@ -227,7 +229,7 @@ export function Downloads() {
                       className="bg-cyan-600/40 hover:bg-cyan-600/60 text-cyan-200 border border-cyan-500/30"
                     >
                       <Play className="w-4 h-4 mr-1" />
-                      {actionInProgress === `resume-${item.id}` ? "..." : "Reprendre"}
+                      {actionInProgress === `resume-${item.id}` ? "..." : t("downloads.resume")}
                     </Button>
                   )}
                   <Button
@@ -241,7 +243,7 @@ export function Downloads() {
                     }`}
                   >
                     <Trash2 className="w-4 h-4 mr-1" />
-                    {actionInProgress === `clean-${item.hashString}` ? "..." : "Supprimer"}
+                    {actionInProgress === `clean-${item.hashString}` ? "..." : t("downloads.remove")}
                   </Button>
                 </div>
               </CardContent>

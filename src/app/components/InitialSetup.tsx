@@ -18,8 +18,13 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Progress } from "./ui/progress";
 import { Switch } from "./ui/switch";
+import { useI18n, type SupportedLanguage } from "../i18n/LanguageProvider";
 
 const TOTAL_STEPS = 4;
+
+function parseSupportedLanguage(input: unknown): SupportedLanguage {
+  return input === "en" ? "en" : "fr";
+}
 
 function buildFallbackSettings(username = "admin"): UserSettings {
   return {
@@ -34,7 +39,9 @@ function buildFallbackSettings(username = "admin"): UserSettings {
     },
     placeholders: {
       notifications: {},
-      preferences: {},
+      preferences: {
+        language: "fr",
+      },
       torrent: {
         url: "",
         port: "",
@@ -75,6 +82,7 @@ export function InitialSetup() {
     mustConfigureTmdb ||
     mustConfigureTorrent ||
     mustConfigureIndexer;
+  const { t, availableLanguages, setLanguage } = useI18n();
 
   const [activeStep, setActiveStep] = useState(0);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
@@ -104,15 +112,19 @@ export function InitialSetup() {
   const [indexerDefaultQuality, setIndexerDefaultQuality] = useState("all");
   const [indexerError, setIndexerError] = useState<string | null>(null);
   const [isIndexerSaving, setIsIndexerSaving] = useState(false);
+  const [languageCode, setLanguageCode] = useState<SupportedLanguage>("fr");
+  const [languageMessage, setLanguageMessage] = useState<string | null>(null);
+  const [languageError, setLanguageError] = useState<string | null>(null);
+  const [isLanguageSaving, setIsLanguageSaving] = useState(false);
 
   const stepStatuses = useMemo(
     () => [
-      { key: "password", title: "Sécurité", icon: ShieldCheck, required: mustChangePassword },
-      { key: "tmdb", title: "Clé TMDB", icon: KeyRound, required: mustConfigureTmdb },
-      { key: "torrent", title: "Client torrent", icon: Server, required: mustConfigureTorrent },
-      { key: "indexer", title: "Tracker", icon: RadioTower, required: mustConfigureIndexer },
+      { key: "password", title: t("setup.steps.security"), icon: ShieldCheck, required: mustChangePassword },
+      { key: "tmdb", title: t("setup.steps.tmdb"), icon: KeyRound, required: mustConfigureTmdb },
+      { key: "torrent", title: t("setup.steps.torrent"), icon: Server, required: mustConfigureTorrent },
+      { key: "indexer", title: t("setup.steps.indexer"), icon: RadioTower, required: mustConfigureIndexer },
     ],
-    [mustChangePassword, mustConfigureIndexer, mustConfigureTmdb, mustConfigureTorrent]
+    [mustChangePassword, mustConfigureIndexer, mustConfigureTmdb, mustConfigureTorrent, t]
   );
 
   const firstIncompleteStep = useMemo(() => {
@@ -136,6 +148,7 @@ export function InitialSetup() {
     setIndexerUrl(indexerSettings.url || "");
     setIndexerToken(indexerSettings.token || "");
     setIndexerDefaultQuality(indexerSettings.defaultQuality || "all");
+    setLanguageCode(parseSupportedLanguage(sourceSettings.placeholders?.preferences?.language));
   }, [settings, user?.username]);
 
   useEffect(() => {
@@ -177,7 +190,7 @@ export function InitialSetup() {
   if (isLoading || isBootstrapping) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center text-white/70">
-        Préparation de la configuration initiale...
+        {t("setup.preparing")}
       </div>
     );
   }
@@ -197,6 +210,10 @@ export function InitialSetup() {
     placeholders: {
       ...(currentSettings.placeholders || buildFallbackSettings(user?.username || "admin").placeholders),
       ...(overrides.placeholders || {}),
+      preferences: {
+        ...(currentSettings.placeholders?.preferences || {}),
+        ...(overrides.placeholders?.preferences || {}),
+      },
       torrent: {
         ...(currentSettings.placeholders?.torrent || {}),
         ...(overrides.placeholders?.torrent || {}),
@@ -217,17 +234,46 @@ export function InitialSetup() {
     setActiveStep((current) => Math.min(current + 1, TOTAL_STEPS - 1));
   };
 
+  const saveLanguage = async (nextLanguage: SupportedLanguage) => {
+    setLanguageMessage(null);
+    setLanguageError(null);
+    setIsLanguageSaving(true);
+
+    try {
+      const updatedSettings = buildUpdatedSettings({
+        placeholders: {
+          preferences: {
+            ...(currentSettings.placeholders?.preferences || {}),
+            language: nextLanguage,
+          },
+        },
+      });
+
+      await updateSettings(updatedSettings);
+      setSettings(updatedSettings);
+      setLanguage(nextLanguage);
+      await refresh();
+      setLanguageMessage(t("settings.language.success"));
+    } catch (submitError) {
+      setLanguageError(
+        submitError instanceof Error ? submitError.message : t("settings.language.failed")
+      );
+    } finally {
+      setIsLanguageSaving(false);
+    }
+  };
+
   const handlePasswordSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setPasswordError(null);
 
     if (!newPassword) {
-      setPasswordError("Le nouveau mot de passe est requis.");
+      setPasswordError(t("setup.password.errors.required"));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordError("La confirmation du mot de passe ne correspond pas.");
+      setPasswordError(t("setup.password.errors.mismatch"));
       return;
     }
 
@@ -240,7 +286,7 @@ export function InitialSetup() {
       goToNextVisibleStep();
     } catch (submitError) {
       setPasswordError(
-        submitError instanceof Error ? submitError.message : "Mise à jour impossible"
+        submitError instanceof Error ? submitError.message : t("setup.password.errors.updateFailed")
       );
     } finally {
       setIsPasswordSaving(false);
@@ -253,7 +299,7 @@ export function InitialSetup() {
     setTmdbMessage(null);
 
     if (!tmdbApiKey.trim()) {
-      setTmdbError("La clé API TMDB est requise.");
+      setTmdbError(t("setup.tmdb.errors.required"));
       return;
     }
 
@@ -283,7 +329,7 @@ export function InitialSetup() {
       goToNextVisibleStep();
     } catch (submitError) {
       setTmdbError(
-        submitError instanceof Error ? submitError.message : "Configuration impossible"
+        submitError instanceof Error ? submitError.message : t("setup.tmdb.errors.configFailed")
       );
     } finally {
       setIsTmdbSaving(false);
@@ -295,12 +341,12 @@ export function InitialSetup() {
     setTorrentError(null);
 
     if (!torrentUrl.trim() || !torrentPort.trim()) {
-      setTorrentError("L'URL et le port du client torrent sont requis.");
+      setTorrentError(t("setup.torrent.errors.urlPortRequired"));
       return;
     }
 
     if (torrentAuthRequired && (!torrentUsername.trim() || !torrentPassword.trim())) {
-      setTorrentError("Les identifiants Transmission sont requis quand l'authentification est activée.");
+      setTorrentError(t("setup.torrent.errors.credentialsRequired"));
       return;
     }
 
@@ -333,7 +379,7 @@ export function InitialSetup() {
       goToNextVisibleStep();
     } catch (submitError) {
       setTorrentError(
-        submitError instanceof Error ? submitError.message : "Configuration du client torrent impossible"
+        submitError instanceof Error ? submitError.message : t("setup.torrent.errors.configFailed")
       );
     } finally {
       setIsTorrentSaving(false);
@@ -345,7 +391,7 @@ export function InitialSetup() {
     setIndexerError(null);
 
     if (!indexerUrl.trim() || !indexerToken.trim()) {
-      setIndexerError("L'URL et le jeton API du tracker sont requis.");
+      setIndexerError(t("setup.indexer.errors.urlTokenRequired"));
       return;
     }
 
@@ -369,7 +415,7 @@ export function InitialSetup() {
       navigate("/", { replace: true });
     } catch (submitError) {
       setIndexerError(
-        submitError instanceof Error ? submitError.message : "Configuration du tracker impossible"
+        submitError instanceof Error ? submitError.message : t("setup.indexer.errors.configFailed")
       );
     } finally {
       setIsIndexerSaving(false);
@@ -378,12 +424,48 @@ export function InitialSetup() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div className="space-y-3">
-        <div className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-cyan-200">
-          Première configuration
+      <div className="flex items-center justify-center gap-3">
+        <img
+          src="/favicon.svg"
+          alt={t("common.appName")}
+          className="h-12 w-12 rounded-sm"
+        />
+        <h1 className="text-4xl font-black text-white tracking-tighter">{t("common.appName")}</h1>
+      </div>
+
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-3">
+          <div className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-cyan-200">
+            {t("setup.badge")}
+          </div>
+          <div>
+            <h2 className="text-4xl font-black tracking-tight text-white">{t("setup.title")}</h2>
+          </div>
         </div>
-        <div>
-          <h2 className="text-4xl font-black tracking-tight text-white">Assistant de démarrage</h2>
+
+        <div className="w-full max-w-[220px] rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white backdrop-blur-sm md:mt-1">
+          <div className="space-y-1.5">
+            <Label htmlFor="setup-language" className="text-xs text-white/70">{t("settings.language.field")}</Label>
+            <select
+              id="setup-language"
+              value={languageCode}
+              disabled={isLanguageSaving}
+              onChange={(event) => {
+                const nextLanguage = parseSupportedLanguage(event.target.value);
+                setLanguageCode(nextLanguage);
+                void saveLanguage(nextLanguage);
+              }}
+              className="h-9 w-full rounded-md border border-white/10 bg-slate-900 px-2.5 text-sm text-white outline-none disabled:opacity-60"
+            >
+              {availableLanguages.map((language) => (
+                <option key={language.code} value={language.code}>
+                  {language.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {languageMessage ? <p className="mt-1.5 text-xs text-emerald-300">{languageMessage}</p> : null}
+          {languageError ? <p className="mt-1.5 text-xs text-red-300">{languageError}</p> : null}
         </div>
       </div>
 
@@ -395,7 +477,7 @@ export function InitialSetup() {
             </div>
             <div className="text-sm text-white/60">
               <p className="text-sm uppercase tracking-[0.22em] text-white/45">
-                Étape {currentStepNumber} sur {TOTAL_STEPS}
+                {t("setup.progress", { current: currentStepNumber, total: TOTAL_STEPS })}
               </p>
             </div>
           </div>
@@ -423,7 +505,7 @@ export function InitialSetup() {
                         <Icon className="h-4 w-4 text-cyan-200" />
                       </div>
                       <div>
-                        <p className="text-xs text-white/45">Étape {index + 1}</p>
+                        <p className="text-xs text-white/45">{t("setup.stepLabel", { index: index + 1 })}</p>
                         <p className="font-medium text-white">{step.title}</p>
                       </div>
                     </div>
@@ -439,16 +521,16 @@ export function InitialSetup() {
       {activeStep === 0 ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
-            <CardTitle>Changez le mot de passe par défaut</CardTitle>
+            <CardTitle>{t("setup.password.cardTitle")}</CardTitle>
             <CardDescription className="text-white/60">
-              Cette étape sécurise immédiatement le compte administrateur
+              {t("setup.password.cardDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="setup-new-password">Nouveau mot de passe</Label>
+                  <Label htmlFor="setup-new-password">{t("setup.password.newPassword")}</Label>
                   <Input
                     id="setup-new-password"
                     type="password"
@@ -459,7 +541,7 @@ export function InitialSetup() {
                 </div>
               </div>
               <div className="space-y-2 md:max-w-md">
-                <Label htmlFor="setup-confirm-password">Confirmation</Label>
+                <Label htmlFor="setup-confirm-password">{t("setup.password.confirm")}</Label>
                 <Input
                   id="setup-confirm-password"
                   type="password"
@@ -470,9 +552,9 @@ export function InitialSetup() {
               </div>
               {passwordError ? <p className="text-sm text-red-300">{passwordError}</p> : null}
               <div className="flex items-center justify-between gap-3">
-                <div className="text-sm text-white/55">Minimum 6 caractères.</div>
+                <div className="text-sm text-white/55">{t("setup.password.minimum")}</div>
                 <Button type="submit" disabled={isPasswordSaving} className="bg-cyan-600 text-white hover:bg-cyan-700">
-                  {isPasswordSaving ? "Enregistrement..." : "Enregistrer et continuer"}
+                  {isPasswordSaving ? t("common.saving") : t("setup.password.saveAndContinue")}
                 </Button>
               </div>
             </form>
@@ -483,23 +565,23 @@ export function InitialSetup() {
       {activeStep === 1 ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
-            <CardTitle>Renseignez votre clé API TMDB</CardTitle>
+            <CardTitle>{t("setup.tmdb.cardTitle")}</CardTitle>
             <CardDescription className="text-white/60">
-              SeedFlix utilise TMDB pour récupérer les fiches films et séries.
+              {t("setup.tmdb.cardDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleTmdbSubmit} className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="setup-tmdb-key">Clé API TMDB</Label>
+                  <Label htmlFor="setup-tmdb-key">{t("setup.tmdb.keyLabel")}</Label>
                   <a
                     href="https://developer.themoviedb.org/docs/getting-started"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-sm text-cyan-300 transition-colors hover:text-cyan-200"
                   >
-                    Documentation TMDB
+                    {t("setup.tmdb.documentation")}
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 </div>
@@ -508,18 +590,18 @@ export function InitialSetup() {
                   type="password"
                   value={tmdbApiKey}
                   onChange={(event) => setTmdbApiKey(event.target.value)}
-                  placeholder="Clé API v3 ou Read Access Token v4"
+                  placeholder={t("setup.tmdb.placeholder")}
                   className="border-white/10 bg-slate-900 text-white"
                 />
                 <p className="text-xs text-white/55">
-                  SeedFlix accepte la clé API TMDB classique et le jeton de lecture v4.
+                  {t("setup.tmdb.helper")}
                 </p>
               </div>
               {tmdbMessage ? <p className="text-sm text-emerald-300">{tmdbMessage}</p> : null}
               {tmdbError ? <p className="text-sm text-red-300">{tmdbError}</p> : null}
               <div className="flex items-center justify-end gap-3">
                 <Button type="submit" disabled={isTmdbSaving} className="bg-cyan-600 text-white hover:bg-cyan-700">
-                  {isTmdbSaving ? "Test en cours..." : "Tester, enregistrer et continuer"}
+                  {isTmdbSaving ? t("setup.tmdb.testing") : t("setup.tmdb.saveAndContinue")}
                 </Button>
               </div>
             </form>
@@ -530,31 +612,31 @@ export function InitialSetup() {
       {activeStep === 2 ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
-            <CardTitle>Configurez le client torrent</CardTitle>
+            <CardTitle>{t("setup.torrent.cardTitle")}</CardTitle>
             <CardDescription className="text-white/60">
-              Ces informations servent à tester la connexion puis à envoyer les téléchargements.
+              {t("setup.torrent.cardDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleTorrentSubmit} className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="setup-torrent-url">URL</Label>
+                  <Label htmlFor="setup-torrent-url">{t("setup.torrent.url")}</Label>
                   <Input
                     id="setup-torrent-url"
                     value={torrentUrl}
                     onChange={(event) => setTorrentUrl(event.target.value)}
-                    placeholder="https://seedbox.example.com"
+                    placeholder={t("setup.torrent.urlPlaceholder")}
                     className="border-white/10 bg-slate-900 text-white"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="setup-torrent-port">Port RPC</Label>
+                  <Label htmlFor="setup-torrent-port">{t("setup.torrent.port")}</Label>
                   <Input
                     id="setup-torrent-port"
                     value={torrentPort}
                     onChange={(event) => setTorrentPort(event.target.value)}
-                    placeholder="9091"
+                    placeholder={t("setup.torrent.portPlaceholder")}
                     className="border-white/10 bg-slate-900 text-white"
                   />
                 </div>
@@ -562,8 +644,8 @@ export function InitialSetup() {
 
               <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/10 px-4 py-3">
                 <div>
-                  <p className="font-medium text-white">Authentification requise</p>
-                  <p className="text-sm text-white/55">Activez si votre client Transmission demande un identifiant.</p>
+                  <p className="font-medium text-white">{t("setup.torrent.authRequired")}</p>
+                  <p className="text-sm text-white/55">{t("setup.torrent.authDescription")}</p>
                 </div>
                 <Switch checked={torrentAuthRequired} onCheckedChange={setTorrentAuthRequired} />
               </div>
@@ -571,7 +653,7 @@ export function InitialSetup() {
               {torrentAuthRequired ? (
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="setup-torrent-username">Nom d'utilisateur</Label>
+                    <Label htmlFor="setup-torrent-username">{t("setup.torrent.username")}</Label>
                     <Input
                       id="setup-torrent-username"
                       value={torrentUsername}
@@ -580,7 +662,7 @@ export function InitialSetup() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="setup-torrent-password">Mot de passe</Label>
+                    <Label htmlFor="setup-torrent-password">{t("setup.torrent.password")}</Label>
                     <Input
                       id="setup-torrent-password"
                       type="password"
@@ -594,22 +676,22 @@ export function InitialSetup() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="setup-movies-folder">Dossier films</Label>
+                  <Label htmlFor="setup-movies-folder">{t("setup.torrent.moviesFolder")}</Label>
                   <Input
                     id="setup-movies-folder"
                     value={torrentMoviesFolder}
                     onChange={(event) => setTorrentMoviesFolder(event.target.value)}
-                    placeholder="/downloads/movies"
+                    placeholder={t("setup.torrent.moviesFolderPlaceholder")}
                     className="border-white/10 bg-slate-900 text-white"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="setup-series-folder">Dossier séries</Label>
+                  <Label htmlFor="setup-series-folder">{t("setup.torrent.seriesFolder")}</Label>
                   <Input
                     id="setup-series-folder"
                     value={torrentSeriesFolder}
                     onChange={(event) => setTorrentSeriesFolder(event.target.value)}
-                    placeholder="/downloads/series"
+                    placeholder={t("setup.torrent.seriesFolderPlaceholder")}
                     className="border-white/10 bg-slate-900 text-white"
                   />
                 </div>
@@ -619,7 +701,7 @@ export function InitialSetup() {
 
               <div className="flex items-center justify-end gap-3">
                 <Button type="submit" disabled={isTorrentSaving} className="bg-cyan-600 text-white hover:bg-cyan-700">
-                  {isTorrentSaving ? "Test en cours..." : "Tester et continuer"}
+                  {isTorrentSaving ? t("setup.torrent.testing") : t("setup.torrent.testAndContinue")}
                 </Button>
               </div>
             </form>
@@ -630,26 +712,26 @@ export function InitialSetup() {
       {activeStep === 3 ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
-            <CardTitle>Configurez le tracker</CardTitle>
+            <CardTitle>{t("setup.indexer.cardTitle")}</CardTitle>
             <CardDescription className="text-white/60">
-              Fournissez l'URL Torznab et le jeton API pour activer la recherche de releases.
+              {t("setup.indexer.cardDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleIndexerSubmit} className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="setup-indexer-url">URL Torznab</Label>
+                  <Label htmlFor="setup-indexer-url">{t("setup.indexer.url")}</Label>
                   <Input
                     id="setup-indexer-url"
                     value={indexerUrl}
                     onChange={(event) => setIndexerUrl(event.target.value)}
-                    placeholder="https://indexer.example.com/api"
+                    placeholder={t("setup.indexer.urlPlaceholder")}
                     className="border-white/10 bg-slate-900 text-white"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="setup-indexer-token">Jeton API</Label>
+                  <Label htmlFor="setup-indexer-token">{t("setup.indexer.token")}</Label>
                   <Input
                     id="setup-indexer-token"
                     type="password"
@@ -661,21 +743,21 @@ export function InitialSetup() {
               </div>
 
               <div className="space-y-2 md:max-w-xs">
-                <Label htmlFor="setup-indexer-quality">Qualité par défaut</Label>
+                <Label htmlFor="setup-indexer-quality">{t("setup.indexer.defaultQuality")}</Label>
                 <select
                   id="setup-indexer-quality"
                   value={indexerDefaultQuality}
                   onChange={(event) => setIndexerDefaultQuality(event.target.value)}
                   className="h-10 w-full rounded-md border border-white/10 bg-slate-900 px-3 text-white outline-none"
                 >
-                  <option value="all">Toutes qualités</option>
-                  <option value="2160p">2160p (4K)</option>
-                  <option value="1080p">1080p</option>
-                  <option value="720p">720p</option>
-                  <option value="480p">480p</option>
-                  <option value="bluray">BluRay</option>
-                  <option value="webdl">WEB-DL / WEBRip</option>
-                  <option value="hdtv">HDTV</option>
+                  <option value="all">{t("setup.indexer.allQualities")}</option>
+                  <option value="2160p">{t("setup.indexer.quality.2160p")}</option>
+                  <option value="1080p">{t("setup.indexer.quality.1080p")}</option>
+                  <option value="720p">{t("setup.indexer.quality.720p")}</option>
+                  <option value="480p">{t("setup.indexer.quality.480p")}</option>
+                  <option value="bluray">{t("setup.indexer.quality.bluray")}</option>
+                  <option value="webdl">{t("setup.indexer.quality.webdl")}</option>
+                  <option value="hdtv">{t("setup.indexer.quality.hdtv")}</option>
                 </select>
               </div>
 
@@ -687,7 +769,7 @@ export function InitialSetup() {
                   disabled={isIndexerSaving}
                   className="bg-cyan-600 text-white hover:bg-cyan-700"
                 >
-                  {isIndexerSaving ? "Test et enregistrement..." : "Tester et terminer la configuration"}
+                  {isIndexerSaving ? t("setup.indexer.testing") : t("setup.indexer.testAndFinish")}
                 </Button>
               </div>
             </form>
