@@ -1,6 +1,6 @@
 import type { Movie, TMDBMovie, TMDBMovieDetails, TMDBSearchResponse } from "../types/movie";
 import { TMDB_GENRES } from "../types/movie";
-import { API_BASE_URL, getTmdbImageUrl } from "../config/tmdb";
+import { API_BASE_URL, getTmdbImageUrl, getTmdbLanguageParam } from "../config/tmdb";
 
 export interface MoviePageResult {
   movies: Movie[];
@@ -136,10 +136,13 @@ function paginateMovies(movies: Movie[], page: number): MoviePageResult {
 // Récupérer les films populaires
 export async function getPopularMoviesPage(
   page = 1,
-  filters: DiscoverFilters = {}
+  filters: DiscoverFilters = {},
+  uiLanguage = "fr"
 ): Promise<MoviePageResult> {
+  const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+
   const params = new URLSearchParams({
-    language: "fr-FR",
+    language: tmdbLanguage,
     page: String(page),
   });
 
@@ -181,10 +184,12 @@ export async function getPopularMoviesPage(
   }
 }
 
-export async function getMovieGenres(): Promise<GenreItem[]> {
+export async function getMovieGenres(uiLanguage = "fr"): Promise<GenreItem[]> {
+  const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+
   try {
     const response = await fetch(
-      `${API_BASE_URL}/movies/genres?language=fr-FR`
+      `${API_BASE_URL}/movies/genres?language=${encodeURIComponent(tmdbLanguage)}`
     );
     if (!response.ok) {
       throw new Error("Failed to fetch movie genres");
@@ -203,10 +208,13 @@ export async function getMovieGenres(): Promise<GenreItem[]> {
 
 export async function discoverMoviesPage(
   page = 1,
-  filters: DiscoverFilters = {}
+  filters: DiscoverFilters = {},
+  uiLanguage = "fr"
 ): Promise<MoviePageResult> {
+  const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+
   const params = new URLSearchParams({
-    language: "fr-FR",
+    language: tmdbLanguage,
     page: String(page),
   });
 
@@ -241,25 +249,27 @@ export async function discoverMoviesPage(
     };
   } catch (error) {
     console.error("Error discovering movies:", error);
-    return getPopularMoviesPage(page);
+    return getPopularMoviesPage(page, {}, uiLanguage);
   }
 }
 
 // Compatibilité: conserver la version non paginée
-export async function getPopularMovies(): Promise<Movie[]> {
-  const response = await getPopularMoviesPage(1);
+export async function getPopularMovies(uiLanguage = "fr"): Promise<Movie[]> {
+  const response = await getPopularMoviesPage(1, {}, uiLanguage);
   return response.movies;
 }
 
 // Rechercher des films
-export async function searchMoviesPage(query: string, page = 1): Promise<MoviePageResult> {
+export async function searchMoviesPage(query: string, page = 1, uiLanguage = "fr"): Promise<MoviePageResult> {
+  const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+
   if (!query.trim()) {
-    return getPopularMoviesPage(page);
+    return getPopularMoviesPage(page, {}, uiLanguage);
   }
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/movies/search?language=fr-FR&query=${encodeURIComponent(query)}&page=${page}`
+      `${API_BASE_URL}/movies/search?language=${encodeURIComponent(tmdbLanguage)}&query=${encodeURIComponent(query)}&page=${page}`
     );
 
     if (!response.ok) {
@@ -285,16 +295,18 @@ export async function searchMoviesPage(query: string, page = 1): Promise<MoviePa
 }
 
 // Compatibilité: conserver la version non paginée
-export async function searchMovies(query: string): Promise<Movie[]> {
-  const response = await searchMoviesPage(query, 1);
+export async function searchMovies(query: string, uiLanguage = "fr"): Promise<Movie[]> {
+  const response = await searchMoviesPage(query, 1, uiLanguage);
   return response.movies;
 }
 
 // Récupérer les détails d'un film
-export async function getMovieById(id: number): Promise<Movie | null> {
+export async function getMovieById(id: number, uiLanguage = "fr"): Promise<Movie | null> {
+  const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+
   try {
     const response = await fetch(
-      `${API_BASE_URL}/movies/${id}?language=fr-FR`
+      `${API_BASE_URL}/movies/${id}?language=${encodeURIComponent(tmdbLanguage)}`
     );
 
     if (!response.ok) {

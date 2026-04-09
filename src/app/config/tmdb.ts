@@ -12,6 +12,24 @@ export const TMDB_POSTER_SIZE = "w500";
 export const TMDB_BACKDROP_SIZE = "original";
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
+export function getTmdbLanguageParam(language: string | null | undefined): string {
+  const normalized = String(language || "").trim().toLowerCase();
+
+  if (!normalized || normalized.startsWith("fr")) {
+    return "fr-FR";
+  }
+
+  if (normalized.startsWith("en")) {
+    return "en-US";
+  }
+
+  if (normalized.includes("-")) {
+    return normalized;
+  }
+
+  return `${normalized}-${normalized.toUpperCase()}`;
+}
+
 export function getTmdbImageUrl(
   path: string | null,
   size: string = TMDB_POSTER_SIZE,

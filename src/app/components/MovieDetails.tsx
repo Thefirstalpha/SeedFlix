@@ -116,12 +116,12 @@ export function MovieDetails() {
 
   useEffect(() => {
     loadMovieDetails();
-  }, [id]);
+  }, [id, language]);
 
   const loadMovieDetails = async () => {
     setIsLoading(true);
     try {
-      const movieData = await getMovieById(Number(id));
+      const movieData = await getMovieById(Number(id), language);
       setMovie(movieData);
       if (movieData) {
         setInWishlist(await isInWishlist(movieData.id));

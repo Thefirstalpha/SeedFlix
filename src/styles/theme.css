@@ -188,3 +188,40 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+.search-wave-overlay {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+.search-wave-overlay::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    108deg,
+    rgba(255, 255, 255, 0) 22%,
+    rgba(255, 255, 255, 0.16) 48%,
+    rgba(255, 255, 255, 0) 76%
+  );
+  transform: translateX(-120%);
+  animation: search-wave-slide 2.3s ease-in-out infinite;
+}
+
+@keyframes search-wave-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-wave-overlay::after {
+    animation: none;
+    opacity: 0;
+  }
+}

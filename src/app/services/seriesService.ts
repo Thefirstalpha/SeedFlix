@@ -1,4 +1,4 @@
-import { API_BASE_URL, getTmdbImageUrl } from "../config/tmdb";
+import { API_BASE_URL, getTmdbImageUrl, getTmdbLanguageParam } from "../config/tmdb";
 import type {
   Series,
   SeriesDetails,
@@ -197,10 +197,13 @@ function getMockSeries(): Series[] {
 
 export async function getPopularSeriesPage(
   page = 1,
-  filters: SeriesDiscoverFilters = {}
+  filters: SeriesDiscoverFilters = {},
+  uiLanguage = "fr"
 ): Promise<SeriesPageResult> {
+  const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+
   const params = new URLSearchParams({
-    language: "fr-FR",
+    language: tmdbLanguage,
     page: String(page),
   });
 
@@ -247,10 +250,12 @@ export async function getPopularSeriesPage(
   }
 }
 
-export async function getSeriesGenres(): Promise<SeriesGenreItem[]> {
+export async function getSeriesGenres(uiLanguage = "fr"): Promise<SeriesGenreItem[]> {
+  const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+
   try {
     const response = await fetch(
-      `${API_BASE_URL}/series/genres?language=fr-FR`
+      `${API_BASE_URL}/series/genres?language=${encodeURIComponent(tmdbLanguage)}`
     );
     if (!response.ok) {
       throw new Error("Failed to fetch series genres");
@@ -269,10 +274,13 @@ export async function getSeriesGenres(): Promise<SeriesGenreItem[]> {
 
 export async function discoverSeriesPage(
   page = 1,
-  filters: SeriesDiscoverFilters = {}
+  filters: SeriesDiscoverFilters = {},
+  uiLanguage = "fr"
 ): Promise<SeriesPageResult> {
+  const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+
   const params = new URLSearchParams({
-    language: "fr-FR",
+    language: tmdbLanguage,
     page: String(page),
   });
 
@@ -307,18 +315,20 @@ export async function discoverSeriesPage(
     };
   } catch (error) {
     console.error("Error discovering series:", error);
-    return getPopularSeriesPage(page);
+    return getPopularSeriesPage(page, {}, uiLanguage);
   }
 }
 
-export async function searchSeriesPage(query: string, page = 1): Promise<SeriesPageResult> {
+export async function searchSeriesPage(query: string, page = 1, uiLanguage = "fr"): Promise<SeriesPageResult> {
+  const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+
   if (!query.trim()) {
-    return getPopularSeriesPage(page);
+    return getPopularSeriesPage(page, {}, uiLanguage);
   }
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/series/search?language=fr-FR&query=${encodeURIComponent(
+      `${API_BASE_URL}/series/search?language=${encodeURIComponent(tmdbLanguage)}&query=${encodeURIComponent(
         query
       )}&page=${page}`
     );
@@ -345,10 +355,12 @@ export async function searchSeriesPage(query: string, page = 1): Promise<SeriesP
   }
 }
 
-export async function getSeriesById(id: number): Promise<SeriesDetails | null> {
+export async function getSeriesById(id: number, uiLanguage = "fr"): Promise<SeriesDetails | null> {
+  const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+
   try {
     const response = await fetch(
-      `${API_BASE_URL}/series/${id}?language=fr-FR`
+      `${API_BASE_URL}/series/${id}?language=${encodeURIComponent(tmdbLanguage)}`
     );
 
     if (!response.ok) {
@@ -365,11 +377,14 @@ export async function getSeriesById(id: number): Promise<SeriesDetails | null> {
 
 export async function getSeriesSeasonEpisodes(
   seriesId: number,
-  seasonNumber: number
+  seasonNumber: number,
+  uiLanguage = "fr"
 ): Promise<SeriesEpisode[]> {
+  const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+
   try {
     const response = await fetch(
-      `${API_BASE_URL}/series/${seriesId}/seasons/${seasonNumber}?language=fr-FR`
+      `${API_BASE_URL}/series/${seriesId}/seasons/${seasonNumber}?language=${encodeURIComponent(tmdbLanguage)}`
     );
 
     if (!response.ok) {

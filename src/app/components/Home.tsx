@@ -116,8 +116,10 @@ function toTmdbOriginalLanguageCode(language: string): string | undefined {
 
 
 export function Home() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [activeSearchQuery, setActiveSearchQuery] = useState("");
   const [contentFilter, setContentFilter] = useState<ContentFilter>("all");
   const [genreFilter, setGenreFilter] = useState("all");
   const [languageFilter, setLanguageFilter] = useState("all");
@@ -147,8 +149,13 @@ export function Home() {
 
   const movieCarouselRef = useRef<HTMLDivElement | null>(null);
   const seriesCarouselRef = useRef<HTMLDivElement | null>(null);
+  const skipNextPopularReloadRef = useRef(false);
 
-  const hasSearch = query.trim().length > 0;
+  const trimmedQuery = query.trim();
+  const hasTypedSearch = trimmedQuery.length > 0;
+  const stableSearchQuery = debouncedQuery.trim();
+  const hasActiveSearch = activeSearchQuery.length > 0;
+  const isSearchPending = hasTypedSearch && stableSearchQuery !== trimmedQuery;
   const showMovies = contentFilter !== "series";
   const showSeries = contentFilter !== "movie";
 
@@ -171,8 +178,8 @@ export function Home() {
       setIsLoadingGenres(true);
       try {
         const [moviesGenresResponse, seriesGenresResponse] = await Promise.all([
-          getMovieGenres(),
-          getSeriesGenres(),
+          getMovieGenres(language),
+          getSeriesGenres(language),
         ]);
         setMovieGenres(moviesGenresResponse);
         setSeriesGenres(seriesGenresResponse);
@@ -184,7 +191,7 @@ export function Home() {
     };
 
     loadGenres();
-  }, []);
+  }, [language]);
 
   const fetchMovieRecommendations = async (page = 1) => {
     return getPopularMoviesPage(page, {
@@ -193,7 +200,7 @@ export function Home() {
       yearTo: yearEnd,
       minRating: ratingThreshold,
       originalLanguage: selectedOriginalLanguageCode,
-    });
+    }, language);
   };
 
   const fetchSeriesRecommendations = async (page = 1) => {
@@ -203,7 +210,7 @@ export function Home() {
       yearTo: yearEnd,
       minRating: ratingThreshold,
       originalLanguage: selectedOriginalLanguageCode,
-    });
+    }, language);
   };
 
   const loadMovieRecommendations = async (page = 1, append = false) => {
@@ -265,10 +272,14 @@ export function Home() {
   };
 
   useEffect(() => {
-    if (hasSearch) return;
+    if (hasTypedSearch || hasActiveSearch) return;
+    if (skipNextPopularReloadRef.current) {
+      skipNextPopularReloadRef.current = false;
+      return;
+    }
 
     const loadInitialRecommendations = async () => {
-      // Reset visible data first so filter changes clearly reload both lists
+      // Reset visible data first so filter/language changes clearly reload both lists.
       setRecommendedMovies([]);
       setRecommendedSeries([]);
       setMoviePage(1);
@@ -295,49 +306,87 @@ export function Home() {
 
     loadInitialRecommendations();
   }, [
-    hasSearch,
+    hasTypedSearch,
     contentFilter,
     genreFilter,
     languageFilter,
     yearFrom,
     yearTo,
     minRating,
+    language,
+    hasActiveSearch,
     selectedMovieGenreId,
     selectedSeriesGenreId,
     selectedOriginalLanguageCode,
   ]);
 
   useEffect(() => {
-    const trimmed = query.trim();
-    if (!trimmed) {
+    if (!trimmedQuery) {
+      if (hasActiveSearch) {
+        skipNextPopularReloadRef.current = true;
+      }
+      setDebouncedQuery("");
+      setActiveSearchQuery("");
       setSearchMovies([]);
       setSearchSeries([]);
+      setIsSearching(false);
       return;
     }
 
-    const timeoutId = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const [movieResponse, seriesResponse] = await Promise.all([
-          searchMoviesPage(trimmed, 1),
-          searchSeriesPage(trimmed, 1),
-        ]);
-        setSearchMovies(movieResponse.movies);
-        setSearchSeries(seriesResponse.series);
-      } catch (error) {
-        console.error("Error searching mixed content:", error);
-        setSearchMovies([]);
-        setSearchSeries([]);
-      } finally {
-        setIsSearching(false);
-      }
+    const timeoutId = setTimeout(() => {
+      setDebouncedQuery(trimmedQuery);
     }, 350);
 
     return () => clearTimeout(timeoutId);
-  }, [query]);
+  }, [trimmedQuery, hasActiveSearch]);
+
+  useEffect(() => {
+    if (!stableSearchQuery) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const runSearch = async () => {
+      setIsSearching(true);
+      try {
+        const [movieResponse, seriesResponse] = await Promise.all([
+          searchMoviesPage(stableSearchQuery, 1, language),
+          searchSeriesPage(stableSearchQuery, 1, language),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        setSearchMovies(movieResponse.movies);
+        setSearchSeries(seriesResponse.series);
+        setActiveSearchQuery(stableSearchQuery);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        console.error("Error searching mixed content:", error);
+        setSearchMovies([]);
+        setSearchSeries([]);
+        setActiveSearchQuery(stableSearchQuery);
+      } finally {
+        if (!cancelled) {
+          setIsSearching(false);
+        }
+      }
+    };
+
+    void runSearch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stableSearchQuery, language]);
 
   const maybeLoadMoreMovies = async (container: HTMLDivElement | null) => {
-    if (!container || hasSearch || isLoadingMoreMovies || moviePage >= movieTotalPages) {
+    if (!container || hasTypedSearch || isLoadingMoreMovies || moviePage >= movieTotalPages) {
       return;
     }
 
@@ -348,7 +397,7 @@ export function Home() {
   };
 
   const maybeLoadMoreSeries = async (container: HTMLDivElement | null) => {
-    if (!container || hasSearch || isLoadingMoreSeries || seriesPage >= seriesTotalPages) {
+    if (!container || hasTypedSearch || isLoadingMoreSeries || seriesPage >= seriesTotalPages) {
       return;
     }
 
@@ -422,8 +471,12 @@ export function Home() {
     };
   }, []);
 
-  const baseMovies = hasSearch ? searchMovies : recommendedMovies;
-  const baseSeries = hasSearch ? searchSeries : recommendedSeries;
+  const isSearchBusy = isSearchPending || isSearching;
+  const shouldShowSearchResults = hasActiveSearch;
+  const shouldShowPopularSections = !hasActiveSearch;
+
+  const baseMovies = shouldShowSearchResults ? searchMovies : recommendedMovies;
+  const baseSeries = shouldShowSearchResults ? searchSeries : recommendedSeries;
 
   const availableGenres = useMemo(() => {
     const namesFromMovies = showMovies ? movieGenres.map((genre) => genre.name) : [];
@@ -457,7 +510,7 @@ export function Home() {
       const matchesLanguage =
         languageFilter === "all" || normalizeLanguageCode(movie.language) === languageFilter;
 
-      if (!hasSearch) {
+      if (!shouldShowSearchResults) {
         return matchesLanguage;
       }
 
@@ -466,14 +519,14 @@ export function Home() {
       const matchesRating = movie.rating >= ratingThreshold;
       return matchesGenre && matchesYear && matchesRating && matchesLanguage;
     });
-  }, [baseMovies, genreFilter, hasSearch, languageFilter, localYearStart, localYearEnd, ratingThreshold]);
+  }, [baseMovies, genreFilter, shouldShowSearchResults, languageFilter, localYearStart, localYearEnd, ratingThreshold]);
 
   const filteredSeries = useMemo(() => {
     return baseSeries.filter((show) => {
       const matchesLanguage =
         languageFilter === "all" || normalizeLanguageCode(show.language) === languageFilter;
 
-      if (!hasSearch) {
+      if (!shouldShowSearchResults) {
         return matchesLanguage;
       }
 
@@ -482,9 +535,9 @@ export function Home() {
       const matchesRating = show.rating >= ratingThreshold;
       return matchesGenre && matchesYear && matchesRating && matchesLanguage;
     });
-  }, [baseSeries, genreFilter, hasSearch, languageFilter, localYearStart, localYearEnd, ratingThreshold]);
+  }, [baseSeries, genreFilter, shouldShowSearchResults, languageFilter, localYearStart, localYearEnd, ratingThreshold]);
 
-  const emptyMessage = hasSearch
+  const emptyMessage = shouldShowSearchResults
     ? t("home.emptySearch")
     : t("home.emptyFilters");
 
@@ -496,7 +549,7 @@ export function Home() {
     <div className="space-y-8">
 
       <div className="max-w-5xl mx-auto space-y-4">
-        <div className="relative">
+        <div className="relative overflow-hidden rounded-xl">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
           <Input
             type="text"
@@ -504,6 +557,10 @@ export function Home() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             className="pl-10 h-12 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+          />
+          <div
+            className={`search-wave-overlay pointer-events-none absolute inset-0 rounded-xl transition-opacity duration-500 ${isSearchBusy ? "opacity-100" : "opacity-0"}`}
+            aria-hidden="true"
           />
         </div>
 
@@ -614,7 +671,7 @@ export function Home() {
         </div>
       </div>
 
-      {(isLoadingInitial || isSearching) && (
+      {isLoadingInitial && !shouldShowSearchResults && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="aspect-[2/3] bg-white/5 rounded-lg animate-pulse" />
@@ -622,7 +679,7 @@ export function Home() {
         </div>
       )}
 
-      {!isLoadingInitial && !isSearching && !hasSearch && (
+      {!isLoadingInitial && shouldShowPopularSections && (
         <div className="space-y-8">
           {showMovies && (
             <section className="space-y-4">
@@ -776,7 +833,7 @@ export function Home() {
         </div>
       )}
 
-      {!isLoadingInitial && !isSearching && hasSearch && (
+      {shouldShowSearchResults && (
         <div className="space-y-8">
           {showMovies && (
             <section className="space-y-4">

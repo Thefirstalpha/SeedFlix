@@ -137,6 +137,7 @@ const en = {
     emptySearch: "No results found for this search with the active filters.",
     emptyFilters: "No content available with these filters.",
     searchPlaceholder: "Search for a movie or series...",
+    searching: "Searching...",
     filters: "Filters",
     show: "Show",
     hide: "Hide",

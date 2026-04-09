@@ -111,7 +111,7 @@ export function SeriesDetails() {
 
   useEffect(() => {
     loadSeriesDetails();
-  }, [id]);
+  }, [id, language]);
 
   useEffect(() => {
     if (!series || selectedSeason === null) {
@@ -119,7 +119,7 @@ export function SeriesDetails() {
     }
 
     loadSeasonEpisodes(series.id, selectedSeason);
-  }, [series?.id, selectedSeason]);
+  }, [series?.id, selectedSeason, language]);
 
   // Recherche additionnelle quand on filtre sur une saison pour attraper les épisodes individuels
   useEffect(() => {
@@ -224,7 +224,7 @@ export function SeriesDetails() {
   const loadSeriesDetails = async () => {
     setIsLoading(true);
     try {
-      const seriesData = await getSeriesById(Number(id));
+      const seriesData = await getSeriesById(Number(id), language);
       setSeries(seriesData);
 
       if (seriesData) {
@@ -269,7 +269,7 @@ export function SeriesDetails() {
   ) => {
     setIsLoadingEpisodes(true);
     try {
-      setEpisodes(await getSeriesSeasonEpisodes(seriesId, seasonNumber));
+      setEpisodes(await getSeriesSeasonEpisodes(seriesId, seasonNumber, language));
     } catch {
       setEpisodes([]);
     } finally {
