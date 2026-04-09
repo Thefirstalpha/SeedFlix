@@ -368,8 +368,8 @@ export function Root() {
               {isAuthenticated ? (
                 <div ref={userMenuRef} className="relative self-stretch flex items-stretch">
                   <Button
-                    variant="outline"
-                    className="border-white/10 bg-white/5 text-white hover:bg-white/10 h-full"
+                    variant="ghost"
+                    className="h-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white hover:bg-white/10 hover:text-white"
                     onClick={() => setIsUserMenuOpen((open) => !open)}
                     aria-expanded={isUserMenuOpen}
                     aria-haspopup="menu"

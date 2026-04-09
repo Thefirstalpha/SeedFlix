@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-and-security:
+    name: Build, Services, Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Frontend build
+        run: npm run build
+
+      - name: Backend syntax checks
+        run: |
+          node --check server/index.js
+          node --check server/config.js
+          node --check server/modules/auth.js
+          node --check server/modules/notifications.js
+          node --check server/modules/tmdb.js
+          node --check server/modules/torznab.js
+          node --check server/modules/transmission.js
+          node --check server/modules/wishlist.js
+
+      - name: Service smoke test (server startup + API reachability)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node server/index.js > /tmp/server.log 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          for i in {1..25}; do
+            if curl --silent --show-error --fail http://127.0.0.1:4000/api/auth/me >/tmp/auth.json; then
+              break
+            fi
+            sleep 1
+          done
+
+          grep -q '"authenticated"' /tmp/auth.json
+
+      - name: Dependency vulnerability audit (runtime)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build Docker image
+        run: docker build . --build-arg IMAGE_TAG=ci-${{ github.sha }} -t local/seedflix:ci
+
+      - name: Trivy filesystem vulnerability scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: "1"
+
+      - name: Trivy Docker image vulnerability scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: local/seedflix:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: "1"

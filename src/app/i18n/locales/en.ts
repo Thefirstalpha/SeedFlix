@@ -352,6 +352,9 @@ const en = {
       notifications: "Notifications",
       factory: "Reset",
     },
+    about: {
+      versionLabel: "Image version: {{version}}",
+    },
     language: {
       title: "Interface language",
       description: "Select the language used in the application.",

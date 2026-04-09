@@ -17,6 +17,9 @@ export interface AuthResponse {
 }
 
 export interface UserSettings {
+  appInfo?: {
+    imageTag?: string;
+  };
   profile: {
     username: string;
   };

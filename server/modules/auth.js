@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 import {
+  appImageTag,
   authCookieName,
   dataDir,
   defaultSettingsFilePath,
@@ -294,6 +295,30 @@ function sanitizeUser(user) {
   };
 }
 
+function sanitizeSettingsPayload(settings) {
+  const safeSettings = settings && typeof settings === "object" ? settings : {};
+  return {
+    profile: safeSettings.profile || { username: "admin" },
+    security: safeSettings.security || {},
+    apiKeys: safeSettings.apiKeys || {},
+    placeholders: {
+      notifications: safeSettings.placeholders?.notifications || {},
+      preferences: safeSettings.placeholders?.preferences || {},
+      torrent: safeSettings.placeholders?.torrent || {},
+      indexer: safeSettings.placeholders?.indexer || {},
+    },
+  };
+}
+
+function buildClientSettingsPayload(settings) {
+  return {
+    ...sanitizeSettingsPayload(settings),
+    appInfo: {
+      imageTag: appImageTag,
+    },
+  };
+}
+
 async function getAuthenticatedUser(req) {
   const cookies = parseCookies(req.headers.cookie || "");
   const sessionToken = cookies[authCookieName];
@@ -356,7 +381,7 @@ export function registerAuthRoutes(app) {
         authenticated: true,
         user: sanitizeUser(auth.user),
         ...buildSetupStatus(auth.user),
-        settings: auth.user.settings,
+        settings: buildClientSettingsPayload(auth.user.settings),
       });
     } catch (error) {
       debugLog("Auth me failed:", error);
@@ -487,7 +512,7 @@ export function registerAuthRoutes(app) {
         return;
       }
 
-      res.json(auth.user.settings || {});
+      res.json(buildClientSettingsPayload(auth.user.settings));
     } catch (error) {
       debugLog("Read settings failed:", error);
       res.status(500).json({ error: t("auth.failedLoadSettings") });
@@ -502,7 +527,7 @@ export function registerAuthRoutes(app) {
         return;
       }
 
-      const newSettings = req.body;
+      const newSettings = sanitizeSettingsPayload(req.body);
       const users = await readUsers();
       const nextUsers = users.map((user) => {
         if (user.id !== auth.user.id) {
@@ -515,7 +540,7 @@ export function registerAuthRoutes(app) {
         };
       });
       await writeUsers(nextUsers);
-      res.json(newSettings);
+      res.json(buildClientSettingsPayload(newSettings));
     } catch (error) {
       debugLog("Update settings failed:", error);
       res.status(500).json({ error: t("auth.failedUpdateSettings") });

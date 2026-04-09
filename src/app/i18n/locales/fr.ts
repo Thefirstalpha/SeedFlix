@@ -352,6 +352,9 @@ const fr = {
       notifications: "Notifications",
       factory: "Reinitialisation",
     },
+    about: {
+      versionLabel: "Version de l'image: {{version}}",
+    },
     language: {
       title: "Langue de l'interface",
       description: "Selectionnez la langue utilisee dans l'application.",

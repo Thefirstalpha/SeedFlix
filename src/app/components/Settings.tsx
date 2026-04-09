@@ -221,6 +221,11 @@ export function Settings() {
     },
   });
 
+  const applyUpdatedSettings = (nextSettings: UserSettings) => {
+    setLocalSettings(nextSettings);
+    setSettings(nextSettings);
+  };
+
   const buildTmdbSettings = (): UserSettings => ({
     profile: settings?.profile || { username: user?.username || "admin" },
     security: settings?.security || {
@@ -309,9 +314,8 @@ export function Settings() {
 
     try {
       const updatedSettings = buildTmdbSettings();
-      await updateSettings(updatedSettings);
-      setLocalSettings(updatedSettings);
-      setSettings(updatedSettings);
+      const savedSettings = await updateSettings(updatedSettings);
+      applyUpdatedSettings(savedSettings);
       await refresh();
       setTmdbMessage(t("settings.messages.tmdbSaved"));
     } catch (submitError) {
@@ -341,9 +345,8 @@ export function Settings() {
     });
 
     try {
-      await updateSettings(updatedSettings);
-      setLocalSettings(updatedSettings);
-      setSettings(updatedSettings);
+      const savedSettings = await updateSettings(updatedSettings);
+      applyUpdatedSettings(savedSettings);
     } catch (submitError) {
       setTorrentError(
         submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
@@ -388,9 +391,8 @@ export function Settings() {
     });
 
     try {
-      await updateSettings(updatedSettings);
-      setLocalSettings(updatedSettings);
-      setSettings(updatedSettings);
+      const savedSettings = await updateSettings(updatedSettings);
+      applyUpdatedSettings(savedSettings);
     } catch (submitError) {
       setIndexerError(
         submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
@@ -460,9 +462,8 @@ export function Settings() {
       });
       const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
 
-      await updateSettings(updatedSettings);
-      setLocalSettings(updatedSettings);
-      setSettings(updatedSettings);
+      const savedSettings = await updateSettings(updatedSettings);
+      applyUpdatedSettings(savedSettings);
       await refresh();
       setDiscordTested(true);
       setDiscordMessage(t("settings.messages.discordConfigured"));
@@ -521,9 +522,8 @@ export function Settings() {
       });
       const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
 
-      await updateSettings(updatedSettings);
-      setLocalSettings(updatedSettings);
-      setSettings(updatedSettings);
+      const savedSettings = await updateSettings(updatedSettings);
+      applyUpdatedSettings(savedSettings);
       await refresh();
       setBrowserDevices(nextDevices);
       setBrowserMessage(t("settings.messages.browserSaved"));
@@ -551,9 +551,8 @@ export function Settings() {
       });
       const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
 
-      await updateSettings(updatedSettings);
-      setLocalSettings(updatedSettings);
-      setSettings(updatedSettings);
+      const savedSettings = await updateSettings(updatedSettings);
+      applyUpdatedSettings(savedSettings);
       await refresh();
       setBrowserDevices(nextDevices);
       setBrowserMessage(t("settings.messages.browserRemoved"));
@@ -623,9 +622,8 @@ export function Settings() {
         },
       });
 
-      await updateSettings(updatedSettings);
-      setLocalSettings(updatedSettings);
-      setSettings(updatedSettings);
+      const savedSettings = await updateSettings(updatedSettings);
+      applyUpdatedSettings(savedSettings);
       await refresh();
       setLanguage(languageCode);
       setLanguageMessage(t("settings.language.success"));
@@ -644,6 +642,9 @@ export function Settings() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-white">{t("settings.title")}</h2>
+        <p className="mt-2 text-sm text-white/60">
+          {t("settings.about.versionLabel", { version: settings?.appInfo?.imageTag || "dev" })}
+        </p>
       </div>
       <Tabs
         value={activeTab}
