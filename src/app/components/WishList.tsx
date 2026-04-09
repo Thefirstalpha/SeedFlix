@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router";
-import { Heart, Trash2, Tv, X } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { Download, Heart, Trash2, Tv, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { MovieCard } from "./MovieCard";
 import { Checkbox } from "./ui/checkbox";
@@ -12,12 +12,19 @@ import {
   getSeriesWishlist,
   removeMultipleFromSeriesWishlist,
 } from "../services/seriesWishlistService";
+import { addTorrentToClient } from "../services/torrentService";
+import {
+  getTrackerResults,
+  rejectTrackerResult,
+  type TrackerResultTarget,
+} from "../services/trackerResultService";
 import { useI18n } from "../i18n/LanguageProvider";
 import type { Movie } from "../types/movie";
 import type { SeriesWishlistEntry } from "../types/seriesWishlist";
 
 export function WishList() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("movies");
 
@@ -28,11 +35,45 @@ export function WishList() {
   const [seriesEntries, setSeriesEntries] = useState<SeriesWishlistEntry[]>([]);
   const [selectedEntryIds, setSelectedEntryIds] = useState<string[]>([]);
   const [isSeriesSelectionMode, setIsSeriesSelectionMode] = useState(false);
+  const [trackerTargets, setTrackerTargets] = useState<TrackerResultTarget[]>([]);
+  const [trackerError, setTrackerError] = useState<string | null>(null);
+  const [actionKey, setActionKey] = useState<string | null>(null);
 
   useEffect(() => {
     loadWishlist();
     loadSeriesWishlist();
+    loadTrackerResults();
   }, []);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get("tab");
+    if (requestedTab === "movies" || requestedTab === "series") {
+      setActiveTab(requestedTab);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const targetKey = searchParams.get("target");
+    if (!targetKey) {
+      return;
+    }
+
+    const elementId = `wishlist-target-${encodeURIComponent(targetKey)}`;
+    const timeoutId = window.setTimeout(() => {
+      const element = document.getElementById(elementId);
+      if (!element) {
+        return;
+      }
+
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      element.classList.add("ring-2", "ring-cyan-400", "ring-offset-2", "ring-offset-slate-950");
+      window.setTimeout(() => {
+        element.classList.remove("ring-2", "ring-cyan-400", "ring-offset-2", "ring-offset-slate-950");
+      }, 2200);
+    }, 150);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchParams, activeTab, trackerTargets]);
 
   const loadWishlist = async () => {
     const wishlist = await getWishlist();
@@ -44,6 +85,16 @@ export function WishList() {
     const entries = await getSeriesWishlist();
     setSeriesEntries(entries);
     setSelectedEntryIds([]);
+  };
+
+  const loadTrackerResults = async () => {
+    try {
+      const results = await getTrackerResults();
+      setTrackerTargets(results);
+      setTrackerError(null);
+    } catch (error) {
+      setTrackerError(error instanceof Error ? error.message : "Failed to load tracker results");
+    }
   };
 
   const toggleSelection = (movieId: number) => {
@@ -65,7 +116,7 @@ export function WishList() {
   const handleRemoveSelected = async () => {
     if (selectedIds.length > 0) {
       await removeMultipleFromWishlist(selectedIds);
-      await loadWishlist();
+      await Promise.all([loadWishlist(), loadTrackerResults()]);
       setIsSelectionMode(false);
     }
   };
@@ -96,8 +147,53 @@ export function WishList() {
   const handleRemoveSelectedSeries = async () => {
     if (selectedEntryIds.length > 0) {
       await removeMultipleFromSeriesWishlist(selectedEntryIds);
-      await loadSeriesWishlist();
+      await Promise.all([loadSeriesWishlist(), loadTrackerResults()]);
       setIsSeriesSelectionMode(false);
+    }
+  };
+
+  const handleRejectTrackerResult = async (targetKey: string, trackerStateKey: string) => {
+    const key = `${targetKey}:${trackerStateKey}:reject`;
+    setActionKey(key);
+    try {
+      await rejectTrackerResult(targetKey, trackerStateKey);
+      await loadTrackerResults();
+    } finally {
+      setActionKey(null);
+    }
+  };
+
+  const handleRejectAllTrackerResults = async (target: TrackerResultTarget) => {
+    if (!target.items.length) {
+      return;
+    }
+
+    const key = `${target.targetKey}:reject-all`;
+    setActionKey(key);
+    try {
+      await Promise.all(
+        target.items.map((item) => rejectTrackerResult(target.targetKey, item.trackerStateKey))
+      );
+      await loadTrackerResults();
+    } finally {
+      setActionKey(null);
+    }
+  };
+
+  const handleAddTorrentFromWishlist = async (
+    target: TrackerResultTarget,
+    torrentUrl: string,
+    trackerStateKey: string
+  ) => {
+    const key = `${target.targetKey}:${trackerStateKey}:add`;
+    setActionKey(key);
+    try {
+      const mediaType = target.targetType === "movie" ? "movie" : "series";
+      await addTorrentToClient(torrentUrl, mediaType);
+      await validateTrackerResult(target.targetKey, trackerStateKey);
+      await loadTrackerResults();
+    } finally {
+      setActionKey(null);
     }
   };
 
@@ -203,6 +299,122 @@ export function WishList() {
     });
   };
 
+  const trackerTargetsByKey = new Map(
+    trackerTargets.map((target) => [target.targetKey, target])
+  );
+
+  const renderTrackerTarget = (target: TrackerResultTarget, stopPropagation = false) => {
+    if (!target.items.length) {
+      return null;
+    }
+
+    return (
+      <div
+        key={target.targetKey}
+        id={`wishlist-target-${encodeURIComponent(target.targetKey)}`}
+        className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-3"
+        onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
+      >
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-white font-medium">{target.label || target.title}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline" className="border-white/20 text-white/70">
+              {target.items.length}
+            </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(event) => {
+                if (stopPropagation) {
+                  event.stopPropagation();
+                }
+                handleRejectAllTrackerResults(target);
+              }}
+              disabled={actionKey === `${target.targetKey}:reject-all`}
+              className="border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 hover:text-red-100"
+            >
+              {actionKey === `${target.targetKey}:reject-all` 
+                ? t("wishlistPage.trackerResults.actions.rejectingAll")
+                : t("wishlistPage.trackerResults.actions.rejectAll")}
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {target.items.map((item) => {
+            const torrentUrl = item.downloadUrl || item.link;
+            const addKey = `${target.targetKey}:${item.trackerStateKey}:add`;
+            const rejectKey = `${target.targetKey}:${item.trackerStateKey}:reject`;
+
+            return (
+              <div
+                key={item.trackerStateKey}
+                className="rounded border border-white/10 bg-slate-900/60 p-3 space-y-2"
+              >
+                <p className="text-sm text-white font-medium break-all">{item.title}</p>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    onClick={(event) => {
+                      if (stopPropagation) {
+                        event.stopPropagation();
+                      }
+                      handleAddTorrentFromWishlist(target, torrentUrl, item.trackerStateKey);
+                    }}
+                    disabled={actionKey === addKey}
+                    className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    {actionKey === addKey
+                      ? t("wishlistPage.trackerResults.actions.adding")
+                      : t("wishlistPage.trackerResults.actions.add")}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(event) => {
+                      if (stopPropagation) {
+                        event.stopPropagation();
+                      }
+                      handleRejectTrackerResult(target.targetKey, item.trackerStateKey);
+                    }}
+                    disabled={actionKey === rejectKey}
+                    className="border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 hover:text-red-100"
+                  >
+                    {t("wishlistPage.trackerResults.actions.reject")}
+                  </Button>
+
+                  {item.quality ? (
+                    <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
+                      {item.quality}
+                    </Badge>
+                  ) : null}
+
+                  {item.language ? (
+                    <Badge
+                      variant="outline"
+                      className="border-emerald-500/40 text-emerald-300"
+                    >
+                      {item.language}
+                    </Badge>
+                  ) : null}
+
+                  {item.sizeHuman ? (
+                    <Badge variant="outline" className="border-white/30 text-white/80">
+                      {item.sizeHuman}
+                    </Badge>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -283,8 +495,10 @@ export function WishList() {
 
           {movies.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {movies.map((movie) => (
-                <div key={movie.id} className="relative">
+              {movies.map((movie) => {
+                const movieTrackerTarget = trackerTargetsByKey.get(`movie:${movie.id}`);
+                return (
+                <div key={movie.id} className="relative space-y-3">
                   {isSelectionMode && (
                     <div className="absolute top-2 left-2 z-10">
                       <Card className="bg-white/90 border-none shadow-lg">
@@ -299,8 +513,10 @@ export function WishList() {
                     </div>
                   )}
                   <MovieCard movie={movie} />
+                  {movieTrackerTarget ? renderTrackerTarget(movieTrackerTarget) : null}
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
@@ -318,6 +534,7 @@ export function WishList() {
               </Link>
             </div>
           )}
+          {trackerError ? <p className="text-sm text-red-300">{trackerError}</p> : null}
         </TabsContent>
 
         <TabsContent value="series" className="space-y-6">
@@ -370,7 +587,22 @@ export function WishList() {
 
           {groupedSeries.length > 0 ? (
             <div className="space-y-4">
-              {groupedSeries.map((group) => (
+              {groupedSeries.map((group) => {
+                const seriesTrackerKeys = Array.from(
+                  new Set([
+                    `series:${group.seriesId}`,
+                    ...group.seasons.map((season) => `season:${group.seriesId}:${season.seasonNumber}`),
+                    ...group.episodes.map(
+                      (episode) =>
+                        `episode:${group.seriesId}:${episode.seasonNumber}:${episode.episodeNumber}`
+                    ),
+                  ])
+                );
+                const groupTrackerTargets = seriesTrackerKeys
+                  .map((key) => trackerTargetsByKey.get(key))
+                  .filter((target): target is TrackerResultTarget => Boolean(target));
+
+                return (
                 <Card
                   key={group.seriesId}
                   onClick={() => {
@@ -496,10 +728,17 @@ export function WishList() {
                           </div>
                         </div>
                       )}
+
+                      {groupTrackerTargets.length > 0 ? (
+                        <div className="space-y-3" onClick={(event) => event.stopPropagation()}>
+                          {groupTrackerTargets.map((target) => renderTrackerTarget(target, true))}
+                        </div>
+                      ) : null}
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12">
@@ -517,6 +756,7 @@ export function WishList() {
               </Link>
             </div>
           )}
+          {trackerError ? <p className="text-sm text-red-300">{trackerError}</p> : null}
         </TabsContent>
       </Tabs>
     </div>

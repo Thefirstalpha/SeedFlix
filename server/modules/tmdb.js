@@ -83,8 +83,8 @@ function readDiscoverFilters(query, type) {
     filters.with_genres = withGenres;
   }
 
-  if (Number.isFinite(voteAverageGte)) {
-    filters.vote_average_gte = voteAverageGte;
+  if (Number.isFinite(voteAverageGte) && voteAverageGte > 0) {
+    filters["vote_average.gte"] = voteAverageGte;
   }
 
   if (withOriginalLanguage) {
@@ -96,22 +96,22 @@ function readDiscoverFilters(query, type) {
     const primaryReleaseDateLte = String(query.primary_release_date_lte || "");
 
     if (primaryReleaseDateGte) {
-      filters.primary_release_date_gte = primaryReleaseDateGte;
+      filters["primary_release_date.gte"] = primaryReleaseDateGte;
     }
 
     if (primaryReleaseDateLte) {
-      filters.primary_release_date_lte = primaryReleaseDateLte;
+      filters["primary_release_date.lte"] = primaryReleaseDateLte;
     }
   } else {
     const firstAirDateGte = String(query.first_air_date_gte || "");
     const firstAirDateLte = String(query.first_air_date_lte || "");
 
     if (firstAirDateGte) {
-      filters.first_air_date_gte = firstAirDateGte;
+      filters["first_air_date.gte"] = firstAirDateGte;
     }
 
     if (firstAirDateLte) {
-      filters.first_air_date_lte = firstAirDateLte;
+      filters["first_air_date.lte"] = firstAirDateLte;
     }
   }
 
@@ -121,11 +121,11 @@ function readDiscoverFilters(query, type) {
 function hasActiveDiscoverFilters(filters, type) {
   return Boolean(
     filters.with_genres ||
-      filters.vote_average_gte ||
+      filters["vote_average.gte"] ||
       filters.with_original_language ||
       (type === "movie"
-        ? filters.primary_release_date_gte || filters.primary_release_date_lte
-        : filters.first_air_date_gte || filters.first_air_date_lte)
+        ? filters["primary_release_date.gte"] || filters["primary_release_date.lte"]
+        : filters["first_air_date.gte"] || filters["first_air_date.lte"])
   );
 }
 
@@ -235,13 +235,13 @@ export function registerTmdbRoutes(app) {
         query.with_original_language = withOriginalLanguage;
       }
       if (primaryReleaseDateGte) {
-        query.primary_release_date_gte = primaryReleaseDateGte;
+        query["primary_release_date.gte"] = primaryReleaseDateGte;
       }
       if (primaryReleaseDateLte) {
-        query.primary_release_date_lte = primaryReleaseDateLte;
+        query["primary_release_date.lte"] = primaryReleaseDateLte;
       }
-      if (Number.isFinite(voteAverageGte)) {
-        query.vote_average_gte = voteAverageGte;
+      if (Number.isFinite(voteAverageGte) && voteAverageGte > 0) {
+        query["vote_average.gte"] = voteAverageGte;
       }
 
       const url = buildTmdbUrl("/discover/movie", apiKey, query);
@@ -381,13 +381,13 @@ export function registerTmdbRoutes(app) {
         query.with_original_language = withOriginalLanguage;
       }
       if (firstAirDateGte) {
-        query.first_air_date_gte = firstAirDateGte;
+        query["first_air_date.gte"] = firstAirDateGte;
       }
       if (firstAirDateLte) {
-        query.first_air_date_lte = firstAirDateLte;
+        query["first_air_date.lte"] = firstAirDateLte;
       }
-      if (Number.isFinite(voteAverageGte)) {
-        query.vote_average_gte = voteAverageGte;
+      if (Number.isFinite(voteAverageGte) && voteAverageGte > 0) {
+        query["vote_average.gte"] = voteAverageGte;
       }
 
       const url = buildTmdbUrl("/discover/tv", apiKey, query);

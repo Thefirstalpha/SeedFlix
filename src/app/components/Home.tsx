@@ -596,7 +596,8 @@ export function Home() {
         languageFilter === "all" || normalizeLanguageCode(movie.language) === languageFilter;
 
       if (!shouldShowSearchResults) {
-        return matchesLanguage;
+        const matchesRating = ratingThreshold === 0 || movie.rating >= ratingThreshold;
+        return matchesLanguage && matchesRating;
       }
 
       const matchesGenre = genreFilter === "all" || movie.genre === genreFilter;
@@ -612,7 +613,8 @@ export function Home() {
         languageFilter === "all" || normalizeLanguageCode(show.language) === languageFilter;
 
       if (!shouldShowSearchResults) {
-        return matchesLanguage;
+        const matchesRating = ratingThreshold === 0 || show.rating >= ratingThreshold;
+        return matchesLanguage && matchesRating;
       }
 
       const matchesGenre = genreFilter === "all" || show.genre === genreFilter;

@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 import { Badge } from "./ui/badge";
-import { X, Trash2, Check, CheckCircle, Clock } from "lucide-react";
+import { X, Trash2, Check, CheckCircle, Clock, Search } from "lucide-react";
 import type { Notification } from "../services/notificationService";
 import * as notificationService from "../services/notificationService";
 import { useI18n } from "../i18n/LanguageProvider";
@@ -32,49 +32,40 @@ export default function Notifications() {
       return;
     }
 
-    loadNotifications();
-    const interval = setInterval(loadNotifications, 5000);
+    let cancelled = false;
 
-    return () => clearInterval(interval);
+    const initializeNotifications = async () => {
+      try {
+        const data = await notificationService.getNotifications(100);
+        if (cancelled) {
+          return;
+        }
+
+        // Keep the current visual state while viewing the page.
+        setNotifications(data.notifications);
+        setUnreadCount(data.unreadCount);
+        emitUnreadNotificationsUpdated(data.unreadCount);
+
+        if (data.unreadCount > 0) {
+          await notificationService.markAllAsRead();
+          // Update global unread badge immediately, without mutating local cards state.
+          emitUnreadNotificationsUpdated(0);
+        }
+      } catch (error) {
+        console.error("Error loading notifications:", error);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void initializeNotifications();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user, navigate]);
-
-  const loadNotifications = async () => {
-    try {
-      const data = await notificationService.getNotifications(100);
-      setNotifications(data.notifications);
-      setUnreadCount(data.unreadCount);
-      emitUnreadNotificationsUpdated(data.unreadCount);
-    } catch (error) {
-      console.error("Error loading notifications:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMarkAsRead = async (id: string) => {
-    try {
-      await notificationService.markAsRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      );
-      const nextUnreadCount = Math.max(0, unreadCount - 1);
-      setUnreadCount(nextUnreadCount);
-      emitUnreadNotificationsUpdated(nextUnreadCount);
-    } catch (error) {
-      console.error("Error marking as read:", error);
-    }
-  };
-
-  const handleMarkAllAsRead = async () => {
-    try {
-      await notificationService.markAllAsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      setUnreadCount(0);
-      emitUnreadNotificationsUpdated(0);
-    } catch (error) {
-      console.error("Error marking all as read:", error);
-    }
-  };
 
   const handleDelete = async (id: string) => {
     try {
@@ -89,6 +80,25 @@ export default function Notifications() {
     } catch (error) {
       console.error("Error deleting notification:", error);
     }
+  };
+
+  const isTrackerSuggestion = (notification: Notification) =>
+    String(notification.data?.source || "") === "tracker-rss";
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (!isTrackerSuggestion(notification)) {
+      return;
+    }
+
+    const targetKey = String(notification.data?.targetKey || "").trim();
+    if (!targetKey) {
+      navigate("/wishlist");
+      return;
+    }
+
+    const tab = targetKey.startsWith("movie:") ? "movies" : "series";
+    const params = new URLSearchParams({ tab, target: targetKey });
+    navigate(`/wishlist?${params.toString()}`);
   };
 
   const handleClearAll = async () => {
@@ -110,6 +120,8 @@ export default function Notifications() {
         return "bg-red-500/10 border-red-400/30";
       case "warning":
         return "bg-amber-500/10 border-amber-400/30";
+      case "search":
+        return "bg-cyan-500/10 border-cyan-400/30";
       default:
         return "bg-blue-500/10 border-blue-400/30";
     }
@@ -123,6 +135,8 @@ export default function Notifications() {
         return "bg-red-500/20 text-red-200 border border-red-400/40";
       case "warning":
         return "bg-amber-500/20 text-amber-200 border border-amber-400/40";
+      case "search":
+        return "bg-cyan-500/20 text-cyan-100 border border-cyan-400/40";
       default:
         return "bg-blue-500/20 text-blue-200 border border-blue-400/40";
     }
@@ -136,6 +150,8 @@ export default function Notifications() {
         return <X className="w-4 h-4" />;
       case "warning":
         return <Clock className="w-4 h-4" />;
+      case "search":
+        return <Search className="w-4 h-4" />;
       default:
         return <Check className="w-4 h-4" />;
     }
@@ -158,15 +174,6 @@ export default function Notifications() {
           )}
         </div>
         <div className="flex gap-2">
-          {unreadCount > 0 && (
-            <Button
-              onClick={handleMarkAllAsRead}
-              variant="outline"
-              className="text-sm border-white/20 bg-white/5 text-white hover:bg-white/10"
-            >
-              {t("notificationsPage.markAllRead")}
-            </Button>
-          )}
           {notifications.length > 0 && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -214,9 +221,12 @@ export default function Notifications() {
           {notifications.map((notif) => (
             <Card
               key={notif.id}
+              onClick={() => handleNotificationClick(notif)}
               className={`p-4 border-l-4 border-white/10 transition-all ${
                 getTypeColor(notif.type)
-              } ${!notif.isRead ? "ring-1 ring-white/20 shadow-sm" : "border-l-white/20"}`}
+              } ${!notif.isRead ? "ring-1 ring-white/20 shadow-sm" : "border-l-white/20"} ${
+                isTrackerSuggestion(notif) ? "cursor-pointer hover:bg-white/5" : ""
+              }`}
             >
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1">
@@ -233,6 +243,8 @@ export default function Notifications() {
                             ? t("notificationsPage.types.error")
                             : notif.type === "warning"
                               ? t("notificationsPage.types.warning")
+                              : notif.type === "search"
+                                ? t("notificationsPage.types.search")
                               : t("notificationsPage.types.info")}
                       </span>
                     </Badge>
@@ -249,19 +261,11 @@ export default function Notifications() {
                 </div>
 
                 <div className="flex gap-2 shrink-0">
-                  {!notif.isRead && (
-                    <Button
-                      onClick={() => handleMarkAsRead(notif.id)}
-                      size="sm"
-                      variant="outline"
-                      className="gap-2 border-white/20 bg-white/5 text-white hover:bg-white/10"
-                      title={t("notificationsPage.markAsRead")}
-                    >
-                      <Check className="w-4 h-4" />
-                    </Button>
-                  )}
                   <Button
-                    onClick={() => handleDelete(notif.id)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleDelete(notif.id);
+                    }}
                     size="sm"
                     variant="ghost"
                     className="text-red-300 hover:text-red-200 hover:bg-red-500/15"

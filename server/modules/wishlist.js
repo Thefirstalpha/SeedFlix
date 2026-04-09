@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import path from "node:path";
 
 import {
   dataDir,
@@ -6,6 +7,10 @@ import {
   wishlistFilePath,
 } from "../config.js";
 import { getTranslator } from "../i18n.js";
+
+const trackerSeenFilePath = path.join(dataDir, "tracker-rss-seen.json");
+const trackerRejectedFilePath = path.join(dataDir, "tracker-rss-rejected.json");
+const trackerResultsFilePath = path.join(dataDir, "tracker-rss-results.json");
 
 async function ensureJsonArrayStore(filePath) {
   await fs.mkdir(dataDir, { recursive: true });
@@ -31,6 +36,160 @@ async function readJsonArrayStore(filePath) {
 async function writeJsonArrayStore(filePath, items) {
   await ensureJsonArrayStore(filePath);
   await fs.writeFile(filePath, JSON.stringify(items, null, 2), "utf-8");
+}
+
+async function ensureJsonObjectStore(filePath) {
+  await fs.mkdir(dataDir, { recursive: true });
+  try {
+    await fs.access(filePath);
+  } catch {
+    await fs.writeFile(filePath, "{}", "utf-8");
+  }
+}
+
+async function readJsonObjectStore(filePath) {
+  await ensureJsonObjectStore(filePath);
+  const content = await fs.readFile(filePath, "utf-8");
+
+  try {
+    const parsed = JSON.parse(content);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeJsonObjectStore(filePath, value) {
+  await ensureJsonObjectStore(filePath);
+  await fs.writeFile(filePath, JSON.stringify(value, null, 2), "utf-8");
+}
+
+function extractTargetKeyFromTrackerStateKey(stateKey) {
+  const parts = String(stateKey || "").split(":");
+  if (parts.length < 4) {
+    return null;
+  }
+
+  const targetType = String(parts[1] || "").trim();
+  const segmentA = Number(parts[2]);
+  const segmentB = Number(parts[3]);
+  const segmentC = Number(parts[4]);
+
+  if ((targetType === "movie" || targetType === "series") && Number.isFinite(segmentA)) {
+    return `${targetType}:${segmentA}`;
+  }
+
+  if (targetType === "season" && Number.isFinite(segmentA) && Number.isFinite(segmentB)) {
+    return `${targetType}:${segmentA}:${segmentB}`;
+  }
+
+  if (
+    targetType === "episode" &&
+    Number.isFinite(segmentA) &&
+    Number.isFinite(segmentB) &&
+    Number.isFinite(segmentC)
+  ) {
+    return `${targetType}:${segmentA}:${segmentB}:${segmentC}`;
+  }
+
+  return null;
+}
+
+function buildSeriesTargetKey(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+
+  const type = String(entry.type || "").trim();
+  const seriesId = Number(entry.seriesId);
+  if (!Number.isFinite(seriesId)) {
+    return null;
+  }
+
+  if (type === "series") {
+    return `series:${seriesId}`;
+  }
+
+  if (type === "season") {
+    const seasonNumber = Number(entry.seasonNumber);
+    return Number.isFinite(seasonNumber) ? `season:${seriesId}:${seasonNumber}` : null;
+  }
+
+  if (type === "episode") {
+    const seasonNumber = Number(entry.seasonNumber);
+    const episodeNumber = Number(entry.episodeNumber);
+    return Number.isFinite(seasonNumber) && Number.isFinite(episodeNumber)
+      ? `episode:${seriesId}:${seasonNumber}:${episodeNumber}`
+      : null;
+  }
+
+  return null;
+}
+
+async function purgeTrackerStateStore(filePath, targetKeys) {
+  const keys = Array.from(new Set(Array.isArray(targetKeys) ? targetKeys : [])).filter(Boolean);
+  if (!keys.length) {
+    return 0;
+  }
+
+  const wanted = new Set(keys);
+  const stateEntries = await readJsonObjectStore(filePath);
+  let removedCount = 0;
+
+  for (const seenKey of Object.keys(stateEntries)) {
+    const targetKey = extractTargetKeyFromTrackerStateKey(seenKey);
+    if (targetKey && wanted.has(targetKey)) {
+      delete stateEntries[seenKey];
+      removedCount += 1;
+    }
+  }
+
+  if (removedCount > 0) {
+    await writeJsonObjectStore(filePath, stateEntries);
+  }
+
+  return removedCount;
+}
+
+async function purgeTrackerStateForTargetKeys(targetKeys) {
+  await Promise.all([
+    purgeTrackerStateStore(trackerSeenFilePath, targetKeys),
+    purgeTrackerStateStore(trackerRejectedFilePath, targetKeys),
+    purgeTrackerResultsStore(targetKeys),
+  ]);
+}
+
+async function purgeTrackerResultsStore(targetKeys) {
+  const keys = Array.from(new Set(Array.isArray(targetKeys) ? targetKeys : [])).filter(Boolean);
+  if (!keys.length) {
+    return 0;
+  }
+
+  const wanted = new Set(keys);
+  const allResults = await readJsonObjectStore(trackerResultsFilePath);
+  let removedCount = 0;
+
+  for (const username of Object.keys(allResults)) {
+    const userResults = allResults[username];
+    if (!userResults || typeof userResults !== "object" || Array.isArray(userResults)) {
+      continue;
+    }
+
+    for (const targetKey of Object.keys(userResults)) {
+      if (wanted.has(targetKey)) {
+        delete userResults[targetKey];
+        removedCount += 1;
+      }
+    }
+
+    allResults[username] = userResults;
+  }
+
+  if (removedCount > 0) {
+    await writeJsonObjectStore(trackerResultsFilePath, allResults);
+  }
+
+  return removedCount;
 }
 
 export async function readWishlist() {
@@ -184,6 +343,11 @@ export function registerWishlistRoutes(app) {
       const wishlist = await readWishlist();
       const updatedWishlist = wishlist.filter((movie) => movie.id !== movieId);
       await writeWishlist(updatedWishlist);
+
+      if (updatedWishlist.length !== wishlist.length) {
+        await purgeTrackerStateForTargetKeys([`movie:${movieId}`]);
+      }
+
       res.json({ ok: true });
     } catch (error) {
       console.error("Remove wishlist movie failed:", error);
@@ -202,6 +366,11 @@ export function registerWishlistRoutes(app) {
       const wishlist = await readWishlist();
       const updatedWishlist = wishlist.filter((movie) => !idsSet.has(movie.id));
       await writeWishlist(updatedWishlist);
+
+      const removedMovieTargetKeys = wishlist
+        .filter((movie) => idsSet.has(movie.id))
+        .map((movie) => `movie:${movie.id}`);
+      await purgeTrackerStateForTargetKeys(removedMovieTargetKeys);
 
       res.json({ ok: true });
     } catch (error) {
@@ -328,8 +497,18 @@ export function registerWishlistRoutes(app) {
     try {
       const entryId = req.params.entryId;
       const wishlist = await readSeriesWishlist();
+      const removedEntry = wishlist.find((entry) => entry.entryId === entryId);
       const updated = wishlist.filter((entry) => entry.entryId !== entryId);
       await writeSeriesWishlist(updated);
+
+      if (removedEntry) {
+        const removedTargetKey = buildSeriesTargetKey(removedEntry);
+        const updatedTargetKeys = new Set(updated.map((entry) => buildSeriesTargetKey(entry)).filter(Boolean));
+        if (removedTargetKey && !updatedTargetKeys.has(removedTargetKey)) {
+          await purgeTrackerStateForTargetKeys([removedTargetKey]);
+        }
+      }
+
       res.json({ ok: true });
     } catch (error) {
       console.error("Remove series wishlist entry failed:", error);
@@ -345,8 +524,22 @@ export function registerWishlistRoutes(app) {
         : [];
       const entryIdsSet = new Set(entryIds);
       const wishlist = await readSeriesWishlist();
+      const removedEntries = wishlist.filter((entry) => entryIdsSet.has(entry.entryId));
       const updated = wishlist.filter((entry) => !entryIdsSet.has(entry.entryId));
       await writeSeriesWishlist(updated);
+
+      const updatedTargetKeys = new Set(updated.map((entry) => buildSeriesTargetKey(entry)).filter(Boolean));
+      const removedTargetKeys = Array.from(
+        new Set(
+          removedEntries
+            .map((entry) => buildSeriesTargetKey(entry))
+            .filter(Boolean)
+            .filter((targetKey) => !updatedTargetKeys.has(targetKey))
+        )
+      );
+
+      await purgeTrackerStateForTargetKeys(removedTargetKeys);
+
       res.json({ ok: true });
     } catch (error) {
       console.error("Bulk remove series wishlist entries failed:", error);
