@@ -736,8 +736,6 @@ export function Home() {
 
       {!isLoadingInitial && !isSearching && hasSearch && (
         <div className="space-y-8">
-          <h3 className="text-2xl font-semibold text-white">Resultats en liste verticale pour "{query.trim()}"</h3>
-
           {showMovies && (
             <section className="space-y-4">
               <h4 className="text-xl font-semibold text-white">Films</h4>

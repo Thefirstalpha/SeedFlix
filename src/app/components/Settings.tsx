@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router";
+import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
@@ -25,6 +25,7 @@ import {
   updateSettings,
   type UserSettings,
 } from "../services/authService";
+import * as notificationService from "../services/notificationService";
 import { useAuth } from "../context/AuthContext";
 
 const QUALITY_OPTIONS = [
@@ -38,9 +39,17 @@ const QUALITY_OPTIONS = [
   { value: "hdtv", label: "HDTV" },
 ];
 
+const SETTINGS_TABS = ["security", "api", "notifications", "factory"] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+function isValidSettingsTab(value: string): value is SettingsTab {
+  return SETTINGS_TABS.includes(value as SettingsTab);
+}
+
 export function Settings() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAuthenticated, isLoading, user, setSettings, refresh } = useAuth();
   const [settings, setLocalSettings] = useState<UserSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -76,6 +85,23 @@ export function Settings() {
   const [discordMessage, setDiscordMessage] = useState<string | null>(null);
   const [discordError, setDiscordError] = useState<string | null>(null);
   const [isDiscordSaving, setIsDiscordSaving] = useState(false);
+  const [testNotifMessage, setTestNotifMessage] = useState<string | null>(null);
+  const [testNotifError, setTestNotifError] = useState<string | null>(null);
+  const [isSendingTestNotif, setIsSendingTestNotif] = useState(false);
+  const tabParam = searchParams.get("tab");
+  const activeTab: SettingsTab = isValidSettingsTab(String(tabParam || ""))
+    ? (tabParam as SettingsTab)
+    : "security";
+
+  useEffect(() => {
+    if (tabParam && isValidSettingsTab(tabParam)) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("tab", "security");
+    setSearchParams(nextParams, { replace: true });
+  }, [tabParam, searchParams, setSearchParams]);
 
   const applySettingsToForms = (incomingSettings: UserSettings) => {
     const torrentSettings = incomingSettings.placeholders?.torrent || {};
@@ -408,12 +434,42 @@ export function Settings() {
     }
   };
 
+  const handleSendTestNotification = async () => {
+    setTestNotifError(null);
+    setTestNotifMessage(null);
+    setIsSendingTestNotif(true);
+
+    try {
+      const response = await notificationService.sendTestNotification();
+      setTestNotifMessage(response.message || "Notification de test envoyée");
+      window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
+    } catch (submitError) {
+      setTestNotifError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Impossible d'envoyer la notification de test"
+      );
+    } finally {
+      setIsSendingTestNotif(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-white">Paramètres</h2>
       </div>
-      <Tabs defaultValue="security" className="space-y-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          if (isValidSettingsTab(value)) {
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.set("tab", value);
+            setSearchParams(nextParams, { replace: true });
+          }
+        }}
+        className="space-y-6"
+      >
         <TabsList className="bg-white/10 border border-white/10">
           <TabsTrigger value="security" className="text-white data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
             Sécurité
@@ -764,6 +820,36 @@ export function Settings() {
                         </Button>
                       </div>
                     </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 p-4 bg-slate-800/50 rounded-md border border-purple-500/20">
+                  <div>
+                    <h4 className="font-medium text-white">Notification de test</h4>
+                    <p className="text-sm text-purple-200/70">
+                      Génère une notification de test
+                    </p>
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={handleSendTestNotification}
+                    disabled={isSendingTestNotif}
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    {isSendingTestNotif ? "Envoi en cours..." : "Notification de test"}
+                  </Button>
+
+                  {testNotifMessage && (
+                    <p className="text-sm text-emerald-300 p-2 bg-emerald-900/20 rounded">
+                      ✓ {testNotifMessage}
+                    </p>
+                  )}
+
+                  {testNotifError && (
+                    <p className="text-sm text-red-300 p-2 bg-red-900/30 rounded">
+                      ✗ {testNotifError}
+                    </p>
                   )}
                 </div>
               </form>

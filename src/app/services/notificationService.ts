@@ -33,7 +33,7 @@ export async function getNotifications(
     params.append("unreadOnly", "true");
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/notifications?${params}`, {
+  const response = await fetch(`${API_BASE_URL}/notifications?${params}`, {
     credentials: "include",
   });
 
@@ -48,7 +48,7 @@ export async function getNotifications(
 
 export async function markAsRead(notificationId: string): Promise<Notification> {
   const response = await fetch(
-    `${API_BASE_URL}/api/notifications/${notificationId}/read`,
+    `${API_BASE_URL}/notifications/${notificationId}/read`,
     {
       method: "POST",
       credentials: "include",
@@ -65,7 +65,7 @@ export async function markAsRead(notificationId: string): Promise<Notification> 
 }
 
 export async function markAllAsRead(): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/notifications/read-all`, {
+  const response = await fetch(`${API_BASE_URL}/notifications/read-all`, {
     method: "POST",
     credentials: "include",
   });
@@ -79,7 +79,7 @@ export async function markAllAsRead(): Promise<void> {
 
 export async function deleteNotification(notificationId: string): Promise<void> {
   const response = await fetch(
-    `${API_BASE_URL}/api/notifications/${notificationId}`,
+    `${API_BASE_URL}/notifications/${notificationId}`,
     {
       method: "DELETE",
       credentials: "include",
@@ -94,7 +94,7 @@ export async function deleteNotification(notificationId: string): Promise<void> 
 }
 
 export async function clearAllNotifications(): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/notifications`, {
+  const response = await fetch(`${API_BASE_URL}/notifications`, {
     method: "DELETE",
     credentials: "include",
   });
@@ -104,4 +104,19 @@ export async function clearAllNotifications(): Promise<void> {
       `Failed to clear notifications: ${response.status} ${response.statusText}`
     );
   }
+}
+
+export async function sendTestNotification(): Promise<{ ok: boolean; message: string }> {
+  const response = await fetch(`${API_BASE_URL}/notifications/test`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to send test notification: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return parseJson<{ ok: boolean; message: string }>(response);
 }

@@ -1,10 +1,12 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router";
 import { Download, Heart, LogOut, Settings, User, Bell, Menu } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { getWishlistCount } from "../services/wishlistService";
 import { getSeriesWishlistCount } from "../services/seriesWishlistService";
 import { getTorrentDownloads } from "../services/torrentService";
 import * as notificationService from "../services/notificationService";
+import type { Notification } from "../services/notificationService";
 import { Button } from "./ui/button";
 import {
   Sheet,
@@ -16,12 +18,34 @@ import {
 } from "./ui/sheet";
 import { useAuth } from "../context/AuthContext";
 
+type UnreadNotificationsEvent = CustomEvent<{ count: number }>;
+const NOTIFICATIONS_POLL_INTERVAL_MS = 5000;
+
+function showNotificationToast(type: Notification["type"], title: string, description: string) {
+  switch (type) {
+    case "success":
+      toast.success(title, { description });
+      break;
+    case "error":
+      toast.error(title, { description });
+      break;
+    case "warning":
+      toast.warning(title, { description });
+      break;
+    default:
+      toast.info(title, { description });
+      break;
+  }
+}
+
 export function Root() {
   const location = useLocation();
   const navigate = useNavigate();
   const [wishlistCount, setWishlistCount] = useState(0);
   const [downloadsCount, setDownloadsCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const hasHydratedUnreadRef = useRef(false);
+  const previousUnreadCountRef = useRef(0);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const wishlistTarget = location.pathname === "/wishlist" ? "/" : "/wishlist";
@@ -97,7 +121,44 @@ export function Root() {
     const loadUnreadCount = async () => {
       try {
         const data = await notificationService.getNotifications(1, true);
-        setUnreadNotificationsCount(data.unreadCount);
+        const latestUnread = Array.isArray(data.notifications)
+          ? data.notifications[0]
+          : undefined;
+        const nextUnreadCount = Number(data.unreadCount || 0);
+        const previousUnreadCount = previousUnreadCountRef.current;
+
+        if (
+          hasHydratedUnreadRef.current &&
+          nextUnreadCount > previousUnreadCount &&
+          location.pathname !== "/notifications"
+        ) {
+          const delta = nextUnreadCount - previousUnreadCount;
+          if (latestUnread) {
+            showNotificationToast(
+              latestUnread.type,
+              delta > 1 ? `${delta} nouvelles notifications` : latestUnread.title,
+              delta > 1
+                ? `${latestUnread.message} (et ${delta - 1} autre${delta - 1 > 1 ? "s" : ""})`
+                : latestUnread.message
+            );
+          } else {
+            toast.info(
+              delta > 1 ? `${delta} nouvelles notifications` : "Nouvelle notification",
+              {
+                description: "Une mise a jour est disponible dans l'onglet Notifications.",
+              }
+            );
+          }
+        }
+
+        hasHydratedUnreadRef.current = true;
+        previousUnreadCountRef.current = nextUnreadCount;
+        setUnreadNotificationsCount(nextUnreadCount);
+        window.dispatchEvent(
+          new CustomEvent("seedflix:notifications-updated", {
+            detail: { count: nextUnreadCount },
+          })
+        );
       } catch {
         setUnreadNotificationsCount(0);
       }
@@ -106,15 +167,39 @@ export function Root() {
     void loadUnreadCount();
     const interval = setInterval(() => {
       void loadUnreadCount();
-    }, 10000);
+    }, NOTIFICATIONS_POLL_INTERVAL_MS);
 
-    return () => clearInterval(interval);
+    const handleImmediateRefresh = () => {
+      void loadUnreadCount();
+    };
+    window.addEventListener("seedflix:notifications-refresh-request", handleImmediateRefresh);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("seedflix:notifications-refresh-request", handleImmediateRefresh);
+    };
   }, [
     isAuthenticated,
     isSetupPage,
     hasPendingSetup,
     location.pathname,
   ]);
+
+  useEffect(() => {
+    const handleUnreadUpdate = (event: Event) => {
+      const typedEvent = event as UnreadNotificationsEvent;
+      const nextCount = Number(typedEvent.detail?.count);
+      if (Number.isFinite(nextCount) && nextCount >= 0) {
+        previousUnreadCountRef.current = nextCount;
+        setUnreadNotificationsCount(nextCount);
+      }
+    };
+
+    window.addEventListener("seedflix:notifications-updated", handleUnreadUpdate);
+    return () => {
+      window.removeEventListener("seedflix:notifications-updated", handleUnreadUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isUserMenuOpen) {

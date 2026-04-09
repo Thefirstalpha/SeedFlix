@@ -2,14 +2,270 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { requireAuth } from "./auth.js";
-import { dataDir } from "../config.js";
+import { dataDir, usersFilePath } from "../config.js";
+import { readSeriesWishlist, readWishlist } from "./wishlist.js";
+import { searchTorznabForQuery } from "./torznab.js";
+import { debugLog } from "../logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const notificationsFilePath = path.join(dataDir, "notifications.json");
+const trackerSeenFilePath = path.join(dataDir, "tracker-rss-seen.json");
+const trackerPollIntervalMs = 1000 * 60 * 5;
+const trackerSeenTtlMs = 1000 * 60 * 60 * 24 * 30;
+let trackerPollerStarted = false;
+
+async function ensureJsonStore(filePath, fallback) {
+  await fs.mkdir(dataDir, { recursive: true });
+  try {
+    await fs.access(filePath);
+  } catch {
+    await fs.writeFile(filePath, JSON.stringify(fallback, null, 2), "utf-8");
+  }
+}
+
+async function readUsers() {
+  await ensureJsonStore(usersFilePath, []);
+  const content = await fs.readFile(usersFilePath, "utf-8");
+
+  try {
+    const parsed = JSON.parse(content);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function readTrackerSeen() {
+  await ensureJsonStore(trackerSeenFilePath, {});
+  const content = await fs.readFile(trackerSeenFilePath, "utf-8");
+  try {
+    const parsed = JSON.parse(content);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeTrackerSeen(entries) {
+  await ensureJsonStore(trackerSeenFilePath, {});
+  await fs.writeFile(trackerSeenFilePath, JSON.stringify(entries, null, 2), "utf-8");
+}
+
+function normalizeMatchText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function isLikelyMatch(itemTitle, candidates) {
+  const normalizedItem = normalizeMatchText(itemTitle);
+  if (!normalizedItem) {
+    return false;
+  }
+
+  return candidates.some((candidate) => {
+    const normalizedCandidate = normalizeMatchText(candidate);
+    if (!normalizedCandidate || normalizedCandidate.length < 3) {
+      return false;
+    }
+
+    return (
+      normalizedItem.includes(normalizedCandidate) ||
+      normalizedCandidate.includes(normalizedItem)
+    );
+  });
+}
+
+function getUserDiscordWebhook(user) {
+  const notifSettings = user?.settings?.placeholders?.notifications || {};
+  const enabledChannels = Array.isArray(notifSettings.enabledChannels)
+    ? notifSettings.enabledChannels
+    : [];
+
+  if (!enabledChannels.includes("discord")) {
+    return "";
+  }
+
+  return String(notifSettings?.discord?.webhookUrl || "").trim();
+}
+
+async function notifyUser(user, notification) {
+  const userId = String(user?.username || "").trim();
+  if (!userId) {
+    return;
+  }
+
+  await addNotification(userId, notification);
+
+  const webhookUrl = getUserDiscordWebhook(user);
+  if (webhookUrl) {
+    await sendDiscordNotification(webhookUrl, notification);
+  }
+}
+
+function buildWishlistTargets(movieWishlist, seriesWishlist) {
+  const movieTargets = (Array.isArray(movieWishlist) ? movieWishlist : [])
+    .filter((item) => Number.isFinite(Number(item?.id)))
+    .map((item) => ({
+      key: `movie:${Number(item.id)}`,
+      type: "movie",
+      title: String(item.title || ""),
+      originalTitle: String(item.originalTitle || ""),
+      id: Number(item.id),
+    }));
+
+  const dedupSeries = new Map();
+  for (const entry of Array.isArray(seriesWishlist) ? seriesWishlist : []) {
+    const seriesId = Number(entry?.seriesId);
+    if (!Number.isFinite(seriesId)) {
+      continue;
+    }
+
+    const key = `series:${seriesId}`;
+    if (dedupSeries.has(key)) {
+      continue;
+    }
+
+    dedupSeries.set(key, {
+      key,
+      type: "series",
+      title: String(entry.seriesTitle || ""),
+      id: seriesId,
+    });
+  }
+
+  return [...movieTargets, ...dedupSeries.values()];
+}
+
+async function pollTrackerForWishlist() {
+  try {
+    const users = await readUsers();
+    if (!users.length) {
+      return;
+    }
+
+    const [movieWishlist, seriesWishlist, seen] = await Promise.all([
+      readWishlist(),
+      readSeriesWishlist(),
+      readTrackerSeen(),
+    ]);
+
+    const targets = buildWishlistTargets(movieWishlist, seriesWishlist);
+    if (!targets.length) {
+      return;
+    }
+
+    const nextSeen = { ...seen };
+    const now = Date.now();
+
+    for (const key of Object.keys(nextSeen)) {
+      if (Number(nextSeen[key]) + trackerSeenTtlMs < now) {
+        delete nextSeen[key];
+      }
+    }
+
+    for (const user of users) {
+      const indexerSettings = user?.settings?.placeholders?.indexer || {};
+      const indexerUrl = String(indexerSettings.url || "").trim();
+      const indexerToken = String(indexerSettings.token || "").trim();
+      if (!indexerUrl || !indexerToken) {
+        continue;
+      }
+
+      const authLike = { user: { settings: user.settings || {} } };
+
+      for (const target of targets) {
+        const candidates = [target.title, target.originalTitle].filter(Boolean);
+        if (!candidates.length) {
+          continue;
+        }
+
+        const query = String(candidates[0]).trim();
+        if (!query) {
+          continue;
+        }
+
+        const result = await searchTorznabForQuery(authLike, query, { limit: 8, tmdbId: target.id });
+        if (!result.ok || !Array.isArray(result.items) || !result.items.length) {
+          continue;
+        }
+
+        const match = result.items.find((item) => isLikelyMatch(item.title, candidates));
+        if (!match) {
+          continue;
+        }
+
+        const uniqueItemRef = String(match.guid || match.downloadUrl || match.title || "").trim();
+        if (!uniqueItemRef) {
+          continue;
+        }
+
+        const seenKey = `${String(user.username)}:${target.key}:${uniqueItemRef}`;
+        if (nextSeen[seenKey]) {
+          continue;
+        }
+
+        const mediaLabel = target.type === "movie" ? "Film" : "Série";
+        const details = {};
+        if (match.quality) {
+          details.Qualite = match.quality;
+        }
+        if (match.language) {
+          details.Langue = match.language;
+        }
+        if (match.sizeHuman) {
+          details.Taille = match.sizeHuman;
+        }
+        if (Number.isFinite(match.seeders || NaN)) {
+          details.Seeders = match.seeders;
+        }
+
+        await notifyUser(user, {
+          type: "success",
+          title: `${mediaLabel} disponible sur tracker`,
+          message: `${target.title}: une version semble disponible (${match.title}).`,
+          data: {
+            source: "tracker-rss",
+            mediaType: target.type,
+            mediaId: target.id,
+            trackerItem: {
+              title: match.title,
+              downloadUrl: match.downloadUrl || match.link || "",
+              pubDate: match.pubDate || null,
+            },
+            details,
+          },
+        });
+
+        nextSeen[seenKey] = now;
+      }
+    }
+
+    await writeTrackerSeen(nextSeen);
+  } catch (error) {
+    debugLog("Tracker wishlist polling failed:", error);
+  }
+}
+
+function startTrackerWishlistPolling() {
+  if (trackerPollerStarted) {
+    return;
+  }
+
+  trackerPollerStarted = true;
+  void pollTrackerForWishlist();
+  setInterval(() => {
+    void pollTrackerForWishlist();
+  }, trackerPollIntervalMs);
+}
 
 // Charger les notifications
 async function loadNotifications() {
+  await ensureJsonStore(notificationsFilePath, {});
   try {
     const content = await fs.readFile(notificationsFilePath, "utf-8");
     return JSON.parse(content);
@@ -20,6 +276,7 @@ async function loadNotifications() {
 
 // Sauvegarder les notifications
 async function saveNotifications(notifications) {
+  await ensureJsonStore(notificationsFilePath, {});
   await fs.writeFile(
     notificationsFilePath,
     JSON.stringify(notifications, null, 2)
@@ -183,10 +440,46 @@ function getColorByType(type) {
 
 // Enregistrer les routes
 export function registerNotificationRoutes(app) {
-  // Récupérer les notifications
-  app.get("/api/notifications", requireAuth, async (req, res) => {
+  startTrackerWishlistPolling();
+
+  // Notification de test (interne + Discord si configuré)
+  app.post("/api/notifications/test", async (req, res) => {
     try {
-      const userId = req.user.username;
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
+
+      const notification = {
+        type: "info",
+        title: "Notification de test",
+        message: "SeedFlix: la chaîne de notification fonctionne correctement.",
+        data: {
+          source: "manual-test",
+          details: {
+            Canal: "Interne + Discord (si actif)",
+            Horodatage: new Date().toLocaleString("fr-FR"),
+          },
+        },
+      };
+
+      await notifyUser(auth.user, notification);
+      res.json({ ok: true, message: "Notification de test envoyée" });
+    } catch (error) {
+      console.error("Error sending test notification:", error);
+      res.status(500).json({ error: error.message || "Notification de test impossible" });
+    }
+  });
+
+  // Récupérer les notifications
+  app.get("/api/notifications", async (req, res) => {
+    try {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
+
+      const userId = auth.user.username;
       const limit = parseInt(req.query.limit) || 50;
       const unreadOnly = req.query.unreadOnly === "true";
 
@@ -204,9 +497,14 @@ export function registerNotificationRoutes(app) {
   });
 
   // Marquer comme lue
-  app.post("/api/notifications/:id/read", requireAuth, async (req, res) => {
+  app.post("/api/notifications/:id/read", async (req, res) => {
     try {
-      const userId = req.user.username;
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
+
+      const userId = auth.user.username;
       const notificationId = req.params.id;
 
       const notif = await markAsRead(userId, notificationId);
@@ -223,9 +521,14 @@ export function registerNotificationRoutes(app) {
   });
 
   // Marquer toutes comme lues
-  app.post("/api/notifications/read-all", requireAuth, async (req, res) => {
+  app.post("/api/notifications/read-all", async (req, res) => {
     try {
-      const userId = req.user.username;
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
+
+      const userId = auth.user.username;
       await markAllAsRead(userId);
       res.json({ success: true });
     } catch (error) {
@@ -235,9 +538,14 @@ export function registerNotificationRoutes(app) {
   });
 
   // Supprimer une notification
-  app.delete("/api/notifications/:id", requireAuth, async (req, res) => {
+  app.delete("/api/notifications/:id", async (req, res) => {
     try {
-      const userId = req.user.username;
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
+
+      const userId = auth.user.username;
       const notificationId = req.params.id;
 
       const success = await deleteNotification(userId, notificationId);
@@ -254,9 +562,14 @@ export function registerNotificationRoutes(app) {
   });
 
   // Vider toutes les notifications
-  app.delete("/api/notifications", requireAuth, async (req, res) => {
+  app.delete("/api/notifications", async (req, res) => {
     try {
-      const userId = req.user.username;
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
+
+      const userId = auth.user.username;
       await clearNotifications(userId);
       res.json({ success: true });
     } catch (error) {
@@ -264,4 +577,5 @@ export function registerNotificationRoutes(app) {
       res.status(500).json({ error: error.message });
     }
   });
+
 }
