@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { MovieCard } from "./MovieCard";
@@ -18,6 +18,7 @@ import type { Movie } from "../types/movie";
 import type { Series } from "../types/series";
 
 type ContentFilter = "all" | "movie" | "series";
+const CAROUSEL_WHEEL_SPEED = 3.8;
 
 const DEFAULT_LANGUAGE_OPTIONS = [
   "Francais",
@@ -81,6 +82,7 @@ export function Home() {
   const [yearFrom, setYearFrom] = useState("");
   const [yearTo, setYearTo] = useState("");
   const [minRating, setMinRating] = useState("0");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [movieGenres, setMovieGenres] = useState<Array<{ id: number; name: string }>>([]);
   const [seriesGenres, setSeriesGenres] = useState<Array<{ id: number; name: string }>>([]);
@@ -329,10 +331,54 @@ export function Home() {
   };
 
   const handleCarouselWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+    const container = event.currentTarget;
+    if (container.scrollWidth <= container.clientWidth) {
+      return;
+    }
+
+    const dominantDelta =
+      Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+
+    if (dominantDelta !== 0) {
+      container.scrollLeft += dominantDelta * CAROUSEL_WHEEL_SPEED;
       event.preventDefault();
+      event.stopPropagation();
     }
   };
+
+  useEffect(() => {
+    const attachWheelBlocker = (container: HTMLDivElement | null) => {
+      if (!container) {
+        return () => {};
+      }
+
+      const onWheel = (event: WheelEvent) => {
+        if (container.scrollWidth <= container.clientWidth) {
+          return;
+        }
+
+        const dominantDelta =
+          Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+
+        if (dominantDelta !== 0) {
+          container.scrollLeft += dominantDelta * CAROUSEL_WHEEL_SPEED;
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      };
+
+      container.addEventListener("wheel", onWheel, { passive: false });
+      return () => container.removeEventListener("wheel", onWheel);
+    };
+
+    const cleanupMovie = attachWheelBlocker(movieCarouselRef.current);
+    const cleanupSeries = attachWheelBlocker(seriesCarouselRef.current);
+
+    return () => {
+      cleanupMovie();
+      cleanupSeries();
+    };
+  }, []);
 
   const baseMovies = hasSearch ? searchMovies : recommendedMovies;
   const baseSeries = hasSearch ? searchSeries : recommendedSeries;
@@ -420,94 +466,109 @@ export function Home() {
         </div>
 
         <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-4">
-          <div className="flex items-center gap-2 text-white">
-            <SlidersHorizontal className="w-4 h-4" />
-            <span className="text-sm font-semibold">Filtres</span>
-          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setFiltersOpen((prev) => !prev)}
+            className="w-full justify-between px-2 text-white hover:bg-white/10"
+          >
+            <span className="flex items-center gap-2 text-sm font-semibold">
+              <SlidersHorizontal className="w-4 h-4" />
+              Filtres
+            </span>
+            <span className="flex items-center gap-2 text-xs text-white/70">
+              {filtersOpen ? "Masquer" : "Afficher"}
+              <ChevronDown className={`w-4 h-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
+            </span>
+          </Button>
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              onClick={() => setContentFilter("all")}
-              className={contentFilter === "all" ? "bg-white text-slate-900 hover:bg-white/90" : "bg-white/10 text-white hover:bg-white/20"}
-            >
-              Tout
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setContentFilter("movie")}
-              className={contentFilter === "movie" ? "bg-purple-500 text-white hover:bg-purple-600" : "bg-white/10 text-white hover:bg-white/20"}
-            >
-              Films
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setContentFilter("series")}
-              className={contentFilter === "series" ? "bg-cyan-500 text-slate-900 hover:bg-cyan-400" : "bg-white/10 text-white hover:bg-white/20"}
-            >
-              Séries
-            </Button>
-          </div>
+          {filtersOpen && (
+            <>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => setContentFilter("all")}
+                  className={contentFilter === "all" ? "bg-white text-slate-900 hover:bg-white/90" : "bg-white/10 text-white hover:bg-white/20"}
+                >
+                  Tout
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setContentFilter("movie")}
+                  className={contentFilter === "movie" ? "bg-purple-500 text-white hover:bg-purple-600" : "bg-white/10 text-white hover:bg-white/20"}
+                >
+                  Films
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setContentFilter("series")}
+                  className={contentFilter === "series" ? "bg-cyan-500 text-slate-900 hover:bg-cyan-400" : "bg-white/10 text-white hover:bg-white/20"}
+                >
+                  Séries
+                </Button>
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            <select
-              value={genreFilter}
-              onChange={(event) => setGenreFilter(event.target.value)}
-              className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
-            >
-              <option value="all">Tous les genres</option>
-              {availableGenres.map((genre) => (
-                <option key={genre} value={genre}>
-                  {genre}
-                </option>
-              ))}
-            </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <select
+                  value={genreFilter}
+                  onChange={(event) => setGenreFilter(event.target.value)}
+                  className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
+                >
+                  <option value="all">Tous les genres</option>
+                  {availableGenres.map((genre) => (
+                    <option key={genre} value={genre}>
+                      {genre}
+                    </option>
+                  ))}
+                </select>
 
-            <select
-              value={languageFilter}
-              onChange={(event) => setLanguageFilter(event.target.value)}
-              className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
-            >
-              <option value="all">Toutes les langues</option>
-              {availableLanguages.map((language) => (
-                <option key={language} value={language}>
-                  {language}
-                </option>
-              ))}
-            </select>
+                <select
+                  value={languageFilter}
+                  onChange={(event) => setLanguageFilter(event.target.value)}
+                  className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
+                >
+                  <option value="all">Toutes les langues</option>
+                  {availableLanguages.map((language) => (
+                    <option key={language} value={language}>
+                      {language}
+                    </option>
+                  ))}
+                </select>
 
-            <Input
-              type="number"
-              min={1900}
-              max={2100}
-              placeholder="Date min (annee)"
-              value={yearFrom}
-              onChange={(event) => setYearFrom(event.target.value)}
-              className="h-10 bg-slate-900 border-white/20 text-white"
-            />
+                <Input
+                  type="number"
+                  min={1900}
+                  max={2100}
+                  placeholder="Date min (annee)"
+                  value={yearFrom}
+                  onChange={(event) => setYearFrom(event.target.value)}
+                  className="h-10 bg-slate-900 border-white/20 text-white"
+                />
 
-            <Input
-              type="number"
-              min={1900}
-              max={2100}
-              placeholder="Date max (annee)"
-              value={yearTo}
-              onChange={(event) => setYearTo(event.target.value)}
-              className="h-10 bg-slate-900 border-white/20 text-white"
-            />
+                <Input
+                  type="number"
+                  min={1900}
+                  max={2100}
+                  placeholder="Date max (annee)"
+                  value={yearTo}
+                  onChange={(event) => setYearTo(event.target.value)}
+                  className="h-10 bg-slate-900 border-white/20 text-white"
+                />
 
-            <select
-              value={minRating}
-              onChange={(event) => setMinRating(event.target.value)}
-              className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
-            >
-              <option value="0">Toutes les notes</option>
-              <option value="6">Note {">="} 6</option>
-              <option value="7">Note {">="} 7</option>
-              <option value="8">Note {">="} 8</option>
-              <option value="9">Note {">="} 9</option>
-            </select>
-          </div>
+                <select
+                  value={minRating}
+                  onChange={(event) => setMinRating(event.target.value)}
+                  className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
+                >
+                  <option value="0">Toutes les notes</option>
+                  <option value="6">Note {">="} 6</option>
+                  <option value="7">Note {">="} 7</option>
+                  <option value="8">Note {">="} 8</option>
+                  <option value="9">Note {">="} 9</option>
+                </select>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -544,8 +605,8 @@ export function Home() {
                         const container = event.currentTarget;
                         void maybeLoadMoreMovies(container);
                       }}
-                      onWheel={handleCarouselWheel}
-                      className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-y"
+                      onWheelCapture={handleCarouselWheel}
+                      className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-x overscroll-contain"
                     >
                       <div className="flex gap-3 sm:gap-4 py-4 pr-3 sm:pr-4">
                         {filteredMovies.map((movie) => (
@@ -598,8 +659,8 @@ export function Home() {
                         const container = event.currentTarget;
                         void maybeLoadMoreSeries(container);
                       }}
-                      onWheel={handleCarouselWheel}
-                      className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-y"
+                      onWheelCapture={handleCarouselWheel}
+                      className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-x overscroll-contain"
                     >
                       <div className="flex gap-3 sm:gap-4 py-4 pr-3 sm:pr-4">
                         {filteredSeries.map((show) => (
