@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -15,6 +15,7 @@ import {
   searchSeriesPage,
 } from "../services/seriesService";
 import { useI18n } from "../i18n/LanguageProvider";
+import { useSearchState } from "../context/SearchStateContext";
 import type { Movie } from "../types/movie";
 import type { Series } from "../types/series";
 
@@ -117,39 +118,42 @@ function toTmdbOriginalLanguageCode(language: string): string | undefined {
 
 export function Home() {
   const { t, language } = useI18n();
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [activeSearchQuery, setActiveSearchQuery] = useState("");
-  const [contentFilter, setContentFilter] = useState<ContentFilter>("all");
-  const [genreFilter, setGenreFilter] = useState("all");
-  const [languageFilter, setLanguageFilter] = useState("all");
-  const [yearFrom, setYearFrom] = useState("");
-  const [yearTo, setYearTo] = useState("");
-  const [minRating, setMinRating] = useState("0");
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const { state, updateSearchState } = useSearchState();
 
-  const [movieGenres, setMovieGenres] = useState<Array<{ id: number; name: string }>>([]);
-  const [seriesGenres, setSeriesGenres] = useState<Array<{ id: number; name: string }>>([]);
-
-  const [recommendedMovies, setRecommendedMovies] = useState<Movie[]>([]);
-  const [recommendedSeries, setRecommendedSeries] = useState<Series[]>([]);
-  const [searchMovies, setSearchMovies] = useState<Movie[]>([]);
-  const [searchSeries, setSearchSeries] = useState<Series[]>([]);
-
-  const [moviePage, setMoviePage] = useState(1);
-  const [movieTotalPages, setMovieTotalPages] = useState(1);
-  const [seriesPage, setSeriesPage] = useState(1);
-  const [seriesTotalPages, setSeriesTotalPages] = useState(1);
-
-  const [isLoadingInitial, setIsLoadingInitial] = useState(true);
-  const [isLoadingMoreMovies, setIsLoadingMoreMovies] = useState(false);
-  const [isLoadingMoreSeries, setIsLoadingMoreSeries] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isLoadingGenres, setIsLoadingGenres] = useState(true);
+  // Destructure state for easier access
+  const {
+    query,
+    debouncedQuery,
+    activeSearchQuery,
+    contentFilter,
+    genreFilter,
+    languageFilter,
+    yearFrom,
+    yearTo,
+    minRating,
+    filtersOpen,
+    movieGenres,
+    recommendedMovies,
+    searchMovies,
+    moviePage,
+    movieTotalPages,
+    seriesGenres,
+    recommendedSeries,
+    searchSeries,
+    seriesPage,
+    seriesTotalPages,
+    isLoadingInitial,
+    isLoadingMoreMovies,
+    isLoadingMoreSeries,
+    isSearching,
+    isLoadingGenres,
+  } = state;
 
   const movieCarouselRef = useRef<HTMLDivElement | null>(null);
   const seriesCarouselRef = useRef<HTMLDivElement | null>(null);
   const skipNextPopularReloadRef = useRef(false);
+  const scrollRestoredRef = useRef(false);
+  const isFirstMountRef = useRef(true);
 
   const trimmedQuery = query.trim();
   const hasTypedSearch = trimmedQuery.length > 0;
@@ -175,18 +179,20 @@ export function Home() {
 
   useEffect(() => {
     const loadGenres = async () => {
-      setIsLoadingGenres(true);
+      updateSearchState({ isLoadingGenres: true });
       try {
         const [moviesGenresResponse, seriesGenresResponse] = await Promise.all([
           getMovieGenres(language),
           getSeriesGenres(language),
         ]);
-        setMovieGenres(moviesGenresResponse);
-        setSeriesGenres(seriesGenresResponse);
+        updateSearchState({
+          movieGenres: moviesGenresResponse,
+          seriesGenres: seriesGenresResponse,
+        });
       } catch (error) {
         console.error("Error loading genres:", error);
       } finally {
-        setIsLoadingGenres(false);
+        updateSearchState({ isLoadingGenres: false });
       }
     };
 
@@ -215,59 +221,63 @@ export function Home() {
 
   const loadMovieRecommendations = async (page = 1, append = false) => {
     if (!showMovies) {
-      setRecommendedMovies([]);
-      setMoviePage(1);
-      setMovieTotalPages(1);
+      updateSearchState({
+        recommendedMovies: [],
+        moviePage: 1,
+        movieTotalPages: 1,
+      });
       return;
     }
 
     try {
       if (page > 1) {
-        setIsLoadingMoreMovies(true);
+        updateSearchState({ isLoadingMoreMovies: true });
       }
 
       const response = await fetchMovieRecommendations(page);
-      setRecommendedMovies((prev) =>
-        append ? [...prev, ...response.movies] : response.movies
-      );
-      setMoviePage(response.page);
-      setMovieTotalPages(response.totalPages);
+      updateSearchState((prev) => ({
+        recommendedMovies: append ? [...prev.recommendedMovies, ...response.movies] : response.movies,
+        moviePage: response.page,
+        movieTotalPages: response.totalPages,
+        isLoadingMoreMovies: false,
+      }));
     } catch (error) {
       console.error("Error loading movie recommendations:", error);
       if (!append) {
-        setRecommendedMovies([]);
+        updateSearchState({ recommendedMovies: [] });
       }
-    } finally {
-      setIsLoadingMoreMovies(false);
+      updateSearchState({ isLoadingMoreMovies: false });
     }
   };
 
   const loadSeriesRecommendations = async (page = 1, append = false) => {
     if (!showSeries) {
-      setRecommendedSeries([]);
-      setSeriesPage(1);
-      setSeriesTotalPages(1);
+      updateSearchState({
+        recommendedSeries: [],
+        seriesPage: 1,
+        seriesTotalPages: 1,
+      });
       return;
     }
 
     try {
       if (page > 1) {
-        setIsLoadingMoreSeries(true);
+        updateSearchState({ isLoadingMoreSeries: true });
       }
 
       const response = await fetchSeriesRecommendations(page);
-      setRecommendedSeries((prev) =>
-        append ? [...prev, ...response.series] : response.series
-      );
-      setSeriesPage(response.page);
-      setSeriesTotalPages(response.totalPages);
+      updateSearchState((prev) => ({
+        recommendedSeries: append ? [...prev.recommendedSeries, ...response.series] : response.series,
+        seriesPage: response.page,
+        seriesTotalPages: response.totalPages,
+        isLoadingMoreSeries: false,
+      }));
     } catch (error) {
       console.error("Error loading series recommendations:", error);
       if (!append) {
-        setRecommendedSeries([]);
+        updateSearchState({ recommendedSeries: [] });
       }
-    } finally {
-      setIsLoadingMoreSeries(false);
+      updateSearchState({ isLoadingMoreSeries: false });
     }
   };
 
@@ -278,14 +288,24 @@ export function Home() {
       return;
     }
 
+    // Skip reload on subsequent mounts if we already have data (returning from detail page)
+    if (!isFirstMountRef.current && recommendedMovies.length > 0 && recommendedSeries.length > 0) {
+      return;
+    }
+    isFirstMountRef.current = false;
+
     const loadInitialRecommendations = async () => {
       // Reset visible data first so filter/language changes clearly reload both lists.
-      setRecommendedMovies([]);
-      setRecommendedSeries([]);
-      setMoviePage(1);
-      setMovieTotalPages(1);
-      setSeriesPage(1);
-      setSeriesTotalPages(1);
+      updateSearchState({
+        recommendedMovies: [],
+        recommendedSeries: [],
+        moviePage: 1,
+        movieTotalPages: 1,
+        seriesPage: 1,
+        seriesTotalPages: 1,
+        isLoadingInitial: true,
+      });
+      
       if (movieCarouselRef.current) {
         movieCarouselRef.current.scrollLeft = 0;
       }
@@ -293,14 +313,13 @@ export function Home() {
         seriesCarouselRef.current.scrollLeft = 0;
       }
 
-      setIsLoadingInitial(true);
       try {
         await Promise.all([
           loadMovieRecommendations(1, false),
           loadSeriesRecommendations(1, false),
         ]);
       } finally {
-        setIsLoadingInitial(false);
+        updateSearchState({ isLoadingInitial: false });
       }
     };
 
@@ -325,16 +344,18 @@ export function Home() {
       if (hasActiveSearch) {
         skipNextPopularReloadRef.current = true;
       }
-      setDebouncedQuery("");
-      setActiveSearchQuery("");
-      setSearchMovies([]);
-      setSearchSeries([]);
-      setIsSearching(false);
+      updateSearchState({
+        debouncedQuery: "",
+        activeSearchQuery: "",
+        searchMovies: [],
+        searchSeries: [],
+        isSearching: false,
+      });
       return;
     }
 
     const timeoutId = setTimeout(() => {
-      setDebouncedQuery(trimmedQuery);
+      updateSearchState({ debouncedQuery: trimmedQuery });
     }, 350);
 
     return () => clearTimeout(timeoutId);
@@ -348,7 +369,7 @@ export function Home() {
     let cancelled = false;
 
     const runSearch = async () => {
-      setIsSearching(true);
+      updateSearchState({ isSearching: true });
       try {
         const [movieResponse, seriesResponse] = await Promise.all([
           searchMoviesPage(stableSearchQuery, 1, language),
@@ -359,22 +380,24 @@ export function Home() {
           return;
         }
 
-        setSearchMovies(movieResponse.movies);
-        setSearchSeries(seriesResponse.series);
-        setActiveSearchQuery(stableSearchQuery);
+        updateSearchState({
+          searchMovies: movieResponse.movies,
+          searchSeries: seriesResponse.series,
+          activeSearchQuery: stableSearchQuery,
+          isSearching: false,
+        });
       } catch (error) {
         if (cancelled) {
           return;
         }
 
         console.error("Error searching mixed content:", error);
-        setSearchMovies([]);
-        setSearchSeries([]);
-        setActiveSearchQuery(stableSearchQuery);
-      } finally {
-        if (!cancelled) {
-          setIsSearching(false);
-        }
+        updateSearchState({
+          searchMovies: [],
+          searchSeries: [],
+          activeSearchQuery: stableSearchQuery,
+          isSearching: false,
+        });
       }
     };
 
@@ -471,6 +494,44 @@ export function Home() {
     };
   }, []);
 
+  // Restore scroll positions on mount and attach scroll listeners
+  useEffect(() => {
+    // Restore scroll positions only once on mount
+    if (!scrollRestoredRef.current && movieCarouselRef.current && seriesCarouselRef.current) {
+      if (state.movieCarouselScrollLeft > 0) {
+        movieCarouselRef.current.scrollLeft = state.movieCarouselScrollLeft;
+      }
+      if (state.seriesCarouselScrollLeft > 0) {
+        seriesCarouselRef.current.scrollLeft = state.seriesCarouselScrollLeft;
+      }
+      scrollRestoredRef.current = true;
+    }
+
+    // Attach scroll listeners to save scroll positions
+    const onMovieScroll = () => {
+      if (movieCarouselRef.current) {
+        updateSearchState({ movieCarouselScrollLeft: movieCarouselRef.current.scrollLeft });
+      }
+    };
+
+    const onSeriesScroll = () => {
+      if (seriesCarouselRef.current) {
+        updateSearchState({ seriesCarouselScrollLeft: seriesCarouselRef.current.scrollLeft });
+      }
+    };
+
+    const movieCarousel = movieCarouselRef.current;
+    const seriesCarousel = seriesCarouselRef.current;
+
+    movieCarousel?.addEventListener("scroll", onMovieScroll);
+    seriesCarousel?.addEventListener("scroll", onSeriesScroll);
+
+    return () => {
+      movieCarousel?.removeEventListener("scroll", onMovieScroll);
+      seriesCarousel?.removeEventListener("scroll", onSeriesScroll);
+    };
+  }, []);
+
   const isSearchBusy = isSearchPending || isSearching;
   const shouldShowSearchResults = hasActiveSearch;
   const shouldShowPopularSections = !hasActiveSearch;
@@ -492,13 +553,13 @@ export function Home() {
 
   useEffect(() => {
     if (genreFilter !== "all" && !availableGenres.includes(genreFilter)) {
-      setGenreFilter("all");
+      updateSearchState({ genreFilter: "all" });
     }
   }, [availableGenres, genreFilter]);
 
   useEffect(() => {
     if (languageFilter !== "all" && !availableLanguages.includes(languageFilter)) {
-      setLanguageFilter("all");
+      updateSearchState({ languageFilter: "all" });
     }
   }, [availableLanguages, languageFilter]);
 
@@ -555,7 +616,7 @@ export function Home() {
             type="text"
             placeholder={t("home.searchPlaceholder")}
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => updateSearchState({ query: event.target.value })}
             className="pl-10 h-12 bg-white/10 border-white/20 text-white placeholder:text-white/50"
           />
           <div
@@ -568,7 +629,7 @@ export function Home() {
           <Button
             type="button"
             variant="ghost"
-            onClick={() => setFiltersOpen((prev) => !prev)}
+            onClick={() => updateSearchState((prev) => ({ filtersOpen: !prev.filtersOpen }))}
             className="w-full justify-between px-2 text-white hover:bg-white/10"
           >
             <span className="flex items-center gap-2 text-sm font-semibold">
@@ -586,21 +647,21 @@ export function Home() {
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  onClick={() => setContentFilter("all")}
+                  onClick={() => updateSearchState({ contentFilter: "all" })}
                   className={contentFilter === "all" ? "bg-white text-slate-900 hover:bg-white/90" : "bg-white/10 text-white hover:bg-white/20"}
                 >
                   {t("home.all")}
                 </Button>
                 <Button
                   size="sm"
-                  onClick={() => setContentFilter("movie")}
+                  onClick={() => updateSearchState({ contentFilter: "movie" })}
                   className={contentFilter === "movie" ? "bg-purple-500 text-white hover:bg-purple-600" : "bg-white/10 text-white hover:bg-white/20"}
                 >
                   {t("home.movies")}
                 </Button>
                 <Button
                   size="sm"
-                  onClick={() => setContentFilter("series")}
+                  onClick={() => updateSearchState({ contentFilter: "series" })}
                   className={contentFilter === "series" ? "bg-cyan-500 text-slate-900 hover:bg-cyan-400" : "bg-white/10 text-white hover:bg-white/20"}
                 >
                   {t("home.series")}
@@ -610,7 +671,7 @@ export function Home() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                 <select
                   value={genreFilter}
-                  onChange={(event) => setGenreFilter(event.target.value)}
+                  onChange={(event) => updateSearchState({ genreFilter: event.target.value })}
                   className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
                 >
                   <option value="all">{t("home.allGenres")}</option>
@@ -623,7 +684,7 @@ export function Home() {
 
                 <select
                   value={languageFilter}
-                  onChange={(event) => setLanguageFilter(event.target.value)}
+                  onChange={(event) => updateSearchState({ languageFilter: event.target.value })}
                   className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
                 >
                   <option value="all">{t("home.allLanguages")}</option>
@@ -640,7 +701,7 @@ export function Home() {
                   max={2100}
                   placeholder={t("home.minYear")}
                   value={yearFrom}
-                  onChange={(event) => setYearFrom(event.target.value)}
+                  onChange={(event) => updateSearchState({ yearFrom: event.target.value })}
                   className="h-10 bg-slate-900 border-white/20 text-white"
                 />
 
@@ -650,13 +711,13 @@ export function Home() {
                   max={2100}
                   placeholder={t("home.maxYear")}
                   value={yearTo}
-                  onChange={(event) => setYearTo(event.target.value)}
+                  onChange={(event) => updateSearchState({ yearTo: event.target.value })}
                   className="h-10 bg-slate-900 border-white/20 text-white"
                 />
 
                 <select
                   value={minRating}
-                  onChange={(event) => setMinRating(event.target.value)}
+                  onChange={(event) => updateSearchState({ minRating: event.target.value })}
                   className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
                 >
                   <option value="0">{t("home.allRatings")}</option>
