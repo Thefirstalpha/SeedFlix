@@ -594,7 +594,7 @@ export function Home() {
                       size="icon"
                       variant="outline"
                       onClick={() => scrollCarousel(movieCarouselRef.current, "left")}
-                      className="shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                      className="hidden lg:inline-flex shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
@@ -606,9 +606,9 @@ export function Home() {
                         void maybeLoadMoreMovies(container);
                       }}
                       onWheelCapture={handleCarouselWheel}
-                      className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-x overscroll-contain"
+                      className="-mx-4 lg:mx-0 flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-x overscroll-contain"
                     >
-                      <div className="flex gap-3 sm:gap-4 py-4 pr-3 sm:pr-4">
+                      <div className="flex gap-3 sm:gap-4 py-4 pr-4 lg:pr-4 pl-4 lg:pl-0">
                         {filteredMovies.map((movie) => (
                           <div key={movie.id} className="min-w-[172px] max-w-[172px] sm:min-w-[196px] sm:max-w-[196px] md:min-w-[220px] md:max-w-[220px] shrink-0">
                             <MovieCard
@@ -624,7 +624,28 @@ export function Home() {
                       size="icon"
                       variant="outline"
                       onClick={() => scrollCarousel(movieCarouselRef.current, "right")}
-                      className="shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                      className="hidden lg:inline-flex shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-3 lg:hidden">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={() => scrollCarousel(movieCarouselRef.current, "left")}
+                      className="border-white/15 bg-white/5 text-white hover:bg-white/10"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={() => scrollCarousel(movieCarouselRef.current, "right")}
+                      className="border-white/15 bg-white/5 text-white hover:bg-white/10"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </Button>
@@ -648,7 +669,7 @@ export function Home() {
                       size="icon"
                       variant="outline"
                       onClick={() => scrollCarousel(seriesCarouselRef.current, "left")}
-                      className="shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                      className="hidden lg:inline-flex shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
@@ -660,9 +681,9 @@ export function Home() {
                         void maybeLoadMoreSeries(container);
                       }}
                       onWheelCapture={handleCarouselWheel}
-                      className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-x overscroll-contain"
+                      className="-mx-4 lg:mx-0 flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-x overscroll-contain"
                     >
-                      <div className="flex gap-3 sm:gap-4 py-4 pr-3 sm:pr-4">
+                      <div className="flex gap-3 sm:gap-4 py-4 pr-4 lg:pr-4 pl-4 lg:pl-0">
                         {filteredSeries.map((show) => (
                           <div key={show.id} className="min-w-[172px] max-w-[172px] sm:min-w-[196px] sm:max-w-[196px] md:min-w-[220px] md:max-w-[220px] shrink-0">
                             <SeriesCard
@@ -678,7 +699,28 @@ export function Home() {
                       size="icon"
                       variant="outline"
                       onClick={() => scrollCarousel(seriesCarouselRef.current, "right")}
-                      className="shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                      className="hidden lg:inline-flex shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-3 lg:hidden">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={() => scrollCarousel(seriesCarouselRef.current, "left")}
+                      className="border-white/15 bg-white/5 text-white hover:bg-white/10"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={() => scrollCarousel(seriesCarouselRef.current, "right")}
+                      className="border-white/15 bg-white/5 text-white hover:bg-white/10"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </Button>
