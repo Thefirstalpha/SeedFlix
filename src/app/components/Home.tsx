@@ -125,6 +125,7 @@ export function Home() {
     query,
     debouncedQuery,
     activeSearchQuery,
+    popularCacheKey,
     contentFilter,
     genreFilter,
     languageFilter,
@@ -153,7 +154,6 @@ export function Home() {
   const seriesCarouselRef = useRef<HTMLDivElement | null>(null);
   const skipNextPopularReloadRef = useRef(false);
   const scrollRestoredRef = useRef(false);
-  const isFirstMountRef = useRef(true);
 
   const trimmedQuery = query.trim();
   const hasTypedSearch = trimmedQuery.length > 0;
@@ -176,6 +176,29 @@ export function Home() {
   const ratingThreshold = Number(minRating) || 0;
   const { safeFrom: yearStart, safeTo: yearEnd } = yearToDateBounds(yearFrom, yearTo);
   const selectedOriginalLanguageCode = toTmdbOriginalLanguageCode(languageFilter);
+  const popularRequestKey = useMemo(
+    () =>
+      JSON.stringify({
+        language,
+        contentFilter,
+        selectedMovieGenreId: selectedMovieGenreId ?? null,
+        selectedSeriesGenreId: selectedSeriesGenreId ?? null,
+        yearStart: yearStart ?? null,
+        yearEnd: yearEnd ?? null,
+        minRating: ratingThreshold,
+        originalLanguage: selectedOriginalLanguageCode ?? null,
+      }),
+    [
+      language,
+      contentFilter,
+      selectedMovieGenreId,
+      selectedSeriesGenreId,
+      yearStart,
+      yearEnd,
+      ratingThreshold,
+      selectedOriginalLanguageCode,
+    ]
+  );
 
   useEffect(() => {
     const loadGenres = async () => {
@@ -288,11 +311,17 @@ export function Home() {
       return;
     }
 
-    // Skip reload on subsequent mounts if we already have data (returning from detail page)
-    if (!isFirstMountRef.current && recommendedMovies.length > 0 && recommendedSeries.length > 0) {
+    const hasMoviesForView = !showMovies || recommendedMovies.length > 0;
+    const hasSeriesForView = !showSeries || recommendedSeries.length > 0;
+    const isPopularCacheValid = popularCacheKey === popularRequestKey;
+
+    // Skip reload if same filters/langue and we already have data for current view.
+    if (isPopularCacheValid && hasMoviesForView && hasSeriesForView) {
+      if (isLoadingInitial) {
+        updateSearchState({ isLoadingInitial: false });
+      }
       return;
     }
-    isFirstMountRef.current = false;
 
     const loadInitialRecommendations = async () => {
       // Reset visible data first so filter/language changes clearly reload both lists.
@@ -318,6 +347,7 @@ export function Home() {
           loadMovieRecommendations(1, false),
           loadSeriesRecommendations(1, false),
         ]);
+        updateSearchState({ popularCacheKey: popularRequestKey });
       } finally {
         updateSearchState({ isLoadingInitial: false });
       }
@@ -326,17 +356,11 @@ export function Home() {
     loadInitialRecommendations();
   }, [
     hasTypedSearch,
-    contentFilter,
-    genreFilter,
-    languageFilter,
-    yearFrom,
-    yearTo,
-    minRating,
-    language,
     hasActiveSearch,
-    selectedMovieGenreId,
-    selectedSeriesGenreId,
-    selectedOriginalLanguageCode,
+    showMovies,
+    showSeries,
+    popularCacheKey,
+    popularRequestKey,
   ]);
 
   useEffect(() => {

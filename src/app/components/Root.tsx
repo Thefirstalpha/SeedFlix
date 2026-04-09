@@ -355,7 +355,7 @@ export function Root() {
                 <Link
                   to="/notifications"
                   aria-label={t("root.notifications")}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10 self-stretch"
                 >
                   <Bell className="w-5 h-5 text-amber-300" />
                   {unreadNotificationsCount > 0 && (
@@ -366,10 +366,10 @@ export function Root() {
                 </Link>
 
               {isAuthenticated ? (
-                <div ref={userMenuRef} className="relative">
+                <div ref={userMenuRef} className="relative self-stretch flex items-stretch">
                   <Button
                     variant="outline"
-                    className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    className="border-white/10 bg-white/5 text-white hover:bg-white/10 h-full"
                     onClick={() => setIsUserMenuOpen((open) => !open)}
                     aria-expanded={isUserMenuOpen}
                     aria-haspopup="menu"

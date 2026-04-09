@@ -13,6 +13,7 @@ interface SearchState {
   query: string;
   debouncedQuery: string;
   activeSearchQuery: string;
+  popularCacheKey: string;
   contentFilter: "all" | "movie" | "series";
   genreFilter: string;
   languageFilter: string;
@@ -57,6 +58,7 @@ const DEFAULT_SEARCH_STATE: SearchState = {
   query: "",
   debouncedQuery: "",
   activeSearchQuery: "",
+  popularCacheKey: "",
   contentFilter: "all",
   genreFilter: "all",
   languageFilter: "all",
