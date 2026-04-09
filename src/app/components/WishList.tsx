@@ -16,8 +16,10 @@ import { addTorrentToClient } from "../services/torrentService";
 import {
   getTrackerResults,
   rejectTrackerResult,
+  validateTrackerResult,
   type TrackerResultTarget,
 } from "../services/trackerResultService";
+import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/LanguageProvider";
 import type { Movie } from "../types/movie";
 import type { SeriesWishlistEntry } from "../types/seriesWishlist";
@@ -26,6 +28,7 @@ export function WishList() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t } = useI18n();
+  const { settings } = useAuth();
   const [activeTab, setActiveTab] = useState("movies");
 
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -303,6 +306,29 @@ export function WishList() {
     trackerTargets.map((target) => [target.targetKey, target])
   );
 
+  const spoilerModeEnabled = Boolean(
+    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode
+  );
+
+  const getEpisodeCode = (targetKey: string, fallbackSeason?: number | null, fallbackEpisode?: number | null) => {
+    const match = String(targetKey || "").match(/^episode:\d+:(\d+):(\d+)$/i);
+    const season = match?.[1] ? Number(match[1]) : Number(fallbackSeason || 0);
+    const episode = match?.[2] ? Number(match[2]) : Number(fallbackEpisode || 0);
+    if (!Number.isFinite(season) || !Number.isFinite(episode) || season <= 0 || episode <= 0) {
+      return "";
+    }
+    return `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+  };
+
+  const getSpoilerSafeTrackerLabel = (target: TrackerResultTarget) => {
+    if (!spoilerModeEnabled || target.targetType !== "episode") {
+      return target.label || target.title;
+    }
+
+    const episodeCode = getEpisodeCode(target.targetKey);
+    return episodeCode ? `${target.title} - ${episodeCode}` : target.title;
+  };
+
   const renderTrackerTarget = (target: TrackerResultTarget, stopPropagation = false) => {
     if (!target.items.length) {
       return null;
@@ -316,7 +342,7 @@ export function WishList() {
         onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
       >
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <p className="text-white font-medium">{target.label || target.title}</p>
+          <p className="text-white font-medium">{getSpoilerSafeTrackerLabel(target)}</p>
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="border-white/20 text-white/70">
               {target.items.length}
@@ -720,8 +746,12 @@ export function WishList() {
                                   variant="outline"
                                   className="border-white/20 text-white/70"
                                 >
-                                  S{episode.seasonNumber}E{episode.episodeNumber}
-                                  {episode.episodeName ? ` – ${episode.episodeName}` : ""}
+                                  {getEpisodeCode("", episode.seasonNumber, episode.episodeNumber)}
+                                  {spoilerModeEnabled
+                                    ? ` - ${t("seriesDetails.spoilers.hiddenTitle")}`
+                                    : episode.episodeName
+                                      ? ` - ${episode.episodeName}`
+                                      : ""}
                                 </Badge>
                               </div>
                             ))}

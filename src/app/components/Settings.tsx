@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Switch } from "./ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   AlertDialog,
@@ -46,7 +47,7 @@ const QUALITY_OPTIONS = [
   { value: "hdtv", labelKey: "settings.quality.hdtv" },
 ];
 
-const SETTINGS_TABS = ["security", "api", "notifications", "factory"] as const;
+const SETTINGS_TABS = ["general", "api", "notifications", "factory"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 function parseSupportedLanguage(input: unknown): SupportedLanguage {
@@ -55,6 +56,14 @@ function parseSupportedLanguage(input: unknown): SupportedLanguage {
 
 function isValidSettingsTab(value: string): value is SettingsTab {
   return SETTINGS_TABS.includes(value as SettingsTab);
+}
+
+function normalizeSettingsTab(value: string | null): SettingsTab | null {
+  if (value === "security") {
+    return "general";
+  }
+
+  return value && isValidSettingsTab(value) ? value : null;
 }
 
 export function Settings() {
@@ -104,24 +113,24 @@ export function Settings() {
   const [isBrowserSaving, setIsBrowserSaving] = useState(false);
   const [browserDeviceId] = useState(getOrCreateBrowserDeviceId);
   const [languageCode, setLanguageCode] = useState<SupportedLanguage>("fr");
-  const [languageMessage, setLanguageMessage] = useState<string | null>(null);
-  const [languageError, setLanguageError] = useState<string | null>(null);
-  const [isLanguageSaving, setIsLanguageSaving] = useState(false);
+  const [spoilerMode, setSpoilerMode] = useState(false);
+  const [preferencesMessage, setPreferencesMessage] = useState<string | null>(null);
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
+  const [isPreferencesSaving, setIsPreferencesSaving] = useState(false);
   const [testNotifMessage, setTestNotifMessage] = useState<string | null>(null);
   const [testNotifError, setTestNotifError] = useState<string | null>(null);
   const [isSendingTestNotif, setIsSendingTestNotif] = useState(false);
   const tabParam = searchParams.get("tab");
-  const activeTab: SettingsTab = isValidSettingsTab(String(tabParam || ""))
-    ? (tabParam as SettingsTab)
-    : "security";
+  const activeTab: SettingsTab = normalizeSettingsTab(tabParam) || "general";
 
   useEffect(() => {
-    if (tabParam && isValidSettingsTab(tabParam)) {
+    const normalizedTab = normalizeSettingsTab(tabParam);
+    if (normalizedTab && tabParam === normalizedTab) {
       return;
     }
 
     const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("tab", "security");
+    nextParams.set("tab", normalizedTab || "general");
     setSearchParams(nextParams, { replace: true });
   }, [tabParam, searchParams, setSearchParams]);
 
@@ -151,6 +160,7 @@ export function Settings() {
     );
     setBrowserDevices(parseBrowserDevices((notifSettings as any).browser?.devices));
     setLanguageCode(parseSupportedLanguage((incomingSettings.placeholders?.preferences as any)?.language));
+    setSpoilerMode(Boolean((incomingSettings.placeholders?.preferences as any)?.spoilerMode));
   };
 
   const buildNotificationSettingsPayload = (params: {
@@ -608,34 +618,53 @@ export function Settings() {
     }
   };
 
-  const handleLanguageSave = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setLanguageMessage(null);
-    setLanguageError(null);
-    setIsLanguageSaving(true);
+  const savePreferences = async (nextPreferences: Record<string, unknown>, nextLanguage?: SupportedLanguage) => {
+    setPreferencesMessage(null);
+    setPreferencesError(null);
+    setIsPreferencesSaving(true);
 
     try {
       const updatedSettings = buildUpdatedSettings({
-        preferences: {
-          ...(settings?.placeholders?.preferences || {}),
-          language: languageCode,
-        },
+        preferences: nextPreferences,
       });
 
       const savedSettings = await updateSettings(updatedSettings);
       applyUpdatedSettings(savedSettings);
       await refresh();
-      setLanguage(languageCode);
-      setLanguageMessage(t("settings.language.success"));
+      if (nextLanguage) {
+        setLanguage(nextLanguage);
+      }
+      setPreferencesMessage(t("settings.preferences.saved"));
     } catch (submitError) {
-      setLanguageError(
+      setPreferencesError(
         submitError instanceof Error
           ? submitError.message
-          : t("settings.language.failed")
+          : t("settings.preferences.failed")
       );
     } finally {
-      setIsLanguageSaving(false);
+      setIsPreferencesSaving(false);
     }
+  };
+
+  const handleLanguageChange = async (nextLanguage: SupportedLanguage) => {
+    setLanguageCode(nextLanguage);
+    await savePreferences(
+      {
+        ...(settings?.placeholders?.preferences || {}),
+        language: nextLanguage,
+        spoilerMode,
+      },
+      nextLanguage
+    );
+  };
+
+  const handleSpoilerChange = async (nextSpoilerMode: boolean) => {
+    setSpoilerMode(nextSpoilerMode);
+    await savePreferences({
+      ...(settings?.placeholders?.preferences || {}),
+      language: languageCode,
+      spoilerMode: nextSpoilerMode,
+    });
   };
 
   return (
@@ -658,8 +687,8 @@ export function Settings() {
         className="space-y-6"
       >
         <TabsList className="bg-white/10 border border-white/10">
-          <TabsTrigger value="security" className="text-white data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
-            {t("settings.tabs.security")}
+          <TabsTrigger value="general" className="text-white data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+            {t("settings.tabs.general")}
           </TabsTrigger>
           <TabsTrigger value="api" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             {t("settings.tabs.configuration")}
@@ -672,22 +701,23 @@ export function Settings() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="security">
+        <TabsContent value="general">
           <Card className="border-blue-500/30 bg-blue-950/15 text-white mb-6">
             <CardHeader>
-              <CardTitle className="text-blue-200">{t("settings.language.title")}</CardTitle>
+              <CardTitle className="text-blue-200">{t("settings.preferences.title")}</CardTitle>
               <CardDescription className="text-blue-100/70">
-                {t("settings.language.description")}
+                {t("settings.preferences.description")}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleLanguageSave} className="space-y-4 max-w-lg">
+              <div className="space-y-5 max-w-lg">
                 <div className="space-y-2">
                   <Label htmlFor="settings-language">{t("settings.language.field")}</Label>
                   <select
                     id="settings-language"
                     value={languageCode}
-                    onChange={(event) => setLanguageCode(parseSupportedLanguage(event.target.value))}
+                    onChange={(event) => void handleLanguageChange(parseSupportedLanguage(event.target.value))}
+                    disabled={isPreferencesSaving}
                     className="w-full bg-slate-900 border border-white/10 text-white rounded-md px-3 py-2"
                   >
                     {availableLanguages.map((language) => (
@@ -698,13 +728,22 @@ export function Settings() {
                   </select>
                 </div>
 
-                {languageMessage && <p className="text-sm text-emerald-300">{languageMessage}</p>}
-                {languageError && <p className="text-sm text-red-300">{languageError}</p>}
+                <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/10 px-4 py-3 gap-4">
+                  <div>
+                    <p className="font-medium text-white">{t("settings.spoilers.toggleLabel")}</p>
+                    <p className="text-sm text-white/55">{t("settings.spoilers.toggleHelp")}</p>
+                  </div>
+                  <Switch
+                    checked={spoilerMode}
+                    onCheckedChange={(checked) => void handleSpoilerChange(Boolean(checked))}
+                    disabled={isPreferencesSaving}
+                  />
+                </div>
 
-                <Button type="submit" disabled={isLanguageSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  {isLanguageSaving ? t("common.saving") : t("settings.language.save")}
-                </Button>
-              </form>
+                {isPreferencesSaving ? <p className="text-sm text-white/60">{t("common.saving")}</p> : null}
+                {preferencesMessage && <p className="text-sm text-emerald-300">{preferencesMessage}</p>}
+                {preferencesError && <p className="text-sm text-red-300">{preferencesError}</p>}
+              </div>
             </CardContent>
           </Card>
 

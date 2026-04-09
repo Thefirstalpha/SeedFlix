@@ -20,7 +20,7 @@ function emitUnreadNotificationsUpdated(count: number) {
 
 export default function Notifications() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, settings } = useAuth();
   const { t, language } = useI18n();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +84,21 @@ export default function Notifications() {
 
   const isTrackerSuggestion = (notification: Notification) =>
     String(notification.data?.source || "") === "tracker-rss";
+
+  const spoilerModeEnabled = Boolean(
+    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode
+  );
+
+  const maskEpisodeLabel = (value: string) =>
+    value.replace(/(S\d{1,2}E\d{1,2})(?:\s*[-–]\s*.+)?$/i, "$1");
+
+  const getNotificationMessage = (notification: Notification) => {
+    if (!spoilerModeEnabled || String(notification.data?.mediaType || "") !== "episode") {
+      return notification.message;
+    }
+
+    return maskEpisodeLabel(String(notification.message || ""));
+  };
 
   const handleNotificationClick = (notification: Notification) => {
     if (!isTrackerSuggestion(notification)) {
@@ -253,7 +268,7 @@ export default function Notifications() {
                     )}
                   </div>
                   <p className="text-sm text-white/85 mb-2">
-                    {notif.message}
+                    {getNotificationMessage(notif)}
                   </p>
                   <p className="text-xs text-white/60">
                     {new Date(notif.createdAt).toLocaleString(language === "fr" ? "fr-FR" : "en-US")}
