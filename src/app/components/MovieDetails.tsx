@@ -375,9 +375,6 @@ export function MovieDetails() {
             <CardContent className="p-6 space-y-4">
               <div>
                 <h3 className="text-xl font-semibold text-white">{t("movieDetails.tracker.title")}</h3>
-                <p className="text-sm text-white/60 mt-1">
-                  {t("movieDetails.tracker.description")}
-                </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-4">

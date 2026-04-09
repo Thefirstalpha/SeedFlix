@@ -188,7 +188,6 @@ const en = {
     },
     tracker: {
       title: "Tracker results",
-      description: "Versions detected on Torznab: quality, languages, and metadata.",
       quality: "Quality",
       language: "Language",
       all: "All",
