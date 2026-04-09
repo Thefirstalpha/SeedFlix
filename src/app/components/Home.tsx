@@ -547,9 +547,9 @@ export function Home() {
                       onWheel={handleCarouselWheel}
                       className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-y"
                     >
-                      <div className="flex gap-4 py-4 pr-4">
+                      <div className="flex gap-3 sm:gap-4 py-4 pr-3 sm:pr-4">
                         {filteredMovies.map((movie) => (
-                          <div key={movie.id} className="min-w-[220px] max-w-[220px] shrink-0">
+                          <div key={movie.id} className="min-w-[172px] max-w-[172px] sm:min-w-[196px] sm:max-w-[196px] md:min-w-[220px] md:max-w-[220px] shrink-0">
                             <MovieCard
                               movie={movie}
                             />
@@ -601,9 +601,9 @@ export function Home() {
                       onWheel={handleCarouselWheel}
                       className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth touch-pan-y"
                     >
-                      <div className="flex gap-4 py-4 pr-4">
+                      <div className="flex gap-3 sm:gap-4 py-4 pr-3 sm:pr-4">
                         {filteredSeries.map((show) => (
-                          <div key={show.id} className="min-w-[220px] max-w-[220px] shrink-0">
+                          <div key={show.id} className="min-w-[172px] max-w-[172px] sm:min-w-[196px] sm:max-w-[196px] md:min-w-[220px] md:max-w-[220px] shrink-0">
                             <SeriesCard
                               series={show}
                             />

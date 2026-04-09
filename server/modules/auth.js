@@ -370,10 +370,11 @@ export function registerAuthRoutes(app) {
       }
 
       const sessions = await readSessions();
+      const now = Date.now();
       const token = randomBytes(24).toString("hex");
-      const expiresAt = Date.now() + sessionDurationMs;
+      const expiresAt = now + sessionDurationMs;
       const nextSessions = [
-        ...sessions.filter((session) => session.userId !== user.id),
+        ...sessions.filter((session) => Number(session.expiresAt) > now),
         { token, userId: user.id, expiresAt },
       ];
       await writeSessions(nextSessions);
