@@ -83,6 +83,18 @@ function showBrowserNotification(title: string, message: string) {
   });
 }
 
+function maskEpisodeLabel(value: string) {
+  return String(value || "").replace(/(S\d{1,2}E\d{1,2})(?:\s*[-–]\s*[^:\n]+)?/i, "$1");
+}
+
+function getSafeNotificationMessage(message: string, spoilerModeEnabled: boolean, mediaType?: unknown) {
+  if (!spoilerModeEnabled || String(mediaType || "") !== "episode") {
+    return message;
+  }
+
+  return maskEpisodeLabel(message);
+}
+
 export function Root() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -108,6 +120,9 @@ export function Root() {
     mustConfigureTorrent,
     mustConfigureIndexer,
   } = useAuth();
+  const spoilerModeEnabled = Boolean(
+    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode
+  );
   const isSetupPage = location.pathname === "/setup";
   const isLoginPage = location.pathname === "/login";
   const shouldShowHeader = !isLoginPage && !isSetupPage;
@@ -187,10 +202,15 @@ export function Root() {
           if (latestUnread) {
             const toastTitle =
               delta > 1 ? `${delta} nouvelles notifications` : latestUnread.title;
+            const safeLatestMessage = getSafeNotificationMessage(
+              latestUnread.message,
+              spoilerModeEnabled,
+              latestUnread.data?.mediaType
+            );
             const toastDescription =
               delta > 1
-                ? `${latestUnread.message} (et ${delta - 1} autre${delta - 1 > 1 ? "s" : ""})`
-                : latestUnread.message;
+                ? `${safeLatestMessage} (et ${delta - 1} autre${delta - 1 > 1 ? "s" : ""})`
+                : safeLatestMessage;
 
             showNotificationToast(latestUnread.type, toastTitle, toastDescription);
 
@@ -200,7 +220,7 @@ export function Root() {
                 browserDeviceId
               )
             ) {
-              showBrowserNotification(latestUnread.title, latestUnread.message);
+              showBrowserNotification(latestUnread.title, safeLatestMessage);
             }
           } else {
             toast.info(
@@ -246,6 +266,7 @@ export function Root() {
     location.pathname,
     settings,
     browserDeviceId,
+    spoilerModeEnabled,
   ]);
 
   useEffect(() => {
