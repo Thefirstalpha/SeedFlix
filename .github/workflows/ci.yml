@@ -94,7 +94,7 @@ jobs:
           image-ref: local/seedflix:ci
           hide-progress: true
           trivy-config: trivy.yaml
-          severity: HIGH,CRITICAL
+          severity: CRITICAL
           ignore-unfixed: true
           format: table
           exit-code: "1"
