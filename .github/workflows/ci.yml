@@ -81,6 +81,7 @@ jobs:
           scan-ref: .
           hide-progress: true
           skip-dirs: node_modules,dist,.git
+          trivy-config: trivy.yaml
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           format: table
@@ -92,6 +93,7 @@ jobs:
           version: latest
           image-ref: local/seedflix:ci
           hide-progress: true
+          trivy-config: trivy.yaml
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           format: table
