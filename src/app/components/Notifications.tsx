@@ -90,7 +90,7 @@ export default function Notifications() {
   );
 
   const maskEpisodeLabel = (value: string) =>
-    value.replace(/(S\d{1,2}E\d{1,2})(?:\s*[-–]\s*.+)?$/i, "$1");
+    value.replace(/(S\d{1,2}E\d{1,2})(?:\s*[-–]\s*[^:\n]+)?/i, "$1");
 
   const getNotificationMessage = (notification: Notification) => {
     if (!spoilerModeEnabled || String(notification.data?.mediaType || "") !== "episode") {

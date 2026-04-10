@@ -747,11 +747,9 @@ export function WishList() {
                                   className="border-white/20 text-white/70"
                                 >
                                   {getEpisodeCode("", episode.seasonNumber, episode.episodeNumber)}
-                                  {spoilerModeEnabled
-                                    ? ` - ${t("seriesDetails.spoilers.hiddenTitle")}`
-                                    : episode.episodeName
-                                      ? ` - ${episode.episodeName}`
-                                      : ""}
+                                  {!spoilerModeEnabled && episode.episodeName
+                                    ? ` - ${episode.episodeName}`
+                                    : ""}
                                 </Badge>
                               </div>
                             ))}

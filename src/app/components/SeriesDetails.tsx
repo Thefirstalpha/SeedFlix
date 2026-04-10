@@ -668,17 +668,8 @@ export function SeriesDetails() {
                                 >
                                   <p className="text-white font-semibold">
                                     {t("seriesDetails.episodeNumber", { number: episode.episodeNumber })}
-                                    {isEpisodeHidden
-                                      ? `: ${t("seriesDetails.spoilers.hiddenTitle")}`
-                                      : episode.name
-                                        ? `: ${episode.name}`
-                                        : ""}
+                                    {!isEpisodeHidden && (episode.name ? `: ${episode.name}` : "")}
                                   </p>
-                                  {isEpisodeHidden ? (
-                                    <p className="mt-2 text-xs uppercase tracking-wide text-violet-300/90">
-                                      {t("seriesDetails.spoilers.clickToReveal")}
-                                    </p>
-                                  ) : null}
                                 </button>
                                 <p className="text-white/60 text-sm mt-0.5">
                                   {episode.airDate || t("seriesDetails.unknownDate")}
@@ -731,12 +722,15 @@ export function SeriesDetails() {
                               <button
                                 type="button"
                                 onClick={() => toggleEpisodeReveal(episode.id)}
-                                className="mt-3 block w-full rounded-md border border-dashed border-violet-400/30 bg-violet-500/5 p-3 text-left transition-colors hover:bg-violet-500/10"
+                                className="mt-3 block w-full rounded-md border border-dashed border-violet-400/30 bg-violet-500/5 p-1 text-left transition-colors hover:bg-violet-500/10"
                               >
-                                <div className="space-y-2">
-                                  <div className="h-3 w-1/3 rounded bg-white/10" />
-                                  <div className="h-3 w-full rounded bg-white/10" />
-                                  <div className="h-3 w-5/6 rounded bg-white/10" />
+                                <div className="relative space-y-1.5">
+                                  <div className="h-2 w-1/3 rounded bg-white/10" />
+                                  <div className="h-2 w-full rounded bg-white/10" />
+                                  <div className="h-2 w-5/6 rounded bg-white/10" />
+                                  <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold uppercase tracking-widest text-violet-200/70">
+                                    Mode spoiler
+                                  </span>
                                 </div>
                               </button>
                             ) : episode.overview ? (
