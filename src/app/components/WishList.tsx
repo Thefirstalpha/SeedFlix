@@ -192,9 +192,20 @@ export function WishList() {
     setActionKey(key);
     try {
       const mediaType = target.targetType === "movie" ? "movie" : "series";
-      await addTorrentToClient(torrentUrl, mediaType);
-      await validateTrackerResult(target.targetKey, trackerStateKey);
-      await loadTrackerResults();
+      await addTorrentToClient(torrentUrl, mediaType, target.targetKey);
+      
+      // Validate tracker result (best effort)
+      try {
+        await validateTrackerResult(target.targetKey, trackerStateKey);
+      } catch {
+        // Silent fail - tracker validation is optional
+      }
+      
+      // Reload data (best effort - continue even if one fails)
+      await Promise.allSettled([loadTrackerResults(), loadWishlist(), loadSeriesWishlist()]);
+    } catch (error) {
+      console.error("Error adding torrent from wishlist:", error);
+      // Data stays visible even if error occurs
     } finally {
       setActionKey(null);
     }

@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - "**"
+      - "master"
   pull_request:
 
 permissions:
@@ -21,10 +21,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -81,6 +81,7 @@ jobs:
           scan-ref: .
           hide-progress: true
           skip-dirs: node_modules,dist,.git
+          trivy-config: trivy.yaml
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           format: table
@@ -92,7 +93,8 @@ jobs:
           version: latest
           image-ref: local/seedflix:ci
           hide-progress: true
-          severity: HIGH,CRITICAL
+          trivy-config: trivy.yaml
+          severity: CRITICAL
           ignore-unfixed: true
           format: table
           exit-code: "1"

@@ -22,6 +22,9 @@ LABEL org.opencontainers.image.version="${IMAGE_TAG}"
 # Pull in latest Alpine security fixes available at build time.
 RUN apk upgrade --no-cache
 
+# Update bundled npm to latest patched release so image scans do not fail on npm's own transitive deps.
+RUN npm install -g npm@latest
+
 COPY package*.json ./
 RUN npm ci --omit=dev
 

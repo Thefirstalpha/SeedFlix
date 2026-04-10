@@ -122,6 +122,14 @@ const en = {
     activeSummary: "{{active}} active out of {{total}} torrent(s)",
     loading: "Loading downloads...",
     empty: "No active downloads.",
+    filters: {
+      label: "Filters",
+      active: "Active",
+      completed: "Completed",
+      seedflixOnly: "SeedFlix only",
+      allTorrents: "All torrents",
+      empty: "No torrents match the selected filters.",
+    },
     unknown: "Unknown",
     finished: "Finished",
     rate: "Rate",
@@ -131,6 +139,7 @@ const en = {
     pause: "Pause",
     resume: "Resume",
     remove: "Remove",
+    dontTrack: "Don't track",
     loadFailed: "Failed to load downloads",
   },
   home: {

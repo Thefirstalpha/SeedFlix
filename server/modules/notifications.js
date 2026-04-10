@@ -218,6 +218,28 @@ function getUserDiscordWebhook(user) {
   return String(notifSettings?.discord?.webhookUrl || "").trim();
 }
 
+function isSpoilerModeEnabled(user) {
+  return Boolean(user?.settings?.placeholders?.preferences?.spoilerMode);
+}
+
+function maskEpisodeLabel(value) {
+  return String(value || "").replace(/(S\d{1,2}E\d{1,2})(?:\s*[-–]\s*[^:\n]+)?/i, "$1");
+}
+
+function buildExternalNotificationPayload(user, notification) {
+  if (
+    !isSpoilerModeEnabled(user) ||
+    String(notification?.data?.mediaType || "") !== "episode"
+  ) {
+    return notification;
+  }
+
+  return {
+    ...notification,
+    message: maskEpisodeLabel(notification?.message),
+  };
+}
+
 function buildSeriesTarget(entry) {
   const seriesId = Number(entry?.seriesId);
   if (!Number.isFinite(seriesId)) {
@@ -283,7 +305,8 @@ async function notifyUser(user, notification) {
 
   const webhookUrl = getUserDiscordWebhook(user);
   if (webhookUrl) {
-    await sendDiscordNotification(webhookUrl, notification);
+    const externalNotification = buildExternalNotificationPayload(user, notification);
+    await sendDiscordNotification(webhookUrl, externalNotification);
   }
 }
 

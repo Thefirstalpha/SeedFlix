@@ -686,20 +686,34 @@ export function Settings() {
         }}
         className="space-y-6"
       >
-        <TabsList className="bg-white/10 border border-white/10">
-          <TabsTrigger value="general" className="text-white data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
-            {t("settings.tabs.general")}
-          </TabsTrigger>
-          <TabsTrigger value="api" className="text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            {t("settings.tabs.configuration")}
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white">
-            {t("settings.tabs.notifications")}
-          </TabsTrigger>
-          <TabsTrigger value="factory" className="text-white data-[state=active]:bg-red-600 data-[state=active]:text-white">
-            {t("settings.tabs.factory")}
-          </TabsTrigger>
-        </TabsList>
+        <div className="w-full overflow-x-auto pb-1">
+          <TabsList className="bg-white/10 border border-white/10 min-w-max">
+            <TabsTrigger
+              value="general"
+              className="flex-none text-white data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+            >
+              {t("settings.tabs.general")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="api"
+              className="flex-none text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              {t("settings.tabs.configuration")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="notifications"
+              className="flex-none text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white"
+            >
+              {t("settings.tabs.notifications")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="factory"
+              className="flex-none text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+            >
+              {t("settings.tabs.factory")}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="general">
           <Card className="border-blue-500/30 bg-blue-950/15 text-white mb-6">

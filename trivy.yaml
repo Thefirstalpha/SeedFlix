@@ -1,0 +1,15 @@
+pkg:
+  # Do not report vulnerabilities in dev-only dependencies.
+  include-dev-deps: false
+
+scan:
+  skip-dirs:
+    - node_modules
+    - dist
+    - .git
+  skip-files:
+    # npm CLI bundles its own copy of picomatch (and other libs) under its own node_modules.
+    # These are npm's internal runtime deps, not our application code.
+    # Trivy finds them when scanning the Docker image but they are not reachable from the app.
+    - /usr/local/lib/node_modules/npm/package.json
+    - /usr/local/lib/node_modules/npm/package-lock.json

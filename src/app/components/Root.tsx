@@ -68,7 +68,7 @@ function canUseBrowserNotificationChannel(
   return browserDevices.some((device) => device.id === browserDeviceId);
 }
 
-function showBrowserNotification(title: string, message: string) {
+async function showBrowserNotification(title: string, message: string) {
   if (typeof window === "undefined" || typeof Notification === "undefined") {
     return;
   }
@@ -77,10 +77,39 @@ function showBrowserNotification(title: string, message: string) {
     return;
   }
 
+  if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration?.showNotification) {
+        await registration.showNotification(title, {
+          body: message,
+          icon: "/favicon.svg",
+          badge: "/favicon-96x96.png",
+          tag: "seedflix-notification",
+        });
+        return;
+      }
+    } catch {
+      // Fallback to Notification API below.
+    }
+  }
+
   new Notification(title, {
     body: message,
     icon: "/favicon.svg",
   });
+}
+
+function maskEpisodeLabel(value: string) {
+  return String(value || "").replace(/(S\d{1,2}E\d{1,2})(?:\s*[-–]\s*[^:\n]+)?/i, "$1");
+}
+
+function getSafeNotificationMessage(message: string, spoilerModeEnabled: boolean, mediaType?: unknown) {
+  if (!spoilerModeEnabled || String(mediaType || "") !== "episode") {
+    return message;
+  }
+
+  return maskEpisodeLabel(message);
 }
 
 export function Root() {
@@ -108,6 +137,9 @@ export function Root() {
     mustConfigureTorrent,
     mustConfigureIndexer,
   } = useAuth();
+  const spoilerModeEnabled = Boolean(
+    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode
+  );
   const isSetupPage = location.pathname === "/setup";
   const isLoginPage = location.pathname === "/login";
   const shouldShowHeader = !isLoginPage && !isSetupPage;
@@ -187,10 +219,15 @@ export function Root() {
           if (latestUnread) {
             const toastTitle =
               delta > 1 ? `${delta} nouvelles notifications` : latestUnread.title;
+            const safeLatestMessage = getSafeNotificationMessage(
+              latestUnread.message,
+              spoilerModeEnabled,
+              latestUnread.data?.mediaType
+            );
             const toastDescription =
               delta > 1
-                ? `${latestUnread.message} (et ${delta - 1} autre${delta - 1 > 1 ? "s" : ""})`
-                : latestUnread.message;
+                ? `${safeLatestMessage} (et ${delta - 1} autre${delta - 1 > 1 ? "s" : ""})`
+                : safeLatestMessage;
 
             showNotificationToast(latestUnread.type, toastTitle, toastDescription);
 
@@ -200,7 +237,7 @@ export function Root() {
                 browserDeviceId
               )
             ) {
-              showBrowserNotification(latestUnread.title, latestUnread.message);
+              void showBrowserNotification(latestUnread.title, safeLatestMessage);
             }
           } else {
             toast.info(
@@ -246,6 +283,7 @@ export function Root() {
     location.pathname,
     settings,
     browserDeviceId,
+    spoilerModeEnabled,
   ]);
 
   useEffect(() => {
