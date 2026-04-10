@@ -1,4 +1,4 @@
-import { requireAuth } from "./auth.js";
+import { withAuth } from "./auth.js";
 import { debugLog } from "../logger.js";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -441,12 +441,8 @@ async function createAndSendNotification(userId, notification) {
 }
 
 export function registerTransmissionRoutes(app) {
-  app.post("/api/torrent/test", async (req, res) => {
+  app.post("/api/torrent/test", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const settings = resolveTorrentSettings(auth, req.body);
@@ -506,14 +502,10 @@ export function registerTransmissionRoutes(app) {
         error: t("transmission.testFailed"),
       });
     }
-  });
+  }));
 
-  app.post("/api/torrent/add", async (req, res) => {
+  app.post("/api/torrent/add", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const settings = resolveTorrentSettings(auth, req.body);
@@ -603,14 +595,10 @@ export function registerTransmissionRoutes(app) {
         error: t("transmission.addFailed"),
       });
     }
-  });
+  }));
 
-  app.get("/api/torrent/downloads", async (req, res) => {
+  app.get("/api/torrent/downloads", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const settings = resolveTorrentSettings(auth, req.query);
@@ -714,14 +702,10 @@ export function registerTransmissionRoutes(app) {
         error: t("transmission.downloadsFailed"),
       });
     }
-  });
+  }));
 
-  app.post("/api/torrent/pause", async (req, res) => {
+  app.post("/api/torrent/pause", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const torrentId = Number(req.body?.id);
@@ -789,14 +773,10 @@ export function registerTransmissionRoutes(app) {
         error: t("transmission.pauseFailed"),
       });
     }
-  });
+  }));
 
-  app.post("/api/torrent/resume", async (req, res) => {
+  app.post("/api/torrent/resume", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const torrentId = Number(req.body?.id);
@@ -846,14 +826,10 @@ export function registerTransmissionRoutes(app) {
         error: t("transmission.resumeFailed"),
       });
     }
-  });
+  }));
 
-  app.post("/api/torrent/clean", async (req, res) => {
+  app.post("/api/torrent/clean", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const torrentHash = String(req.body?.hash || "").trim().toLowerCase();
@@ -873,14 +849,10 @@ export function registerTransmissionRoutes(app) {
         error: t("transmission.cleanFailed"),
       });
     }
-  });
+  }));
 
-  app.post("/api/torrent/unmanage", async (req, res) => {
+  app.post("/api/torrent/unmanage", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const torrentHash = String(req.body?.hash || "").trim().toLowerCase();
@@ -900,5 +872,5 @@ export function registerTransmissionRoutes(app) {
         error: t("transmission.unmanageFailed"),
       });
     }
-  });
+  }));
 }

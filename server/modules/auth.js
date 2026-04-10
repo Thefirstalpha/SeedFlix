@@ -380,7 +380,30 @@ async function requireAuth(req, res) {
   return auth;
 }
 
-export { getAuthenticatedUser, requireAuth };
+function withAuth(handler) {
+  return async (req, res) => {
+    const auth = await requireAuth(req, res);
+    if (!auth) {
+      return;
+    }
+
+    return handler(req, res, auth);
+  };
+}
+
+function withAdmin(handler) {
+  return withAuth(async (req, res, auth) => {
+    const t = getTranslator(req, auth.user);
+    if (auth.user.username !== "admin") {
+      res.status(403).json({ error: t("auth.adminRequired") });
+      return;
+    }
+
+    return handler(req, res, auth);
+  });
+}
+
+export { getAuthenticatedUser, requireAuth, withAuth, withAdmin };
 
 export async function getGlobalTmdbApiKey() {
   const globalConfig = await readGlobalConfig();
@@ -476,12 +499,8 @@ export function registerAuthRoutes(app) {
     }
   });
 
-  app.post("/api/auth/change-password", async (req, res) => {
+  app.post("/api/auth/change-password", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const currentPassword = String(req.body?.currentPassword || "");
@@ -532,31 +551,21 @@ export function registerAuthRoutes(app) {
       debugLog("Change password failed:", error);
       res.status(500).json({ error: t("auth.failedChangePassword") });
     }
-  });
+  }));
 
-  app.get("/api/settings", async (req, res) => {
+  app.get("/api/settings", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       res.json(buildClientSettingsPayload(auth.user.settings));
     } catch (error) {
       debugLog("Read settings failed:", error);
       res.status(500).json({ error: t("auth.failedLoadSettings") });
     }
-  });
+  }));
 
-  app.put("/api/settings", async (req, res) => {
+  app.put("/api/settings", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const newSettings = sanitizeSettingsPayload(req.body);
       const users = await readUsers();
       const nextUsers = users.map((user) => {
@@ -575,42 +584,22 @@ export function registerAuthRoutes(app) {
       debugLog("Update settings failed:", error);
       res.status(500).json({ error: t("auth.failedUpdateSettings") });
     }
-  });
+  }));
 
-  app.get("/api/settings/global", async (req, res) => {
+  app.get("/api/settings/global", withAdmin(async (req, res) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      if (auth.user.username !== "admin") {
-        res.status(403).json({ error: t("auth.adminRequired") });
-        return;
-      }
-
       const globalConfig = await readGlobalConfig();
       res.json({ tmdbApiKey: globalConfig.tmdbApiKey || "" });
     } catch (error) {
       debugLog("Read global settings failed:", error);
       res.status(500).json({ error: t("auth.failedLoadSettings") });
     }
-  });
+  }));
 
-  app.put("/api/settings/global", async (req, res) => {
+  app.put("/api/settings/global", withAdmin(async (req, res) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      if (auth.user.username !== "admin") {
-        res.status(403).json({ error: t("auth.adminRequired") });
-        return;
-      }
-
       const tmdbApiKey = String(req.body?.tmdbApiKey || "").trim();
       await writeGlobalConfig({ tmdbApiKey });
       res.json({ tmdbApiKey });
@@ -618,22 +607,11 @@ export function registerAuthRoutes(app) {
       debugLog("Update global settings failed:", error);
       res.status(500).json({ error: t("auth.failedUpdateSettings") });
     }
-  });
+  }));
 
-  app.post("/api/settings/reset", async (req, res) => {
+  app.post("/api/settings/reset", withAdmin(async (req, res) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      // Factory reset is admin-only
-      if (auth.user.username !== "admin") {
-        res.status(403).json({ error: t("auth.adminRequired") });
-        return;
-      }
-
       const { resetAllWishlists } = await import("./wishlist.js");
 
       const defaults = await readDefaultSettings();
@@ -670,26 +648,15 @@ export function registerAuthRoutes(app) {
       debugLog("Reset settings failed:", error);
       res.status(500).json({ error: t("auth.failedResetSettings") });
     }
-  });
+  }));
 
   // ────────────────────────────────────────────────────────────────────────
   // User Management (Admin only)
   // ────────────────────────────────────────────────────────────────────────
 
-  app.get("/api/users", async (req, res) => {
+  app.get("/api/users", withAdmin(async (req, res) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      // Only admin can manage users
-      if (auth.user.username !== "admin") {
-        res.status(403).json({ error: t("auth.adminRequired") });
-        return;
-      }
-
       const users = await readUsers();
       // Return all users except admin
       const nonAdminUsers = users
@@ -704,22 +671,11 @@ export function registerAuthRoutes(app) {
       debugLog("List users failed:", error);
       res.status(500).json({ error: t("auth.failedListUsers") });
     }
-  });
+  }));
 
-  app.post("/api/users", async (req, res) => {
+  app.post("/api/users", withAdmin(async (req, res) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      // Only admin can create users
-      if (auth.user.username !== "admin") {
-        res.status(403).json({ error: t("auth.adminRequired") });
-        return;
-      }
-
       const username = String(req.body?.username || "").trim();
 
       if (!username) {
@@ -759,22 +715,11 @@ export function registerAuthRoutes(app) {
       debugLog("Create user failed:", error);
       res.status(500).json({ error: t("auth.failedCreateUser") });
     }
-  });
+  }));
 
-  app.delete("/api/users/:id", async (req, res) => {
+  app.delete("/api/users/:id", withAdmin(async (req, res) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      // Only admin can delete users
-      if (auth.user.username !== "admin") {
-        res.status(403).json({ error: t("auth.adminRequired") });
-        return;
-      }
-
       const userId = parseInt(String(req.params.id), 10);
 
       const users = await readUsers();
@@ -804,22 +749,11 @@ export function registerAuthRoutes(app) {
       debugLog("Delete user failed:", error);
       res.status(500).json({ error: t("auth.failedDeleteUser") });
     }
-  });
+  }));
 
-  app.post("/api/users/:id/reset-password", async (req, res) => {
+  app.post("/api/users/:id/reset-password", withAdmin(async (req, res) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      // Only admin can reset user passwords
-      if (auth.user.username !== "admin") {
-        res.status(403).json({ error: t("auth.adminRequired") });
-        return;
-      }
-
       const userId = parseInt(String(req.params.id), 10);
 
       const users = await readUsers();
@@ -859,7 +793,7 @@ export function registerAuthRoutes(app) {
       debugLog("Reset user password failed:", error);
       res.status(500).json({ error: t("auth.failedResetUserPassword") });
     }
-  });
+  }));
 }
 
 function defaultGlobalConfig() {

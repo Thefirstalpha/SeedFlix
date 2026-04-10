@@ -1,4 +1,4 @@
-import { requireAuth } from "./auth.js";
+import { withAuth } from "./auth.js";
 import { debugLog } from "../logger.js";
 import { getTranslator } from "../i18n.js";
 
@@ -397,12 +397,8 @@ export async function searchTorznabForQuery(auth, query, options = {}) {
 }
 
 export function registerTorznabRoutes(app) {
-  app.get("/api/indexer/search", async (req, res) => {
+  app.get("/api/indexer/search", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const query = String(req.query.query || "").trim();
@@ -444,14 +440,10 @@ export function registerTorznabRoutes(app) {
         error: t("torznab.searchFailed"),
       });
     }
-  });
+  }));
 
-  app.post("/api/indexer/test", async (req, res) => {
+  app.post("/api/indexer/test", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const { url, token } = resolveIndexerSettings(auth, req.body);
@@ -514,5 +506,5 @@ export function registerTorznabRoutes(app) {
         error: t("torznab.testFailed"),
       });
     }
-  });
+  }));
 }

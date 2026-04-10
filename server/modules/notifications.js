@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { requireAuth } from "./auth.js";
+import { withAuth } from "./auth.js";
 import { dataDir, usersFilePath } from "../config.js";
 import { readSeriesWishlist, readWishlist } from "./wishlist.js";
 import { searchTorznabForQuery } from "./torznab.js";
@@ -1147,12 +1147,8 @@ export function registerNotificationRoutes(app) {
   startTrackerWishlistPolling();
 
   // Notification de test (interne + Discord si configuré)
-  app.post("/api/notifications/test", async (req, res) => {
+  app.post("/api/notifications/test", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const notification = {
@@ -1177,16 +1173,11 @@ export function registerNotificationRoutes(app) {
       console.error("Error sending test notification:", error);
       res.status(500).json({ error: error.message || t("notifications.testFailed") });
     }
-  });
+  }));
 
   // Récupérer les notifications
-  app.get("/api/notifications", async (req, res) => {
+  app.get("/api/notifications", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userId = resolveNotificationUserKey(auth.user);
       const limit = parseInt(req.query.limit) || 50;
       const unreadOnly = req.query.unreadOnly === "true";
@@ -1203,15 +1194,10 @@ export function registerNotificationRoutes(app) {
       console.error("Error getting notifications:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
-  app.get("/api/tracker-results", async (req, res) => {
+  app.get("/api/tracker-results", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const targets = await getTrackerResultsForUser(resolveNotificationUserKey(auth.user), {
         legacyUserKey: auth.user.username,
       });
@@ -1220,15 +1206,10 @@ export function registerNotificationRoutes(app) {
       console.error("Error getting tracker results:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
-  app.post("/api/tracker-results/reject", async (req, res) => {
+  app.post("/api/tracker-results/reject", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const t = getTranslator(req, auth.user);
       const result = await rejectTrackerResultItem(
         resolveNotificationUserKey(auth.user),
@@ -1248,15 +1229,10 @@ export function registerNotificationRoutes(app) {
       console.error("Error rejecting tracker result:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
-  app.post("/api/tracker-results/validate", async (req, res) => {
+  app.post("/api/tracker-results/validate", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const result = await validateTrackerResultItem(
         resolveNotificationUserKey(auth.user),
         req.body?.targetKey,
@@ -1272,16 +1248,11 @@ export function registerNotificationRoutes(app) {
       console.error("Error validating tracker result:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
   // Marquer comme lue
-  app.post("/api/notifications/:id/read", async (req, res) => {
+  app.post("/api/notifications/:id/read", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userId = resolveNotificationUserKey(auth.user);
       const notificationId = req.params.id;
 
@@ -1297,16 +1268,11 @@ export function registerNotificationRoutes(app) {
       console.error("Error marking notification as read:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
   // Marquer toutes comme lues
-  app.post("/api/notifications/read-all", async (req, res) => {
+  app.post("/api/notifications/read-all", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userId = resolveNotificationUserKey(auth.user);
       await markAllAsRead(userId);
       res.json({ success: true });
@@ -1314,16 +1280,11 @@ export function registerNotificationRoutes(app) {
       console.error("Error marking all as read:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
   // Supprimer une notification
-  app.delete("/api/notifications/:id", async (req, res) => {
+  app.delete("/api/notifications/:id", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userId = resolveNotificationUserKey(auth.user);
       const notificationId = req.params.id;
 
@@ -1339,16 +1300,11 @@ export function registerNotificationRoutes(app) {
       console.error("Error deleting notification:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
   // Vider toutes les notifications
-  app.delete("/api/notifications", async (req, res) => {
+  app.delete("/api/notifications", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userId = resolveNotificationUserKey(auth.user);
       await clearNotifications(userId);
       res.json({ success: true });
@@ -1356,6 +1312,6 @@ export function registerNotificationRoutes(app) {
       console.error("Error clearing notifications:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
 }

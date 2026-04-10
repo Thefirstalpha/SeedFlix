@@ -1,7 +1,7 @@
 import { tmdbApiKey as defaultTmdbApiKey, tmdbBaseUrl } from "../config.js";
 import { debugLog } from "../logger.js";
 import { getTranslator } from "../i18n.js";
-import { requireAuth, getGlobalTmdbApiKey } from "./auth.js";
+import { withAdmin, withAuth, getGlobalTmdbApiKey } from "./auth.js";
 
 async function getTmdbApiKey() {
   const globalKey = await getGlobalTmdbApiKey();
@@ -128,14 +128,9 @@ function hasActiveDiscoverFilters(filters, type) {
 }
 
 export function registerTmdbRoutes(app) {
-  app.post("/api/tmdb/test-key", async (req, res) => {
+  app.post("/api/tmdb/test-key", withAdmin(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const apiKey = String(req.body?.apiKey || "").trim();
       if (!apiKey) {
         res.status(400).json({ error: t("tmdb.apiKeyRequired") });
@@ -161,9 +156,9 @@ export function registerTmdbRoutes(app) {
       debugLog("TMDB key test failed:", error);
       res.status(500).json({ error: t("tmdb.testApiKeyFailed") });
     }
-  });
+  }));
 
-  app.get("/api/movies/popular", async (req, res) => {
+  app.get("/api/movies/popular", withAuth(async (req, res) => {
     const t = getTranslator(req);
     const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
@@ -184,9 +179,9 @@ export function registerTmdbRoutes(app) {
       debugLog("Popular movies proxy failed:", error);
       res.status(500).json({ error: t("tmdb.fetchPopularMoviesFailed") });
     }
-  });
+  }));
 
-  app.get("/api/movies/genres", async (req, res) => {
+  app.get("/api/movies/genres", withAuth(async (req, res) => {
     const t = getTranslator(req);
     const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
@@ -202,9 +197,9 @@ export function registerTmdbRoutes(app) {
       debugLog("Movie genres proxy failed:", error);
       res.status(500).json({ error: t("tmdb.fetchMovieGenresFailed") });
     }
-  });
+  }));
 
-  app.get("/api/movies/discover", async (req, res) => {
+  app.get("/api/movies/discover", withAuth(async (req, res) => {
     const t = getTranslator(req);
     const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
@@ -249,9 +244,9 @@ export function registerTmdbRoutes(app) {
       debugLog("Discover movies proxy failed:", error);
       res.status(500).json({ error: t("tmdb.discoverMoviesFailed") });
     }
-  });
+  }));
 
-  app.get("/api/movies/search", async (req, res) => {
+  app.get("/api/movies/search", withAuth(async (req, res) => {
     const t = getTranslator(req);
     const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
@@ -279,9 +274,9 @@ export function registerTmdbRoutes(app) {
       debugLog("Search movies proxy failed:", error);
       res.status(500).json({ error: t("tmdb.searchMoviesFailed") });
     }
-  });
+  }));
 
-  app.get("/api/movies/:id", async (req, res) => {
+  app.get("/api/movies/:id", withAuth(async (req, res) => {
     const t = getTranslator(req);
     const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
@@ -307,9 +302,9 @@ export function registerTmdbRoutes(app) {
       debugLog("Movie details proxy failed:", error);
       res.status(500).json({ error: t("tmdb.fetchMovieDetailsFailed") });
     }
-  });
+  }));
 
-  app.get("/api/series/popular", async (req, res) => {
+  app.get("/api/series/popular", withAuth(async (req, res) => {
     const t = getTranslator(req);
     const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
@@ -330,9 +325,9 @@ export function registerTmdbRoutes(app) {
       debugLog("Popular series proxy failed:", error);
       res.status(500).json({ error: t("tmdb.fetchPopularSeriesFailed") });
     }
-  });
+  }));
 
-  app.get("/api/series/genres", async (req, res) => {
+  app.get("/api/series/genres", withAuth(async (req, res) => {
     const t = getTranslator(req);
     const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
@@ -348,9 +343,9 @@ export function registerTmdbRoutes(app) {
       debugLog("Series genres proxy failed:", error);
       res.status(500).json({ error: t("tmdb.fetchSeriesGenresFailed") });
     }
-  });
+  }));
 
-  app.get("/api/series/discover", async (req, res) => {
+  app.get("/api/series/discover", withAuth(async (req, res) => {
     const t = getTranslator(req);
     const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
@@ -395,9 +390,9 @@ export function registerTmdbRoutes(app) {
       debugLog("Discover series proxy failed:", error);
       res.status(500).json({ error: t("tmdb.discoverSeriesFailed") });
     }
-  });
+  }));
 
-  app.get("/api/series/search", async (req, res) => {
+  app.get("/api/series/search", withAuth(async (req, res) => {
     const t = getTranslator(req);
     const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
@@ -425,9 +420,9 @@ export function registerTmdbRoutes(app) {
       debugLog("Search series proxy failed:", error);
       res.status(500).json({ error: t("tmdb.searchSeriesFailed") });
     }
-  });
+  }));
 
-  app.get("/api/series/:id", async (req, res) => {
+  app.get("/api/series/:id", withAuth(async (req, res) => {
     const t = getTranslator(req);
     const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
@@ -453,9 +448,9 @@ export function registerTmdbRoutes(app) {
       debugLog("Series details proxy failed:", error);
       res.status(500).json({ error: t("tmdb.fetchSeriesDetailsFailed") });
     }
-  });
+  }));
 
-  app.get("/api/series/:id/seasons/:seasonNumber", async (req, res) => {
+  app.get("/api/series/:id/seasons/:seasonNumber", withAuth(async (req, res) => {
     const t = getTranslator(req);
     const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
@@ -481,6 +476,6 @@ export function registerTmdbRoutes(app) {
       debugLog("Season details proxy failed:", error);
       res.status(500).json({ error: t("tmdb.fetchSeasonDetailsFailed") });
     }
-  });
+  }));
 }
 

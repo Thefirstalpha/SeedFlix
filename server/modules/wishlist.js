@@ -7,7 +7,7 @@ import {
   wishlistFilePath,
 } from "../config.js";
 import { getTranslator } from "../i18n.js";
-import { requireAuth } from "./auth.js";
+import { withAuth } from "./auth.js";
 
 const trackerSeenFilePath = path.join(dataDir, "tracker-rss-seen.json");
 const trackerRejectedFilePath = path.join(dataDir, "tracker-rss-rejected.json");
@@ -366,32 +366,21 @@ function normalizeSeriesEntry(entry) {
 }
 
 export function registerWishlistRoutes(app) {
-  app.get("/api/wishlist", async (req, res) => {
+  app.get("/api/wishlist", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userKey = auth.user.username;
-      const trackerUserKey = String(auth.user.id || "");
       const wishlist = await readWishlist(userKey);
       res.json(wishlist);
     } catch (error) {
       console.error("Read wishlist failed:", error);
       res.status(500).json({ error: t("wishlist.readWishlistFailed") });
     }
-  });
+  }));
 
-  app.post("/api/wishlist", async (req, res) => {
+  app.post("/api/wishlist", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userKey = auth.user.username;
       const movie = normalizeMovie(req.body);
       if (!movie) {
@@ -411,17 +400,13 @@ export function registerWishlistRoutes(app) {
       console.error("Add wishlist movie failed:", error);
       res.status(500).json({ error: t("wishlist.addMovieFailed") });
     }
-  });
+  }));
 
-  app.delete("/api/wishlist/:id", async (req, res) => {
+  app.delete("/api/wishlist/:id", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userKey = auth.user.username;
+      const trackerUserKey = String(auth.user.id || "");
       const movieId = Number(req.params.id);
       if (!Number.isFinite(movieId)) {
         res.status(400).json({ error: t("wishlist.invalidMovieId") });
@@ -441,16 +426,11 @@ export function registerWishlistRoutes(app) {
       console.error("Remove wishlist movie failed:", error);
       res.status(500).json({ error: t("wishlist.removeMovieFailed") });
     }
-  });
+  }));
 
-  app.delete("/api/wishlist", async (req, res) => {
+  app.delete("/api/wishlist", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userKey = auth.user.username;
       const trackerUserKey = String(auth.user.id || "");
       const ids = Array.isArray(req.body?.ids)
@@ -472,18 +452,12 @@ export function registerWishlistRoutes(app) {
       console.error("Remove multiple wishlist movies failed:", error);
       res.status(500).json({ error: t("wishlist.removeMoviesFailed") });
     }
-  });
+  }));
 
-  app.get("/api/wishlist/:id", async (req, res) => {
+  app.get("/api/wishlist/:id", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userKey = auth.user.username;
-      const trackerUserKey = String(auth.user.id || "");
       const movieId = Number(req.params.id);
       if (!Number.isFinite(movieId)) {
         res.status(400).json({ error: t("wishlist.invalidMovieId") });
@@ -497,16 +471,11 @@ export function registerWishlistRoutes(app) {
       console.error("Check wishlist movie failed:", error);
       res.status(500).json({ error: t("wishlist.checkMovieFailed") });
     }
-  });
+  }));
 
-  app.get("/api/series-wishlist", async (req, res) => {
+  app.get("/api/series-wishlist", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userKey = auth.user.username;
       const wishlist = await readSeriesWishlist(userKey);
       res.json(wishlist);
@@ -514,16 +483,11 @@ export function registerWishlistRoutes(app) {
       console.error("Read series wishlist failed:", error);
       res.status(500).json({ error: t("wishlist.readSeriesWishlistFailed") });
     }
-  });
+  }));
 
-  app.get("/api/series-wishlist/series/:seriesId/status", async (req, res) => {
+  app.get("/api/series-wishlist/series/:seriesId/status", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userKey = auth.user.username;
       const seriesId = Number(req.params.seriesId);
       if (!Number.isFinite(seriesId)) {
@@ -550,16 +514,11 @@ export function registerWishlistRoutes(app) {
       console.error("Series wishlist status failed:", error);
       res.status(500).json({ error: t("wishlist.getSeriesStatusFailed") });
     }
-  });
+  }));
 
-  app.post("/api/series-wishlist", async (req, res) => {
+  app.post("/api/series-wishlist", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userKey = auth.user.username;
       const entry = normalizeSeriesEntry(req.body);
       if (!entry) {
@@ -610,17 +569,13 @@ export function registerWishlistRoutes(app) {
       console.error("Add series wishlist entry failed:", error);
       res.status(500).json({ error: t("wishlist.addSeriesFailed") });
     }
-  });
+  }));
 
-  app.delete("/api/series-wishlist/entry/:entryId", async (req, res) => {
+  app.delete("/api/series-wishlist/entry/:entryId", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userKey = auth.user.username;
+      const trackerUserKey = String(auth.user.id || "");
       const entryId = req.params.entryId;
       const wishlist = await readSeriesWishlist(userKey);
       const removedEntry = wishlist.find((entry) => entry.entryId === entryId);
@@ -640,16 +595,11 @@ export function registerWishlistRoutes(app) {
       console.error("Remove series wishlist entry failed:", error);
       res.status(500).json({ error: t("wishlist.removeSeriesEntryFailed") });
     }
-  });
+  }));
 
-  app.delete("/api/series-wishlist/bulk", async (req, res) => {
+  app.delete("/api/series-wishlist/bulk", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const userKey = auth.user.username;
       const trackerUserKey = String(auth.user.id || "");
       const entryIds = Array.isArray(req.body?.entryIds)
@@ -678,5 +628,5 @@ export function registerWishlistRoutes(app) {
       console.error("Bulk remove series wishlist entries failed:", error);
       res.status(500).json({ error: t("wishlist.removeSeriesEntriesFailed") });
     }
-  });
+  }));
 }
