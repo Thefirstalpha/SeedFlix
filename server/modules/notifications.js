@@ -119,8 +119,25 @@ function padMediaNumber(value) {
   return String(Number(value) || 0).padStart(2, "0");
 }
 
-function buildTrackerStateKey(username, targetKey, uniqueItemRef) {
-  return `${String(username || "").trim()}:${String(targetKey || "").trim()}:${String(uniqueItemRef || "").trim()}`;
+function buildTrackerStateKey(userKey, targetKey, uniqueItemRef) {
+  return `${String(userKey ?? "")}:${String(targetKey || "").trim()}:${String(uniqueItemRef || "").trim()}`;
+}
+
+function userStoreKey(userId) {
+  if (userId === null || userId === undefined) {
+    return "";
+  }
+
+  return String(userId);
+}
+
+function resolveNotificationUserKey(user) {
+  const byId = userStoreKey(user?.id);
+  if (byId) {
+    return byId;
+  }
+
+  return userStoreKey(user?.username);
 }
 
 function extractTargetKeyFromTrackerStateKey(stateKey) {
@@ -152,6 +169,15 @@ function extractTargetKeyFromTrackerStateKey(stateKey) {
   }
 
   return null;
+}
+
+function extractUserKeyFromTrackerStateKey(stateKey) {
+  const parts = String(stateKey || "").split(":");
+  if (parts.length < 4) {
+    return "";
+  }
+
+  return String(parts[0] || "").trim();
 }
 
 function parsePositiveNumber(value) {
@@ -296,7 +322,7 @@ function buildSeriesTarget(entry) {
 }
 
 async function notifyUser(user, notification) {
-  const userId = String(user?.username || "").trim();
+  const userId = resolveNotificationUserKey(user);
   if (!userId) {
     return;
   }
@@ -385,7 +411,7 @@ function getTrackerNotificationTitleKey(targetType) {
   }
 }
 
-function pruneTrackerStateEntries(entries, activeTargetKeys, now) {
+function pruneTrackerStateEntries(entries, activeTargetKeysByUser, now) {
   const nextEntries = { ...entries };
   let expiredCount = 0;
   let removedTargetCount = 0;
@@ -398,7 +424,9 @@ function pruneTrackerStateEntries(entries, activeTargetKeys, now) {
     }
 
     const targetKey = extractTargetKeyFromTrackerStateKey(key);
-    if (targetKey && !activeTargetKeys.has(targetKey)) {
+    const userKey = extractUserKeyFromTrackerStateKey(key);
+    const userActiveTargets = activeTargetKeysByUser[userKey] || new Set();
+    if (targetKey && !userActiveTargets.has(targetKey)) {
       delete nextEntries[key];
       removedTargetCount += 1;
     }
@@ -491,39 +519,44 @@ async function pollTrackerForWishlist() {
       return;
     }
 
-    const [movieWishlist, seriesWishlist, seen, rejected, trackerResults] = await Promise.all([
-      readWishlist(),
-      readSeriesWishlist(),
+    const [seen, rejected, trackerResults] = await Promise.all([
       readTrackerSeen(),
       readTrackerRejected(),
       readTrackerResults(),
     ]);
 
+    const targetsByUser = {};
+    const activeTargetKeysByUser = {};
+    let totalTargets = 0;
+
+    for (const user of users) {
+      const userStoreKey = resolveNotificationUserKey(user);
+      if (!userStoreKey) {
+        continue;
+      }
+
+      const [movieWishlist, seriesWishlist] = await Promise.all([
+        readWishlist(String(user?.username || "")),
+        readSeriesWishlist(String(user?.username || "")),
+      ]);
+
+      const userTargets = buildWishlistTargets(movieWishlist, seriesWishlist);
+      targetsByUser[userStoreKey] = userTargets;
+      activeTargetKeysByUser[userStoreKey] = new Set(userTargets.map((target) => target.key));
+      totalTargets += userTargets.length;
+    }
+
     debugLog("[RSS] Loaded stores", {
       users: users.length,
-      movieWishlist: Array.isArray(movieWishlist) ? movieWishlist.length : 0,
-      seriesWishlist: Array.isArray(seriesWishlist) ? seriesWishlist.length : 0,
+      totalTargets,
       seenEntries: Object.keys(seen || {}).length,
       rejectedEntries: Object.keys(rejected || {}).length,
       resultsUsers: Object.keys(trackerResults || {}).length,
     });
 
-    const targets = buildWishlistTargets(movieWishlist, seriesWishlist);
-    const activeTargetKeys = new Set(targets.map((target) => target.key));
-
-    debugLog("[RSS] Targets ready", {
-      totalTargets: targets.length,
-      preview: targets.slice(0, 5).map((target) => ({
-        key: target.key,
-        type: target.type,
-        id: target.id,
-        title: target.title,
-      })),
-    });
-
     const now = Date.now();
-    const prunedSeen = pruneTrackerStateEntries(seen, activeTargetKeys, now);
-    const prunedRejected = pruneTrackerStateEntries(rejected, activeTargetKeys, now);
+    const prunedSeen = pruneTrackerStateEntries(seen, activeTargetKeysByUser, now);
+    const prunedRejected = pruneTrackerStateEntries(rejected, activeTargetKeysByUser, now);
     const nextSeen = prunedSeen.nextEntries;
     const nextRejected = prunedRejected.nextEntries;
     const nextTrackerResults = { ...trackerResults };
@@ -550,7 +583,7 @@ async function pollTrackerForWishlist() {
       });
     }
 
-    if (!targets.length) {
+    if (!totalTargets) {
       const clearedTrackerResults = Object.fromEntries(
         Object.keys(nextTrackerResults).map((username) => [username, {}])
       );
@@ -569,6 +602,9 @@ async function pollTrackerForWishlist() {
 
     for (const user of users) {
       const username = String(user?.username || "unknown");
+      const userStoreKey = resolveNotificationUserKey(user);
+      const userTargets = Array.isArray(targetsByUser[userStoreKey]) ? targetsByUser[userStoreKey] : [];
+      const activeTargetKeys = activeTargetKeysByUser[userStoreKey] || new Set();
       const indexerSettings = user?.settings?.placeholders?.indexer || {};
       const indexerUrl = String(indexerSettings.url || "").trim();
       const indexerToken = String(indexerSettings.token || "").trim();
@@ -579,15 +615,15 @@ async function pollTrackerForWishlist() {
 
       debugLog("[RSS] User polling started", {
         username,
-        targetCount: targets.length,
+        targetCount: userTargets.length,
       });
 
       const userResults =
-        nextTrackerResults[username] && typeof nextTrackerResults[username] === "object"
-          ? nextTrackerResults[username]
+        nextTrackerResults[userStoreKey] && typeof nextTrackerResults[userStoreKey] === "object"
+          ? nextTrackerResults[userStoreKey]
           : {};
       const prunedUserResults = pruneTrackerResultsEntries(userResults, activeTargetKeys);
-      nextTrackerResults[username] = prunedUserResults.nextResults;
+      nextTrackerResults[userStoreKey] = prunedUserResults.nextResults;
 
       if (prunedUserResults.removedTargetCount > 0) {
         debugLog("[RSS] Pruned stale tracker result targets", {
@@ -598,7 +634,7 @@ async function pollTrackerForWishlist() {
 
       const authLike = { user: { settings: user.settings || {} } };
 
-      for (const target of targets) {
+      for (const target of userTargets) {
         const candidates = [target.title, target.originalTitle].filter(Boolean);
         if (!candidates.length) {
           debugLog("[RSS] Target skipped: no title candidates", {
@@ -666,7 +702,7 @@ async function pollTrackerForWishlist() {
             continue;
           }
 
-          const candidateStateKey = buildTrackerStateKey(user.username, target.key, uniqueItemRef);
+          const candidateStateKey = buildTrackerStateKey(userStoreKey, target.key, uniqueItemRef);
           if (nextRejected[candidateStateKey]) {
             debugLog("[RSS] Match skipped: rejected", {
               username,
@@ -725,8 +761,8 @@ async function pollTrackerForWishlist() {
 
         const translator = getTranslator(undefined, user);
 
-        nextTrackerResults[username] = upsertTrackerResultsForTarget(
-          nextTrackerResults[username],
+        nextTrackerResults[userStoreKey] = upsertTrackerResultsForTarget(
+          nextTrackerResults[userStoreKey],
           target,
           actionableItems,
           now
@@ -828,9 +864,13 @@ async function saveNotifications(notifications) {
 // Ajouter une notification
 export async function addNotification(userId, notification) {
   const notifications = await loadNotifications();
+  const userKey = userStoreKey(userId);
+  if (!userKey) {
+    return null;
+  }
 
-  if (!notifications[userId]) {
-    notifications[userId] = [];
+  if (!notifications[userKey]) {
+    notifications[userKey] = [];
   }
 
   const id = Date.now().toString();
@@ -844,7 +884,7 @@ export async function addNotification(userId, notification) {
     data: notification.data || {},
   };
 
-  notifications[userId].push(notif);
+  notifications[userKey].push(notif);
   await saveNotifications(notifications);
 
   return notif;
@@ -853,7 +893,22 @@ export async function addNotification(userId, notification) {
 // Obtenir les notifications d'un utilisateur
 export async function getNotifications(userId, options = {}) {
   const notifications = await loadNotifications();
-  let userNotifs = notifications[userId] || [];
+  const userKey = userStoreKey(userId);
+  const legacyKey = userStoreKey(options.legacyUserKey);
+
+  let userNotifs = [];
+  if (Array.isArray(notifications[userKey])) {
+    userNotifs = [...notifications[userKey]];
+  }
+  if (legacyKey && legacyKey !== userKey && Array.isArray(notifications[legacyKey])) {
+    userNotifs = [...userNotifs, ...notifications[legacyKey]];
+
+    // One-shot migration from legacy username bucket to user.id bucket.
+    const dedupById = new Map(userNotifs.map((item) => [String(item?.id || ""), item]));
+    notifications[userKey] = Array.from(dedupById.values());
+    delete notifications[legacyKey];
+    await saveNotifications(notifications);
+  }
 
   if (options.unreadOnly) {
     userNotifs = userNotifs.filter((n) => !n.isRead);
@@ -871,9 +926,10 @@ export async function getNotifications(userId, options = {}) {
 // Marquer comme lue
 export async function markAsRead(userId, notificationId) {
   const notifications = await loadNotifications();
+  const userKey = userStoreKey(userId);
 
-  if (notifications[userId]) {
-    const notif = notifications[userId].find((n) => n.id === notificationId);
+  if (notifications[userKey]) {
+    const notif = notifications[userKey].find((n) => n.id === notificationId);
     if (notif) {
       notif.isRead = true;
       await saveNotifications(notifications);
@@ -887,9 +943,10 @@ export async function markAsRead(userId, notificationId) {
 // Marquer toutes comme lues
 export async function markAllAsRead(userId) {
   const notifications = await loadNotifications();
+  const userKey = userStoreKey(userId);
 
-  if (notifications[userId]) {
-    notifications[userId].forEach((n) => {
+  if (notifications[userKey]) {
+    notifications[userKey].forEach((n) => {
       n.isRead = true;
     });
     await saveNotifications(notifications);
@@ -899,9 +956,10 @@ export async function markAllAsRead(userId) {
 // Supprimer une notification
 export async function deleteNotification(userId, notificationId) {
   const notifications = await loadNotifications();
+  const userKey = userStoreKey(userId);
 
-  if (notifications[userId]) {
-    notifications[userId] = notifications[userId].filter(
+  if (notifications[userKey]) {
+    notifications[userKey] = notifications[userKey].filter(
       (n) => n.id !== notificationId
     );
     await saveNotifications(notifications);
@@ -911,11 +969,22 @@ export async function deleteNotification(userId, notificationId) {
   return false;
 }
 
-export async function getTrackerResultsForUser(userId) {
+export async function getTrackerResultsForUser(userId, options = {}) {
   const allResults = await readTrackerResults();
-  const userResults = allResults[userId] && typeof allResults[userId] === "object"
-    ? allResults[userId]
+  const userKey = userStoreKey(userId);
+  const legacyKey = userStoreKey(options.legacyUserKey);
+
+  const userResultsById = allResults[userKey] && typeof allResults[userKey] === "object"
+    ? allResults[userKey]
     : {};
+  const userResultsLegacy =
+    legacyKey && legacyKey !== userKey && allResults[legacyKey] && typeof allResults[legacyKey] === "object"
+      ? allResults[legacyKey]
+      : {};
+  const userResults = {
+    ...userResultsLegacy,
+    ...userResultsById,
+  };
 
   return Object.values(userResults)
     .filter((entry) => entry && typeof entry === "object")
@@ -931,20 +1000,30 @@ export async function getTrackerResultsForUser(userId) {
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }
 
-async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode) {
+async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode, options = {}) {
   const normalizedTargetKey = String(targetKey || "").trim();
   const normalizedStateKey = String(trackerStateKey || "").trim();
   if (!normalizedTargetKey || !normalizedStateKey) {
     return { ok: false, reason: "invalid-input" };
   }
 
+  const normalizedUserKey = userStoreKey(userId);
+  const legacyUserKey = userStoreKey(options.legacyUserKey);
+
   const [allResults, rejected] = await Promise.all([
     readTrackerResults(),
     readTrackerRejected(),
   ]);
 
-  const userResults = allResults[userId] && typeof allResults[userId] === "object"
-    ? { ...allResults[userId] }
+  const currentBucketKey =
+    allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
+      ? normalizedUserKey
+      : legacyUserKey && allResults[legacyUserKey] && typeof allResults[legacyUserKey] === "object"
+        ? legacyUserKey
+        : normalizedUserKey;
+
+  const userResults = allResults[currentBucketKey] && typeof allResults[currentBucketKey] === "object"
+    ? { ...allResults[currentBucketKey] }
     : {};
   const bucket = userResults[normalizedTargetKey] && typeof userResults[normalizedTargetKey] === "object"
     ? { ...userResults[normalizedTargetKey] }
@@ -967,7 +1046,10 @@ async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode)
     bucket.updatedAt = new Date().toISOString();
     userResults[normalizedTargetKey] = bucket;
   }
-  allResults[userId] = userResults;
+  allResults[normalizedUserKey] = userResults;
+  if (legacyUserKey && legacyUserKey !== normalizedUserKey) {
+    delete allResults[legacyUserKey];
+  }
 
   if (mode === "reject") {
     rejected[normalizedStateKey] = Date.now();
@@ -981,20 +1063,21 @@ async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode)
   return { ok: true };
 }
 
-export async function rejectTrackerResultItem(userId, targetKey, trackerStateKey) {
-  return mutateTrackerResultItem(userId, targetKey, trackerStateKey, "reject");
+export async function rejectTrackerResultItem(userId, targetKey, trackerStateKey, options = {}) {
+  return mutateTrackerResultItem(userId, targetKey, trackerStateKey, "reject", options);
 }
 
-export async function validateTrackerResultItem(userId, targetKey, trackerStateKey) {
-  return mutateTrackerResultItem(userId, targetKey, trackerStateKey, "validate");
+export async function validateTrackerResultItem(userId, targetKey, trackerStateKey, options = {}) {
+  return mutateTrackerResultItem(userId, targetKey, trackerStateKey, "validate", options);
 }
 
 // Supprimer toutes les notifications
 export async function clearNotifications(userId) {
   const notifications = await loadNotifications();
+  const userKey = userStoreKey(userId);
 
-  if (notifications[userId]) {
-    delete notifications[userId];
+  if (notifications[userKey]) {
+    delete notifications[userKey];
     await saveNotifications(notifications);
   }
 }
@@ -1104,13 +1187,14 @@ export function registerNotificationRoutes(app) {
         return;
       }
 
-      const userId = auth.user.username;
+      const userId = resolveNotificationUserKey(auth.user);
       const limit = parseInt(req.query.limit) || 50;
       const unreadOnly = req.query.unreadOnly === "true";
 
       const notifications = await getNotifications(userId, {
         limit,
         unreadOnly,
+        legacyUserKey: auth.user.username,
       });
       const unreadCount = await getUnreadCount(userId);
 
@@ -1128,7 +1212,9 @@ export function registerNotificationRoutes(app) {
         return;
       }
 
-      const targets = await getTrackerResultsForUser(auth.user.username);
+      const targets = await getTrackerResultsForUser(resolveNotificationUserKey(auth.user), {
+        legacyUserKey: auth.user.username,
+      });
       res.json({ ok: true, targets });
     } catch (error) {
       console.error("Error getting tracker results:", error);
@@ -1145,9 +1231,10 @@ export function registerNotificationRoutes(app) {
 
       const t = getTranslator(req, auth.user);
       const result = await rejectTrackerResultItem(
-        auth.user.username,
+        resolveNotificationUserKey(auth.user),
         req.body?.targetKey,
-        req.body?.trackerStateKey
+        req.body?.trackerStateKey,
+        { legacyUserKey: auth.user.username }
       );
       if (!result.ok) {
         if (result.reason === "not-found") {
@@ -1171,9 +1258,10 @@ export function registerNotificationRoutes(app) {
       }
 
       const result = await validateTrackerResultItem(
-        auth.user.username,
+        resolveNotificationUserKey(auth.user),
         req.body?.targetKey,
-        req.body?.trackerStateKey
+        req.body?.trackerStateKey,
+        { legacyUserKey: auth.user.username }
       );
       if (!result.ok) {
         return res.status(404).json({ error: "Tracker result not found" });
@@ -1194,7 +1282,7 @@ export function registerNotificationRoutes(app) {
         return;
       }
 
-      const userId = auth.user.username;
+      const userId = resolveNotificationUserKey(auth.user);
       const notificationId = req.params.id;
 
       const notif = await markAsRead(userId, notificationId);
@@ -1219,7 +1307,7 @@ export function registerNotificationRoutes(app) {
         return;
       }
 
-      const userId = auth.user.username;
+      const userId = resolveNotificationUserKey(auth.user);
       await markAllAsRead(userId);
       res.json({ success: true });
     } catch (error) {
@@ -1236,7 +1324,7 @@ export function registerNotificationRoutes(app) {
         return;
       }
 
-      const userId = auth.user.username;
+      const userId = resolveNotificationUserKey(auth.user);
       const notificationId = req.params.id;
 
       const success = await deleteNotification(userId, notificationId);
@@ -1261,7 +1349,7 @@ export function registerNotificationRoutes(app) {
         return;
       }
 
-      const userId = auth.user.username;
+      const userId = resolveNotificationUserKey(auth.user);
       await clearNotifications(userId);
       res.json({ success: true });
     } catch (error) {

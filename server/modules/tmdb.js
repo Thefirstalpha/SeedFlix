@@ -1,14 +1,12 @@
 import { tmdbApiKey as defaultTmdbApiKey, tmdbBaseUrl } from "../config.js";
 import { debugLog } from "../logger.js";
 import { getTranslator } from "../i18n.js";
-import { getAuthenticatedUser, requireAuth } from "./auth.js";
+import { requireAuth, getGlobalTmdbApiKey } from "./auth.js";
 
-async function getTmdbApiKey(req) {
-  const auth = await getAuthenticatedUser(req);
-  const userKey = auth?.user?.settings?.apiKeys?.tmdb?.trim();
-
-  if (userKey) {
-    return userKey;
+async function getTmdbApiKey() {
+  const globalKey = await getGlobalTmdbApiKey();
+  if (globalKey) {
+    return globalKey;
   }
 
   return defaultTmdbApiKey || "";
@@ -167,7 +165,7 @@ export function registerTmdbRoutes(app) {
 
   app.get("/api/movies/popular", async (req, res) => {
     const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey(req);
+    const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
@@ -190,7 +188,7 @@ export function registerTmdbRoutes(app) {
 
   app.get("/api/movies/genres", async (req, res) => {
     const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey(req);
+    const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
@@ -208,7 +206,7 @@ export function registerTmdbRoutes(app) {
 
   app.get("/api/movies/discover", async (req, res) => {
     const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey(req);
+    const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
@@ -255,7 +253,7 @@ export function registerTmdbRoutes(app) {
 
   app.get("/api/movies/search", async (req, res) => {
     const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey(req);
+    const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
@@ -285,7 +283,7 @@ export function registerTmdbRoutes(app) {
 
   app.get("/api/movies/:id", async (req, res) => {
     const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey(req);
+    const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
@@ -313,7 +311,7 @@ export function registerTmdbRoutes(app) {
 
   app.get("/api/series/popular", async (req, res) => {
     const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey(req);
+    const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
@@ -336,7 +334,7 @@ export function registerTmdbRoutes(app) {
 
   app.get("/api/series/genres", async (req, res) => {
     const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey(req);
+    const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
@@ -354,7 +352,7 @@ export function registerTmdbRoutes(app) {
 
   app.get("/api/series/discover", async (req, res) => {
     const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey(req);
+    const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
@@ -401,7 +399,7 @@ export function registerTmdbRoutes(app) {
 
   app.get("/api/series/search", async (req, res) => {
     const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey(req);
+    const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
@@ -431,7 +429,7 @@ export function registerTmdbRoutes(app) {
 
   app.get("/api/series/:id", async (req, res) => {
     const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey(req);
+    const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
@@ -459,7 +457,7 @@ export function registerTmdbRoutes(app) {
 
   app.get("/api/series/:id/seasons/:seasonNumber", async (req, res) => {
     const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey(req);
+    const apiKey = await getTmdbApiKey();
     if (!assertTmdbKey(apiKey, res, t)) {
       return;
     }
@@ -485,3 +483,4 @@ export function registerTmdbRoutes(app) {
     }
   });
 }
+

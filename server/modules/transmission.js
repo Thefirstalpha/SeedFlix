@@ -298,22 +298,22 @@ function parseTargetKey(targetKey) {
   return null;
 }
 
-async function removeWishlistTarget(targetKey) {
+async function removeWishlistTarget(userId, targetKey) {
   const parsed = parseTargetKey(targetKey);
   if (!parsed) {
     return;
   }
 
   if (parsed.kind === "movie") {
-    const wishlist = await readWishlist();
+    const wishlist = await readWishlist(userId);
     const next = wishlist.filter((movie) => Number(movie?.id) !== parsed.mediaId);
     if (next.length !== wishlist.length) {
-      await writeWishlist(next);
+      await writeWishlist(userId, next);
     }
     return;
   }
 
-  const seriesWishlist = await readSeriesWishlist();
+  const seriesWishlist = await readSeriesWishlist(userId);
   let nextSeriesWishlist = seriesWishlist;
 
   if (parsed.kind === "series") {
@@ -346,7 +346,7 @@ async function removeWishlistTarget(targetKey) {
   }
 
   if (nextSeriesWishlist.length !== seriesWishlist.length) {
-    await writeSeriesWishlist(nextSeriesWishlist);
+    await writeSeriesWishlist(userId, nextSeriesWishlist);
   }
 }
 function isMagnetLink(value) {
@@ -568,7 +568,7 @@ export function registerTransmissionRoutes(app) {
 
       const isDuplicate = Boolean(data?.arguments?.["torrent-duplicate"]);
       if (targetKey) {
-        await removeWishlistTarget(targetKey);
+        await removeWishlistTarget(auth.user.username, targetKey);
       }
 
       // Create notification
