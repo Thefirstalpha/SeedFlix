@@ -1,12 +1,20 @@
 import { requireAuth } from "./auth.js";
 import { debugLog } from "../logger.js";
 import { promises as fs } from "node:fs";
+import path from "node:path";
 import { appTorrentsFilePath, dataDir } from "../config.js";
 import { addNotification, sendDiscordNotification } from "./notifications.js";
+import {
+  readWishlist,
+  writeWishlist,
+  readSeriesWishlist,
+  writeSeriesWishlist,
+} from "./wishlist.js";
 import { getTranslator } from "../i18n.js";
 
 const transmissionTimeoutMs = 8000;
 const transmissionRpcPath = "/transmission/rpc";
+const torrentCompletedStoreFilePath = path.join(dataDir, "torrent-completed-notified.json");
 const transmissionStatusLabels = {
   0: "Stopped",
   1: "Queued to check files",
@@ -17,12 +25,25 @@ const transmissionStatusLabels = {
   6: "Seeding",
 };
 
+function isDownloadingTorrent(torrent) {
+  return !Boolean(torrent?.isFinished) && [3, 4].includes(Number(torrent?.status));
+}
+
 async function ensureAppTorrentsStore() {
   await fs.mkdir(dataDir, { recursive: true });
   try {
     await fs.access(appTorrentsFilePath);
   } catch {
     await fs.writeFile(appTorrentsFilePath, "{}", "utf-8");
+  }
+}
+
+async function ensureCompletedTorrentStore() {
+  await fs.mkdir(dataDir, { recursive: true });
+  try {
+    await fs.access(torrentCompletedStoreFilePath);
+  } catch {
+    await fs.writeFile(torrentCompletedStoreFilePath, "{}", "utf-8");
   }
 }
 
@@ -121,6 +142,103 @@ function createAuthHeaders(authRequired, username, password) {
   };
 }
 
+function getUserDiscordWebhook(user) {
+  const notifSettings = user?.settings?.placeholders?.notifications || {};
+  const enabledChannels = Array.isArray(notifSettings.enabledChannels)
+    ? notifSettings.enabledChannels
+    : [];
+
+  if (!enabledChannels.includes("discord")) {
+    return "";
+  }
+
+  return String(notifSettings?.discord?.webhookUrl || "").trim();
+}
+
+async function notifyCompletedTorrents(auth, torrents) {
+  const userId = String(auth?.user?.id || "").trim();
+  if (!userId) {
+    return;
+  }
+
+  const managedHashes = await getAppTorrentHashesForUser(auth.user.id);
+  if (!managedHashes.size) {
+    return;
+  }
+
+  const completedManaged = (Array.isArray(torrents) ? torrents : []).filter((torrent) => {
+    const hash = String(torrent?.hashString || "").trim().toLowerCase();
+    return hash && managedHashes.has(hash) && Boolean(torrent?.isFinished);
+  });
+
+  if (!completedManaged.length) {
+    return;
+  }
+
+  const completedStore = await readCompletedTorrentStore();
+  const alreadyNotified = new Set(
+    Array.isArray(completedStore[userId])
+      ? completedStore[userId].map((value) => String(value || "").trim().toLowerCase()).filter(Boolean)
+      : []
+  );
+
+  const t = getTranslator(undefined, auth.user);
+  const webhookUrl = getUserDiscordWebhook(auth.user);
+  let didChange = false;
+
+  for (const torrent of completedManaged) {
+    const hash = String(torrent.hashString || "").trim().toLowerCase();
+    if (!hash || alreadyNotified.has(hash)) {
+      continue;
+    }
+
+    const notification = {
+      title: t("downloads.finished"),
+      message: String(torrent.name || "Torrent"),
+      type: "success",
+      data: {
+        source: "transmission-complete",
+        hash,
+        details: {
+          status: t("downloads.finished"),
+        },
+      },
+    };
+
+    await addNotification(auth.user.id, notification);
+    if (webhookUrl) {
+      await sendDiscordNotification(webhookUrl, notification);
+    }
+
+    alreadyNotified.add(hash);
+    didChange = true;
+  }
+
+  if (didChange) {
+    completedStore[userId] = Array.from(alreadyNotified);
+    await writeCompletedTorrentStore(completedStore);
+  }
+}
+  async function readCompletedTorrentStore() {
+    await ensureCompletedTorrentStore();
+    const content = await fs.readFile(torrentCompletedStoreFilePath, "utf-8");
+    try {
+      const parsed = JSON.parse(content);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return {};
+      }
+      return parsed;
+    } catch {
+      return {};
+    }
+  }
+
+  async function writeCompletedTorrentStore(data) {
+    await ensureCompletedTorrentStore();
+    await fs.writeFile(torrentCompletedStoreFilePath, JSON.stringify(data, null, 2), "utf-8");
+  }
+
+
 async function postTransmissionRpc(url, headers, sessionId, body) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), transmissionTimeoutMs);
@@ -142,6 +260,95 @@ async function postTransmissionRpc(url, headers, sessionId, body) {
   }
 }
 
+function parseTargetKey(targetKey) {
+  const value = String(targetKey || "").trim();
+  if (!value) {
+    return null;
+  }
+
+  const parts = value.split(":");
+  const kind = String(parts[0] || "").trim();
+
+  if ((kind === "movie" || kind === "series") && parts.length === 2) {
+    const mediaId = Number(parts[1]);
+    return Number.isFinite(mediaId) ? { kind, mediaId } : null;
+  }
+
+  if (kind === "season" && parts.length === 3) {
+    const mediaId = Number(parts[1]);
+    const seasonNumber = Number(parts[2]);
+    if (!Number.isFinite(mediaId) || !Number.isFinite(seasonNumber)) {
+      return null;
+    }
+
+    return { kind, mediaId, seasonNumber };
+  }
+
+  if (kind === "episode" && parts.length === 4) {
+    const mediaId = Number(parts[1]);
+    const seasonNumber = Number(parts[2]);
+    const episodeNumber = Number(parts[3]);
+    if (!Number.isFinite(mediaId) || !Number.isFinite(seasonNumber) || !Number.isFinite(episodeNumber)) {
+      return null;
+    }
+
+    return { kind, mediaId, seasonNumber, episodeNumber };
+  }
+
+  return null;
+}
+
+async function removeWishlistTarget(targetKey) {
+  const parsed = parseTargetKey(targetKey);
+  if (!parsed) {
+    return;
+  }
+
+  if (parsed.kind === "movie") {
+    const wishlist = await readWishlist();
+    const next = wishlist.filter((movie) => Number(movie?.id) !== parsed.mediaId);
+    if (next.length !== wishlist.length) {
+      await writeWishlist(next);
+    }
+    return;
+  }
+
+  const seriesWishlist = await readSeriesWishlist();
+  let nextSeriesWishlist = seriesWishlist;
+
+  if (parsed.kind === "series") {
+    nextSeriesWishlist = seriesWishlist.filter((entry) => Number(entry?.seriesId) !== parsed.mediaId);
+  } else if (parsed.kind === "season") {
+    nextSeriesWishlist = seriesWishlist.filter((entry) => {
+      const sameSeries = Number(entry?.seriesId) === parsed.mediaId;
+      if (!sameSeries) {
+        return true;
+      }
+
+      if (String(entry?.type) === "episode" && Number(entry?.seasonNumber) === parsed.seasonNumber) {
+        return false;
+      }
+
+      return !(String(entry?.type) === "season" && Number(entry?.seasonNumber) === parsed.seasonNumber);
+    });
+  } else if (parsed.kind === "episode") {
+    nextSeriesWishlist = seriesWishlist.filter((entry) => {
+      if (String(entry?.type) !== "episode") {
+        return true;
+      }
+
+      return !(
+        Number(entry?.seriesId) === parsed.mediaId &&
+        Number(entry?.seasonNumber) === parsed.seasonNumber &&
+        Number(entry?.episodeNumber) === parsed.episodeNumber
+      );
+    });
+  }
+
+  if (nextSeriesWishlist.length !== seriesWishlist.length) {
+    await writeSeriesWishlist(nextSeriesWishlist);
+  }
+}
 function isMagnetLink(value) {
   return String(value || "").trim().toLowerCase().startsWith("magnet:?");
 }
@@ -312,6 +519,7 @@ export function registerTransmissionRoutes(app) {
       const settings = resolveTorrentSettings(auth, req.body);
       const torrentUrl = String(req.body?.torrentUrl || "").trim();
       const mediaType = String(req.body?.mediaType || "movie").trim().toLowerCase();
+      const targetKey = String(req.body?.targetKey || "").trim();
       if (!settings.url) {
         res.status(400).json({ error: t("transmission.urlRequired") });
         return;
@@ -358,8 +566,12 @@ export function registerTransmissionRoutes(app) {
       const added = data?.arguments?.["torrent-added"] || data?.arguments?.["torrent-duplicate"] || null;
       await registerAppTorrentForUser(auth.user.id, added);
 
-      // Create notification
       const isDuplicate = Boolean(data?.arguments?.["torrent-duplicate"]);
+      if (targetKey) {
+        await removeWishlistTarget(targetKey);
+      }
+
+      // Create notification
       const torrentName = added?.name || "Torrent";
       await createAndSendNotification(auth.user.id, {
         title: isDuplicate ? t("transmission.duplicateTitle") : t("transmission.addedTitle"),
@@ -402,6 +614,7 @@ export function registerTransmissionRoutes(app) {
       const t = getTranslator(req, auth.user);
 
       const settings = resolveTorrentSettings(auth, req.query);
+      const includeAll = String(req.query?.includeAll || "").trim().toLowerCase() === "true";
       if (!settings.url) {
         res.status(400).json({ error: t("transmission.urlRequired") });
         return;
@@ -451,36 +664,43 @@ export function registerTransmissionRoutes(app) {
       }
 
       const allowedHashes = await getAppTorrentHashesForUser(auth.user.id);
-      const torrents = Array.isArray(data?.arguments?.torrents)
+      const rawTorrents = Array.isArray(data?.arguments?.torrents)
         ? data.arguments.torrents
-            .filter((torrent) => {
-              const hash = String(torrent?.hashString || "").trim().toLowerCase();
-              return hash && allowedHashes.has(hash);
-            })
-            .map((torrent) => ({
-              id: torrent.id,
-              hashString: torrent.hashString,
-              name: torrent.name,
-              status: torrent.status,
-              statusLabel: transmissionStatusLabels[torrent.status] || "Unknown",
-              progress: Math.round(Number(torrent.percentDone || 0) * 1000) / 10,
-              rateDownload: Number(torrent.rateDownload || 0),
-              eta: Number(torrent.eta || 0),
-              totalSize: Number(torrent.totalSize || 0),
-              downloadDir: torrent.downloadDir,
-              addedDate: torrent.addedDate,
-              isFinished: Boolean(torrent.isFinished),
-              leftUntilDone: Number(torrent.leftUntilDone || 0),
-              peersConnected: Number(torrent.peersConnected || 0),
-              error: Number(torrent.error || 0),
-              errorString: torrent.errorString || "",
-            }))
         : [];
+
+      await notifyCompletedTorrents(auth, rawTorrents);
+
+      const torrents = rawTorrents
+        .map((torrent) => {
+          const hash = String(torrent?.hashString || "").trim().toLowerCase();
+          const managedBySeedflix = Boolean(hash && allowedHashes.has(hash));
+
+          return {
+            id: torrent.id,
+            hashString: torrent.hashString,
+            name: torrent.name,
+            status: torrent.status,
+            statusLabel: transmissionStatusLabels[torrent.status] || "Unknown",
+            progress: Math.round(Number(torrent.percentDone || 0) * 1000) / 10,
+            rateDownload: Number(torrent.rateDownload || 0),
+            eta: Number(torrent.eta || 0),
+            totalSize: Number(torrent.totalSize || 0),
+            downloadDir: torrent.downloadDir,
+            addedDate: torrent.addedDate,
+            isFinished: Boolean(torrent.isFinished),
+            leftUntilDone: Number(torrent.leftUntilDone || 0),
+            peersConnected: Number(torrent.peersConnected || 0),
+            error: Number(torrent.error || 0),
+            errorString: torrent.errorString || "",
+            managedBySeedflix,
+          };
+        })
+        .filter((torrent) => (includeAll ? true : torrent.managedBySeedflix));
 
       res.json({
         ok: true,
         torrents,
-        activeCount: torrents.filter((torrent) => [3, 4, 5, 6].includes(torrent.status)).length,
+        activeCount: torrents.filter((torrent) => isDownloadingTorrent(torrent)).length,
       });
     } catch (error) {
       const t = getTranslator(req);
@@ -651,6 +871,33 @@ export function registerTransmissionRoutes(app) {
       debugLog("Clean torrent failed:", error);
       res.status(500).json({
         error: t("transmission.cleanFailed"),
+      });
+    }
+  });
+
+  app.post("/api/torrent/unmanage", async (req, res) => {
+    try {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
+      const t = getTranslator(req, auth.user);
+
+      const torrentHash = String(req.body?.hash || "").trim().toLowerCase();
+      if (!torrentHash) {
+        res.status(400).json({ error: t("transmission.invalidHash") });
+        return;
+      }
+
+      // Remove torrent from app store
+      await removeAppTorrentForUser(auth.user.id, torrentHash);
+
+      res.json({ ok: true, message: t("transmission.unmanaged") });
+    } catch (error) {
+      const t = getTranslator(req);
+      debugLog("Unmanage torrent failed:", error);
+      res.status(500).json({
+        error: t("transmission.unmanageFailed"),
       });
     }
   });

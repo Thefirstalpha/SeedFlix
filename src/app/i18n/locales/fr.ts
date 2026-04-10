@@ -122,6 +122,14 @@ const fr = {
     activeSummary: "{{active}} actif(s) sur {{total}} torrent(s)",
     loading: "Chargement des téléchargements...",
     empty: "Aucun téléchargement en cours.",
+    filters: {
+      label: "Filtres",
+      active: "Actifs",
+      completed: "Terminés",
+      seedflixOnly: "SeedFlix uniquement",
+      allTorrents: "Tous les torrents",
+      empty: "Aucun torrent pour les filtres sélectionnés.",
+    },
     unknown: "Inconnu",
     finished: "Terminé",
     rate: "Débit",
@@ -131,6 +139,7 @@ const fr = {
     pause: "Pause",
     resume: "Reprendre",
     remove: "Supprimer",
+    dontTrack: "Ne plus suivre",
     loadFailed: "Impossible de charger les téléchargements",
   },
   home: {

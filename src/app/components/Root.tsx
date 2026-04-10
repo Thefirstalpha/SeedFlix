@@ -68,13 +68,30 @@ function canUseBrowserNotificationChannel(
   return browserDevices.some((device) => device.id === browserDeviceId);
 }
 
-function showBrowserNotification(title: string, message: string) {
+async function showBrowserNotification(title: string, message: string) {
   if (typeof window === "undefined" || typeof Notification === "undefined") {
     return;
   }
 
   if (Notification.permission !== "granted") {
     return;
+  }
+
+  if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration?.showNotification) {
+        await registration.showNotification(title, {
+          body: message,
+          icon: "/favicon.svg",
+          badge: "/favicon-96x96.png",
+          tag: "seedflix-notification",
+        });
+        return;
+      }
+    } catch {
+      // Fallback to Notification API below.
+    }
   }
 
   new Notification(title, {
@@ -220,7 +237,7 @@ export function Root() {
                 browserDeviceId
               )
             ) {
-              showBrowserNotification(latestUnread.title, safeLatestMessage);
+              void showBrowserNotification(latestUnread.title, safeLatestMessage);
             }
           } else {
             toast.info(
