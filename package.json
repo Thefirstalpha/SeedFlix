@@ -90,6 +90,9 @@
       "optional": true
     }
   },
+  "overrides": {
+    "picomatch": "4.0.4"
+  },
   "pnpm": {
     "overrides": {
       "vite": "6.3.5"
