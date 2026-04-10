@@ -19,7 +19,8 @@
       }
     },
     "preferences": {
-      "language": "fr"
+      "language": "fr",
+      "spoilerMode": false
     },
     "torrent": {
       "url": "",

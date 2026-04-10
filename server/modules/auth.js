@@ -52,6 +52,7 @@ function buildDefaultSettings(username = "admin") {
       },
       preferences: {
         language: "fr",
+        spoilerMode: false,
       },
       torrent: {
         url: "",

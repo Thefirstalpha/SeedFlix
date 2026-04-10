@@ -236,6 +236,11 @@ const en = {
     covered: "Covered",
     addEpisode: "Add episode",
     removeEpisode: "Remove episode",
+    spoilers: {
+      hiddenTitle: "hidden title",
+      clickToReveal: "Click to reveal this episode",
+      noOverview: "No summary available for this episode.",
+    },
     episodesUnavailable: "Episode details are not available for this season.",
     noSeasonInfo: "No season information available for this series.",
     notAvailable: "Not available",
@@ -347,13 +352,28 @@ const en = {
   settings: {
     title: "Settings",
     tabs: {
-      security: "Security",
+      general: "General",
       configuration: "Configuration",
       notifications: "Notifications",
       factory: "Reset",
     },
     about: {
       versionLabel: "Image version: {{version}}",
+    },
+    preferences: {
+      title: "Display preferences",
+      description: "Configure language and spoiler behavior. Changes are saved automatically.",
+      saved: "Preferences updated.",
+      failed: "Unable to update preferences",
+    },
+    spoilers: {
+      title: "Spoiler mode",
+      description: "Hide episode titles and summaries on series pages until manually revealed.",
+      toggleLabel: "Hide episode spoilers",
+      toggleHelp: "When enabled, episode titles and summaries are hidden and revealed on click.",
+      save: "Save spoiler mode",
+      saved: "Spoiler mode updated.",
+      failed: "Unable to update spoiler mode",
     },
     language: {
       title: "Interface language",

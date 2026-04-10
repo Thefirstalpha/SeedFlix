@@ -102,7 +102,11 @@ export function SeriesDetails() {
   const [sortBy, setSortBy] = useState<"size" | "date">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
+  const [revealedEpisodeIds, setRevealedEpisodeIds] = useState<number[]>([]);
   const ITEMS_PER_PAGE = 10;
+  const spoilerModeEnabled = Boolean(
+    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode
+  );
 
   useEffect(() => {
     const preferred = String(settings?.placeholders?.indexer?.defaultQuality || "all").toLowerCase();
@@ -208,6 +212,10 @@ export function SeriesDetails() {
   useEffect(() => {
     setCurrentPage(1);
   }, [qualityFilter, seasonFilter, languageFilter, sortBy, sortOrder]);
+
+  useEffect(() => {
+    setRevealedEpisodeIds([]);
+  }, [selectedSeason, spoilerModeEnabled, language]);
 
   const availableReleaseLanguages = useMemo(() => {
     const values = Array.from(
@@ -381,6 +389,14 @@ export function SeriesDetails() {
       });
     }
     await refreshStatus();
+  };
+
+  const toggleEpisodeReveal = (episodeId: number) => {
+    setRevealedEpisodeIds((prev) =>
+      prev.includes(episodeId)
+        ? prev.filter((id) => id !== episodeId)
+        : [...prev, episodeId]
+    );
   };
 
   if (isLoading) {
@@ -633,6 +649,8 @@ export function SeriesDetails() {
                             selectedSeason,
                             episode.episodeNumber
                           );
+                        const isEpisodeHidden =
+                          spoilerModeEnabled && !revealedEpisodeIds.includes(episode.id);
 
                         return (
                           <div
@@ -641,10 +659,18 @@ export function SeriesDetails() {
                           >
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex-1 min-w-0">
-                                <p className="text-white font-semibold">
-                                  {t("seriesDetails.episodeNumber", { number: episode.episodeNumber })}
-                                  {episode.name ? `: ${episode.name}` : ""}
-                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => spoilerModeEnabled && toggleEpisodeReveal(episode.id)}
+                                  className={`w-full text-left rounded-md ${
+                                    spoilerModeEnabled ? "transition-colors hover:bg-white/5 px-2 py-1 -mx-2 -my-1" : ""
+                                  }`}
+                                >
+                                  <p className="text-white font-semibold">
+                                    {t("seriesDetails.episodeNumber", { number: episode.episodeNumber })}
+                                    {!isEpisodeHidden && (episode.name ? `: ${episode.name}` : "")}
+                                  </p>
+                                </button>
                                 <p className="text-white/60 text-sm mt-0.5">
                                   {episode.airDate || t("seriesDetails.unknownDate")}
                                   {episode.runtime
@@ -692,11 +718,30 @@ export function SeriesDetails() {
                               </div>
                             </div>
 
-                            {episode.overview && (
+                            {isEpisodeHidden ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleEpisodeReveal(episode.id)}
+                                className="mt-3 block w-full rounded-md border border-dashed border-violet-400/30 bg-violet-500/5 p-1 text-left transition-colors hover:bg-violet-500/10"
+                              >
+                                <div className="relative space-y-1.5">
+                                  <div className="h-2 w-1/3 rounded bg-white/10" />
+                                  <div className="h-2 w-full rounded bg-white/10" />
+                                  <div className="h-2 w-5/6 rounded bg-white/10" />
+                                  <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold uppercase tracking-widest text-violet-200/70">
+                                    Mode spoiler
+                                  </span>
+                                </div>
+                              </button>
+                            ) : episode.overview ? (
                               <p className="text-white/75 mt-3 text-sm leading-relaxed break-words">
                                 {episode.overview}
                               </p>
-                            )}
+                            ) : spoilerModeEnabled ? (
+                              <p className="text-white/45 mt-3 text-sm">
+                                {t("seriesDetails.spoilers.noOverview")}
+                              </p>
+                            ) : null}
                           </div>
                         );
                         })}
