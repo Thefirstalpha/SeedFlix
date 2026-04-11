@@ -6,3 +6,5 @@ dist
 npm-debug.log*
 Dockerfile.*
 docker-compose*.yml
+data
+server/data

@@ -17,7 +17,7 @@ pnpm-debug.log*
 .env.*
 
 # Runtime data
-server/data/
+data/
 
 # OS / Editor files
 .DS_Store

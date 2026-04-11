@@ -17,7 +17,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const serverDir = __dirname;
-export const dataDir = path.join(serverDir, "data");
+export const dataDir = path.resolve(serverDir, "../data");
 export const wishlistFilePath = path.join(dataDir, "wishlist-movies.json");
 export const seriesWishlistFilePath = path.join(dataDir, "wishlist-series.json");
 export const usersFilePath = path.join(dataDir, "users.json");

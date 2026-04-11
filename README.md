@@ -25,7 +25,7 @@ SeedFlix is designed for users who want a lightweight web interface to:
 - keep wishlists and notifications isolated per user,
 - manage application access through an admin account.
 
-The project targets a self-hosted setup and stores its runtime data locally under `server/data`.
+The project targets a self-hosted setup and stores its runtime data locally under `data/` at the repository root.
 
 ## Highlights
 
@@ -52,7 +52,7 @@ The project targets a self-hosted setup and stores its runtime data locally unde
 
 - Node.js
 - Express 5
-- JSON-based runtime storage under `server/data`
+- JSON-based runtime storage under `data/`
 - Session cookie authentication
 
 ### Integrations
@@ -122,22 +122,24 @@ npm run build
 ### Docker Compose
 
 ```bash
-docker compose up --build
+docker compose -f docker-compose.yml up --build
 ```
+
+Run the command from the repository root so the `./data` volume is resolved correctly.
 
 The application is exposed on `http://localhost:4000`.
 
 Runtime data is persisted through:
 
 ```text
-./server/data:/app/server/data
+./data:/app/data
 ```
 
 ### Manual Docker Build
 
 ```bash
 docker build --build-arg IMAGE_TAG=local -t seedflix:local .
-docker run --rm -p 4000:4000 -v ${PWD}/server/data:/app/server/data seedflix:local
+docker run --rm -p 4000:4000 -v ${PWD}/data:/app/data seedflix:local
 ```
 
 ## Configuration
@@ -207,9 +209,9 @@ APP_IMAGE_TAG=dev
 .
 ├── src/                    Frontend application
 │   └── app/                Routes, components, services, contexts, i18n
+├── data/                   Runtime JSON data stores
 ├── server/                 Express backend
 │   ├── modules/            Feature modules
-│   ├── data/               Runtime JSON data stores
 │   └── defaultSettings.json
 ├── docker/                 Container-related assets
 ├── .github/workflows/      CI and release automation
@@ -239,7 +241,7 @@ Main API families include:
 If you expose this repository publicly, it is recommended to:
 
 - keep real API keys and credentials out of tracked files,
-- avoid committing production `server/data` content,
+- avoid committing production `data/` content,
 - configure repository secrets before enabling release publishing,
 - enable branch protection on the default branch,
 - optionally connect SonarCloud for additional static analysis.

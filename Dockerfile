@@ -32,8 +32,10 @@ RUN npm install -g npm@latest
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY --chown=node:node server ./server
-COPY --chown=node:node --from=build /app/dist ./dist
+RUN mkdir -p /app/server/modules /app/data && chown node:node /app/data
+COPY --chown=node:node --chmod=0444 server/config.js server/defaultSettings.json server/i18n.js server/index.js server/logger.js ./server/
+COPY --chown=node:node --chmod=0555 server/modules ./server/modules
+COPY --chown=node:node --chmod=0555 --from=build /app/dist ./dist
 
 # Use the non-root user that already exists in the official Node image.
 USER node
