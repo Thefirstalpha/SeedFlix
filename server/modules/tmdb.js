@@ -158,324 +158,202 @@ export function registerTmdbRoutes(app) {
     }
   }));
 
-  app.get("/api/movies/popular", withAuth(async (req, res) => {
-    const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey();
-    if (!assertTmdbKey(apiKey, res, t)) {
-      return;
-    }
-
-    try {
-      const filters = readDiscoverFilters(req.query, "movie");
-      const url = hasActiveDiscoverFilters(filters, "movie")
-        ? buildTmdbUrl("/discover/movie", apiKey, filters)
-        : buildTmdbUrl("/movie/popular", apiKey, {
-            page: filters.page,
-            language: filters.language,
-          });
-      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
-      res.status(response.status).json(data);
-    } catch (error) {
-      debugLog("Popular movies proxy failed:", error);
-      res.status(500).json({ error: t("tmdb.fetchPopularMoviesFailed") });
-    }
-  }));
-
-  app.get("/api/movies/genres", withAuth(async (req, res) => {
-    const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey();
-    if (!assertTmdbKey(apiKey, res, t)) {
-      return;
-    }
-
-    try {
-      const language = String(req.query.language || "fr-FR");
-      const url = buildTmdbUrl("/genre/movie/list", apiKey, { language });
-      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
-      res.status(response.status).json(data);
-    } catch (error) {
-      debugLog("Movie genres proxy failed:", error);
-      res.status(500).json({ error: t("tmdb.fetchMovieGenresFailed") });
-    }
-  }));
-
-  app.get("/api/movies/discover", withAuth(async (req, res) => {
-    const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey();
-    if (!assertTmdbKey(apiKey, res, t)) {
-      return;
-    }
-
-    try {
-      const page = Number(req.query.page || 1);
-      const language = String(req.query.language || "fr-FR");
-      const withGenres = Number(req.query.with_genres);
-      const withOriginalLanguage = String(req.query.with_original_language || "").trim();
-      const primaryReleaseDateGte = String(req.query.primary_release_date_gte || "");
-      const primaryReleaseDateLte = String(req.query.primary_release_date_lte || "");
-      const voteAverageGte = Number(req.query.vote_average_gte);
-
-      const query = {
-        page,
-        language,
-        sort_by: "popularity.desc",
-      };
-
-      if (Number.isFinite(withGenres)) {
-        query.with_genres = withGenres;
-      }
-      if (withOriginalLanguage) {
-        query.with_original_language = withOriginalLanguage;
-      }
-      if (primaryReleaseDateGte) {
-        query["primary_release_date.gte"] = primaryReleaseDateGte;
-      }
-      if (primaryReleaseDateLte) {
-        query["primary_release_date.lte"] = primaryReleaseDateLte;
-      }
-      if (Number.isFinite(voteAverageGte) && voteAverageGte > 0) {
-        query["vote_average.gte"] = voteAverageGte;
-      }
-
-      const url = buildTmdbUrl("/discover/movie", apiKey, query);
-      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
-      res.status(response.status).json(data);
-    } catch (error) {
-      debugLog("Discover movies proxy failed:", error);
-      res.status(500).json({ error: t("tmdb.discoverMoviesFailed") });
-    }
-  }));
-
-  app.get("/api/movies/search", withAuth(async (req, res) => {
-    const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey();
-    if (!assertTmdbKey(apiKey, res, t)) {
-      return;
-    }
-
-    try {
-      const query = String(req.query.query || "").trim();
-      const page = Number(req.query.page || 1);
-      const language = String(req.query.language || "fr-FR");
-
-      if (!query) {
-        res.status(400).json({ error: t("tmdb.queryRequired") });
+  function registerTmdbGetProxyRoute(routePath, options) {
+    app.get(routePath, withAuth(async (req, res) => {
+      const t = getTranslator(req);
+      const apiKey = await getTmdbApiKey();
+      if (!assertTmdbKey(apiKey, res, t)) {
         return;
       }
 
-      const url = buildTmdbUrl("/search/movie", apiKey, {
-        query,
-        page,
-        language,
-      });
-      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
-      res.status(response.status).json(data);
-    } catch (error) {
-      debugLog("Search movies proxy failed:", error);
-      res.status(500).json({ error: t("tmdb.searchMoviesFailed") });
-    }
-  }));
+      try {
+        const request = options.buildRequest({ req, res, t });
+        if (!request) {
+          return;
+        }
 
-  app.get("/api/movies/:id", withAuth(async (req, res) => {
-    const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey();
-    if (!assertTmdbKey(apiKey, res, t)) {
-      return;
-    }
+        const url = buildTmdbUrl(request.path, apiKey, request.query || {});
+        const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
+        res.status(response.status).json(data);
+      } catch (error) {
+        debugLog(`${options.debugContext} failed:`, error);
+        res.status(500).json({ error: t(options.errorKey) });
+      }
+    }));
+  }
 
-    try {
+  registerTmdbGetProxyRoute("/api/movies/popular", {
+    debugContext: "Popular movies proxy",
+    errorKey: "tmdb.fetchPopularMoviesFailed",
+    buildRequest: ({ req }) => {
+      const filters = readDiscoverFilters(req.query, "movie");
+
+      return hasActiveDiscoverFilters(filters, "movie")
+        ? { path: "/discover/movie", query: filters }
+        : {
+            path: "/movie/popular",
+            query: {
+              page: filters.page,
+              language: filters.language,
+            },
+          };
+    },
+  });
+
+  registerTmdbGetProxyRoute("/api/movies/genres", {
+    debugContext: "Movie genres proxy",
+    errorKey: "tmdb.fetchMovieGenresFailed",
+    buildRequest: ({ req }) => ({
+      path: "/genre/movie/list",
+      query: { language: String(req.query.language || "fr-FR") },
+    }),
+  });
+
+  registerTmdbGetProxyRoute("/api/movies/discover", {
+    debugContext: "Discover movies proxy",
+    errorKey: "tmdb.discoverMoviesFailed",
+    buildRequest: ({ req }) => ({
+      path: "/discover/movie",
+      query: readDiscoverFilters(req.query, "movie"),
+    }),
+  });
+
+  registerTmdbGetProxyRoute("/api/movies/search", {
+    debugContext: "Search movies proxy",
+    errorKey: "tmdb.searchMoviesFailed",
+    buildRequest: ({ req, res, t }) => {
+      const query = String(req.query.query || "").trim();
+      if (!query) {
+        res.status(400).json({ error: t("tmdb.queryRequired") });
+        return null;
+      }
+
+      return {
+        path: "/search/movie",
+        query: {
+          query,
+          page: Number(req.query.page || 1),
+          language: String(req.query.language || "fr-FR"),
+        },
+      };
+    },
+  });
+
+  registerTmdbGetProxyRoute("/api/movies/:id", {
+    debugContext: "Movie details proxy",
+    errorKey: "tmdb.fetchMovieDetailsFailed",
+    buildRequest: ({ req, res, t }) => {
       const id = Number(req.params.id);
-      const language = String(req.query.language || "fr-FR");
-
       if (!Number.isFinite(id)) {
         res.status(400).json({ error: t("tmdb.invalidMovieId") });
-        return;
+        return null;
       }
 
-      const url = buildTmdbUrl(`/movie/${id}`, apiKey, {
-        language,
-        append_to_response: "credits",
-      });
-      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
-      res.status(response.status).json(data);
-    } catch (error) {
-      debugLog("Movie details proxy failed:", error);
-      res.status(500).json({ error: t("tmdb.fetchMovieDetailsFailed") });
-    }
-  }));
-
-  app.get("/api/series/popular", withAuth(async (req, res) => {
-    const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey();
-    if (!assertTmdbKey(apiKey, res, t)) {
-      return;
-    }
-
-    try {
-      const filters = readDiscoverFilters(req.query, "series");
-      const url = hasActiveDiscoverFilters(filters, "series")
-        ? buildTmdbUrl("/discover/tv", apiKey, filters)
-        : buildTmdbUrl("/tv/popular", apiKey, {
-            page: filters.page,
-            language: filters.language,
-          });
-      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
-      res.status(response.status).json(data);
-    } catch (error) {
-      debugLog("Popular series proxy failed:", error);
-      res.status(500).json({ error: t("tmdb.fetchPopularSeriesFailed") });
-    }
-  }));
-
-  app.get("/api/series/genres", withAuth(async (req, res) => {
-    const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey();
-    if (!assertTmdbKey(apiKey, res, t)) {
-      return;
-    }
-
-    try {
-      const language = String(req.query.language || "fr-FR");
-      const url = buildTmdbUrl("/genre/tv/list", apiKey, { language });
-      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
-      res.status(response.status).json(data);
-    } catch (error) {
-      debugLog("Series genres proxy failed:", error);
-      res.status(500).json({ error: t("tmdb.fetchSeriesGenresFailed") });
-    }
-  }));
-
-  app.get("/api/series/discover", withAuth(async (req, res) => {
-    const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey();
-    if (!assertTmdbKey(apiKey, res, t)) {
-      return;
-    }
-
-    try {
-      const page = Number(req.query.page || 1);
-      const language = String(req.query.language || "fr-FR");
-      const withGenres = Number(req.query.with_genres);
-      const withOriginalLanguage = String(req.query.with_original_language || "").trim();
-      const firstAirDateGte = String(req.query.first_air_date_gte || "");
-      const firstAirDateLte = String(req.query.first_air_date_lte || "");
-      const voteAverageGte = Number(req.query.vote_average_gte);
-
-      const query = {
-        page,
-        language,
-        sort_by: "popularity.desc",
+      return {
+        path: `/movie/${id}`,
+        query: {
+          language: String(req.query.language || "fr-FR"),
+          append_to_response: "credits",
+        },
       };
+    },
+  });
 
-      if (Number.isFinite(withGenres)) {
-        query.with_genres = withGenres;
-      }
-      if (withOriginalLanguage) {
-        query.with_original_language = withOriginalLanguage;
-      }
-      if (firstAirDateGte) {
-        query["first_air_date.gte"] = firstAirDateGte;
-      }
-      if (firstAirDateLte) {
-        query["first_air_date.lte"] = firstAirDateLte;
-      }
-      if (Number.isFinite(voteAverageGte) && voteAverageGte > 0) {
-        query["vote_average.gte"] = voteAverageGte;
-      }
+  registerTmdbGetProxyRoute("/api/series/popular", {
+    debugContext: "Popular series proxy",
+    errorKey: "tmdb.fetchPopularSeriesFailed",
+    buildRequest: ({ req }) => {
+      const filters = readDiscoverFilters(req.query, "series");
 
-      const url = buildTmdbUrl("/discover/tv", apiKey, query);
-      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
-      res.status(response.status).json(data);
-    } catch (error) {
-      debugLog("Discover series proxy failed:", error);
-      res.status(500).json({ error: t("tmdb.discoverSeriesFailed") });
-    }
-  }));
+      return hasActiveDiscoverFilters(filters, "series")
+        ? { path: "/discover/tv", query: filters }
+        : {
+            path: "/tv/popular",
+            query: {
+              page: filters.page,
+              language: filters.language,
+            },
+          };
+    },
+  });
 
-  app.get("/api/series/search", withAuth(async (req, res) => {
-    const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey();
-    if (!assertTmdbKey(apiKey, res, t)) {
-      return;
-    }
+  registerTmdbGetProxyRoute("/api/series/genres", {
+    debugContext: "Series genres proxy",
+    errorKey: "tmdb.fetchSeriesGenresFailed",
+    buildRequest: ({ req }) => ({
+      path: "/genre/tv/list",
+      query: { language: String(req.query.language || "fr-FR") },
+    }),
+  });
 
-    try {
+  registerTmdbGetProxyRoute("/api/series/discover", {
+    debugContext: "Discover series proxy",
+    errorKey: "tmdb.discoverSeriesFailed",
+    buildRequest: ({ req }) => ({
+      path: "/discover/tv",
+      query: readDiscoverFilters(req.query, "series"),
+    }),
+  });
+
+  registerTmdbGetProxyRoute("/api/series/search", {
+    debugContext: "Search series proxy",
+    errorKey: "tmdb.searchSeriesFailed",
+    buildRequest: ({ req, res, t }) => {
       const query = String(req.query.query || "").trim();
-      const page = Number(req.query.page || 1);
-      const language = String(req.query.language || "fr-FR");
-
       if (!query) {
         res.status(400).json({ error: t("tmdb.queryRequired") });
-        return;
+        return null;
       }
 
-      const url = buildTmdbUrl("/search/tv", apiKey, {
-        query,
-        page,
-        language,
-      });
-      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
-      res.status(response.status).json(data);
-    } catch (error) {
-      debugLog("Search series proxy failed:", error);
-      res.status(500).json({ error: t("tmdb.searchSeriesFailed") });
-    }
-  }));
+      return {
+        path: "/search/tv",
+        query: {
+          query,
+          page: Number(req.query.page || 1),
+          language: String(req.query.language || "fr-FR"),
+        },
+      };
+    },
+  });
 
-  app.get("/api/series/:id", withAuth(async (req, res) => {
-    const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey();
-    if (!assertTmdbKey(apiKey, res, t)) {
-      return;
-    }
-
-    try {
+  registerTmdbGetProxyRoute("/api/series/:id", {
+    debugContext: "Series details proxy",
+    errorKey: "tmdb.fetchSeriesDetailsFailed",
+    buildRequest: ({ req, res, t }) => {
       const id = Number(req.params.id);
-      const language = String(req.query.language || "fr-FR");
-
       if (!Number.isFinite(id)) {
         res.status(400).json({ error: t("tmdb.invalidSeriesId") });
-        return;
+        return null;
       }
 
-      const url = buildTmdbUrl(`/tv/${id}`, apiKey, {
-        language,
-        append_to_response: "credits",
-      });
-      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
-      res.status(response.status).json(data);
-    } catch (error) {
-      debugLog("Series details proxy failed:", error);
-      res.status(500).json({ error: t("tmdb.fetchSeriesDetailsFailed") });
-    }
-  }));
+      return {
+        path: `/tv/${id}`,
+        query: {
+          language: String(req.query.language || "fr-FR"),
+          append_to_response: "credits",
+        },
+      };
+    },
+  });
 
-  app.get("/api/series/:id/seasons/:seasonNumber", withAuth(async (req, res) => {
-    const t = getTranslator(req);
-    const apiKey = await getTmdbApiKey();
-    if (!assertTmdbKey(apiKey, res, t)) {
-      return;
-    }
-
-    try {
+  registerTmdbGetProxyRoute("/api/series/:id/seasons/:seasonNumber", {
+    debugContext: "Season details proxy",
+    errorKey: "tmdb.fetchSeasonDetailsFailed",
+    buildRequest: ({ req, res, t }) => {
       const id = Number(req.params.id);
       const seasonNumber = Number(req.params.seasonNumber);
-      const language = String(req.query.language || "fr-FR");
-
       if (!Number.isFinite(id) || !Number.isFinite(seasonNumber)) {
         res.status(400).json({ error: t("tmdb.invalidSeriesIdOrSeason") });
-        return;
+        return null;
       }
 
-      const url = buildTmdbUrl(`/tv/${id}/season/${seasonNumber}`, apiKey, {
-        language,
-      });
-      const { response, data } = await fetchTmdb(url, apiKey, t("tmdb.invalidResponse"));
-      res.status(response.status).json(data);
-    } catch (error) {
-      debugLog("Season details proxy failed:", error);
-      res.status(500).json({ error: t("tmdb.fetchSeasonDetailsFailed") });
-    }
-  }));
+      return {
+        path: `/tv/${id}/season/${seasonNumber}`,
+        query: {
+          language: String(req.query.language || "fr-FR"),
+        },
+      };
+    },
+  });
 }
 

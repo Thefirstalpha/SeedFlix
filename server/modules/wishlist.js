@@ -8,6 +8,10 @@ import {
 } from "../config.js";
 import { getTranslator } from "../i18n.js";
 import { withAuth } from "./auth.js";
+import {
+  extractTargetKeyFromTrackerStateKey,
+  extractUserKeyFromTrackerStateKey,
+} from "./trackerStateKey.js";
 
 const trackerSeenFilePath = path.join(dataDir, "tracker-rss-seen.json");
 const trackerRejectedFilePath = path.join(dataDir, "tracker-rss-rejected.json");
@@ -96,46 +100,6 @@ async function readJsonObjectStore(filePath) {
 async function writeJsonObjectStore(filePath, value) {
   await ensureJsonObjectStore(filePath);
   await fs.writeFile(filePath, JSON.stringify(value, null, 2), "utf-8");
-}
-
-function extractTargetKeyFromTrackerStateKey(stateKey) {
-  const parts = String(stateKey || "").split(":");
-  if (parts.length < 4) {
-    return null;
-  }
-
-  const targetType = String(parts[1] || "").trim();
-  const segmentA = Number(parts[2]);
-  const segmentB = Number(parts[3]);
-  const segmentC = Number(parts[4]);
-
-  if ((targetType === "movie" || targetType === "series") && Number.isFinite(segmentA)) {
-    return `${targetType}:${segmentA}`;
-  }
-
-  if (targetType === "season" && Number.isFinite(segmentA) && Number.isFinite(segmentB)) {
-    return `${targetType}:${segmentA}:${segmentB}`;
-  }
-
-  if (
-    targetType === "episode" &&
-    Number.isFinite(segmentA) &&
-    Number.isFinite(segmentB) &&
-    Number.isFinite(segmentC)
-  ) {
-    return `${targetType}:${segmentA}:${segmentB}:${segmentC}`;
-  }
-
-  return null;
-}
-
-function extractUserKeyFromTrackerStateKey(stateKey) {
-  const parts = String(stateKey || "").split(":");
-  if (parts.length < 4) {
-    return "";
-  }
-
-  return String(parts[0] || "").trim();
 }
 
 function buildSeriesTargetKey(entry) {

@@ -7,6 +7,10 @@ import { readSeriesWishlist, readWishlist } from "./wishlist.js";
 import { searchTorznabForQuery } from "./torznab.js";
 import { debugLog } from "../logger.js";
 import { getTranslator } from "../i18n.js";
+import {
+  extractTargetKeyFromTrackerStateKey,
+  extractUserKeyFromTrackerStateKey,
+} from "./trackerStateKey.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -130,46 +134,6 @@ function userStoreKey(userId) {
 
 function resolveNotificationUserKey(user) {
   return userStoreKey(user?.id);
-}
-
-function extractTargetKeyFromTrackerStateKey(stateKey) {
-  const parts = String(stateKey || "").split(":");
-  if (parts.length < 4) {
-    return null;
-  }
-
-  const targetType = String(parts[1] || "").trim();
-  const segmentA = Number(parts[2]);
-  const segmentB = Number(parts[3]);
-  const segmentC = Number(parts[4]);
-
-  if ((targetType === "movie" || targetType === "series") && Number.isFinite(segmentA)) {
-    return `${targetType}:${segmentA}`;
-  }
-
-  if (targetType === "season" && Number.isFinite(segmentA) && Number.isFinite(segmentB)) {
-    return `${targetType}:${segmentA}:${segmentB}`;
-  }
-
-  if (
-    targetType === "episode" &&
-    Number.isFinite(segmentA) &&
-    Number.isFinite(segmentB) &&
-    Number.isFinite(segmentC)
-  ) {
-    return `${targetType}:${segmentA}:${segmentB}:${segmentC}`;
-  }
-
-  return null;
-}
-
-function extractUserKeyFromTrackerStateKey(stateKey) {
-  const parts = String(stateKey || "").split(":");
-  if (parts.length < 4) {
-    return "";
-  }
-
-  return String(parts[0] || "").trim();
 }
 
 function parsePositiveNumber(value) {
