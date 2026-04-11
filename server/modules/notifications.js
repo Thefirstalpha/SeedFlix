@@ -23,57 +23,56 @@ const indexerPollIntervalMs = 1000 * 60 * 0.5;
 const indexerSeenTtlMs = 1000 * 60 * 60 * 24 * 30;
 let indexerPollerStarted = false;
 
-async function readJsonArrayStore(filePath, fallback = []) {
+
+function readJsonStoreTyped(filePath, fallback) {
   const parsed = readJsonStore(filePath, fallback);
-
-  try {
+  if (Array.isArray(fallback)) {
     return Array.isArray(parsed) ? parsed : fallback;
-  } catch {
-    return fallback;
   }
+  if (typeof fallback === "object" && fallback !== null) {
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
+  }
+  return fallback;
 }
 
-async function readJsonObjectStore(filePath) {
-  const parsed = readJsonStore(filePath, {});
-
-  try {
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-async function writeJsonStore(filePath, fallback, value) {
-  readJsonStore(filePath, fallback);
+function writeJsonStoreTyped(filePath, value) {
   writeJsonStoreDb(filePath, value);
 }
 
 async function readUsers() {
-  return readJsonArrayStore(usersFilePath, []);
+  return readJsonStoreTyped(usersFilePath, []);
 }
 
 async function readIndexerSeen() {
-  return readJsonObjectStore(indexerSeenFilePath);
+  return readJsonStoreTyped(indexerSeenFilePath, {});
 }
 
 async function writeIndexerSeen(entries) {
-  await writeJsonStore(indexerSeenFilePath, {}, entries);
+  writeJsonStoreTyped(indexerSeenFilePath, entries);
 }
 
 async function readIndexerRejected() {
-  return readJsonObjectStore(indexerRejectedFilePath);
+  return readJsonStoreTyped(indexerRejectedFilePath, {});
 }
 
 async function writeIndexerRejected(entries) {
-  await writeJsonStore(indexerRejectedFilePath, {}, entries);
+  writeJsonStoreTyped(indexerRejectedFilePath, entries);
 }
 
 async function readIndexerResults() {
-  return readJsonObjectStore(indexerResultsFilePath);
+  return readJsonStoreTyped(indexerResultsFilePath, {});
 }
 
 async function writeIndexerResults(entries) {
-  await writeJsonStore(indexerResultsFilePath, {}, entries);
+  writeJsonStoreTyped(indexerResultsFilePath, entries);
+}
+
+async function loadNotifications() {
+  return readJsonStoreTyped(notificationsFilePath, {});
+}
+
+async function saveNotifications(notifications) {
+  writeJsonStoreTyped(notificationsFilePath, notifications || {});
 }
 
 function normalizeMatchText(value) {
@@ -785,15 +784,6 @@ function startIndexerWishlistPolling() {
   }, indexerPollIntervalMs);
 }
 
-// Charger les notifications
-async function loadNotifications() {
-  return readJsonObjectStore(notificationsFilePath);
-}
-
-// Sauvegarder les notifications
-async function saveNotifications(notifications) {
-  await writeJsonStore(notificationsFilePath, {}, notifications || {});
-}
 
 // Ajouter une notification
 export async function addNotification(userId, notification) {
