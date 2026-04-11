@@ -37,5 +37,10 @@ RUN npm ci --omit=dev
 COPY server ./server
 COPY --from=build /app/dist ./dist
 
+# Create non-root user for security.
+RUN addgroup -g 1000 app && adduser -D -u 1000 -G app app
+RUN chown -R app:app /app
+USER app
+
 EXPOSE 4000
 CMD ["node", "server/index.js"]
