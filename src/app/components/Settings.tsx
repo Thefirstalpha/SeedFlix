@@ -1863,8 +1863,8 @@ export function Settings() {
                   {t("settings.database.warning")}
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-                  <div className="space-y-3 rounded-lg border border-white/10 bg-slate-900/40 p-4">
+                <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] overflow-x-auto max-w-full">
+                  <div className="w-full space-y-3 rounded-lg border border-white/10 bg-slate-900/40 p-4">
                     <div className="flex items-center justify-between gap-2">
                       <h3 className="font-medium text-white">{t("settings.database.namespaces")}</h3>
                       <Button
@@ -1904,7 +1904,7 @@ export function Settings() {
                     )}
                   </div>
 
-                  <div className="space-y-4 rounded-lg border border-white/10 bg-slate-900/40 p-4">
+                  <div className="w-full space-y-4 rounded-lg border border-white/10 bg-slate-900/40 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <h3 className="font-medium text-white">

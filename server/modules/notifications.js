@@ -1081,6 +1081,16 @@ function getColorByType(type) {
   return colors[type] || colors.info;
 }
 
+// Rejet d'un résultat indexer (single)
+export async function rejectIndexerResultItem(userId, targetKey, indexerStateKey) {
+  return mutateIndexerResultItem(userId, targetKey, indexerStateKey, "reject");
+}
+
+// Rejet de plusieurs résultats indexer (batch)
+export async function rejectIndexerResultItems(userId, targetKey, indexerStateKeys) {
+  return mutateIndexerResultItemsBatch(userId, targetKey, indexerStateKeys, "reject");
+}
+
 // Enregistrer les routes
 export function registerNotificationRoutes(app) {
   startIndexerWishlistPolling();
