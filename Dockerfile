@@ -35,8 +35,8 @@ RUN npm ci --omit=dev
 # Data directory is owned by node so the app can write runtime files.
 # All code files are owned by root (read-only for the running process).
 RUN mkdir -p /app/server/modules /app/data && chown node:node /app/data
-COPY --chown=root:root --chmod=444 server/config.js server/defaultSettings.json server/i18n.js server/index.js server/logger.js ./server/
-COPY --chown=root:root --chmod=555 server/modules ./server/modules
+COPY --chown=root:root --chmod=444 server/* ./server/
+COPY --chown=root:root --chmod=444 server/modules/* ./server/modules/
 COPY --chown=root:root --chmod=555 --from=build /app/dist ./dist
 
 # Use the non-root user that already exists in the official Node image.

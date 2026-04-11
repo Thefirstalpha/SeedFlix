@@ -98,3 +98,15 @@ jobs:
           ignore-unfixed: true
           format: table
           exit-code: "1"
+
+      - name: Docker container smoke test
+        run: |
+          docker run -d --rm -p 4000:4000 --name seedflix-test local/seedflix:ci
+          for i in {1..25}; do
+            if curl --silent --show-error --fail http://127.0.0.1:4000/api/auth/me >/tmp/auth.json; then
+              break
+            fi
+            sleep 1
+          done
+          grep -q '"authenticated"' /tmp/auth.json
+          docker stop seedflix-test
