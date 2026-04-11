@@ -8,10 +8,8 @@ RUN npm ci
 FROM deps AS build
 COPY index.html ./
 COPY vite.config.ts ./
-COPY tsconfig.json ./
 COPY postcss.config.mjs ./
 COPY src ./src
-COPY server ./server
 COPY public ./public
 RUN npm run build
 
