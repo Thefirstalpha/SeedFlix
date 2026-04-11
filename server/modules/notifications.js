@@ -1,42 +1,32 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { withAuth } from "./auth.js";
-import { dataDir, usersFilePath } from "../config.js";
 import { readSeriesWishlist, readWishlist } from "./wishlist.js";
 import { searchTorznabForQuery } from "./torznab.js";
 import { debugLog } from "../logger.js";
 import { getTranslator } from "../i18n.js";
 import {
+  mutateJsonStore,
+  readJsonStore,
+  runInTransaction,
+  writeJsonStore as writeJsonStoreDb,
+} from "../db.js";
+import {
   extractTargetKeyFromIndexerStateKey,
   extractUserKeyFromIndexerStateKey,
 } from "./indexerStateKey.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const notificationsFilePath = path.join(dataDir, "notifications.json");
-const indexerSeenFilePath = path.join(dataDir, "indexer-rss-seen.json");
-const indexerRejectedFilePath = path.join(dataDir, "indexer-rss-rejected.json");
-const indexerResultsFilePath = path.join(dataDir, "indexer-rss-results.json");
+const usersFilePath = "auth.users";
+const notificationsFilePath = "notifications.items";
+const indexerSeenFilePath = "indexer.rss.seen";
+const indexerRejectedFilePath = "indexer.rss.rejected";
+const indexerResultsFilePath = "indexer.rss.results";
 const indexerPollIntervalMs = 1000 * 60 * 0.5;
 const indexerSeenTtlMs = 1000 * 60 * 60 * 24 * 30;
 let indexerPollerStarted = false;
 
-async function ensureJsonStore(filePath, fallback) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  try {
-    await fs.access(filePath);
-  } catch {
-    await fs.writeFile(filePath, JSON.stringify(fallback, null, 2), "utf-8");
-  }
-}
-
 async function readJsonArrayStore(filePath, fallback = []) {
-  await ensureJsonStore(filePath, fallback);
-  const content = await fs.readFile(filePath, "utf-8");
+  const parsed = readJsonStore(filePath, fallback);
 
   try {
-    const parsed = JSON.parse(content);
     return Array.isArray(parsed) ? parsed : fallback;
   } catch {
     return fallback;
@@ -44,11 +34,9 @@ async function readJsonArrayStore(filePath, fallback = []) {
 }
 
 async function readJsonObjectStore(filePath) {
-  await ensureJsonStore(filePath, {});
-  const content = await fs.readFile(filePath, "utf-8");
+  const parsed = readJsonStore(filePath, {});
 
   try {
-    const parsed = JSON.parse(content);
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};
@@ -56,8 +44,8 @@ async function readJsonObjectStore(filePath) {
 }
 
 async function writeJsonStore(filePath, fallback, value) {
-  await ensureJsonStore(filePath, fallback);
-  await fs.writeFile(filePath, JSON.stringify(value, null, 2), "utf-8");
+  readJsonStore(filePath, fallback);
+  writeJsonStoreDb(filePath, value);
 }
 
 async function readUsers() {
@@ -799,34 +787,19 @@ function startIndexerWishlistPolling() {
 
 // Charger les notifications
 async function loadNotifications() {
-  await ensureJsonStore(notificationsFilePath, {});
-  try {
-    const content = await fs.readFile(notificationsFilePath, "utf-8");
-    return JSON.parse(content);
-  } catch {
-    return {};
-  }
+  return readJsonObjectStore(notificationsFilePath);
 }
 
 // Sauvegarder les notifications
 async function saveNotifications(notifications) {
-  await ensureJsonStore(notificationsFilePath, {});
-  await fs.writeFile(
-    notificationsFilePath,
-    JSON.stringify(notifications, null, 2)
-  );
+  await writeJsonStore(notificationsFilePath, {}, notifications || {});
 }
 
 // Ajouter une notification
 export async function addNotification(userId, notification) {
-  const notifications = await loadNotifications();
   const userKey = userStoreKey(userId);
   if (!userKey) {
     return null;
-  }
-
-  if (!notifications[userKey]) {
-    notifications[userKey] = [];
   }
 
   const id = Date.now().toString();
@@ -840,8 +813,14 @@ export async function addNotification(userId, notification) {
     data: notification.data || {},
   };
 
-  notifications[userKey].push(notif);
-  await saveNotifications(notifications);
+  mutateJsonStore(notificationsFilePath, {}, (notifications) => {
+    const nextNotifications = notifications && typeof notifications === "object" ? notifications : {};
+    if (!Array.isArray(nextNotifications[userKey])) {
+      nextNotifications[userKey] = [];
+    }
+    nextNotifications[userKey].push(notif);
+    return nextNotifications;
+  });
 
   return notif;
 }
@@ -871,48 +850,62 @@ export async function getNotifications(userId, options = {}) {
 
 // Marquer comme lue
 export async function markAsRead(userId, notificationId) {
-  const notifications = await loadNotifications();
   const userKey = userStoreKey(userId);
+  let updatedNotification = null;
 
-  if (notifications[userKey]) {
-    const notif = notifications[userKey].find((n) => n.id === notificationId);
-    if (notif) {
-      notif.isRead = true;
-      await saveNotifications(notifications);
-      return notif;
+  mutateJsonStore(notificationsFilePath, {}, (notifications) => {
+    const nextNotifications = notifications && typeof notifications === "object" ? notifications : {};
+    if (!Array.isArray(nextNotifications[userKey])) {
+      return nextNotifications;
     }
-  }
 
-  return null;
+    const notif = nextNotifications[userKey].find((n) => n.id === notificationId);
+    if (!notif) {
+      return nextNotifications;
+    }
+
+    notif.isRead = true;
+    updatedNotification = notif;
+    return nextNotifications;
+  });
+
+  return updatedNotification;
 }
 
 // Marquer toutes comme lues
 export async function markAllAsRead(userId) {
-  const notifications = await loadNotifications();
   const userKey = userStoreKey(userId);
+  mutateJsonStore(notificationsFilePath, {}, (notifications) => {
+    const nextNotifications = notifications && typeof notifications === "object" ? notifications : {};
+    if (!Array.isArray(nextNotifications[userKey])) {
+      return nextNotifications;
+    }
 
-  if (notifications[userKey]) {
-    notifications[userKey].forEach((n) => {
+    nextNotifications[userKey].forEach((n) => {
       n.isRead = true;
     });
-    await saveNotifications(notifications);
-  }
+    return nextNotifications;
+  });
 }
 
 // Supprimer une notification
 export async function deleteNotification(userId, notificationId) {
-  const notifications = await loadNotifications();
   const userKey = userStoreKey(userId);
+  let wasDeleted = false;
 
-  if (notifications[userKey]) {
-    notifications[userKey] = notifications[userKey].filter(
-      (n) => n.id !== notificationId
-    );
-    await saveNotifications(notifications);
-    return true;
-  }
+  mutateJsonStore(notificationsFilePath, {}, (notifications) => {
+    const nextNotifications = notifications && typeof notifications === "object" ? notifications : {};
+    if (!Array.isArray(nextNotifications[userKey])) {
+      return nextNotifications;
+    }
 
-  return false;
+    const beforeCount = nextNotifications[userKey].length;
+    nextNotifications[userKey] = nextNotifications[userKey].filter((n) => n.id !== notificationId);
+    wasDeleted = nextNotifications[userKey].length !== beforeCount;
+    return nextNotifications;
+  });
+
+  return wasDeleted;
 }
 
 export async function getIndexerResultsForUser(userId) {
@@ -951,47 +944,44 @@ async function mutateIndexerResultItem(userId, targetKey, indexerStateKey, mode)
 
   const normalizedUserKey = userStoreKey(userId);
 
-  const [allResults, rejected] = await Promise.all([
-    readIndexerResults(),
-    readIndexerRejected(),
-  ]);
+  return runInTransaction((tx) => {
+    const allResults = tx.readJson(indexerResultsFilePath, {});
+    const rejected = tx.readJson(indexerRejectedFilePath, {});
 
-  const userResults = allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
-    ? { ...allResults[normalizedUserKey] }
-    : {};
-  const bucket = userResults[normalizedTargetKey] && typeof userResults[normalizedTargetKey] === "object"
-    ? { ...userResults[normalizedTargetKey] }
-    : null;
-  if (!bucket || !Array.isArray(bucket.items)) {
-    return { ok: false, reason: "not-found" };
-  }
+    const userResults = allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
+      ? { ...allResults[normalizedUserKey] }
+      : {};
+    const bucket = userResults[normalizedTargetKey] && typeof userResults[normalizedTargetKey] === "object"
+      ? { ...userResults[normalizedTargetKey] }
+      : null;
+    if (!bucket || !Array.isArray(bucket.items)) {
+      return { ok: false, reason: "not-found" };
+    }
 
-  const index = bucket.items.findIndex(
-    (item) => String(item?.indexerStateKey || "").trim() === normalizedStateKey
-  );
-  if (index < 0) {
-    return { ok: false, reason: "not-found" };
-  }
+    const index = bucket.items.findIndex(
+      (item) => String(item?.indexerStateKey || "").trim() === normalizedStateKey
+    );
+    if (index < 0) {
+      return { ok: false, reason: "not-found" };
+    }
 
-  bucket.items.splice(index, 1);
-  if (bucket.items.length === 0) {
-    delete userResults[normalizedTargetKey];
-  } else {
-    bucket.updatedAt = new Date().toISOString();
-    userResults[normalizedTargetKey] = bucket;
-  }
-  allResults[normalizedUserKey] = userResults;
+    bucket.items.splice(index, 1);
+    if (bucket.items.length === 0) {
+      delete userResults[normalizedTargetKey];
+    } else {
+      bucket.updatedAt = new Date().toISOString();
+      userResults[normalizedTargetKey] = bucket;
+    }
+    allResults[normalizedUserKey] = userResults;
 
-  if (mode === "reject") {
-    rejected[normalizedStateKey] = Date.now();
-  }
+    if (mode === "reject") {
+      rejected[normalizedStateKey] = Date.now();
+      tx.writeJson(indexerRejectedFilePath, rejected);
+    }
+    tx.writeJson(indexerResultsFilePath, allResults);
 
-  await Promise.all([
-    writeIndexerResults(allResults),
-    mode === "reject" ? writeIndexerRejected(rejected) : Promise.resolve(),
-  ]);
-
-  return { ok: true };
+    return { ok: true };
+  });
 }
 
 async function mutateIndexerResultItemsBatch(userId, targetKey, indexerStateKeys, mode) {
@@ -1009,53 +999,51 @@ async function mutateIndexerResultItemsBatch(userId, targetKey, indexerStateKeys
   }
 
   const normalizedUserKey = userStoreKey(userId);
-  const [allResults, rejected] = await Promise.all([
-    readIndexerResults(),
-    readIndexerRejected(),
-  ]);
 
-  const userResults = allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
-    ? { ...allResults[normalizedUserKey] }
-    : {};
-  const bucket = userResults[normalizedTargetKey] && typeof userResults[normalizedTargetKey] === "object"
-    ? { ...userResults[normalizedTargetKey] }
-    : null;
+  return runInTransaction((tx) => {
+    const allResults = tx.readJson(indexerResultsFilePath, {});
+    const rejected = tx.readJson(indexerRejectedFilePath, {});
 
-  if (!bucket || !Array.isArray(bucket.items)) {
-    return { ok: false, reason: "not-found" };
-  }
+    const userResults = allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
+      ? { ...allResults[normalizedUserKey] }
+      : {};
+    const bucket = userResults[normalizedTargetKey] && typeof userResults[normalizedTargetKey] === "object"
+      ? { ...userResults[normalizedTargetKey] }
+      : null;
 
-  const removableStateKeys = new Set(normalizedStateKeys);
-  const originalLength = bucket.items.length;
-  bucket.items = bucket.items.filter(
-    (item) => !removableStateKeys.has(String(item?.indexerStateKey || "").trim())
-  );
-
-  if (bucket.items.length === originalLength) {
-    return { ok: false, reason: "not-found" };
-  }
-
-  if (bucket.items.length === 0) {
-    delete userResults[normalizedTargetKey];
-  } else {
-    bucket.updatedAt = new Date().toISOString();
-    userResults[normalizedTargetKey] = bucket;
-  }
-  allResults[normalizedUserKey] = userResults;
-
-  if (mode === "reject") {
-    const rejectedAt = Date.now();
-    for (const stateKey of removableStateKeys) {
-      rejected[stateKey] = rejectedAt;
+    if (!bucket || !Array.isArray(bucket.items)) {
+      return { ok: false, reason: "not-found" };
     }
-  }
 
-  await Promise.all([
-    writeIndexerResults(allResults),
-    mode === "reject" ? writeIndexerRejected(rejected) : Promise.resolve(),
-  ]);
+    const removableStateKeys = new Set(normalizedStateKeys);
+    const originalLength = bucket.items.length;
+    bucket.items = bucket.items.filter(
+      (item) => !removableStateKeys.has(String(item?.indexerStateKey || "").trim())
+    );
 
-  return { ok: true };
+    if (bucket.items.length === originalLength) {
+      return { ok: false, reason: "not-found" };
+    }
+
+    if (bucket.items.length === 0) {
+      delete userResults[normalizedTargetKey];
+    } else {
+      bucket.updatedAt = new Date().toISOString();
+      userResults[normalizedTargetKey] = bucket;
+    }
+    allResults[normalizedUserKey] = userResults;
+
+    if (mode === "reject") {
+      const rejectedAt = Date.now();
+      for (const stateKey of removableStateKeys) {
+        rejected[stateKey] = rejectedAt;
+      }
+      tx.writeJson(indexerRejectedFilePath, rejected);
+    }
+    tx.writeJson(indexerResultsFilePath, allResults);
+
+    return { ok: true };
+  });
 }
 
 export async function rejectIndexerResultItem(userId, targetKey, indexerStateKey, options = {}) {
@@ -1072,13 +1060,14 @@ export async function validateIndexerResultItem(userId, targetKey, indexerStateK
 
 // Supprimer toutes les notifications
 export async function clearNotifications(userId) {
-  const notifications = await loadNotifications();
   const userKey = userStoreKey(userId);
-
-  if (notifications[userKey]) {
-    delete notifications[userKey];
-    await saveNotifications(notifications);
-  }
+  mutateJsonStore(notificationsFilePath, {}, (notifications) => {
+    const nextNotifications = notifications && typeof notifications === "object" ? notifications : {};
+    if (nextNotifications[userKey]) {
+      delete nextNotifications[userKey];
+    }
+    return nextNotifications;
+  });
 }
 
 // Compter les non-lues

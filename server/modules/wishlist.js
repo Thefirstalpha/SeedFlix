@@ -1,37 +1,21 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-
-import {
-  dataDir,
-  seriesWishlistFilePath,
-  wishlistFilePath,
-} from "../config.js";
 import { getTranslator } from "../i18n.js";
 import { withAuth } from "./auth.js";
+import { mutateJsonStore, readJsonStore, writeJsonStore } from "../db.js";
 import {
   extractTargetKeyFromIndexerStateKey,
   extractUserKeyFromIndexerStateKey,
 } from "./indexerStateKey.js";
 
-const indexerSeenFilePath = path.join(dataDir, "indexer-rss-seen.json");
-const indexerRejectedFilePath = path.join(dataDir, "indexer-rss-rejected.json");
-const indexerResultsFilePath = path.join(dataDir, "indexer-rss-results.json");
-
-async function ensureJsonArrayStore(filePath) {
-  await fs.mkdir(dataDir, { recursive: true });
-  try {
-    await fs.access(filePath);
-  } catch {
-    await fs.writeFile(filePath, "{}", "utf-8");
-  }
-}
+const wishlistFilePath = "wishlist.movies";
+const seriesWishlistFilePath = "wishlist.series";
+const indexerSeenFilePath = "indexer.rss.seen";
+const indexerRejectedFilePath = "indexer.rss.rejected";
+const indexerResultsFilePath = "indexer.rss.results";
 
 async function readJsonArrayStore(filePath) {
-  await ensureJsonArrayStore(filePath);
-  const content = await fs.readFile(filePath, "utf-8");
+  const parsed = readJsonStore(filePath, {});
 
   try {
-    const parsed = JSON.parse(content);
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};
@@ -39,8 +23,7 @@ async function readJsonArrayStore(filePath) {
 }
 
 async function writeJsonArrayStore(filePath, items) {
-  await ensureJsonArrayStore(filePath);
-  await fs.writeFile(filePath, JSON.stringify(items, null, 2), "utf-8");
+  writeJsonStore(filePath, items && typeof items === "object" ? items : {});
 }
 
 function normalizeUserStoreKey(userId) {
@@ -62,35 +45,26 @@ async function readUserWishlistStore(filePath, userId) {
 }
 
 async function writeUserWishlistStore(filePath, userId, items) {
-  const allWishlists = await readJsonArrayStore(filePath);
   const userKey = normalizeUserStoreKey(userId);
   if (!userKey) {
     return;
   }
 
-  allWishlists[userKey] = normalizeWishlistArray(items);
-  await writeJsonArrayStore(filePath, allWishlists);
+  mutateJsonStore(filePath, {}, (allWishlists) => {
+    const nextWishlists = allWishlists && typeof allWishlists === "object" ? allWishlists : {};
+    nextWishlists[userKey] = normalizeWishlistArray(items);
+    return nextWishlists;
+  });
 }
 
 async function clearAllUserWishlistStore(filePath) {
   await writeJsonArrayStore(filePath, {});
 }
 
-async function ensureJsonObjectStore(filePath) {
-  await fs.mkdir(dataDir, { recursive: true });
-  try {
-    await fs.access(filePath);
-  } catch {
-    await fs.writeFile(filePath, "{}", "utf-8");
-  }
-}
-
 async function readJsonObjectStore(filePath) {
-  await ensureJsonObjectStore(filePath);
-  const content = await fs.readFile(filePath, "utf-8");
+  const parsed = readJsonStore(filePath, {});
 
   try {
-    const parsed = JSON.parse(content);
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};
@@ -98,8 +72,7 @@ async function readJsonObjectStore(filePath) {
 }
 
 async function writeJsonObjectStore(filePath, value) {
-  await ensureJsonObjectStore(filePath);
-  await fs.writeFile(filePath, JSON.stringify(value, null, 2), "utf-8");
+  writeJsonStore(filePath, value && typeof value === "object" ? value : {});
 }
 
 function buildSeriesTargetKey(entry) {

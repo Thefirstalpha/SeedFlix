@@ -1,8 +1,5 @@
 import { withAuth } from "./auth.js";
 import { debugLog } from "../logger.js";
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { appTorrentsFilePath, dataDir } from "../config.js";
 import { addNotification, sendDiscordNotification } from "./notifications.js";
 import {
   readWishlist,
@@ -11,10 +8,12 @@ import {
   writeSeriesWishlist,
 } from "./wishlist.js";
 import { getTranslator } from "../i18n.js";
+import { mutateJsonStore, readJsonStore, writeJsonStore } from "../db.js";
 
 const transmissionTimeoutMs = 8000;
 const transmissionRpcPath = "/transmission/rpc";
-const torrentCompletedStoreFilePath = path.join(dataDir, "torrent-completed-notified.json");
+const appTorrentsFilePath = "transmission.app-torrents";
+const torrentCompletedStoreFilePath = "transmission.completed-notified";
 const transmissionStatusLabels = {
   0: "Stopped",
   1: "Queued to check files",
@@ -29,20 +28,9 @@ function isDownloadingTorrent(torrent) {
   return !Boolean(torrent?.isFinished) && [3, 4].includes(Number(torrent?.status));
 }
 
-async function ensureJsonObjectStore(filePath) {
-  await fs.mkdir(dataDir, { recursive: true });
-  try {
-    await fs.access(filePath);
-  } catch {
-    await fs.writeFile(filePath, "{}", "utf-8");
-  }
-}
-
 async function readJsonObjectStore(filePath) {
-  await ensureJsonObjectStore(filePath);
-  const content = await fs.readFile(filePath, "utf-8");
+  const parsed = readJsonStore(filePath, {});
   try {
-    const parsed = JSON.parse(content);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return {};
     }
@@ -53,16 +41,11 @@ async function readJsonObjectStore(filePath) {
 }
 
 async function writeJsonObjectStore(filePath, data) {
-  await ensureJsonObjectStore(filePath);
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+  writeJsonStore(filePath, data && typeof data === "object" ? data : {});
 }
 
 async function readAppTorrentsStore() {
   return readJsonObjectStore(appTorrentsFilePath);
-}
-
-async function writeAppTorrentsStore(data) {
-  await writeJsonObjectStore(appTorrentsFilePath, data);
 }
 
 async function readCompletedTorrentStore() {
@@ -79,12 +62,14 @@ async function registerAppTorrentForUser(userId, torrent) {
     return;
   }
 
-  const store = await readAppTorrentsStore();
   const key = String(userId);
-  const existing = Array.isArray(store[key]) ? store[key] : [];
-  const merged = Array.from(new Set([...existing, hash]));
-  store[key] = merged;
-  await writeAppTorrentsStore(store);
+  mutateJsonStore(appTorrentsFilePath, {}, (store) => {
+    const nextStore = store && typeof store === "object" ? store : {};
+    const existing = Array.isArray(nextStore[key]) ? nextStore[key] : [];
+    const merged = Array.from(new Set([...existing, hash]));
+    nextStore[key] = merged;
+    return nextStore;
+  });
 }
 
 async function getAppTorrentHashesForUser(userId) {
@@ -103,12 +88,14 @@ async function removeAppTorrentForUser(userId, hash) {
     return;
   }
 
-  const store = await readAppTorrentsStore();
   const key = String(userId);
-  const existing = Array.isArray(store[key]) ? store[key] : [];
-  const filtered = existing.filter((h) => String(h || "").trim().toLowerCase() !== torrentHash);
-  store[key] = filtered;
-  await writeAppTorrentsStore(store);
+  mutateJsonStore(appTorrentsFilePath, {}, (store) => {
+    const nextStore = store && typeof store === "object" ? store : {};
+    const existing = Array.isArray(nextStore[key]) ? nextStore[key] : [];
+    const filtered = existing.filter((h) => String(h || "").trim().toLowerCase() !== torrentHash);
+    nextStore[key] = filtered;
+    return nextStore;
+  });
 }
 
 function buildTransmissionRpcUrl(rawUrl, rawPort) {

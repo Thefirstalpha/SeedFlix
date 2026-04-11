@@ -1,6 +1,11 @@
 import type { Movie } from "../types/movie";
 import { API_BASE_URL } from "../config/tmdb";
 
+async function parseArrayResponse<T>(response: Response): Promise<T[]> {
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
 // Récupérer la liste de souhaits
 export async function getWishlist(): Promise<Movie[]> {
   try {
@@ -10,9 +15,7 @@ export async function getWishlist(): Promise<Movie[]> {
     if (!response.ok) {
       throw new Error("Failed to fetch wishlist");
     }
-
-    const data = await response.json();
-    return Array.isArray(data) ? data : [];
+    return parseArrayResponse<Movie>(response);
   } catch {
     return [];
   }

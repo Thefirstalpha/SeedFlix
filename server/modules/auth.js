@@ -1,20 +1,28 @@
 import { promises as fs } from "node:fs";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import path from "node:path";
 
 import {
   appImageTag,
   authCookieName,
-  dataDir,
   defaultSettingsFilePath,
-  appTorrentsFilePath,
-  globalConfigFilePath,
   sessionDurationMs,
-  sessionsFilePath,
-  usersFilePath,
 } from "../config.js";
 import { debugLog } from "../logger.js";
 import { getTranslator } from "../i18n.js";
+import {
+  listJsonStores,
+  mutateJsonStore,
+  readJsonStore,
+  readRawJsonStore,
+  runInTransaction,
+  writeRawJsonStore,
+  writeJsonStore,
+} from "../db.js";
+
+const USERS_STORE_KEY = "auth.users";
+const SESSIONS_STORE_KEY = "auth.sessions";
+const GLOBAL_CONFIG_STORE_KEY = "auth.global-config";
+const APP_TORRENTS_STORE_KEY = "transmission.app-torrents";
 
 function hashPassword(password, salt = randomBytes(16).toString("hex")) {
   const hash = scryptSync(password, salt, 64).toString("hex");
@@ -96,53 +104,23 @@ function defaultUserRecord() {
   };
 }
 
-async function ensureJsonStore(filePath, fallback) {
-  await fs.mkdir(dataDir, { recursive: true });
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  try {
-    await fs.access(filePath);
-  } catch {
-    await fs.writeFile(filePath, JSON.stringify(fallback, null, 2), "utf-8");
-  }
-}
-
 async function readUsers() {
-  await ensureJsonStore(usersFilePath, [defaultUserRecord()]);
-  const content = await fs.readFile(usersFilePath, "utf-8");
-
-  try {
-    const parsed = JSON.parse(content);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-async function writeUsers(users) {
-  await ensureJsonStore(usersFilePath, [defaultUserRecord()]);
-  await fs.writeFile(usersFilePath, JSON.stringify(users, null, 2), "utf-8");
+  const users = readJsonStore(USERS_STORE_KEY, [defaultUserRecord()]);
+  return Array.isArray(users) ? users : [defaultUserRecord()];
 }
 
 async function readSessions() {
-  await ensureJsonStore(sessionsFilePath, []);
-  const content = await fs.readFile(sessionsFilePath, "utf-8");
-
-  try {
-    const parsed = JSON.parse(content);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-async function writeSessions(sessions) {
-  await ensureJsonStore(sessionsFilePath, []);
-  await fs.writeFile(sessionsFilePath, JSON.stringify(sessions, null, 2), "utf-8");
+  const sessions = readJsonStore(SESSIONS_STORE_KEY, []);
+  return Array.isArray(sessions) ? sessions : [];
 }
 
 async function readDefaultSettings() {
-  await ensureJsonStore(defaultSettingsFilePath, buildDefaultSettings("admin"));
-  const content = await fs.readFile(defaultSettingsFilePath, "utf-8");
+  let content = "";
+  try {
+    content = await fs.readFile(defaultSettingsFilePath, "utf-8");
+  } catch {
+    return buildDefaultSettings("admin");
+  }
 
   try {
     const parsed = JSON.parse(content);
@@ -157,17 +135,18 @@ async function readDefaultSettings() {
 }
 
 async function ensureUsersStore() {
-  await ensureJsonStore(usersFilePath, [defaultUserRecord()]);
-  const users = await readUsers();
-
-  if (users.length === 0) {
-    await writeUsers([defaultUserRecord()]);
-  }
+  mutateJsonStore(USERS_STORE_KEY, [defaultUserRecord()], (users) => {
+    const safeUsers = Array.isArray(users) ? users : [defaultUserRecord()];
+    return safeUsers.length === 0 ? [defaultUserRecord()] : safeUsers;
+  });
 }
 
 export async function initializeAuthStores() {
   await ensureUsersStore();
-  await ensureJsonStore(sessionsFilePath, []);
+  mutateJsonStore(SESSIONS_STORE_KEY, [], (sessions) =>
+    Array.isArray(sessions) ? sessions : []
+  );
+  writeJsonStore(GLOBAL_CONFIG_STORE_KEY, await readGlobalConfig());
 }
 
 function isTorrentConfigured(user) {
@@ -289,12 +268,13 @@ async function getAuthenticatedUser(req) {
     return null;
   }
 
-  const sessions = await readSessions();
+  let activeSessions = [];
   const now = Date.now();
-  const activeSessions = sessions.filter((session) => Number(session.expiresAt) > now);
-  if (activeSessions.length !== sessions.length) {
-    await writeSessions(activeSessions);
-  }
+  mutateJsonStore(SESSIONS_STORE_KEY, [], (sessions) => {
+    const safeSessions = Array.isArray(sessions) ? sessions : [];
+    activeSessions = safeSessions.filter((session) => Number(session.expiresAt) > now);
+    return activeSessions.length === safeSessions.length ? safeSessions : activeSessions;
+  });
 
   const session = activeSessions.find((entry) => entry.token === sessionToken);
   if (!session) {
@@ -394,28 +374,38 @@ export function registerAuthRoutes(app) {
         return;
       }
 
-      const users = await readUsers();
-      const user = users.find((entry) => entry.username === username);
-      if (!user || !verifyPassword(password, user.passwordSalt, user.passwordHash)) {
+      const now = Date.now();
+      const token = randomBytes(24).toString("hex");
+      const expiresAt = now + sessionDurationMs;
+      const loginResult = runInTransaction((tx) => {
+        const users = tx.readJson(USERS_STORE_KEY, [defaultUserRecord()]);
+        const safeUsers = Array.isArray(users) ? users : [defaultUserRecord()];
+        const user = safeUsers.find((entry) => entry.username === username);
+        if (!user || !verifyPassword(password, user.passwordSalt, user.passwordHash)) {
+          return { ok: false };
+        }
+
+        const sessions = tx.readJson(SESSIONS_STORE_KEY, []);
+        const safeSessions = Array.isArray(sessions) ? sessions : [];
+        const nextSessions = [
+          ...safeSessions.filter((session) => Number(session.expiresAt) > now),
+          { token, userId: user.id, expiresAt },
+        ];
+        tx.writeJson(SESSIONS_STORE_KEY, nextSessions);
+        return { ok: true, user };
+      });
+
+      if (!loginResult.ok) {
         res.status(401).json({ error: t("auth.invalidCredentials") });
         return;
       }
 
-      const sessions = await readSessions();
-      const now = Date.now();
-      const token = randomBytes(24).toString("hex");
-      const expiresAt = now + sessionDurationMs;
-      const nextSessions = [
-        ...sessions.filter((session) => Number(session.expiresAt) > now),
-        { token, userId: user.id, expiresAt },
-      ];
-      await writeSessions(nextSessions);
       setSessionCookie(res, token, expiresAt);
 
       res.json({
-        user: sanitizeUser(user),
-        ...(await buildSetupStatus(user)),
-        settings: user.settings,
+        user: sanitizeUser(loginResult.user),
+        ...(await buildSetupStatus(loginResult.user)),
+        settings: loginResult.user.settings,
       });
     } catch (error) {
       debugLog("Login failed:", error);
@@ -429,8 +419,10 @@ export function registerAuthRoutes(app) {
       const cookies = parseCookies(req.headers.cookie || "");
       const sessionToken = cookies[authCookieName];
       if (sessionToken) {
-        const sessions = await readSessions();
-        await writeSessions(sessions.filter((session) => session.token !== sessionToken));
+        mutateJsonStore(SESSIONS_STORE_KEY, [], (sessions) => {
+          const safeSessions = Array.isArray(sessions) ? sessions : [];
+          return safeSessions.filter((session) => session.token !== sessionToken);
+        });
       }
 
       clearSessionCookie(res);
@@ -443,14 +435,15 @@ export function registerAuthRoutes(app) {
 
   app.post("/api/auth/accept-legal", withAuth(async (req, res, auth) => {
     try {
-      const users = await readUsers();
-      const nextUsers = users.map((user) => {
-        if (user.id !== auth.user.id) {
-          return user;
-        }
-        return { ...user, legalAcceptedAt: new Date().toISOString() };
+      mutateJsonStore(USERS_STORE_KEY, [defaultUserRecord()], (users) => {
+        const safeUsers = Array.isArray(users) ? users : [defaultUserRecord()];
+        return safeUsers.map((user) => {
+          if (user.id !== auth.user.id) {
+            return user;
+          }
+          return { ...user, legalAcceptedAt: new Date().toISOString() };
+        });
       });
-      await writeUsers(nextUsers);
       res.json({ ok: true });
     } catch (error) {
       const t = getTranslator(req);
@@ -476,35 +469,46 @@ export function registerAuthRoutes(app) {
         return;
       }
 
-      if (!verifyPassword(currentPassword, auth.user.passwordSalt, auth.user.passwordHash)) {
+      const { salt, hash } = hashPassword(newPassword);
+      const changeResult = runInTransaction((tx) => {
+        const users = tx.readJson(USERS_STORE_KEY, [defaultUserRecord()]);
+        const safeUsers = Array.isArray(users) ? users : [defaultUserRecord()];
+        const foundUser = safeUsers.find((user) => user.id === auth.user.id);
+        if (!foundUser || !verifyPassword(currentPassword, foundUser.passwordSalt, foundUser.passwordHash)) {
+          return { ok: false };
+        }
+
+        const nextUsers = safeUsers.map((user) => {
+          if (user.id !== auth.user.id) {
+            return user;
+          }
+
+          return {
+            ...user,
+            passwordSalt: salt,
+            passwordHash: hash,
+            mustChangePassword: false,
+            shouldChangePassword: false,
+            firstLoginPending: false,
+            settings: {
+              ...user.settings,
+              security: {
+                ...user.settings?.security,
+                lastPasswordChangeAt: new Date().toISOString(),
+              },
+            },
+          };
+        });
+
+        tx.writeJson(USERS_STORE_KEY, nextUsers);
+        return { ok: true };
+      });
+
+      if (!changeResult.ok) {
         res.status(401).json({ error: t("auth.invalidCurrentPassword") });
         return;
       }
 
-      const users = await readUsers();
-      const { salt, hash } = hashPassword(newPassword);
-      const nextUsers = users.map((user) => {
-        if (user.id !== auth.user.id) {
-          return user;
-        }
-
-        return {
-          ...user,
-          passwordSalt: salt,
-          passwordHash: hash,
-          mustChangePassword: false,
-          shouldChangePassword: false,
-          firstLoginPending: false,
-          settings: {
-            ...user.settings,
-            security: {
-              ...user.settings?.security,
-              lastPasswordChangeAt: new Date().toISOString(),
-            },
-          },
-        };
-      });
-      await writeUsers(nextUsers);
       res.json({ ok: true });
     } catch (error) {
       const t = getTranslator(req);
@@ -527,18 +531,19 @@ export function registerAuthRoutes(app) {
     const t = getTranslator(req);
     try {
       const newSettings = sanitizeSettingsPayload(req.body);
-      const users = await readUsers();
-      const nextUsers = users.map((user) => {
-        if (user.id !== auth.user.id) {
-          return user;
-        }
+      mutateJsonStore(USERS_STORE_KEY, [defaultUserRecord()], (users) => {
+        const safeUsers = Array.isArray(users) ? users : [defaultUserRecord()];
+        return safeUsers.map((user) => {
+          if (user.id !== auth.user.id) {
+            return user;
+          }
 
-        return {
-          ...user,
-          settings: newSettings,
-        };
+          return {
+            ...user,
+            settings: newSettings,
+          };
+        });
       });
-      await writeUsers(nextUsers);
       res.json(buildClientSettingsPayload(newSettings));
     } catch (error) {
       debugLog("Update settings failed:", error);
@@ -569,6 +574,61 @@ export function registerAuthRoutes(app) {
     }
   }));
 
+  app.get("/api/settings/database", withAdmin(async (req, res) => {
+    const t = getTranslator(req);
+    try {
+      res.json({ namespaces: listJsonStores() });
+    } catch (error) {
+      debugLog("Read database namespaces failed:", error);
+      res.status(500).json({ error: t("auth.failedLoadSettings") });
+    }
+  }));
+
+  app.get("/api/settings/database/:namespace", withAdmin(async (req, res) => {
+    const t = getTranslator(req);
+    try {
+      const namespace = String(req.params.namespace || "").trim();
+      if (!namespace) {
+        res.status(400).json({ error: t("auth.failedLoadSettings") });
+        return;
+      }
+
+      const entry = readRawJsonStore(namespace);
+      if (!entry) {
+        res.status(404).json({ error: t("auth.failedLoadSettings") });
+        return;
+      }
+
+      res.json(entry);
+    } catch (error) {
+      debugLog("Read database namespace failed:", error);
+      res.status(500).json({ error: t("auth.failedLoadSettings") });
+    }
+  }));
+
+  app.put("/api/settings/database/:namespace", withAdmin(async (req, res) => {
+    const t = getTranslator(req);
+    try {
+      const namespace = String(req.params.namespace || "").trim();
+      const rawValue = String(req.body?.value || "");
+
+      if (!namespace || !rawValue.trim()) {
+        res.status(400).json({ error: t("auth.failedUpdateSettings") });
+        return;
+      }
+
+      const updatedEntry = writeRawJsonStore(namespace, rawValue);
+      res.json(updatedEntry);
+    } catch (error) {
+      debugLog("Update database namespace failed:", error);
+      if (error instanceof SyntaxError) {
+        res.status(400).json({ error: t("auth.invalidJsonPayload") });
+        return;
+      }
+      res.status(500).json({ error: t("auth.failedUpdateSettings") });
+    }
+  }));
+
   app.post("/api/settings/reset", withAdmin(async (req, res) => {
     const t = getTranslator(req);
     try {
@@ -586,11 +646,13 @@ export function registerAuthRoutes(app) {
         },
       };
 
-      await writeUsers([resetUser]);
+      runInTransaction((tx) => {
+        tx.writeJson(USERS_STORE_KEY, [resetUser]);
+        tx.writeJson(SESSIONS_STORE_KEY, []);
+        tx.writeJson(GLOBAL_CONFIG_STORE_KEY, defaultGlobalConfig());
+        tx.writeJson(APP_TORRENTS_STORE_KEY, {});
+      });
       await resetAllWishlists();
-      await writeSessions([]);
-      await writeGlobalConfig(defaultGlobalConfig());
-      await fs.writeFile(appTorrentsFilePath, "{}", "utf-8");
       clearSessionCookie(res);
 
       res.json({
@@ -643,32 +705,39 @@ export function registerAuthRoutes(app) {
         return;
       }
 
-      const users = await readUsers();
-      if (users.some((user) => user.username === username)) {
+      const generatedPassword = generateSimpleUserPassword();
+      const { salt, hash } = hashPassword(generatedPassword);
+      const createResult = runInTransaction((tx) => {
+        const users = tx.readJson(USERS_STORE_KEY, [defaultUserRecord()]);
+        const safeUsers = Array.isArray(users) ? users : [defaultUserRecord()];
+        if (safeUsers.some((user) => user.username === username)) {
+          return { ok: false, reason: "exists" };
+        }
+
+        const newId = Math.max(0, ...safeUsers.map((user) => user.id)) + 1;
+        const newUser = {
+          id: newId,
+          username,
+          passwordSalt: salt,
+          passwordHash: hash,
+          mustChangePassword: true,
+          shouldChangePassword: false,
+          firstLoginPending: true,
+          settings: buildDefaultSettings(username),
+        };
+
+        tx.writeJson(USERS_STORE_KEY, [...safeUsers, newUser]);
+        return { ok: true, newUser };
+      });
+
+      if (!createResult.ok) {
         res.status(400).json({ error: t("auth.usernameAlreadyExists") });
         return;
       }
 
-      const generatedPassword = generateSimpleUserPassword();
-      const { salt, hash } = hashPassword(generatedPassword);
-      const newId = Math.max(0, ...users.map((user) => user.id)) + 1;
-      const newUser = {
-        id: newId,
-        username,
-        passwordSalt: salt,
-        passwordHash: hash,
-        mustChangePassword: true,
-        shouldChangePassword: false,
-        firstLoginPending: true,
-        settings: buildDefaultSettings(username),
-      };
-
-      const nextUsers = [...users, newUser];
-      await writeUsers(nextUsers);
-
       res.json({
-        id: newUser.id,
-        username: newUser.username,
+        id: createResult.newUser.id,
+        username: createResult.newUser.username,
         generatedPassword,
       });
     } catch (error) {
@@ -682,27 +751,42 @@ export function registerAuthRoutes(app) {
     try {
       const userId = parseInt(String(req.params.id), 10);
 
-      const users = await readUsers();
-      const userToDelete = users.find((user) => user.id === userId);
+      const deleteResult = runInTransaction((tx) => {
+        const users = tx.readJson(USERS_STORE_KEY, [defaultUserRecord()]);
+        const safeUsers = Array.isArray(users) ? users : [defaultUserRecord()];
+        const userToDelete = safeUsers.find((user) => user.id === userId);
 
-      if (!userToDelete) {
-        res.status(404).json({ error: t("auth.userNotFound") });
-        return;
-      }
+        if (!userToDelete) {
+          return { ok: false, reason: "not-found" };
+        }
 
-      // Cannot delete admin user
-      if (userToDelete.username === "admin") {
+        if (userToDelete.username === "admin") {
+          return { ok: false, reason: "admin" };
+        }
+
+        tx.writeJson(
+          USERS_STORE_KEY,
+          safeUsers.filter((user) => user.id !== userId)
+        );
+
+        const sessions = tx.readJson(SESSIONS_STORE_KEY, []);
+        const safeSessions = Array.isArray(sessions) ? sessions : [];
+        tx.writeJson(
+          SESSIONS_STORE_KEY,
+          safeSessions.filter((session) => session.userId !== userId)
+        );
+
+        return { ok: true };
+      });
+
+      if (!deleteResult.ok) {
+        if (deleteResult.reason === "not-found") {
+          res.status(404).json({ error: t("auth.userNotFound") });
+          return;
+        }
         res.status(400).json({ error: t("auth.cannotDeleteAdmin") });
         return;
       }
-
-      const nextUsers = users.filter((user) => user.id !== userId);
-      await writeUsers(nextUsers);
-
-      // Also remove user sessions
-      const sessions = await readSessions();
-      const nextSessions = sessions.filter((session) => session.userId !== userId);
-      await writeSessions(nextSessions);
 
       res.json({ ok: true });
     } catch (error) {
@@ -716,38 +800,49 @@ export function registerAuthRoutes(app) {
     try {
       const userId = parseInt(String(req.params.id), 10);
 
-      const users = await readUsers();
-      const user = users.find((u) => u.id === userId);
+      const generatedPassword = generateSimpleUserPassword();
+      const { salt, hash } = hashPassword(generatedPassword);
+      const resetResult = runInTransaction((tx) => {
+        const users = tx.readJson(USERS_STORE_KEY, [defaultUserRecord()]);
+        const safeUsers = Array.isArray(users) ? users : [defaultUserRecord()];
+        const user = safeUsers.find((u) => u.id === userId);
 
-      if (!user) {
-        res.status(404).json({ error: t("auth.userNotFound") });
-        return;
-      }
+        if (!user) {
+          return { ok: false, reason: "not-found" };
+        }
 
-      // Cannot reset admin password
-      if (user.username === "admin") {
+        if (user.username === "admin") {
+          return { ok: false, reason: "admin" };
+        }
+
+        const nextUsers = safeUsers.map((u) => {
+          if (u.id !== userId) {
+            return u;
+          }
+
+          return {
+            ...u,
+            passwordSalt: salt,
+            passwordHash: hash,
+            // Keep hard reset requirement for users who never completed first login setup.
+            mustChangePassword: Boolean(u.firstLoginPending),
+            shouldChangePassword: !Boolean(u.firstLoginPending),
+          };
+        });
+
+        tx.writeJson(USERS_STORE_KEY, nextUsers);
+        return { ok: true };
+      });
+
+      if (!resetResult.ok) {
+        if (resetResult.reason === "not-found") {
+          res.status(404).json({ error: t("auth.userNotFound") });
+          return;
+        }
         res.status(400).json({ error: t("auth.cannotModifyAdmin") });
         return;
       }
 
-      const generatedPassword = generateSimpleUserPassword();
-      const { salt, hash } = hashPassword(generatedPassword);
-      const nextUsers = users.map((u) => {
-        if (u.id !== userId) {
-          return u;
-        }
-
-        return {
-          ...u,
-          passwordSalt: salt,
-          passwordHash: hash,
-          // Keep hard reset requirement for users who never completed first login setup.
-          mustChangePassword: Boolean(u.firstLoginPending),
-          shouldChangePassword: !Boolean(u.firstLoginPending),
-        };
-      });
-
-      await writeUsers(nextUsers);
       res.json({ ok: true, generatedPassword });
     } catch (error) {
       debugLog("Reset user password failed:", error);
@@ -763,28 +858,19 @@ function defaultGlobalConfig() {
 }
 
 async function writeGlobalConfig(config) {
-  await ensureJsonStore(globalConfigFilePath, defaultGlobalConfig());
   const safeConfig = {
     tmdbApiKey: String(config?.tmdbApiKey || "").trim(),
   };
-  await fs.writeFile(globalConfigFilePath, JSON.stringify(safeConfig, null, 2), "utf-8");
+  writeJsonStore(GLOBAL_CONFIG_STORE_KEY, safeConfig);
 }
 
 async function readGlobalConfig() {
-  await ensureJsonStore(globalConfigFilePath, defaultGlobalConfig());
-  const content = await fs.readFile(globalConfigFilePath, "utf-8");
-
-  let parsed = defaultGlobalConfig();
-  try {
-    const value = JSON.parse(content);
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      parsed = {
-        tmdbApiKey: String(value.tmdbApiKey || "").trim(),
-      };
-    }
-  } catch {
-    parsed = defaultGlobalConfig();
+  const value = readJsonStore(GLOBAL_CONFIG_STORE_KEY, defaultGlobalConfig());
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return defaultGlobalConfig();
   }
 
-  return parsed;
+  return {
+    tmdbApiKey: String(value.tmdbApiKey || "").trim(),
+  };
 }
