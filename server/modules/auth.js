@@ -109,6 +109,8 @@ async function readUsers() {
   return Array.isArray(users) ? users : [defaultUserRecord()];
 }
 
+export { readUsers };
+
 async function readSessions() {
   const sessions = readJsonStore(SESSIONS_STORE_KEY, []);
   return Array.isArray(sessions) ? sessions : [];
