@@ -23,7 +23,7 @@ const indexerSeenTtlMs = 1000 * 60 * 60 * 24 * 30;
 let indexerPollerStarted = false;
 
 async function ensureJsonStore(filePath, fallback) {
-  await fs.mkdir(dataDir, { recursive: true });
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
   try {
     await fs.access(filePath);
   } catch {

@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDebugMode, isRequestLogEnabled, port } from "./config.js";
 import { debugLog, errorLog, infoLog, requestLog } from "./logger.js";
-import { registerAuthRoutes } from "./modules/auth.js";
+import { initializeAuthStores, registerAuthRoutes } from "./modules/auth.js";
 import { registerTransmissionRoutes } from "./modules/transmission.js";
 import { registerTorznabRoutes } from "./modules/torznab.js";
 import { registerTmdbRoutes } from "./modules/tmdb.js";
@@ -39,6 +39,12 @@ if (isDebugMode) {
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
+
+async function bootstrapAppData() {
+  await initializeAuthStores();
+}
+
+await bootstrapAppData();
 
 registerAuthRoutes(app);
 registerWishlistRoutes(app);

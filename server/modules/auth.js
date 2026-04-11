@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import path from "node:path";
 
 import {
   appImageTag,
@@ -97,6 +98,7 @@ function defaultUserRecord() {
 
 async function ensureJsonStore(filePath, fallback) {
   await fs.mkdir(dataDir, { recursive: true });
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
   try {
     await fs.access(filePath);
   } catch {
@@ -161,6 +163,11 @@ async function ensureUsersStore() {
   if (users.length === 0) {
     await writeUsers([defaultUserRecord()]);
   }
+}
+
+export async function initializeAuthStores() {
+  await ensureUsersStore();
+  await ensureJsonStore(sessionsFilePath, []);
 }
 
 function isTorrentConfigured(user) {
