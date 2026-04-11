@@ -994,8 +994,76 @@ async function mutateIndexerResultItem(userId, targetKey, indexerStateKey, mode)
   return { ok: true };
 }
 
+async function mutateIndexerResultItemsBatch(userId, targetKey, indexerStateKeys, mode) {
+  const normalizedTargetKey = String(targetKey || "").trim();
+  const normalizedStateKeys = Array.from(
+    new Set(
+      (Array.isArray(indexerStateKeys) ? indexerStateKeys : [])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (!normalizedTargetKey || normalizedStateKeys.length === 0) {
+    return { ok: false, reason: "invalid-input" };
+  }
+
+  const normalizedUserKey = userStoreKey(userId);
+  const [allResults, rejected] = await Promise.all([
+    readIndexerResults(),
+    readIndexerRejected(),
+  ]);
+
+  const userResults = allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
+    ? { ...allResults[normalizedUserKey] }
+    : {};
+  const bucket = userResults[normalizedTargetKey] && typeof userResults[normalizedTargetKey] === "object"
+    ? { ...userResults[normalizedTargetKey] }
+    : null;
+
+  if (!bucket || !Array.isArray(bucket.items)) {
+    return { ok: false, reason: "not-found" };
+  }
+
+  const removableStateKeys = new Set(normalizedStateKeys);
+  const originalLength = bucket.items.length;
+  bucket.items = bucket.items.filter(
+    (item) => !removableStateKeys.has(String(item?.indexerStateKey || "").trim())
+  );
+
+  if (bucket.items.length === originalLength) {
+    return { ok: false, reason: "not-found" };
+  }
+
+  if (bucket.items.length === 0) {
+    delete userResults[normalizedTargetKey];
+  } else {
+    bucket.updatedAt = new Date().toISOString();
+    userResults[normalizedTargetKey] = bucket;
+  }
+  allResults[normalizedUserKey] = userResults;
+
+  if (mode === "reject") {
+    const rejectedAt = Date.now();
+    for (const stateKey of removableStateKeys) {
+      rejected[stateKey] = rejectedAt;
+    }
+  }
+
+  await Promise.all([
+    writeIndexerResults(allResults),
+    mode === "reject" ? writeIndexerRejected(rejected) : Promise.resolve(),
+  ]);
+
+  return { ok: true };
+}
+
 export async function rejectIndexerResultItem(userId, targetKey, indexerStateKey, options = {}) {
   return mutateIndexerResultItem(userId, targetKey, indexerStateKey, "reject");
+}
+
+export async function rejectIndexerResultItems(userId, targetKey, indexerStateKeys, options = {}) {
+  return mutateIndexerResultItemsBatch(userId, targetKey, indexerStateKeys, "reject");
 }
 
 export async function validateIndexerResultItem(userId, targetKey, indexerStateKey, options = {}) {
@@ -1159,6 +1227,28 @@ export function registerNotificationRoutes(app) {
     }
   });
   app.post("/api/indexer-results/reject", rejectIndexerResultHandler);
+
+  app.post("/api/indexer-results/reject-all", withAuth(async (req, res, auth) => {
+    try {
+      const t = getTranslator(req, auth.user);
+      const result = await rejectIndexerResultItems(
+        resolveNotificationUserKey(auth.user),
+        req.body?.targetKey,
+        req.body?.indexerStateKeys
+      );
+      if (!result.ok) {
+        if (result.reason === "not-found") {
+          return res.status(404).json({ error: t("notifications.notFound") });
+        }
+        return res.status(400).json({ error: t("notifications.rejectNotSupported") });
+      }
+
+      res.json({ ok: true, message: t("notifications.rejected") });
+    } catch (error) {
+      console.error("Error rejecting all indexer results:", error);
+      res.status(500).json({ error: error.message });
+    }
+  }));
 
   const validateIndexerResultHandler = withAuth(async (req, res, auth) => {
     try {

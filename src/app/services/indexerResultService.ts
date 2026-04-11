@@ -62,6 +62,21 @@ export async function rejectIndexerResult(targetKey: string, indexerStateKey: st
   }
 }
 
+export async function rejectAllIndexerResults(targetKey: string, indexerStateKeys: string[]): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/indexer-results/reject-all`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ targetKey, indexerStateKeys }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to reject all indexer results: ${response.status}`);
+  }
+}
+
 export async function validateIndexerResult(targetKey: string, indexerStateKey: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/indexer-results/validate`, {
     method: "POST",

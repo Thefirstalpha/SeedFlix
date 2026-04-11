@@ -15,6 +15,7 @@ import {
 import { addTorrentToClient } from "../services/torrentService";
 import {
   getIndexerResults,
+  rejectAllIndexerResults,
   rejectIndexerResult,
   validateIndexerResult,
   type IndexerResultTarget,
@@ -174,8 +175,9 @@ export function WishList() {
     const key = `${target.targetKey}:reject-all`;
     setActionKey(key);
     try {
-      await Promise.all(
-        target.items.map((item) => rejectIndexerResult(target.targetKey, item.indexerStateKey))
+      await rejectAllIndexerResults(
+        target.targetKey,
+        target.items.map((item) => item.indexerStateKey)
       );
       await loadIndexerResults();
     } finally {
