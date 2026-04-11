@@ -568,7 +568,16 @@ export function WishList() {
                       type="movie"
                     >
                       {isSelectionMode && (
-                        <div className="mb-2" onClick={e => e.stopPropagation()}>
+                        <div
+                          className="mb-2"
+                          onClick={e => e.stopPropagation()}
+                          tabIndex={0}
+                          onKeyDown={e => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                            }
+                          }}
+                        >
                           <Checkbox
                             checked={selectedIds.includes(movie.id)}
                             onCheckedChange={() => toggleSelection(movie.id)}
