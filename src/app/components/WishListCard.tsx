@@ -10,7 +10,7 @@ interface WishListCardProps {
   rating: number;
   genre: string;
   type: "movie" | "series";
-  children?: ReactNode; // Pour injecter les résultats tracker
+  children?: ReactNode; // Pour injecter saisons, épisodes, tracker, etc.
 }
 
 export function WishListCard({ poster, title, year, rating, genre, type, children }: WishListCardProps) {
