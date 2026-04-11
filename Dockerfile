@@ -36,8 +36,7 @@ COPY server ./server
 COPY --from=build /app/dist ./dist
 
 # Create non-root user for security.
-RUN addgroup -g 1000 app
-RUN adduser -D -u 1000 -G app app
+RUN adduser -D -u 1000 app
 RUN chown -R app:app /app
 USER app
 
