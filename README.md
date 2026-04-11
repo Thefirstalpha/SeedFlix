@@ -8,9 +8,11 @@
 [![Trivy Enabled](https://img.shields.io/badge/security-Trivy-1904DA?logo=trivy&logoColor=white)](./trivy.yaml)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D24-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
-SeedFlix is a self-hosted media discovery and download management application built with React, Vite, and Express.
+SeedFlix is a self-hosted media catalog and personal download management application built with React, Vite, and Express.
 
-It combines TMDB catalog browsing, Torznab-based release search, Transmission integration, user-level data isolation, and an admin-controlled configuration model in a single full-stack application.
+It combines TMDB catalog browsing, Torznab-compatible indexer integration, Transmission client connectivity, user-level data isolation, and an admin-controlled configuration model in a single full-stack application.
+
+> **Legal notice:** SeedFlix is intended for lawful, personal use only. Users are responsible for complying with the laws applicable in their jurisdiction.
 
 ![SeedFlix interface](./SeedFlix.png)
 
@@ -19,9 +21,9 @@ It combines TMDB catalog browsing, Torznab-based release search, Transmission in
 SeedFlix is designed for users who want a lightweight web interface to:
 
 - browse movies and series from TMDB,
-- search releases through Torznab-compatible indexers,
-- send downloads to Transmission,
-- track managed downloads,
+- connect to authorized Torznab-compatible indexers,
+- manage personal downloads with a local Transmission instance,
+- track active and completed downloads,
 - keep wishlists and notifications isolated per user,
 - manage application access through an admin account.
 
@@ -31,8 +33,8 @@ The project targets a self-hosted setup and stores its runtime data locally unde
 
 - TMDB-powered movie and series discovery
 - Advanced filtering by genre, language, rating, and release window
-- Torznab release search for movies, series, seasons, and episodes
-- Transmission RPC integration for download submission and monitoring
+- Torznab-compatible indexer integration for release lookup
+- Transmission RPC integration for personal download management
 - Per-user wishlists, notifications, and managed download tracking
 - Admin-only user management and global application settings
 - HTTP-only session authentication
@@ -149,30 +151,6 @@ docker run --rm -p 4000:4000 -v ${PWD}/data:/app/data seedflix:local
 - Default account: `admin` / `admin`
 - On first login, the default password must be changed before normal access is granted.
 
-### Application Settings
-
-Most configuration is handled from the web UI after login:
-
-- TMDB API key
-- Transmission connection settings
-- Torznab endpoint and token
-- Default download folders
-- Notification channels
-- Language and user preferences
-
-### Supported Environment Variables
-
-SeedFlix can also read a few runtime environment variables:
-
-```bash
-PORT=4000
-DEBUG=false
-TMDB_API_KEY=your_tmdb_key
-APP_IMAGE_TAG=dev
-```
-
-`TMDB_API_KEY` can be used to bootstrap the application, but the project also supports admin-managed configuration through the UI.
-
 ## Main Capabilities
 
 ### Discovery
@@ -182,18 +160,18 @@ APP_IMAGE_TAG=dev
 - Filter by language, genre, rating, and release dates
 - Inspect detailed movie, series, season, and episode pages
 
-### Release Search
+### Release Lookup
 
-- Query Torznab indexers from SeedFlix
-- Match releases against wishlists
-- Validate or reject tracker suggestions
-- Notify users when a matching release is found
+- Connect to authorized Torznab-compatible indexers
+- Match indexer results against your personal wishlist
+- Validate or reject release suggestions
+- Notify users when a matching release is available
 
 ### Download Management
 
-- Add torrents or magnet links to Transmission
+- Send personal downloads to a connected Transmission instance
 - Track active and completed managed downloads
-- Distinguish SeedFlix-managed torrents from the rest of the client library
+- Distinguish SeedFlix-managed items from other Transmission library content
 
 ### Administration
 
@@ -203,94 +181,17 @@ APP_IMAGE_TAG=dev
 - Control global settings
 - Run a factory reset
 
-## Repository Structure
-
-```text
-.
-├── src/                    Frontend application
-│   └── app/                Routes, components, services, contexts, i18n
-├── data/                   Runtime JSON data stores
-├── server/                 Express backend
-│   ├── modules/            Feature modules
-│   └── defaultSettings.json
-├── docker/                 Container-related assets
-├── .github/workflows/      CI and release automation
-├── Dockerfile
-├── docker-compose.yml
-└── trivy.yaml
-```
-
-## API Surface
-
-Main API families include:
-
-- `/api/auth/*`
-- `/api/settings/*`
-- `/api/users/*`
-- `/api/wishlist*`
-- `/api/series-wishlist*`
-- `/api/notifications*`
-- `/api/tracker-results*`
-- `/api/indexer/*`
-- `/api/torrent/*`
-- `/api/movies/*`
-- `/api/series/*`
-
-## Public Repository Notes
-
-If you expose this repository publicly, it is recommended to:
-
-- keep real API keys and credentials out of tracked files,
-- avoid committing production `data/` content,
-- configure repository secrets before enabling release publishing,
-- enable branch protection on the default branch,
-- optionally connect SonarCloud for additional static analysis.
-
-## SonarCloud
-
-Yes, there is a free Sonar offering for public repositories: SonarCloud provides a free tier for open-source and public projects.
-
-This repository is now connected to SonarCloud.
-
-Files added for the integration:
-
-- `.github/workflows/sonarcloud.yml`
-- `sonar-project.properties`
-
-The repository is configured with the following SonarCloud identifiers:
-
-- `SONAR_ORGANIZATION`: `thefirstalpha`
-- `SONAR_PROJECT_KEY`: `Thefirstalpha_SeedFlix`
-
-If you need to reconfigure the integration in GitHub:
-
-1. Import the repository into SonarCloud.
-2. Add the repository secret `SONAR_TOKEN`.
-3. Add the repository variable `SONAR_ORGANIZATION`.
-4. Add the repository variable `SONAR_PROJECT_KEY`.
-
-Live badges currently available for this project include:
-
-- Quality Gate
-- Bugs
-- Vulnerabilities
-- Code Smells
-- Security Rating
-
-Example badge URLs for this repository:
-
-```text
-https://sonarcloud.io/api/project_badges/measure?project=Thefirstalpha_SeedFlix&metric=alert_status
-https://sonarcloud.io/api/project_badges/measure?project=Thefirstalpha_SeedFlix&metric=security_rating
-```
 
 ## Legal Notice
 
-SeedFlix is a self-hosted management interface. Users remain responsible for:
+SeedFlix is a personal media management tool intended strictly for lawful use. Users remain solely responsible for:
 
 - complying with the laws applicable in their jurisdiction,
-- respecting content rights and platform terms of service,
-- using indexers, trackers, and media sources lawfully.
+- respecting intellectual property rights and platform terms of service,
+- ensuring that connected indexers and download sources are authorized and legal,
+- using SeedFlix for personal, non-commercial purposes only.
+
+The authors of SeedFlix do not endorse, facilitate, or condone copyright infringement or unauthorized content distribution.
 
 This repository is provided as-is, without warranty.
   

@@ -54,6 +54,7 @@ const en = {
     title: "Getting started wizard",
     preparing: "Preparing initial setup...",
     steps: {
+      legal: "Legal notice",
       security: "Security",
       tmdb: "TMDB key",
       torrent: "Torrent client",
@@ -137,6 +138,17 @@ const en = {
         urlTokenRequired: "Tracker URL and API token are required.",
         configFailed: "Tracker configuration failed",
       },
+      legalNote: "Only connect to authorized and lawful indexers. You are responsible for ensuring your use complies with applicable laws in your country.",
+    },
+    legal: {
+      cardTitle: "Terms of use",
+      cardDescription: "Before using SeedFlix, please read and acknowledge the following.",
+      term1: "SeedFlix is a personal media management tool. It must only be used with content you are legally authorized to access.",
+      term2: "You are solely responsible for ensuring that your use of connected indexers and download sources complies with applicable laws in your country.",
+      term3: "The authors of SeedFlix do not endorse or facilitate copyright infringement or unauthorized distribution of protected content.",
+      term4: "By continuing, you confirm that you will use this platform for personal and lawful purposes only.",
+      checkbox: "I understand and agree to use SeedFlix lawfully and in compliance with the laws applicable in my country.",
+      accept: "Accept and continue",
     },
   },
   downloads: {
