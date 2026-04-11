@@ -3,7 +3,8 @@
 
 [![CI](https://github.com/Thefirstalpha/SeedFlix/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Thefirstalpha/SeedFlix/actions/workflows/ci.yml)
 [![Docker Release](https://github.com/Thefirstalpha/SeedFlix/actions/workflows/release-dockerhub.yml/badge.svg)](https://github.com/Thefirstalpha/SeedFlix/actions/workflows/release-dockerhub.yml)
-[![SonarCloud Ready](https://img.shields.io/badge/SonarCloud-ready-F3702A?logo=sonarcloud&logoColor=white)](https://sonarcloud.io)
+[![SonarCloud Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=Thefirstalpha_SeedFlix&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Thefirstalpha_SeedFlix)
+[![SonarCloud Security Rating](https://sonarcloud.io/api/project_badges/measure?project=Thefirstalpha_SeedFlix&metric=security_rating)](https://sonarcloud.io/project/security_hotspots?id=Thefirstalpha_SeedFlix)
 [![Trivy Enabled](https://img.shields.io/badge/security-Trivy-1904DA?logo=trivy&logoColor=white)](./trivy.yaml)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D24-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
@@ -247,26 +248,26 @@ If you expose this repository publicly, it is recommended to:
 
 Yes, there is a free Sonar offering for public repositories: SonarCloud provides a free tier for open-source and public projects.
 
-This repository is now prepared for SonarCloud analysis.
+This repository is now connected to SonarCloud.
 
 Files added for the integration:
 
 - `.github/workflows/sonarcloud.yml`
 - `sonar-project.properties`
 
-To activate SonarCloud in GitHub:
+The repository is configured with the following SonarCloud identifiers:
+
+- `SONAR_ORGANIZATION`: `thefirstalpha`
+- `SONAR_PROJECT_KEY`: `Thefirstalpha_SeedFlix`
+
+If you need to reconfigure the integration in GitHub:
 
 1. Import the repository into SonarCloud.
 2. Add the repository secret `SONAR_TOKEN`.
 3. Add the repository variable `SONAR_ORGANIZATION`.
 4. Add the repository variable `SONAR_PROJECT_KEY`.
 
-Recommended values for this repository are typically:
-
-- `SONAR_ORGANIZATION`: your SonarCloud organization key
-- `SONAR_PROJECT_KEY`: the SonarCloud project key for SeedFlix
-
-Once SonarCloud is connected and the first analysis has completed, you can replace the temporary `SonarCloud ready` badge with live project badges such as:
+Live badges currently available for this project include:
 
 - Quality Gate
 - Bugs
@@ -274,11 +275,11 @@ Once SonarCloud is connected and the first analysis has completed, you can repla
 - Code Smells
 - Security Rating
 
-Example badge URLs after activation:
+Example badge URLs for this repository:
 
 ```text
-https://sonarcloud.io/api/project_badges/measure?project=<SONAR_PROJECT_KEY>&metric=alert_status
-https://sonarcloud.io/api/project_badges/measure?project=<SONAR_PROJECT_KEY>&metric=security_rating
+https://sonarcloud.io/api/project_badges/measure?project=Thefirstalpha_SeedFlix&metric=alert_status
+https://sonarcloud.io/api/project_badges/measure?project=Thefirstalpha_SeedFlix&metric=security_rating
 ```
 
 ## Legal Notice
