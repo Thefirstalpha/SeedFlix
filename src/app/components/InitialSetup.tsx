@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
 import { Check, ExternalLink, KeyRound, RadioTower, Scale, Server, ShieldCheck } from "lucide-react";
 
@@ -123,6 +123,8 @@ export function InitialSetup() {
   const [legalCheckboxChecked, setLegalCheckboxChecked] = useState(false);
   const [isLegalSaving, setIsLegalSaving] = useState(false);
   const [legalError, setLegalError] = useState<string | null>(null);
+  const stepsScrollerRef = useRef<HTMLDivElement | null>(null);
+  const stepItemRefs = useRef<Array<HTMLDivElement | null>>([]);
   const isAdmin = user?.username === "admin";
 
   const visibleSteps = useMemo(
@@ -204,6 +206,21 @@ export function InitialSetup() {
     }
   }, [firstIncompleteStep, hasPendingSetup, isLoading, location.state, navigate, totalSteps]);
 
+  useEffect(() => {
+    const activeStepElement = stepItemRefs.current[activeStep];
+    const scrollerElement = stepsScrollerRef.current;
+
+    if (!activeStepElement || !scrollerElement) {
+      return;
+    }
+
+    activeStepElement.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [activeStep, totalSteps]);
+
   if (!isLoading && !isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
@@ -212,7 +229,9 @@ export function InitialSetup() {
     return <Navigate to={(location.state as { from?: string } | null)?.from || "/"} replace />;
   }
 
-  if (isLoading || isBootstrapping) {
+  const shouldShowPreparingScreen = isBootstrapping || (isLoading && !isAuthenticated);
+
+  if (shouldShowPreparingScreen) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center text-white/70">
         {t("setup.preparing")}
@@ -514,7 +533,11 @@ export function InitialSetup() {
 
           <Progress value={progressValue} className="bg-white/10" />
 
-          <div className={`grid gap-3 ${totalSteps === 3 ? "md:grid-cols-3" : "md:grid-cols-4"}`}>
+          <div
+            ref={stepsScrollerRef}
+            className="overflow-x-auto pb-1 [scrollbar-width:thin]"
+          >
+            <div className="flex min-w-full gap-3">
             {visibleSteps.map((step, index) => {
               const Icon = step.icon;
               const isActive = index === activeStep;
@@ -523,20 +546,23 @@ export function InitialSetup() {
               return (
                 <div
                   key={step.key}
+                  ref={(node) => {
+                    stepItemRefs.current[index] = node;
+                  }}
                   className={`rounded-xl border px-4 py-3 text-left transition ${
                     isActive
                       ? "border-cyan-400/60 bg-cyan-400/10"
                       : "border-white/10 bg-black/10 hover:bg-white/5"
-                  }`}
+                  } min-w-[220px] shrink-0`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div className="rounded-lg bg-white/10 p-2">
                         <Icon className="h-4 w-4 text-cyan-200" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-xs text-white/45">{t("setup.stepLabel", { index: index + 1 })}</p>
-                        <p className="font-medium text-white">{step.title}</p>
+                        <p className="font-medium text-white whitespace-nowrap">{step.title}</p>
                       </div>
                     </div>
                     {isComplete ? <Check className="h-4 w-4 text-emerald-300" /> : null}
@@ -544,6 +570,7 @@ export function InitialSetup() {
                 </div>
               );
             })}
+            </div>
           </div>
         </CardContent>
       </Card>
