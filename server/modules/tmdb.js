@@ -127,6 +127,90 @@ function hasActiveDiscoverFilters(filters, type) {
   );
 }
 
+function buildPopularRequest(mediaType, req) {
+  const filters = readDiscoverFilters(req.query, mediaType);
+  const apiPath = mediaType === "movie" ? "/discover/movie" : "/discover/tv";
+  const popularPath = mediaType === "movie" ? "/movie/popular" : "/tv/popular";
+
+  return hasActiveDiscoverFilters(filters, mediaType)
+    ? { path: apiPath, query: filters }
+    : {
+        path: popularPath,
+        query: {
+          page: filters.page,
+          language: filters.language,
+        },
+      };
+}
+
+function buildGenresRequest(mediaType, req) {
+  const apiPath = mediaType === "movie" ? "/genre/movie/list" : "/genre/tv/list";
+  return {
+    path: apiPath,
+    query: { language: String(req.query.language || "fr-FR") },
+  };
+}
+
+function buildDiscoverRequest(mediaType, req) {
+  const apiPath = mediaType === "movie" ? "/discover/movie" : "/discover/tv";
+  return {
+    path: apiPath,
+    query: readDiscoverFilters(req.query, mediaType),
+  };
+}
+
+function buildSearchRequest(mediaType, req, res, t) {
+  const query = String(req.query.query || "").trim();
+  if (!query) {
+    res.status(400).json({ error: t("tmdb.queryRequired") });
+    return null;
+  }
+
+  const apiPath = mediaType === "movie" ? "/search/movie" : "/search/tv";
+  return {
+    path: apiPath,
+    query: {
+      query,
+      page: Number(req.query.page || 1),
+      language: String(req.query.language || "fr-FR"),
+    },
+  };
+}
+
+function buildDetailsRequest(mediaType, req, res, t) {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    const errorKey = mediaType === "movie" ? "tmdb.invalidMovieId" : "tmdb.invalidSeriesId";
+    res.status(400).json({ error: t(errorKey) });
+    return null;
+  }
+
+  const apiPath = mediaType === "movie" ? `/movie/${id}` : `/tv/${id}`;
+  return {
+    path: apiPath,
+    query: {
+      language: String(req.query.language || "fr-FR"),
+      append_to_response: "credits",
+    },
+  };
+}
+
+function buildSeasonRequest(req, res, t) {
+  const id = Number(req.params.id);
+  const seasonNumber = Number(req.params.seasonNumber);
+  if (!Number.isFinite(id) || !Number.isFinite(seasonNumber)) {
+    res.status(400).json({ error: t("tmdb.invalidSeriesIdOrSeason") });
+    return null;
+  }
+
+  return {
+    path: `/tv/${id}/season/${seasonNumber}`,
+    query: {
+      language: String(req.query.language || "fr-FR"),
+    },
+  };
+}
+
 export function registerTmdbRoutes(app) {
   app.post("/api/tmdb/test-key", withAdmin(async (req, res, auth) => {
     const t = getTranslator(req);
@@ -185,175 +269,67 @@ export function registerTmdbRoutes(app) {
   registerTmdbGetProxyRoute("/api/movies/popular", {
     debugContext: "Popular movies proxy",
     errorKey: "tmdb.fetchPopularMoviesFailed",
-    buildRequest: ({ req }) => {
-      const filters = readDiscoverFilters(req.query, "movie");
-
-      return hasActiveDiscoverFilters(filters, "movie")
-        ? { path: "/discover/movie", query: filters }
-        : {
-            path: "/movie/popular",
-            query: {
-              page: filters.page,
-              language: filters.language,
-            },
-          };
-    },
+    buildRequest: ({ req }) => buildPopularRequest("movie", req),
   });
 
   registerTmdbGetProxyRoute("/api/movies/genres", {
     debugContext: "Movie genres proxy",
     errorKey: "tmdb.fetchMovieGenresFailed",
-    buildRequest: ({ req }) => ({
-      path: "/genre/movie/list",
-      query: { language: String(req.query.language || "fr-FR") },
-    }),
+    buildRequest: ({ req }) => buildGenresRequest("movie", req),
   });
 
   registerTmdbGetProxyRoute("/api/movies/discover", {
     debugContext: "Discover movies proxy",
     errorKey: "tmdb.discoverMoviesFailed",
-    buildRequest: ({ req }) => ({
-      path: "/discover/movie",
-      query: readDiscoverFilters(req.query, "movie"),
-    }),
+    buildRequest: ({ req }) => buildDiscoverRequest("movie", req),
   });
 
   registerTmdbGetProxyRoute("/api/movies/search", {
     debugContext: "Search movies proxy",
     errorKey: "tmdb.searchMoviesFailed",
-    buildRequest: ({ req, res, t }) => {
-      const query = String(req.query.query || "").trim();
-      if (!query) {
-        res.status(400).json({ error: t("tmdb.queryRequired") });
-        return null;
-      }
-
-      return {
-        path: "/search/movie",
-        query: {
-          query,
-          page: Number(req.query.page || 1),
-          language: String(req.query.language || "fr-FR"),
-        },
-      };
-    },
+    buildRequest: ({ req, res, t }) => buildSearchRequest("movie", req, res, t),
   });
 
   registerTmdbGetProxyRoute("/api/movies/:id", {
     debugContext: "Movie details proxy",
     errorKey: "tmdb.fetchMovieDetailsFailed",
-    buildRequest: ({ req, res, t }) => {
-      const id = Number(req.params.id);
-      if (!Number.isFinite(id)) {
-        res.status(400).json({ error: t("tmdb.invalidMovieId") });
-        return null;
-      }
-
-      return {
-        path: `/movie/${id}`,
-        query: {
-          language: String(req.query.language || "fr-FR"),
-          append_to_response: "credits",
-        },
-      };
-    },
+    buildRequest: ({ req, res, t }) => buildDetailsRequest("movie", req, res, t),
   });
 
   registerTmdbGetProxyRoute("/api/series/popular", {
     debugContext: "Popular series proxy",
     errorKey: "tmdb.fetchPopularSeriesFailed",
-    buildRequest: ({ req }) => {
-      const filters = readDiscoverFilters(req.query, "series");
-
-      return hasActiveDiscoverFilters(filters, "series")
-        ? { path: "/discover/tv", query: filters }
-        : {
-            path: "/tv/popular",
-            query: {
-              page: filters.page,
-              language: filters.language,
-            },
-          };
-    },
+    buildRequest: ({ req }) => buildPopularRequest("series", req),
   });
 
   registerTmdbGetProxyRoute("/api/series/genres", {
     debugContext: "Series genres proxy",
     errorKey: "tmdb.fetchSeriesGenresFailed",
-    buildRequest: ({ req }) => ({
-      path: "/genre/tv/list",
-      query: { language: String(req.query.language || "fr-FR") },
-    }),
+    buildRequest: ({ req }) => buildGenresRequest("series", req),
   });
 
   registerTmdbGetProxyRoute("/api/series/discover", {
     debugContext: "Discover series proxy",
     errorKey: "tmdb.discoverSeriesFailed",
-    buildRequest: ({ req }) => ({
-      path: "/discover/tv",
-      query: readDiscoverFilters(req.query, "series"),
-    }),
+    buildRequest: ({ req }) => buildDiscoverRequest("series", req),
   });
 
   registerTmdbGetProxyRoute("/api/series/search", {
     debugContext: "Search series proxy",
     errorKey: "tmdb.searchSeriesFailed",
-    buildRequest: ({ req, res, t }) => {
-      const query = String(req.query.query || "").trim();
-      if (!query) {
-        res.status(400).json({ error: t("tmdb.queryRequired") });
-        return null;
-      }
-
-      return {
-        path: "/search/tv",
-        query: {
-          query,
-          page: Number(req.query.page || 1),
-          language: String(req.query.language || "fr-FR"),
-        },
-      };
-    },
+    buildRequest: ({ req, res, t }) => buildSearchRequest("series", req, res, t),
   });
 
   registerTmdbGetProxyRoute("/api/series/:id", {
     debugContext: "Series details proxy",
     errorKey: "tmdb.fetchSeriesDetailsFailed",
-    buildRequest: ({ req, res, t }) => {
-      const id = Number(req.params.id);
-      if (!Number.isFinite(id)) {
-        res.status(400).json({ error: t("tmdb.invalidSeriesId") });
-        return null;
-      }
-
-      return {
-        path: `/tv/${id}`,
-        query: {
-          language: String(req.query.language || "fr-FR"),
-          append_to_response: "credits",
-        },
-      };
-    },
+    buildRequest: ({ req, res, t }) => buildDetailsRequest("series", req, res, t),
   });
 
   registerTmdbGetProxyRoute("/api/series/:id/seasons/:seasonNumber", {
     debugContext: "Season details proxy",
     errorKey: "tmdb.fetchSeasonDetailsFailed",
-    buildRequest: ({ req, res, t }) => {
-      const id = Number(req.params.id);
-      const seasonNumber = Number(req.params.seasonNumber);
-      if (!Number.isFinite(id) || !Number.isFinite(seasonNumber)) {
-        res.status(400).json({ error: t("tmdb.invalidSeriesIdOrSeason") });
-        return null;
-      }
-
-      return {
-        path: `/tv/${id}/season/${seasonNumber}`,
-        query: {
-          language: String(req.query.language || "fr-FR"),
-        },
-      };
-    },
+    buildRequest: ({ req, res, t }) => buildSeasonRequest(req, res, t),
   });
 }
 
