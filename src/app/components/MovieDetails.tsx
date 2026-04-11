@@ -12,6 +12,7 @@ import {
   normalizeIndexerLanguage,
   normalizeQuality,
 } from "../services/indexerNormalization";
+import { buildTorrentResultsLabels } from "../services/torrentResultsLabels";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/LanguageProvider";
 import type { Movie } from "../types/movie";
@@ -92,6 +93,11 @@ export function MovieDetails() {
         .filter(Boolean)
     )
   ).sort((a, b) => a.localeCompare(b, "fr"));
+
+  const torrentPanelLabels = useMemo(
+    () => buildTorrentResultsLabels(t, { sectionKey: "movieDetails" }),
+    [t]
+  );
 
   useEffect(() => {
     loadMovieDetails();
@@ -373,30 +379,7 @@ export function MovieDetails() {
             onCurrentPageChange={setCurrentPage}
             totalPages={totalPages}
             locale={language === "fr" ? "fr-FR" : "en-US"}
-            labels={{
-              quality: t("movieDetails.indexer.quality"),
-              language: t("movieDetails.indexer.language"),
-              all: t("movieDetails.indexer.all"),
-              sort: t("movieDetails.indexer.sort"),
-              date: t("movieDetails.indexer.date"),
-              size: t("movieDetails.indexer.size"),
-              searching: t("movieDetails.indexer.searching"),
-              empty: t("movieDetails.indexer.empty"),
-              adding: t("movieDetails.indexer.adding"),
-              addToClient: t("movieDetails.indexer.addToClient"),
-              qualityBadge: (value) => t("movieDetails.indexer.qualityBadge", { value }),
-              languageBadge: (value) => t("movieDetails.indexer.languageBadge", { value }),
-              sizeBadge: (value) => t("movieDetails.indexer.sizeBadge", { value }),
-              seeders: (count) => t("movieDetails.indexer.seeders", { count }),
-              peers: (count) => t("movieDetails.indexer.peers", { count }),
-              categories: (value) => t("movieDetails.indexer.categories", { value }),
-              previous: t("movieDetails.pagination.previous"),
-              current: (current, total) => t("movieDetails.pagination.current", { current, total }),
-              page: (page) => t("movieDetails.pagination.page", { page }),
-              next: t("movieDetails.pagination.next"),
-              sortByDateAria: "Sort by date",
-              sortBySizeAria: "Sort by size",
-            }}
+            labels={torrentPanelLabels}
           />
 
           <div>

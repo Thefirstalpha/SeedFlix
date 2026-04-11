@@ -20,7 +20,7 @@ export interface TorrentReleaseItem {
   categories?: string[];
 }
 
-type TorrentResultsLabels = {
+export type TorrentResultsLabels = {
   quality: string;
   language: string;
   all: string;
