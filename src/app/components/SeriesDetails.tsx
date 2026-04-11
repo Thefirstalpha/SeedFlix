@@ -21,6 +21,7 @@ import {
   normalizeIndexerLanguage,
   normalizeQuality,
 } from "../services/indexerNormalization";
+import { buildTorrentResultsLabels } from "../services/torrentResultsLabels";
 import { addTorrentToClient } from "../services/torrentService";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/LanguageProvider";
@@ -208,6 +209,11 @@ export function SeriesDetails() {
     return values.sort((a, b) => a.localeCompare(b, "fr"));
   }, [releaseResults]);
 
+  const torrentPanelLabels = useMemo(
+    () => buildTorrentResultsLabels(t, { sectionKey: "seriesDetails", includeSeason: true }),
+    [t]
+  );
+
   const loadSeriesDetails = async () => {
     setIsLoading(true);
     try {
@@ -322,9 +328,14 @@ export function SeriesDetails() {
         seriesId: series.id,
         seriesTitle: series.title,
         seriesPoster: series.poster,
+        year: series.year,
+        rating: series.rating,
+        genre: series.genre,
       });
     }
     await refreshStatus();
+    window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
+    window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
   };
 
   const handleSeasonWishlist = async () => {
@@ -340,11 +351,16 @@ export function SeriesDetails() {
         seriesId: series.id,
         seriesTitle: series.title,
         seriesPoster: series.poster,
+        year: series.year,
+        rating: series.rating,
+        genre: series.genre,
         seasonNumber: selectedSeason,
         seasonName: seasonData?.name ?? t("seriesDetails.seasonNumber", { number: selectedSeason }),
       });
     }
     await refreshStatus();
+    window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
+    window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
   };
 
   const handleEpisodeWishlist = async (episode: SeriesEpisode) => {
@@ -359,6 +375,9 @@ export function SeriesDetails() {
         seriesId: series.id,
         seriesTitle: series.title,
         seriesPoster: series.poster,
+        year: series.year,
+        rating: series.rating,
+        genre: series.genre,
         seasonNumber: selectedSeason,
         seasonName:
           availableSeasons.find((s) => s.seasonNumber === selectedSeason)
@@ -368,6 +387,8 @@ export function SeriesDetails() {
       });
     }
     await refreshStatus();
+    window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
+    window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
   };
 
   const toggleEpisodeReveal = (episodeId: number) => {
@@ -767,31 +788,7 @@ export function SeriesDetails() {
             onCurrentPageChange={setCurrentPage}
             totalPages={totalPages}
             locale={language === "fr" ? "fr-FR" : "en-US"}
-            labels={{
-              season: t("seriesDetails.season"),
-              quality: t("seriesDetails.indexer.quality"),
-              language: t("seriesDetails.indexer.language"),
-              all: t("seriesDetails.indexer.all"),
-              sort: t("seriesDetails.indexer.sort"),
-              date: t("seriesDetails.indexer.date"),
-              size: t("seriesDetails.indexer.size"),
-              searching: t("seriesDetails.indexer.searching"),
-              empty: t("seriesDetails.indexer.empty"),
-              adding: t("seriesDetails.indexer.adding"),
-              addToClient: t("seriesDetails.indexer.addToClient"),
-              qualityBadge: (value) => t("seriesDetails.indexer.qualityBadge", { value }),
-              languageBadge: (value) => t("seriesDetails.indexer.languageBadge", { value }),
-              sizeBadge: (value) => t("seriesDetails.indexer.sizeBadge", { value }),
-              seeders: (count) => t("seriesDetails.indexer.seeders", { count }),
-              peers: (count) => t("seriesDetails.indexer.peers", { count }),
-              categories: (value) => t("seriesDetails.indexer.categories", { value }),
-              previous: t("seriesDetails.pagination.previous"),
-              current: (current, total) => t("seriesDetails.pagination.current", { current, total }),
-              page: (page) => t("seriesDetails.pagination.page", { page }),
-              next: t("seriesDetails.pagination.next"),
-              sortByDateAria: "Sort by date",
-              sortBySizeAria: "Sort by size",
-            }}
+            labels={torrentPanelLabels}
           />
         </div>
       </div>

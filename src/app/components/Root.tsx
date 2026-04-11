@@ -164,7 +164,21 @@ export function Root() {
       ]);
       setWishlistCount(movieCount + seriesCount);
     };
+
     void loadCount();
+
+    const handleImmediateWishlistRefresh = () => {
+      void loadCount();
+    };
+
+    window.addEventListener("seedflix:wishlist-refresh-request", handleImmediateWishlistRefresh);
+
+    return () => {
+      window.removeEventListener(
+        "seedflix:wishlist-refresh-request",
+        handleImmediateWishlistRefresh
+      );
+    };
   }, [canShowNavigationActions, location.pathname]);
 
   useEffect(() => {

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { Download, Heart, Trash2, Tv, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { MovieCard } from "./MovieCard";
+import { WishListCard } from "./WishListCard";
 import { Checkbox } from "./ui/checkbox";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -15,6 +16,7 @@ import {
 import { addTorrentToClient } from "../services/torrentService";
 import {
   getIndexerResults,
+  rejectAllIndexerResults,
   rejectIndexerResult,
   validateIndexerResult,
   type IndexerResultTarget,
@@ -121,6 +123,8 @@ export function WishList() {
       await removeMultipleFromWishlist(selectedIds);
       await Promise.all([loadWishlist(), loadIndexerResults()]);
       setIsSelectionMode(false);
+      window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
+      window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
     }
   };
 
@@ -152,6 +156,8 @@ export function WishList() {
       await removeMultipleFromSeriesWishlist(selectedEntryIds);
       await Promise.all([loadSeriesWishlist(), loadIndexerResults()]);
       setIsSeriesSelectionMode(false);
+      window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
+      window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
     }
   };
 
@@ -174,8 +180,9 @@ export function WishList() {
     const key = `${target.targetKey}:reject-all`;
     setActionKey(key);
     try {
-      await Promise.all(
-        target.items.map((item) => rejectIndexerResult(target.targetKey, item.indexerStateKey))
+      await rejectAllIndexerResults(
+        target.targetKey,
+        target.items.map((item) => item.indexerStateKey)
       );
       await loadIndexerResults();
     } finally {
@@ -531,27 +538,56 @@ export function WishList() {
           </div>
 
           {movies.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="space-y-4">
               {movies.map((movie) => {
                 const movieIndexerTarget = indexerTargetsByKey.get(`movie:${movie.id}`);
                 return (
-                <div key={movie.id} className="relative space-y-3">
-                  {isSelectionMode && (
-                    <div className="absolute top-2 left-2 z-10">
-                      <Card className="bg-white/90 border-none shadow-lg">
-                        <CardContent className="p-2">
+                  <div
+                    key={movie.id}
+                    className={isSelectionMode ? undefined : "cursor-pointer hover:bg-white/10 hover:scale-[1.01] transition-all rounded-lg"}
+                    onClick={() => {
+                      if (!isSelectionMode) {
+                        navigate(`/movie/${movie.id}`);
+                      }
+                    }}
+                    tabIndex={isSelectionMode ? -1 : 0}
+                    role="button"
+                    onKeyDown={(e) => {
+                      if (!isSelectionMode && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault();
+                        navigate(`/movie/${movie.id}`);
+                      }
+                    }}
+                  >
+                    <WishListCard
+                      poster={movie.poster}
+                      title={movie.title}
+                      year={movie.year}
+                      rating={movie.rating}
+                      genre={movie.genre}
+                      type="movie"
+                    >
+                      {isSelectionMode && (
+                        <div
+                          className="mb-2"
+                          onClick={e => e.stopPropagation()}
+                          tabIndex={0}
+                          onKeyDown={e => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                            }
+                          }}
+                        >
                           <Checkbox
                             checked={selectedIds.includes(movie.id)}
                             onCheckedChange={() => toggleSelection(movie.id)}
                             className="border-slate-900"
                           />
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
-                  <MovieCard movie={movie} />
-                  {movieIndexerTarget ? renderIndexerTarget(movieIndexerTarget) : null}
-                </div>
+                        </div>
+                      )}
+                      {movieIndexerTarget ? renderIndexerTarget(movieIndexerTarget) : null}
+                    </WishListCard>
+                  </div>
                 );
               })}
             </div>
@@ -640,53 +676,46 @@ export function WishList() {
                   .filter((target): target is IndexerResultTarget => Boolean(target));
 
                 return (
-                <Card
+                <div
                   key={group.seriesId}
+                  className={isSeriesSelectionMode ? undefined : "cursor-pointer hover:bg-white/10 hover:scale-[1.01] transition-all rounded-lg"}
                   onClick={() => {
                     if (!isSeriesSelectionMode) {
                       navigate(`/series/${group.seriesId}`);
                     }
                   }}
-                  className={`border-white/10 bg-white/5 transition-all ${
-                    isSeriesSelectionMode
-                      ? ""
-                      : "cursor-pointer hover:bg-white/10 hover:scale-[1.01]"
-                  }`}
+                  tabIndex={isSeriesSelectionMode ? -1 : 0}
+                  role="button"
+                  onKeyDown={(e) => {
+                    if (!isSeriesSelectionMode && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      navigate(`/series/${group.seriesId}`);
+                    }
+                  }}
                 >
-                  <CardContent className="p-4 space-y-4">
-                    <div className="flex items-start gap-4">
-                      <img
-                        src={group.seriesPoster}
-                        alt={group.seriesTitle}
-                        className="w-16 rounded object-cover aspect-[2/3]"
-                      />
-
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-semibold text-lg hover:text-cyan-300 transition-colors">
-                          {group.seriesTitle}
-                        </p>
-                        <p className="text-white/60 text-sm mt-1">
-                          {group.seriesEntry ? t("wishlistPage.series.fullFavorite") : t("wishlistPage.series.partialFavorite")}
-                        </p>
-
-                        {isSeriesSelectionMode && (
-                          <div
-                            className="mt-2"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <label className="inline-flex items-center gap-2 text-sm text-white/80">
-                              <Checkbox
-                                checked={isGroupFullySelected(group)}
-                                onCheckedChange={() => toggleSeriesGroup(group)}
-                                className="border-white/40"
-                              />
-                              {t("wishlistPage.series.selectWhole")}
-                            </label>
-                          </div>
-                        )}
+                  <WishListCard
+                    poster={group.seriesPoster}
+                    title={group.seriesTitle}
+                    year={group.seriesEntry?.year || 0}
+                    rating={group.seriesEntry?.rating || 0}
+                    genre={group.seriesEntry?.genre || ''}
+                    type="series"
+                  >
+                    {isSeriesSelectionMode && (
+                      <div
+                        className="mt-2"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <label className="inline-flex items-center gap-2 text-sm text-white/80">
+                          <Checkbox
+                            checked={isGroupFullySelected(group)}
+                            onCheckedChange={() => toggleSeriesGroup(group)}
+                            className="border-white/40"
+                          />
+                          {t("wishlistPage.series.selectWhole")}
+                        </label>
                       </div>
-                    </div>
-
+                    )}
                     <div className="space-y-3 pl-1">
                       {group.seriesEntry && (
                         <div
@@ -706,7 +735,6 @@ export function WishList() {
                           </Badge>
                         </div>
                       )}
-
                       {group.seasons.length > 0 && (
                         <div className="space-y-2">
                           <p className="text-white/60 text-xs uppercase tracking-wide">{t("wishlistPage.series.seasons")}</p>
@@ -735,7 +763,6 @@ export function WishList() {
                           </div>
                         </div>
                       )}
-
                       {group.episodes.length > 0 && (
                         <div className="space-y-2">
                           <p className="text-white/60 text-xs uppercase tracking-wide">{t("wishlistPage.series.episodes")}</p>
@@ -767,15 +794,14 @@ export function WishList() {
                           </div>
                         </div>
                       )}
-
                       {groupIndexerTargets.length > 0 ? (
                         <div className="space-y-3" onClick={(event) => event.stopPropagation()}>
                           {groupIndexerTargets.map((target) => renderIndexerTarget(target, true))}
                         </div>
                       ) : null}
                     </div>
-                  </CardContent>
-                </Card>
+                  </WishListCard>
+                </div>
                 );
               })}
             </div>

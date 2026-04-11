@@ -7,11 +7,26 @@ import type {
 
 const BASE = `${API_BASE_URL}/series-wishlist`;
 
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) {
+    throw new Error("Request failed");
+  }
+  return response.json() as Promise<T>;
+}
+
+async function sendJson(url: string, method: "POST" | "DELETE", body?: unknown): Promise<void> {
+  await fetch(url, {
+    method,
+    credentials: "include",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
 export async function getSeriesWishlist(): Promise<SeriesWishlistEntry[]> {
   try {
-    const response = await fetch(BASE);
-    if (!response.ok) throw new Error("Failed to fetch series wishlist");
-    const data = await response.json();
+    const data = await fetchJson<unknown>(BASE);
     return Array.isArray(data) ? data : [];
   } catch {
     return [];
@@ -22,9 +37,7 @@ export async function getSeriesWishlistStatus(
   seriesId: number
 ): Promise<SeriesWishlistStatus> {
   try {
-    const response = await fetch(`${BASE}/series/${seriesId}/status`);
-    if (!response.ok) throw new Error("Failed to fetch series wishlist status");
-    return await response.json();
+    return await fetchJson<SeriesWishlistStatus>(`${BASE}/series/${seriesId}/status`);
   } catch {
     return { seriesInWishlist: false, seasonsInWishlist: [], episodesInWishlist: [] };
   }
@@ -33,27 +46,17 @@ export async function getSeriesWishlistStatus(
 export async function addToSeriesWishlist(
   entry: Omit<SeriesWishlistEntry, "entryId">
 ): Promise<void> {
-  await fetch(BASE, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(entry),
-  });
+  await sendJson(BASE, "POST", entry);
 }
 
 export async function removeFromSeriesWishlist(entryId: string): Promise<void> {
-  await fetch(`${BASE}/entry/${encodeURIComponent(entryId)}`, {
-    method: "DELETE",
-  });
+  await sendJson(`${BASE}/entry/${encodeURIComponent(entryId)}`, "DELETE");
 }
 
 export async function removeMultipleFromSeriesWishlist(
   entryIds: string[]
 ): Promise<void> {
-  await fetch(`${BASE}/bulk`, {
-    method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ entryIds }),
-  });
+  await sendJson(`${BASE}/bulk`, "DELETE", { entryIds });
 }
 
 export async function getSeriesWishlistCount(): Promise<number> {

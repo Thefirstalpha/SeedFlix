@@ -102,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMustConfigureTorrent(response.mustConfigureTorrent);
       setMustConfigureIndexer(response.mustConfigureIndexer);
       setShouldChangePassword(response.shouldChangePassword);
+      setLegalAccepted(Boolean(response.legalAccepted));
       setNeedsInitialSetup(response.needsInitialSetup);
       return response;
     },
@@ -114,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMustConfigureTorrent(false);
       setMustConfigureIndexer(false);
       setShouldChangePassword(false);
+      setLegalAccepted(false);
       setNeedsInitialSetup(false);
     },
     refresh,
@@ -126,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mustConfigureTorrent,
     mustConfigureIndexer,
     shouldChangePassword,
+    legalAccepted,
     needsInitialSetup,
     isLoading,
   ]);

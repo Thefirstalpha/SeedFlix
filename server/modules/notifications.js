@@ -1,91 +1,125 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+// Compte le nombre de notifications non lues pour un utilisateur
+export async function getUnreadCount(userId) {
+  const userKey = userStoreKey(userId);
+  if (!userKey) return 0;
+  const notifications = await loadNotifications();
+  const userNotifications = Array.isArray(notifications[userKey]) ? notifications[userKey] : [];
+  return userNotifications.filter((n) => !n.isRead).length;
+}
+// Envoi d'une notification à un webhook Discord
+export async function sendDiscordNotification(webhookUrl, notification) {
+  if (!webhookUrl || typeof webhookUrl !== "string") return null;
+  try {
+    const embed = {
+      title: notification.title || "",
+      description: notification.message || "",
+      color: notification.type === "error" ? 0xef4444 : notification.type === "success" ? 0x10b981 : notification.type === "warning" ? 0xf59e0b : 0x3b82f6,
+      timestamp: new Date().toISOString(),
+      fields: [],
+    };
+    if (notification.data && notification.data.details && typeof notification.data.details === "object") {
+      Object.entries(notification.data.details).forEach(([key, value]) => {
+        embed.fields.push({
+          name: key,
+          value: String(value),
+          inline: true,
+        });
+      });
+    }
+    const payload = { embeds: [embed] };
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return response.ok ? { success: true } : null;
+  } catch (error) {
+    console.error("Error sending Discord notification:", error.message);
+    return null;
+  }
+}
 import { withAuth } from "./auth.js";
-import { dataDir, usersFilePath } from "../config.js";
 import { readSeriesWishlist, readWishlist } from "./wishlist.js";
 import { searchTorznabForQuery } from "./torznab.js";
 import { debugLog } from "../logger.js";
 import { getTranslator } from "../i18n.js";
 import {
+  mutateJsonStore,
+  readJsonStore,
+  runInTransaction,
+  writeJsonStore as writeJsonStoreDb,
+} from "../db.js";
+import {
   extractTargetKeyFromIndexerStateKey,
   extractUserKeyFromIndexerStateKey,
 } from "./indexerStateKey.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const notificationsFilePath = path.join(dataDir, "notifications.json");
-const indexerSeenFilePath = path.join(dataDir, "indexer-rss-seen.json");
-const indexerRejectedFilePath = path.join(dataDir, "indexer-rss-rejected.json");
-const indexerResultsFilePath = path.join(dataDir, "indexer-rss-results.json");
+const usersFilePath = "auth.users";
+const notificationsFilePath = "notifications.items";
+const indexerSeenFilePath = "indexer.rss.seen";
+const indexerRejectedFilePath = "indexer.rss.rejected";
+const indexerResultsFilePath = "indexer.rss.results";
+
+// Fabrique utilitaire pour générer des fonctions read/write typées
+function createJsonStoreAccessors(filePath, fallback) {
+  return {
+    read: async () => readJsonStoreTyped(filePath, fallback),
+    write: async (value) => writeJsonStoreTyped(filePath, value),
+  };
+}
+
+const usersStore = createJsonStoreAccessors(usersFilePath, []);
+const indexerSeenStore = createJsonStoreAccessors(indexerSeenFilePath, {});
+const indexerRejectedStore = createJsonStoreAccessors(indexerRejectedFilePath, {});
+const indexerResultsStore = createJsonStoreAccessors(indexerResultsFilePath, {});
+const notificationsStore = createJsonStoreAccessors(notificationsFilePath, {});
 const indexerPollIntervalMs = 1000 * 60 * 0.5;
 const indexerSeenTtlMs = 1000 * 60 * 60 * 24 * 30;
 let indexerPollerStarted = false;
 
-async function ensureJsonStore(filePath, fallback) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  try {
-    await fs.access(filePath);
-  } catch {
-    await fs.writeFile(filePath, JSON.stringify(fallback, null, 2), "utf-8");
-  }
-}
 
-async function readJsonArrayStore(filePath, fallback = []) {
-  await ensureJsonStore(filePath, fallback);
-  const content = await fs.readFile(filePath, "utf-8");
-
-  try {
-    const parsed = JSON.parse(content);
+function readJsonStoreTyped(filePath, fallback) {
+  const parsed = readJsonStore(filePath, fallback);
+  if (Array.isArray(fallback)) {
     return Array.isArray(parsed) ? parsed : fallback;
-  } catch {
-    return fallback;
   }
-}
-
-async function readJsonObjectStore(filePath) {
-  await ensureJsonStore(filePath, {});
-  const content = await fs.readFile(filePath, "utf-8");
-
-  try {
-    const parsed = JSON.parse(content);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
+  if (typeof fallback === "object" && fallback !== null) {
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
   }
+  return fallback;
 }
 
-async function writeJsonStore(filePath, fallback, value) {
-  await ensureJsonStore(filePath, fallback);
-  await fs.writeFile(filePath, JSON.stringify(value, null, 2), "utf-8");
+function writeJsonStoreTyped(filePath, value) {
+  writeJsonStoreDb(filePath, value);
 }
+
 
 async function readUsers() {
-  return readJsonArrayStore(usersFilePath, []);
+  return usersStore.read();
 }
-
 async function readIndexerSeen() {
-  return readJsonObjectStore(indexerSeenFilePath);
+  return indexerSeenStore.read();
 }
-
 async function writeIndexerSeen(entries) {
-  await writeJsonStore(indexerSeenFilePath, {}, entries);
+  return indexerSeenStore.write(entries);
 }
-
 async function readIndexerRejected() {
-  return readJsonObjectStore(indexerRejectedFilePath);
+  return indexerRejectedStore.read();
 }
-
 async function writeIndexerRejected(entries) {
-  await writeJsonStore(indexerRejectedFilePath, {}, entries);
+  return indexerRejectedStore.write(entries);
 }
-
 async function readIndexerResults() {
-  return readJsonObjectStore(indexerResultsFilePath);
+  return indexerResultsStore.read();
 }
-
 async function writeIndexerResults(entries) {
-  await writeJsonStore(indexerResultsFilePath, {}, entries);
+  return indexerResultsStore.write(entries);
+}
+async function loadNotifications() {
+  return notificationsStore.read();
+}
+async function saveNotifications(notifications) {
+  return notificationsStore.write(notifications || {});
 }
 
 function normalizeMatchText(value) {
@@ -797,36 +831,12 @@ function startIndexerWishlistPolling() {
   }, indexerPollIntervalMs);
 }
 
-// Charger les notifications
-async function loadNotifications() {
-  await ensureJsonStore(notificationsFilePath, {});
-  try {
-    const content = await fs.readFile(notificationsFilePath, "utf-8");
-    return JSON.parse(content);
-  } catch {
-    return {};
-  }
-}
-
-// Sauvegarder les notifications
-async function saveNotifications(notifications) {
-  await ensureJsonStore(notificationsFilePath, {});
-  await fs.writeFile(
-    notificationsFilePath,
-    JSON.stringify(notifications, null, 2)
-  );
-}
 
 // Ajouter une notification
 export async function addNotification(userId, notification) {
-  const notifications = await loadNotifications();
   const userKey = userStoreKey(userId);
   if (!userKey) {
     return null;
-  }
-
-  if (!notifications[userKey]) {
-    notifications[userKey] = [];
   }
 
   const id = Date.now().toString();
@@ -840,8 +850,14 @@ export async function addNotification(userId, notification) {
     data: notification.data || {},
   };
 
-  notifications[userKey].push(notif);
-  await saveNotifications(notifications);
+  mutateJsonStore(notificationsFilePath, {}, (notifications) => {
+    const nextNotifications = notifications && typeof notifications === "object" ? notifications : {};
+    if (!Array.isArray(nextNotifications[userKey])) {
+      nextNotifications[userKey] = [];
+    }
+    nextNotifications[userKey].push(notif);
+    return nextNotifications;
+  });
 
   return notif;
 }
@@ -871,48 +887,62 @@ export async function getNotifications(userId, options = {}) {
 
 // Marquer comme lue
 export async function markAsRead(userId, notificationId) {
-  const notifications = await loadNotifications();
   const userKey = userStoreKey(userId);
+  let updatedNotification = null;
 
-  if (notifications[userKey]) {
-    const notif = notifications[userKey].find((n) => n.id === notificationId);
-    if (notif) {
-      notif.isRead = true;
-      await saveNotifications(notifications);
-      return notif;
+  mutateJsonStore(notificationsFilePath, {}, (notifications) => {
+    const nextNotifications = notifications && typeof notifications === "object" ? notifications : {};
+    if (!Array.isArray(nextNotifications[userKey])) {
+      return nextNotifications;
     }
-  }
 
-  return null;
+    const notif = nextNotifications[userKey].find((n) => n.id === notificationId);
+    if (!notif) {
+      return nextNotifications;
+    }
+
+    notif.isRead = true;
+    updatedNotification = notif;
+    return nextNotifications;
+  });
+
+  return updatedNotification;
 }
 
 // Marquer toutes comme lues
 export async function markAllAsRead(userId) {
-  const notifications = await loadNotifications();
   const userKey = userStoreKey(userId);
+  mutateJsonStore(notificationsFilePath, {}, (notifications) => {
+    const nextNotifications = notifications && typeof notifications === "object" ? notifications : {};
+    if (!Array.isArray(nextNotifications[userKey])) {
+      return nextNotifications;
+    }
 
-  if (notifications[userKey]) {
-    notifications[userKey].forEach((n) => {
+    nextNotifications[userKey].forEach((n) => {
       n.isRead = true;
     });
-    await saveNotifications(notifications);
-  }
+    return nextNotifications;
+  });
 }
 
 // Supprimer une notification
 export async function deleteNotification(userId, notificationId) {
-  const notifications = await loadNotifications();
   const userKey = userStoreKey(userId);
+  let wasDeleted = false;
 
-  if (notifications[userKey]) {
-    notifications[userKey] = notifications[userKey].filter(
-      (n) => n.id !== notificationId
-    );
-    await saveNotifications(notifications);
-    return true;
-  }
+  mutateJsonStore(notificationsFilePath, {}, (notifications) => {
+    const nextNotifications = notifications && typeof notifications === "object" ? notifications : {};
+    if (!Array.isArray(nextNotifications[userKey])) {
+      return nextNotifications;
+    }
 
-  return false;
+    const beforeCount = nextNotifications[userKey].length;
+    nextNotifications[userKey] = nextNotifications[userKey].filter((n) => n.id !== notificationId);
+    wasDeleted = nextNotifications[userKey].length !== beforeCount;
+    return nextNotifications;
+  });
+
+  return wasDeleted;
 }
 
 export async function getIndexerResultsForUser(userId) {
@@ -942,20 +972,18 @@ export async function getIndexerResultsForUser(userId) {
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }
 
-async function mutateIndexerResultItem(userId, targetKey, indexerStateKey, mode) {
-  const normalizedTargetKey = String(targetKey || "").trim();
-  const normalizedStateKey = String(indexerStateKey || "").trim();
-  if (!normalizedTargetKey || !normalizedStateKey) {
-    return { ok: false, reason: "invalid-input" };
-  }
 
-  const normalizedUserKey = userStoreKey(userId);
 
-  const [allResults, rejected] = await Promise.all([
-    readIndexerResults(),
-    readIndexerRejected(),
-  ]);
-
+// Fonction utilitaire commune pour modification du bucket
+function updateIndexerResultBucket({
+  tx,
+  allResults,
+  rejected,
+  normalizedUserKey,
+  normalizedTargetKey,
+  stateKeysToRemove,
+  mode,
+}) {
   const userResults = allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
     ? { ...allResults[normalizedUserKey] }
     : {};
@@ -965,15 +993,14 @@ async function mutateIndexerResultItem(userId, targetKey, indexerStateKey, mode)
   if (!bucket || !Array.isArray(bucket.items)) {
     return { ok: false, reason: "not-found" };
   }
-
-  const index = bucket.items.findIndex(
-    (item) => String(item?.indexerStateKey || "").trim() === normalizedStateKey
+  const removableStateKeys = new Set(stateKeysToRemove);
+  const originalLength = bucket.items.length;
+  bucket.items = bucket.items.filter(
+    (item) => !removableStateKeys.has(String(item?.indexerStateKey || "").trim())
   );
-  if (index < 0) {
+  if (bucket.items.length === originalLength) {
     return { ok: false, reason: "not-found" };
   }
-
-  bucket.items.splice(index, 1);
   if (bucket.items.length === 0) {
     delete userResults[normalizedTargetKey];
   } else {
@@ -981,84 +1008,65 @@ async function mutateIndexerResultItem(userId, targetKey, indexerStateKey, mode)
     userResults[normalizedTargetKey] = bucket;
   }
   allResults[normalizedUserKey] = userResults;
-
   if (mode === "reject") {
-    rejected[normalizedStateKey] = Date.now();
+    const rejectedAt = Date.now();
+    for (const stateKey of removableStateKeys) {
+      rejected[stateKey] = rejectedAt;
+    }
+    tx.writeJson(indexerRejectedFilePath, rejected);
   }
-
-  await Promise.all([
-    writeIndexerResults(allResults),
-    mode === "reject" ? writeIndexerRejected(rejected) : Promise.resolve(),
-  ]);
-
+  tx.writeJson(indexerResultsFilePath, allResults);
   return { ok: true };
 }
 
-export async function rejectIndexerResultItem(userId, targetKey, indexerStateKey, options = {}) {
-  return mutateIndexerResultItem(userId, targetKey, indexerStateKey, "reject");
-}
-
-export async function validateIndexerResultItem(userId, targetKey, indexerStateKey, options = {}) {
-  return mutateIndexerResultItem(userId, targetKey, indexerStateKey, "validate");
-}
-
-// Supprimer toutes les notifications
-export async function clearNotifications(userId) {
-  const notifications = await loadNotifications();
-  const userKey = userStoreKey(userId);
-
-  if (notifications[userKey]) {
-    delete notifications[userKey];
-    await saveNotifications(notifications);
+async function mutateIndexerResultItem(userId, targetKey, indexerStateKey, mode) {
+  const normalizedTargetKey = String(targetKey || "").trim();
+  const normalizedStateKey = String(indexerStateKey || "").trim();
+  if (!normalizedTargetKey || !normalizedStateKey) {
+    return { ok: false, reason: "invalid-input" };
   }
-}
-
-// Compter les non-lues
-export async function getUnreadCount(userId) {
-  const userNotifs = await getNotifications(userId);
-  return userNotifs.filter((n) => !n.isRead).length;
-}
-
-// Envoyer via Discord
-export async function sendDiscordNotification(webhookUrl, notification) {
-  if (!webhookUrl) {
-    return null;
-  }
-
-  try {
-    const embed = {
-      title: notification.title,
-      description: notification.message,
-      color: getColorByType(notification.type),
-      timestamp: new Date().toISOString(),
-      footer: {
-        text: "SeedFlix Notifications",
-      },
-    };
-
-    if (notification.data?.details) {
-      embed.fields = [];
-      Object.entries(notification.data.details).forEach(([key, value]) => {
-        embed.fields.push({
-          name: key,
-          value: String(value),
-          inline: true,
-        });
-      });
-    }
-
-    const payload = { embeds: [embed] };
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+  const normalizedUserKey = userStoreKey(userId);
+  return runInTransaction((tx) => {
+    const allResults = tx.readJson(indexerResultsFilePath, {});
+    const rejected = tx.readJson(indexerRejectedFilePath, {});
+    return updateIndexerResultBucket({
+      tx,
+      allResults,
+      rejected,
+      normalizedUserKey,
+      normalizedTargetKey,
+      stateKeysToRemove: [normalizedStateKey],
+      mode,
     });
+  });
+}
 
-    return response.ok ? { success: true } : null;
-  } catch (error) {
-    console.error("Error sending Discord notification:", error.message);
-    return null;
+async function mutateIndexerResultItemsBatch(userId, targetKey, indexerStateKeys, mode) {
+  const normalizedTargetKey = String(targetKey || "").trim();
+  const normalizedStateKeys = Array.from(
+    new Set(
+      (Array.isArray(indexerStateKeys) ? indexerStateKeys : [])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+    )
+  );
+  if (!normalizedTargetKey || normalizedStateKeys.length === 0) {
+    return { ok: false, reason: "invalid-input" };
   }
+  const normalizedUserKey = userStoreKey(userId);
+  return runInTransaction((tx) => {
+    const allResults = tx.readJson(indexerResultsFilePath, {});
+    const rejected = tx.readJson(indexerRejectedFilePath, {});
+    return updateIndexerResultBucket({
+      tx,
+      allResults,
+      rejected,
+      normalizedUserKey,
+      normalizedTargetKey,
+      stateKeysToRemove: normalizedStateKeys,
+      mode,
+    });
+  });
 }
 
 // Obtenir la couleur selon le type
@@ -1159,6 +1167,28 @@ export function registerNotificationRoutes(app) {
     }
   });
   app.post("/api/indexer-results/reject", rejectIndexerResultHandler);
+
+  app.post("/api/indexer-results/reject-all", withAuth(async (req, res, auth) => {
+    try {
+      const t = getTranslator(req, auth.user);
+      const result = await rejectIndexerResultItems(
+        resolveNotificationUserKey(auth.user),
+        req.body?.targetKey,
+        req.body?.indexerStateKeys
+      );
+      if (!result.ok) {
+        if (result.reason === "not-found") {
+          return res.status(404).json({ error: t("notifications.notFound") });
+        }
+        return res.status(400).json({ error: t("notifications.rejectNotSupported") });
+      }
+
+      res.json({ ok: true, message: t("notifications.rejected") });
+    } catch (error) {
+      console.error("Error rejecting all indexer results:", error);
+      res.status(500).json({ error: error.message });
+    }
+  }));
 
   const validateIndexerResultHandler = withAuth(async (req, res, auth) => {
     try {

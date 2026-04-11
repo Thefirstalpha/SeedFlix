@@ -240,6 +240,15 @@ export interface User {
   username: string;
 }
 
+export interface DatabaseNamespaceEntry {
+  namespace: string;
+  updatedAt: string;
+}
+
+export interface DatabaseNamespaceValue extends DatabaseNamespaceEntry {
+  value: string;
+}
+
 export interface CreatedUserResponse extends User {
   generatedPassword: string;
 }
@@ -275,4 +284,37 @@ export async function resetUserPassword(userId: number) {
     credentials: "include",
   });
   return parseJson<{ ok: true; generatedPassword: string }>(response, "Impossible de réinitialiser le mot de passe");
+}
+
+export async function listDatabaseNamespaces() {
+  const response = await fetch(`${SETTINGS_BASE}/database`, {
+    credentials: "include",
+  });
+  return parseJson<{ namespaces: DatabaseNamespaceEntry[] }>(
+    response,
+    "Impossible de charger la base de données"
+  );
+}
+
+export async function getDatabaseNamespace(namespace: string) {
+  const response = await fetch(`${SETTINGS_BASE}/database/${encodeURIComponent(namespace)}`, {
+    credentials: "include",
+  });
+  return parseJson<DatabaseNamespaceValue>(
+    response,
+    "Impossible de charger l'entrée de base de données"
+  );
+}
+
+export async function updateDatabaseNamespace(namespace: string, value: string) {
+  const response = await fetch(`${SETTINGS_BASE}/database/${encodeURIComponent(namespace)}`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ value }),
+  });
+  return parseJson<DatabaseNamespaceValue>(
+    response,
+    "Impossible de mettre à jour l'entrée de base de données"
+  );
 }

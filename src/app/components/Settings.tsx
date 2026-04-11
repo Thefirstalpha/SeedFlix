@@ -1,4 +1,38 @@
 import { useEffect, useState } from "react";
+// Fonction utilitaire générique pour la gestion des sauvegardes asynchrones
+async function handleAsyncSave<T = any>({
+  event,
+  setError,
+  setMessage,
+  setSaving,
+  doSave,
+  successMessage,
+  errorMessage,
+  onSuccess,
+}: {
+  event?: React.FormEvent;
+  setError: (msg: string | null) => void;
+  setMessage: (msg: string | null) => void;
+  setSaving: (saving: boolean) => void;
+  doSave: () => Promise<T>;
+  successMessage: string;
+  errorMessage: string;
+  onSuccess?: (result: T) => void;
+}) {
+  if (event) event.preventDefault();
+  setError(null);
+  setMessage(null);
+  setSaving(true);
+  try {
+    const result = await doSave();
+    if (onSuccess) onSuccess(result);
+    setMessage(successMessage);
+  } catch (submitError: any) {
+    setError(submitError instanceof Error ? submitError.message : errorMessage);
+  } finally {
+    setSaving(false);
+  }
+}
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Check, Copy } from "lucide-react";
 import { Button } from "./ui/button";
@@ -6,6 +40,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
+import { Textarea } from "./ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
   AlertDialog,
@@ -29,12 +64,16 @@ import {
 import {
   changePassword,
   getGlobalSettings,
+  getDatabaseNamespace,
   getSettings,
   resetSettings,
   testIndexerConnection,
   testTorrentConnection,
   updateGlobalSettings,
+  updateDatabaseNamespace,
   updateSettings,
+  listDatabaseNamespaces,
+  type DatabaseNamespaceEntry,
   type UserSettings,
   listUsers,
   createUser,
@@ -63,7 +102,7 @@ const QUALITY_OPTIONS = [
   { value: "hdtv", labelKey: "settings.quality.hdtv" },
 ];
 
-const SETTINGS_TABS = ["general", "api", "notifications", "users", "factory"] as const;
+const SETTINGS_TABS = ["general", "notifications", "api", "users", "database", "factory"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 function parseSupportedLanguage(input: unknown): SupportedLanguage {
@@ -75,7 +114,7 @@ function isValidSettingsTab(value: string): value is SettingsTab {
 }
 
 function isAdminOnlyTab(value: SettingsTab) {
-  return value === "users" || value === "factory";
+  return value === "users" || value === "database" || value === "factory";
 }
 
 function normalizeSettingsTab(value: string | null): SettingsTab | null {
@@ -159,6 +198,15 @@ export function Settings() {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [resetPasswordTargetId, setResetPasswordTargetId] = useState<number | null>(null);
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
+  const [databaseNamespaces, setDatabaseNamespaces] = useState<DatabaseNamespaceEntry[]>([]);
+  const [selectedDatabaseNamespace, setSelectedDatabaseNamespace] = useState("");
+  const [databaseRawValue, setDatabaseRawValue] = useState("");
+  const [databaseUpdatedAt, setDatabaseUpdatedAt] = useState("");
+  const [databaseMessage, setDatabaseMessage] = useState<string | null>(null);
+  const [databaseError, setDatabaseError] = useState<string | null>(null);
+  const [isLoadingDatabaseNamespaces, setIsLoadingDatabaseNamespaces] = useState(false);
+  const [isLoadingDatabaseValue, setIsLoadingDatabaseValue] = useState(false);
+  const [isSavingDatabaseValue, setIsSavingDatabaseValue] = useState(false);
   const isAdmin = user?.username === "admin";
 
   const tabParam = searchParams.get("tab");
@@ -327,6 +375,85 @@ export function Settings() {
     void loadUsers();
   }, [isAuthenticated, user]);
 
+  // Extraction de la logique commune de chargement des namespaces
+  const fetchAndSetDatabaseNamespaces = async () => {
+    setIsLoadingDatabaseNamespaces(true);
+    try {
+      const response = await listDatabaseNamespaces();
+      const namespaces = Array.isArray(response.namespaces) ? response.namespaces : [];
+      setDatabaseNamespaces(namespaces);
+      if (namespaces.length === 0) {
+        setDatabaseRawValue("");
+        setDatabaseUpdatedAt("");
+      }
+      setSelectedDatabaseNamespace((current) => {
+        if (current && namespaces.some((entry) => entry.namespace === current)) {
+          return current;
+        }
+        return namespaces[0]?.namespace || "";
+      });
+    } catch (err) {
+      setDatabaseError(
+        err instanceof Error ? err.message : t("settings.database.loadFailed")
+      );
+    } finally {
+      setIsLoadingDatabaseNamespaces(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated || user?.username !== "admin") {
+      return;
+    }
+    void fetchAndSetDatabaseNamespaces();
+  }, [isAuthenticated, t, user?.username]);
+
+  useEffect(() => {
+    if (!isAuthenticated || user?.username !== "admin" || !selectedDatabaseNamespace) {
+      return;
+    }
+
+    const loadDatabaseEntry = async () => {
+      setIsLoadingDatabaseValue(true);
+      setDatabaseError(null);
+      setDatabaseMessage(null);
+      try {
+        const entry = await getDatabaseNamespace(selectedDatabaseNamespace);
+        setDatabaseRawValue(entry.value || "");
+        setDatabaseUpdatedAt(entry.updatedAt || "");
+      } catch (loadError) {
+        setDatabaseError(
+          loadError instanceof Error ? loadError.message : t("settings.database.entryLoadFailed")
+        );
+      } finally {
+        setIsLoadingDatabaseValue(false);
+      }
+    };
+
+    void loadDatabaseEntry();
+  }, [isAuthenticated, selectedDatabaseNamespace, t, user?.username]);
+
+  useEffect(() => {
+    if (!createdUserCredentials || isCreatedUserModalOpen) {
+      return;
+    }
+
+    if (isCreateUserOpen || resetPasswordTargetId !== null) {
+      return;
+    }
+
+    const openTimer = window.setTimeout(() => {
+      setIsCreatedUserModalOpen(true);
+    }, 0);
+
+    return () => window.clearTimeout(openTimer);
+  }, [
+    createdUserCredentials,
+    isCreateUserOpen,
+    isCreatedUserModalOpen,
+    resetPasswordTargetId,
+  ]);
+
   if (!isLoading && !isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
@@ -353,119 +480,109 @@ export function Settings() {
   };
 
   const handleTmdbSave = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setTmdbError(null);
-    setTmdbMessage(null);
-    setIsTmdbSaving(true);
-
     if (!tmdbApiKey.trim()) {
       setTmdbError(t("settings.messages.tmdbKeyRequired"));
       setIsTmdbSaving(false);
       return;
     }
-
-    try {
-      const savedGlobalSettings = await updateGlobalSettings({
-        tmdbApiKey: tmdbApiKey.trim(),
-      });
-      setTmdbApiKey(savedGlobalSettings.tmdbApiKey || "");
-      await refresh();
-      setTmdbMessage(t("settings.messages.tmdbSaved"));
-    } catch (submitError) {
-      setTmdbError(submitError instanceof Error ? submitError.message : t("settings.messages.configFailed"));
-    } finally {
-      setIsTmdbSaving(false);
-    }
+    await handleAsyncSave({
+      event,
+      setError: setTmdbError,
+      setMessage: setTmdbMessage,
+      setSaving: setIsTmdbSaving,
+      doSave: async () => {
+        const savedGlobalSettings = await updateGlobalSettings({
+          tmdbApiKey: tmdbApiKey.trim(),
+        });
+        setTmdbApiKey(savedGlobalSettings.tmdbApiKey || "");
+        await refresh();
+        return savedGlobalSettings;
+      },
+      successMessage: t("settings.messages.tmdbSaved"),
+      errorMessage: t("settings.messages.configFailed"),
+    });
   };
 
   const handleTorrentSave = async (event: React.FormEvent) => {
-    event.preventDefault();
     setResetError(null);
-    setTorrentError(null);
-    setTorrentMessage(null);
-    setIsTorrentSaving(true);
-
-    const updatedSettings: UserSettings = buildUpdatedSettings({
-      torrent: {
-        url: torrentUrl,
-        port: torrentPort,
-        authRequired: torrentAuthRequired,
-        username: torrentAuthRequired ? torrentUsername : undefined,
-        password: torrentAuthRequired ? torrentPassword : "",
-        moviesFolder: torrentMoviesFolder,
-        seriesFolder: torrentSeriesFolder,
+    await handleAsyncSave({
+      event,
+      setError: setTorrentError,
+      setMessage: setTorrentMessage,
+      setSaving: setIsTorrentSaving,
+      doSave: async () => {
+        const updatedSettings: UserSettings = buildUpdatedSettings({
+          torrent: {
+            url: torrentUrl,
+            port: torrentPort,
+            authRequired: torrentAuthRequired,
+            username: torrentAuthRequired ? torrentUsername : undefined,
+            password: torrentAuthRequired ? torrentPassword : "",
+            moviesFolder: torrentMoviesFolder,
+            seriesFolder: torrentSeriesFolder,
+          },
+        });
+        const savedSettings = await updateSettings(updatedSettings);
+        applyUpdatedSettings(savedSettings);
+        try {
+          const response = await testTorrentConnection({
+            url: torrentUrl,
+            port: torrentPort,
+            authRequired: torrentAuthRequired,
+            username: torrentUsername,
+            password: torrentPassword,
+          });
+          return { message: t("settings.messages.configurationSavedWithResponse", { response: response.message }) };
+        } catch (submitError) {
+          throw new Error(
+            submitError instanceof Error
+              ? t("settings.messages.savedButTestFailedWithReason", { reason: submitError.message })
+              : t("settings.messages.savedButTestFailed")
+          );
+        }
+      },
+      successMessage: t("settings.messages.configurationSavedWithResponse", { response: "" }), // sera remplacé par le message réel
+      errorMessage: t("settings.messages.updateFailed"),
+      onSuccess: (result: any) => {
+        if (result && result.message) setTorrentMessage(result.message);
       },
     });
-
-    try {
-      const savedSettings = await updateSettings(updatedSettings);
-      applyUpdatedSettings(savedSettings);
-    } catch (submitError) {
-      setTorrentError(
-        submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
-      );
-      setIsTorrentSaving(false);
-      return;
-    }
-
-    try {
-      const response = await testTorrentConnection({
-        url: torrentUrl,
-        port: torrentPort,
-        authRequired: torrentAuthRequired,
-        username: torrentUsername,
-        password: torrentPassword,
-      });
-      setTorrentMessage(t("settings.messages.configurationSavedWithResponse", { response: response.message }));
-    } catch (submitError) {
-      setTorrentError(
-        submitError instanceof Error
-          ? t("settings.messages.savedButTestFailedWithReason", { reason: submitError.message })
-          : t("settings.messages.savedButTestFailed")
-      );
-    } finally {
-      setIsTorrentSaving(false);
-    }
   };
 
   const handleIndexerSave = async (event: React.FormEvent) => {
-    event.preventDefault();
     setResetError(null);
-    setIndexerError(null);
-    setIndexerMessage(null);
-    setIsIndexerSaving(true);
-
-    const updatedSettings: UserSettings = buildUpdatedSettings({
-      indexer: {
-        url: indexerUrl,
-        token: indexerToken,
-        defaultQuality: indexerDefaultQuality,
+    await handleAsyncSave({
+      event,
+      setError: setIndexerError,
+      setMessage: setIndexerMessage,
+      setSaving: setIsIndexerSaving,
+      doSave: async () => {
+        const updatedSettings: UserSettings = buildUpdatedSettings({
+          indexer: {
+            url: indexerUrl,
+            token: indexerToken,
+            defaultQuality: indexerDefaultQuality,
+          },
+        });
+        const savedSettings = await updateSettings(updatedSettings);
+        applyUpdatedSettings(savedSettings);
+        try {
+          const response = await testIndexerConnection(indexerUrl, indexerToken);
+          return { message: t("settings.messages.configurationSavedWithResponse", { response: response.message }) };
+        } catch (submitError) {
+          throw new Error(
+            submitError instanceof Error
+              ? t("settings.messages.savedButTestFailedWithReason", { reason: submitError.message })
+              : t("settings.messages.savedButTestFailed")
+          );
+        }
+      },
+      successMessage: t("settings.messages.configurationSavedWithResponse", { response: "" }),
+      errorMessage: t("settings.messages.updateFailed"),
+      onSuccess: (result: any) => {
+        if (result && result.message) setIndexerMessage(result.message);
       },
     });
-
-    try {
-      const savedSettings = await updateSettings(updatedSettings);
-      applyUpdatedSettings(savedSettings);
-    } catch (submitError) {
-      setIndexerError(
-        submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
-      );
-      setIsIndexerSaving(false);
-      return;
-    }
-
-    try {
-      const response = await testIndexerConnection(indexerUrl, indexerToken);
-      setIndexerMessage(t("settings.messages.configurationSavedWithResponse", { response: response.message }));
-    } catch (submitError) {
-      setIndexerError(
-        submitError instanceof Error
-          ? t("settings.messages.savedButTestFailedWithReason", { reason: submitError.message })
-          : t("settings.messages.savedButTestFailed")
-      );
-    } finally {
-      setIsIndexerSaving(false);
-    }
   };
 
   const handleDiscordSave = async (event: React.FormEvent) => {
@@ -730,7 +847,7 @@ export function Settings() {
       }
 
       const createdUser = await createUser(newUsername.trim());
-      setUsers([...users, createdUser]);
+      setUsers((currentUsers) => [...currentUsers, createdUser]);
       setNewUsername("");
       setIsCreateUserOpen(false);
       setUsersMessage(
@@ -744,7 +861,7 @@ export function Settings() {
         password: createdUser.generatedPassword,
       });
       setGeneratedPasswordContext("create");
-      setIsCreatedUserModalOpen(true);
+      setIsGeneratedPasswordCopied(false);
     } catch (submitError) {
       setUsersError(
         submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
@@ -794,7 +911,7 @@ export function Settings() {
         password: response.generatedPassword,
       });
       setGeneratedPasswordContext("reset");
-      setIsCreatedUserModalOpen(true);
+      setIsGeneratedPasswordCopied(false);
     } catch (submitError) {
       setUsersError(
         submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
@@ -815,6 +932,74 @@ export function Settings() {
       setTimeout(() => setIsGeneratedPasswordCopied(false), 1500);
     } catch {
       setUsersError(t("settings.messages.updateFailed"));
+    }
+  };
+
+  const handleDatabaseReload = async () => {
+    if (!selectedDatabaseNamespace) {
+      return;
+    }
+
+    setDatabaseError(null);
+    setDatabaseMessage(null);
+    setIsLoadingDatabaseValue(true);
+    try {
+      const entry = await getDatabaseNamespace(selectedDatabaseNamespace);
+      setDatabaseRawValue(entry.value || "");
+      setDatabaseUpdatedAt(entry.updatedAt || "");
+      setDatabaseMessage(t("settings.database.reloaded"));
+    } catch (reloadError) {
+      setDatabaseError(
+        reloadError instanceof Error ? reloadError.message : t("settings.database.entryLoadFailed")
+      );
+    } finally {
+      setIsLoadingDatabaseValue(false);
+    }
+  };
+
+  const handleDatabaseNamespacesReload = async () => {
+    setDatabaseError(null);
+    setDatabaseMessage(null);
+    await fetchAndSetDatabaseNamespaces();
+    setDatabaseMessage(t("settings.database.listReloaded"));
+  };
+
+  const handleDatabasePrettyFormat = () => {
+    setDatabaseError(null);
+    try {
+      const prettyValue = JSON.stringify(JSON.parse(databaseRawValue), null, 2);
+      setDatabaseRawValue(prettyValue);
+    } catch {
+      setDatabaseError(t("settings.database.invalidJson"));
+    }
+  };
+
+  const handleDatabaseSave = async () => {
+    if (!selectedDatabaseNamespace) {
+      return;
+    }
+
+    setDatabaseError(null);
+    setDatabaseMessage(null);
+    setIsSavingDatabaseValue(true);
+    try {
+      const updatedEntry = await updateDatabaseNamespace(selectedDatabaseNamespace, databaseRawValue);
+      setDatabaseRawValue(updatedEntry.value || "");
+      setDatabaseUpdatedAt(updatedEntry.updatedAt || "");
+      setDatabaseNamespaces((current) =>
+        current.map((entry) =>
+          entry.namespace === updatedEntry.namespace
+            ? { namespace: updatedEntry.namespace, updatedAt: updatedEntry.updatedAt }
+            : entry
+        )
+      );
+      setDatabaseMessage(t("settings.database.saved"));
+    } catch (saveError) {
+      setDatabaseError(
+        saveError instanceof Error ? saveError.message : t("settings.database.saveFailed")
+      );
+    } finally {
+      setIsSavingDatabaseValue(false);
     }
   };
 
@@ -846,16 +1031,16 @@ export function Settings() {
               {t("settings.tabs.general")}
             </TabsTrigger>
             <TabsTrigger
-              value="api"
-              className="flex-none text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-            >
-              {t("settings.tabs.configuration")}
-            </TabsTrigger>
-            <TabsTrigger
               value="notifications"
               className="flex-none text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white"
             >
               {t("settings.tabs.notifications")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="api"
+              className="flex-none text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              {t("settings.tabs.configuration")}
             </TabsTrigger>
             {user?.username === "admin" && (
               <TabsTrigger
@@ -863,6 +1048,14 @@ export function Settings() {
                 className="flex-none text-white data-[state=active]:bg-orange-600 data-[state=active]:text-white"
               >
                 {t("settings.tabs.users")}
+              </TabsTrigger>
+            )}
+            {user?.username === "admin" && (
+              <TabsTrigger
+                value="database"
+                className="flex-none text-white data-[state=active]:bg-teal-600 data-[state=active]:text-white"
+              >
+                {t("settings.tabs.database")}
               </TabsTrigger>
             )}
             {user?.username === "admin" && (
@@ -1650,6 +1843,122 @@ export function Settings() {
                       ))}
                     </div>
                   )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {user?.username === "admin" && (
+          <TabsContent value="database">
+            <Card className="border-teal-500/30 bg-teal-950/15 text-white">
+              <CardHeader>
+                <CardTitle className="text-teal-200">{t("settings.database.title")}</CardTitle>
+                <CardDescription className="text-teal-100/70">
+                  {t("settings.database.description")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                  {t("settings.database.warning")}
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+                  <div className="space-y-3 rounded-lg border border-white/10 bg-slate-900/40 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-medium text-white">{t("settings.database.namespaces")}</h3>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void handleDatabaseNamespacesReload()}
+                        className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                      >
+                        {t("settings.database.refreshList")}
+                      </Button>
+                    </div>
+
+                    {isLoadingDatabaseNamespaces ? (
+                      <p className="text-sm text-white/60">{t("common.loading")}</p>
+                    ) : databaseNamespaces.length === 0 ? (
+                      <p className="text-sm text-white/60">{t("settings.database.empty")}</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {databaseNamespaces.map((entry) => (
+                          <button
+                            key={entry.namespace}
+                            type="button"
+                            onClick={() => setSelectedDatabaseNamespace(entry.namespace)}
+                            className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
+                              selectedDatabaseNamespace === entry.namespace
+                                ? "border-teal-400/40 bg-teal-500/15 text-teal-100"
+                                : "border-white/10 bg-slate-950/50 text-white/80 hover:bg-white/5"
+                            }`}
+                          >
+                            <p className="font-mono text-sm">{entry.namespace}</p>
+                            <p className="mt-1 text-xs text-white/50">
+                              {t("settings.database.updatedAt", { value: entry.updatedAt || "-" })}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-4 rounded-lg border border-white/10 bg-slate-900/40 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-medium text-white">
+                          {selectedDatabaseNamespace || t("settings.database.noSelection")}
+                        </h3>
+                        <p className="text-sm text-white/60">
+                          {t("settings.database.updatedAt", { value: databaseUpdatedAt || "-" })}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void handleDatabaseReload()}
+                          disabled={!selectedDatabaseNamespace || isLoadingDatabaseValue || isSavingDatabaseValue}
+                          className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                        >
+                          {t("settings.database.reload")}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleDatabasePrettyFormat}
+                          disabled={!selectedDatabaseNamespace || isLoadingDatabaseValue || isSavingDatabaseValue}
+                          className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                        >
+                          {t("settings.database.prettyFormat")}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => void handleDatabaseSave()}
+                          disabled={!selectedDatabaseNamespace || isLoadingDatabaseValue || isSavingDatabaseValue}
+                          className="bg-teal-600 hover:bg-teal-700 text-white"
+                        >
+                          {isSavingDatabaseValue ? t("common.saving") : t("common.save")}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="database-raw-value">{t("settings.database.rawEditor")}</Label>
+                      <Textarea
+                        id="database-raw-value"
+                        value={databaseRawValue}
+                        onChange={(event) => setDatabaseRawValue(event.target.value)}
+                        disabled={!selectedDatabaseNamespace || isLoadingDatabaseValue}
+                        className="min-h-[420px] bg-slate-950 border-white/10 font-mono text-sm text-white"
+                        spellCheck={false}
+                      />
+                    </div>
+
+                    {databaseMessage ? <p className="text-sm text-emerald-300">{databaseMessage}</p> : null}
+                    {databaseError ? <p className="text-sm text-red-300">{databaseError}</p> : null}
+                  </div>
                 </div>
               </CardContent>
             </Card>
