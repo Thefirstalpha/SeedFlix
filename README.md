@@ -1,5 +1,4 @@
-
-# SeedFlix
+# SeedFlix 
 
 [![CI](https://github.com/Thefirstalpha/SeedFlix/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Thefirstalpha/SeedFlix/actions/workflows/ci.yml)
 [![Docker Release](https://github.com/Thefirstalpha/SeedFlix/actions/workflows/release-dockerhub.yml/badge.svg)](https://github.com/Thefirstalpha/SeedFlix/actions/workflows/release-dockerhub.yml)
@@ -13,8 +12,6 @@ SeedFlix is a self-hosted media catalog and personal transfer management applica
 It combines TMDB catalog browsing, Torznab-compatible indexer integration, Transmission client connectivity for user-approved transfers, user-level data isolation, and an admin-controlled configuration model in a single full-stack application.
 
 > **Legal notice:** SeedFlix is intended for lawful, personal use only. Users are responsible for complying with the laws applicable in their jurisdiction.
-
-![SeedFlix interface](./SeedFlix.png)
 
 ## Overview
 

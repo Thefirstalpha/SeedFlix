@@ -17,6 +17,10 @@ import {
   getSeriesWishlistStatus,
   removeFromSeriesWishlist,
 } from "../services/seriesWishlistService";
+import {
+  normalizeIndexerLanguage,
+  normalizeQuality,
+} from "../services/indexerNormalization";
 import { addTorrentToClient } from "../services/torrentService";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/LanguageProvider";
@@ -34,31 +38,6 @@ const EMPTY_STATUS: SeriesWishlistStatus = {
 
 const SERIES_QUALITY_FILTERS = ["all", "2160p", "1080p", "720p", "480p", "bluray", "webdl", "hdtv"];
 const SERIES_RELEASE_SEARCH_LIMIT = 100;
-
-function normalizeQuality(value: string | null | undefined) {
-  const raw = String(value || "").toLowerCase();
-  if (!raw) return "";
-  if (raw.includes("2160")) return "2160p";
-  if (raw.includes("1080")) return "1080p";
-  if (raw.includes("720")) return "720p";
-  if (raw.includes("480")) return "480p";
-  if (raw.includes("bluray") || raw.includes("brrip") || raw.includes("remux")) return "bluray";
-  if (raw.includes("webdl") || raw.includes("web-dl") || raw.includes("webrip")) return "webdl";
-  if (raw.includes("hdtv")) return "hdtv";
-  return raw;
-}
-
-function normalizeIndexerLanguage(value: string | null | undefined) {
-  const raw = String(value || "").toUpperCase();
-  if (!raw) return "";
-  if (raw.includes("VOSTFR")) return "VOSTFR";
-  if (raw.includes("VFF")) return "VFF";
-  if (raw.includes("VFQ")) return "VFQ";
-  if (raw.includes("MULTI")) return "MULTI";
-  if (raw === "VF" || raw.includes("FRENCH") || raw.includes("TRUEFRENCH")) return "VF";
-  if (raw === "VO") return "VO";
-  return raw;
-}
 
 function detectSeasonFromRelease(item: TorznabSeriesResult): string {
   const title = String(item.title || "");

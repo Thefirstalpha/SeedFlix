@@ -56,5 +56,5 @@ jobs:
             -Dproject.settings=sonar-project.properties
             -Dsonar.verbose=true
             -Dsonar.exclusions=dist/**,node_modules/**,data/**,server/data/**,public/**,docker/**,guidelines/**,.github/**,**/*.d.ts,src/app/i18n/locales/**,**/src/app/i18n/locales/**,**/src/app/i18n/locales/**/*,**/locales/en.ts,**/locales/fr.ts
-            -Dsonar.coverage.exclusions=src/main.tsx,src/vite-env.d.ts,server/index.js,src/app/i18n/locales/**,**/src/app/i18n/locales/**,**/src/app/i18n/locales/**/*,**/locales/en.ts,**/locales/fr.ts
+            -Dsonar.coverage.exclusions=main.tsx,src/vite-env.d.ts,server/index.js,src/app/i18n/locales/**,**/src/app/i18n/locales/**,**/src/app/i18n/locales/**/*,**/locales/en.ts,**/locales/fr.ts
             -Dsonar.cpd.exclusions=src/app/i18n/locales/**,**/src/app/i18n/locales/**,**/src/app/i18n/locales/**/*,**/locales/en.ts,**/locales/fr.ts
