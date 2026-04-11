@@ -122,6 +122,8 @@ export function WishList() {
       await removeMultipleFromWishlist(selectedIds);
       await Promise.all([loadWishlist(), loadIndexerResults()]);
       setIsSelectionMode(false);
+      window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
+      window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
     }
   };
 
@@ -153,6 +155,8 @@ export function WishList() {
       await removeMultipleFromSeriesWishlist(selectedEntryIds);
       await Promise.all([loadSeriesWishlist(), loadIndexerResults()]);
       setIsSeriesSelectionMode(false);
+      window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
+      window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
     }
   };
 

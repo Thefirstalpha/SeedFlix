@@ -331,6 +331,8 @@ export function SeriesDetails() {
       });
     }
     await refreshStatus();
+    window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
+    window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
   };
 
   const handleSeasonWishlist = async () => {
@@ -351,6 +353,8 @@ export function SeriesDetails() {
       });
     }
     await refreshStatus();
+    window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
+    window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
   };
 
   const handleEpisodeWishlist = async (episode: SeriesEpisode) => {
@@ -374,6 +378,8 @@ export function SeriesDetails() {
       });
     }
     await refreshStatus();
+    window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
+    window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
   };
 
   const toggleEpisodeReveal = (episodeId: number) => {

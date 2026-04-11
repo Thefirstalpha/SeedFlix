@@ -150,6 +150,9 @@ export function MovieDetails() {
       await addToWishlist(movie);
       setInWishlist(true);
     }
+
+    window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
+    window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
   };
 
   const handleAddTorrent = async (torrentUrl: string) => {
