@@ -417,7 +417,7 @@ export async function searchSeriesReleases(
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data?.error || "Recherche tracker impossible");
+    throw new Error(data?.error || "Recherche via l'indexer impossible");
   }
 
   return {

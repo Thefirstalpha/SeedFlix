@@ -9,13 +9,13 @@ import {
 import { getTranslator } from "../i18n.js";
 import { withAuth } from "./auth.js";
 import {
-  extractTargetKeyFromTrackerStateKey,
-  extractUserKeyFromTrackerStateKey,
-} from "./trackerStateKey.js";
+  extractTargetKeyFromIndexerStateKey,
+  extractUserKeyFromIndexerStateKey,
+} from "./indexerStateKey.js";
 
-const trackerSeenFilePath = path.join(dataDir, "tracker-rss-seen.json");
-const trackerRejectedFilePath = path.join(dataDir, "tracker-rss-rejected.json");
-const trackerResultsFilePath = path.join(dataDir, "tracker-rss-results.json");
+const indexerSeenFilePath = path.join(dataDir, "indexer-rss-seen.json");
+const indexerRejectedFilePath = path.join(dataDir, "indexer-rss-rejected.json");
+const indexerResultsFilePath = path.join(dataDir, "indexer-rss-results.json");
 
 async function ensureJsonArrayStore(filePath) {
   await fs.mkdir(dataDir, { recursive: true });
@@ -133,7 +133,7 @@ function buildSeriesTargetKey(entry) {
   return null;
 }
 
-async function purgeTrackerStateStore(filePath, targetKeys, userId) {
+async function purgeIndexerStateStore(filePath, targetKeys, userId) {
   const keys = Array.from(new Set(Array.isArray(targetKeys) ? targetKeys : [])).filter(Boolean);
   if (!keys.length) {
     return 0;
@@ -145,12 +145,12 @@ async function purgeTrackerStateStore(filePath, targetKeys, userId) {
   let removedCount = 0;
 
   for (const seenKey of Object.keys(stateEntries)) {
-    const ownerId = extractUserKeyFromTrackerStateKey(seenKey);
+    const ownerId = extractUserKeyFromIndexerStateKey(seenKey);
     if (wantedUserId && ownerId !== wantedUserId) {
       continue;
     }
 
-    const targetKey = extractTargetKeyFromTrackerStateKey(seenKey);
+    const targetKey = extractTargetKeyFromIndexerStateKey(seenKey);
     if (targetKey && wanted.has(targetKey)) {
       delete stateEntries[seenKey];
       removedCount += 1;
@@ -164,15 +164,15 @@ async function purgeTrackerStateStore(filePath, targetKeys, userId) {
   return removedCount;
 }
 
-async function purgeTrackerStateForTargetKeys(targetKeys, userId) {
+async function purgeIndexerStateForTargetKeys(targetKeys, userId) {
   await Promise.all([
-    purgeTrackerStateStore(trackerSeenFilePath, targetKeys, userId),
-    purgeTrackerStateStore(trackerRejectedFilePath, targetKeys, userId),
-    purgeTrackerResultsStore(targetKeys, userId),
+    purgeIndexerStateStore(indexerSeenFilePath, targetKeys, userId),
+    purgeIndexerStateStore(indexerRejectedFilePath, targetKeys, userId),
+    purgeIndexerResultsStore(indexerResultsFilePath, targetKeys, userId),
   ]);
 }
 
-async function purgeTrackerResultsStore(targetKeys, userId) {
+async function purgeIndexerResultsStore(filePath, targetKeys, userId) {
   const keys = Array.from(new Set(Array.isArray(targetKeys) ? targetKeys : [])).filter(Boolean);
   if (!keys.length) {
     return 0;
@@ -180,7 +180,7 @@ async function purgeTrackerResultsStore(targetKeys, userId) {
 
   const wanted = new Set(keys);
   const wantedUserId = normalizeUserStoreKey(userId);
-  const allResults = await readJsonObjectStore(trackerResultsFilePath);
+  const allResults = await readJsonObjectStore(filePath);
   let removedCount = 0;
 
   for (const username of Object.keys(allResults)) {
@@ -204,7 +204,7 @@ async function purgeTrackerResultsStore(targetKeys, userId) {
   }
 
   if (removedCount > 0) {
-    await writeJsonObjectStore(trackerResultsFilePath, allResults);
+    await writeJsonObjectStore(filePath, allResults);
   }
 
   return removedCount;
@@ -362,7 +362,7 @@ export function registerWishlistRoutes(app) {
     const t = getTranslator(req);
     try {
       const userKey = auth.user.username;
-      const trackerUserKey = String(auth.user.id || "");
+      const indexerUserKey = String(auth.user.id || "");
       const movieId = Number(req.params.id);
       if (!Number.isFinite(movieId)) {
         res.status(400).json({ error: t("wishlist.invalidMovieId") });
@@ -374,7 +374,7 @@ export function registerWishlistRoutes(app) {
       await writeWishlist(userKey, updatedWishlist);
 
       if (updatedWishlist.length !== wishlist.length) {
-        await purgeTrackerStateForTargetKeys([`movie:${movieId}`], trackerUserKey);
+        await purgeIndexerStateForTargetKeys([`movie:${movieId}`], indexerUserKey);
       }
 
       res.json({ ok: true });
@@ -388,7 +388,7 @@ export function registerWishlistRoutes(app) {
     const t = getTranslator(req);
     try {
       const userKey = auth.user.username;
-      const trackerUserKey = String(auth.user.id || "");
+      const indexerUserKey = String(auth.user.id || "");
       const ids = Array.isArray(req.body?.ids)
         ? req.body.ids.map((id) => Number(id)).filter((id) => Number.isFinite(id))
         : [];
@@ -401,7 +401,7 @@ export function registerWishlistRoutes(app) {
       const removedMovieTargetKeys = wishlist
         .filter((movie) => idsSet.has(movie.id))
         .map((movie) => `movie:${movie.id}`);
-      await purgeTrackerStateForTargetKeys(removedMovieTargetKeys, trackerUserKey);
+      await purgeIndexerStateForTargetKeys(removedMovieTargetKeys, indexerUserKey);
 
       res.json({ ok: true });
     } catch (error) {
@@ -531,7 +531,7 @@ export function registerWishlistRoutes(app) {
     const t = getTranslator(req);
     try {
       const userKey = auth.user.username;
-      const trackerUserKey = String(auth.user.id || "");
+      const indexerUserKey = String(auth.user.id || "");
       const entryId = req.params.entryId;
       const wishlist = await readSeriesWishlist(userKey);
       const removedEntry = wishlist.find((entry) => entry.entryId === entryId);
@@ -542,7 +542,7 @@ export function registerWishlistRoutes(app) {
         const removedTargetKey = buildSeriesTargetKey(removedEntry);
         const updatedTargetKeys = new Set(updated.map((entry) => buildSeriesTargetKey(entry)).filter(Boolean));
         if (removedTargetKey && !updatedTargetKeys.has(removedTargetKey)) {
-          await purgeTrackerStateForTargetKeys([removedTargetKey], trackerUserKey);
+          await purgeIndexerStateForTargetKeys([removedTargetKey], indexerUserKey);
         }
       }
 
@@ -557,7 +557,7 @@ export function registerWishlistRoutes(app) {
     const t = getTranslator(req);
     try {
       const userKey = auth.user.username;
-      const trackerUserKey = String(auth.user.id || "");
+      const indexerUserKey = String(auth.user.id || "");
       const entryIds = Array.isArray(req.body?.entryIds)
         ? req.body.entryIds.map((id) => String(id))
         : [];
@@ -577,7 +577,7 @@ export function registerWishlistRoutes(app) {
         )
       );
 
-      await purgeTrackerStateForTargetKeys(removedTargetKeys, trackerUserKey);
+      await purgeIndexerStateForTargetKeys(removedTargetKeys, indexerUserKey);
 
       res.json({ ok: true });
     } catch (error) {

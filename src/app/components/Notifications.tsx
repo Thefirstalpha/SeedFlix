@@ -82,8 +82,8 @@ export default function Notifications() {
     }
   };
 
-  const isTrackerSuggestion = (notification: Notification) =>
-    String(notification.data?.source || "") === "tracker-rss";
+  const isIndexerSuggestion = (notification: Notification) =>
+    String(notification.data?.source || "") === "indexer-rss";
 
   const spoilerModeEnabled = Boolean(
     (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode
@@ -101,7 +101,7 @@ export default function Notifications() {
   };
 
   const handleNotificationClick = (notification: Notification) => {
-    if (!isTrackerSuggestion(notification)) {
+    if (!isIndexerSuggestion(notification)) {
       return;
     }
 
@@ -240,7 +240,7 @@ export default function Notifications() {
               className={`p-4 border-l-4 border-white/10 transition-all ${
                 getTypeColor(notif.type)
               } ${!notif.isRead ? "ring-1 ring-white/20 shadow-sm" : "border-l-white/20"} ${
-                isTrackerSuggestion(notif) ? "cursor-pointer hover:bg-white/5" : ""
+                isIndexerSuggestion(notif) ? "cursor-pointer hover:bg-white/5" : ""
               }`}
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">

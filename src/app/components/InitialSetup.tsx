@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
-import { Check, ExternalLink, KeyRound, RadioTower, Server, ShieldCheck } from "lucide-react";
+import { Check, ExternalLink, KeyRound, RadioTower, Scale, Server, ShieldCheck } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import {
+  acceptLegal,
   changePassword,
   getGlobalSettings,
   getSettings,
@@ -19,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Progress } from "./ui/progress";
+import { Checkbox } from "./ui/checkbox";
 import { Switch } from "./ui/switch";
 import { useI18n, type SupportedLanguage } from "../i18n/LanguageProvider";
 
@@ -74,6 +76,7 @@ export function InitialSetup() {
     mustConfigureTmdb,
     mustConfigureTorrent,
     mustConfigureIndexer,
+    legalAccepted,
     needsInitialSetup,
   } = useAuth();
   const hasPendingSetup =
@@ -117,16 +120,31 @@ export function InitialSetup() {
   const [languageMessage, setLanguageMessage] = useState<string | null>(null);
   const [languageError, setLanguageError] = useState<string | null>(null);
   const [isLanguageSaving, setIsLanguageSaving] = useState(false);
+  const [legalCheckboxChecked, setLegalCheckboxChecked] = useState(false);
+  const [isLegalSaving, setIsLegalSaving] = useState(false);
+  const [legalError, setLegalError] = useState<string | null>(null);
   const isAdmin = user?.username === "admin";
 
   const visibleSteps = useMemo(
     () => [
+      { key: "legal", title: t("setup.steps.legal"), icon: Scale, required: needsInitialSetup && !legalAccepted },
       { key: "password", title: t("setup.steps.security"), icon: ShieldCheck, required: mustChangePassword },
       { key: "tmdb", title: t("setup.steps.tmdb"), icon: KeyRound, required: mustConfigureTmdb },
       { key: "torrent", title: t("setup.steps.torrent"), icon: Server, required: mustConfigureTorrent },
       { key: "indexer", title: t("setup.steps.indexer"), icon: RadioTower, required: mustConfigureIndexer },
-    ].filter((step) => isAdmin || step.key !== "tmdb"),
-    [isAdmin, mustChangePassword, mustConfigureIndexer, mustConfigureTmdb, mustConfigureTorrent, t]
+    ]
+      .filter((step) => step.key !== "legal" || needsInitialSetup)
+      .filter((step) => isAdmin || step.key !== "tmdb"),
+    [
+      isAdmin,
+      legalAccepted,
+      mustChangePassword,
+      mustConfigureIndexer,
+      mustConfigureTmdb,
+      mustConfigureTorrent,
+      needsInitialSetup,
+      t,
+    ]
   );
 
   const totalSteps = visibleSteps.length;
@@ -267,6 +285,20 @@ export function InitialSetup() {
       );
     } finally {
       setIsLanguageSaving(false);
+    }
+  };
+
+  const handleLegalAccept = async () => {
+    setLegalError(null);
+    setIsLegalSaving(true);
+    try {
+      await acceptLegal();
+      await refresh();
+      goToNextVisibleStep();
+    } catch (err) {
+      setLegalError(err instanceof Error ? err.message : t("common.loading"));
+    } finally {
+      setIsLegalSaving(false);
     }
   };
 
@@ -515,6 +547,61 @@ export function InitialSetup() {
           </div>
         </CardContent>
       </Card>
+
+      {currentStep?.key === "legal" ? (
+        <Card className="border-white/10 bg-white/5 text-white">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Scale className="h-5 w-5 text-cyan-300" />
+              {t("setup.legal.cardTitle")}
+            </CardTitle>
+            <CardDescription className="text-white/60">
+              {t("setup.legal.cardDescription")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <ul className="space-y-2.5 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/75">
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
+                <span>{t("setup.legal.term1")}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
+                <span>{t("setup.legal.term2")}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
+                <span>{t("setup.legal.term3")}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
+                <span>{t("setup.legal.term4")}</span>
+              </li>
+            </ul>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="legal-accept-checkbox"
+                checked={legalCheckboxChecked}
+                onCheckedChange={(checked) => setLegalCheckboxChecked(Boolean(checked))}
+                className="mt-0.5"
+              />
+              <Label htmlFor="legal-accept-checkbox" className="cursor-pointer text-sm leading-snug text-white/80">
+                {t("setup.legal.checkbox")}
+              </Label>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                onClick={handleLegalAccept}
+                disabled={!legalCheckboxChecked || isLegalSaving}
+                className="bg-cyan-600 text-white hover:bg-cyan-700"
+              >
+                {isLegalSaving ? t("common.saving") : t("setup.legal.accept")}
+              </Button>
+            </div>
+            {legalError ? <p className="text-sm text-red-400">{legalError}</p> : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {currentStep?.key === "password" ? (
         <Card className="border-white/10 bg-white/5 text-white">
@@ -776,6 +863,10 @@ export function InitialSetup() {
                   <option value="hdtv">{t("setup.indexer.quality.hdtv")}</option>
                 </select>
               </div>
+
+              <p className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-200/90">
+                {t("setup.indexer.legalNote")}
+              </p>
 
               {indexerError ? <p className="text-sm text-red-300">{indexerError}</p> : null}
 

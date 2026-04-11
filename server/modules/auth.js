@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import path from "node:path";
 
 import {
   appImageTag,
@@ -97,6 +98,7 @@ function defaultUserRecord() {
 
 async function ensureJsonStore(filePath, fallback) {
   await fs.mkdir(dataDir, { recursive: true });
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
   try {
     await fs.access(filePath);
   } catch {
@@ -163,6 +165,11 @@ async function ensureUsersStore() {
   }
 }
 
+export async function initializeAuthStores() {
+  await ensureUsersStore();
+  await ensureJsonStore(sessionsFilePath, []);
+}
+
 function isTorrentConfigured(user) {
   const torrentSettings = user?.settings?.placeholders?.torrent || {};
   const hasEndpoint = Boolean(String(torrentSettings.url || "").trim());
@@ -200,6 +207,7 @@ async function buildSetupStatus(user) {
   const mustConfigureTorrent = !isTorrentConfigured(user);
   const mustConfigureIndexer = !isIndexerConfigured(user);
   const shouldChangePassword = Boolean(user?.shouldChangePassword);
+  const legalAccepted = Boolean(user?.legalAcceptedAt);
 
   return {
     mustChangePassword,
@@ -207,7 +215,9 @@ async function buildSetupStatus(user) {
     mustConfigureTorrent,
     mustConfigureIndexer,
     shouldChangePassword,
+    legalAccepted,
     needsInitialSetup:
+      !legalAccepted ||
       mustChangePassword ||
       mustConfigureTmdb ||
       mustConfigureTorrent ||
@@ -355,6 +365,7 @@ export function registerAuthRoutes(app) {
           mustConfigureIndexer: false,
           shouldChangePassword: false,
           needsInitialSetup: false,
+          legalAccepted: false,
         });
         return;
       }
@@ -429,6 +440,24 @@ export function registerAuthRoutes(app) {
       res.status(500).json({ error: t("auth.failedLogout") });
     }
   });
+
+  app.post("/api/auth/accept-legal", withAuth(async (req, res, auth) => {
+    try {
+      const users = await readUsers();
+      const nextUsers = users.map((user) => {
+        if (user.id !== auth.user.id) {
+          return user;
+        }
+        return { ...user, legalAcceptedAt: new Date().toISOString() };
+      });
+      await writeUsers(nextUsers);
+      res.json({ ok: true });
+    } catch (error) {
+      const t = getTranslator(req);
+      debugLog("Accept legal failed:", error);
+      res.status(500).json({ error: t("auth.failedUpdateSettings") });
+    }
+  }));
 
   app.post("/api/auth/change-password", withAuth(async (req, res, auth) => {
     try {

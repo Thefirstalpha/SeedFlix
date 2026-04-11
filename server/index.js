@@ -3,9 +3,9 @@ import express from "express";
 import cors from "cors";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { isDebugMode, port } from "./config.js";
-import { debugLog } from "./logger.js";
-import { registerAuthRoutes } from "./modules/auth.js";
+import { isDebugMode, isRequestLogEnabled, port } from "./config.js";
+import { debugLog, errorLog, infoLog, requestLog } from "./logger.js";
+import { initializeAuthStores, registerAuthRoutes } from "./modules/auth.js";
 import { registerTransmissionRoutes } from "./modules/transmission.js";
 import { registerTorznabRoutes } from "./modules/torznab.js";
 import { registerTmdbRoutes } from "./modules/tmdb.js";
@@ -21,6 +21,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+if (isRequestLogEnabled) {
+  app.use((req, res, next) => {
+    const startedAt = Date.now();
+    res.on("finish", () => {
+      const elapsedMs = Date.now() - startedAt;
+      requestLog(`${req.method} ${req.originalUrl} -> ${res.statusCode} (${elapsedMs}ms)`);
+    });
+    next();
+  });
+}
+
 if (isDebugMode) {
   debugLog("Mode debug actif");
 }
@@ -28,6 +39,12 @@ if (isDebugMode) {
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
+
+async function bootstrapAppData() {
+  await initializeAuthStores();
+}
+
+await bootstrapAppData();
 
 registerAuthRoutes(app);
 registerWishlistRoutes(app);
@@ -49,7 +66,12 @@ app.use((req, res, next) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.listen(port, () => {
-  console.log(`API server running on http://localhost:${port}`);
+const server = app.listen(port, () => {
+  infoLog(`API server running on http://localhost:${port}`);
   debugLog("Server startup complete");
+});
+
+server.on("error", (error) => {
+  errorLog("Server startup failed:", error);
+  process.exitCode = 1;
 });

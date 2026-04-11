@@ -8,36 +8,15 @@ import { TorrentResultsPanel } from "./TorrentResultsPanel";
 import { getMovieById, searchMovieReleases, type TorznabMovieResult } from "../services/movieService";
 import { addTorrentToClient } from "../services/torrentService";
 import { addToWishlist, removeFromWishlist, isInWishlist } from "../services/wishlistService";
+import {
+  normalizeIndexerLanguage,
+  normalizeQuality,
+} from "../services/indexerNormalization";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/LanguageProvider";
 import type { Movie } from "../types/movie";
 
 const MOVIE_QUALITY_FILTERS = ["all", "2160p", "1080p", "720p", "480p", "bluray", "webdl", "hdtv"];
-
-function normalizeQuality(value: string | null | undefined) {
-  const raw = String(value || "").toLowerCase();
-  if (!raw) return "";
-  if (raw.includes("2160")) return "2160p";
-  if (raw.includes("1080")) return "1080p";
-  if (raw.includes("720")) return "720p";
-  if (raw.includes("480")) return "480p";
-  if (raw.includes("bluray") || raw.includes("brrip") || raw.includes("remux")) return "bluray";
-  if (raw.includes("webdl") || raw.includes("web-dl") || raw.includes("webrip")) return "webdl";
-  if (raw.includes("hdtv")) return "hdtv";
-  return raw;
-}
-
-function normalizeTrackerLanguage(value: string | null | undefined) {
-  const raw = String(value || "").toUpperCase();
-  if (!raw) return "";
-  if (raw.includes("VOSTFR")) return "VOSTFR";
-  if (raw.includes("VFF")) return "VFF";
-  if (raw.includes("VFQ")) return "VFQ";
-  if (raw.includes("MULTI")) return "MULTI";
-  if (raw === "VF" || raw.includes("FRENCH") || raw.includes("TRUEFRENCH")) return "VF";
-  if (raw === "VO") return "VO";
-  return raw;
-}
 
 export function MovieDetails() {
   const { id } = useParams();
@@ -68,7 +47,7 @@ export function MovieDetails() {
   const filteredReleaseResults = useMemo(() => {
     let results = releaseResults.filter((item) => {
       const languageOk =
-        languageFilter === "all" || normalizeTrackerLanguage(item.language) === languageFilter;
+        languageFilter === "all" || normalizeIndexerLanguage(item.language) === languageFilter;
 
       if (qualityFilter === "all") {
         return languageOk;
@@ -109,7 +88,7 @@ export function MovieDetails() {
   const availableReleaseLanguages = Array.from(
     new Set(
       releaseResults
-        .map((item) => normalizeTrackerLanguage(item.language))
+        .map((item) => normalizeIndexerLanguage(item.language))
         .filter(Boolean)
     )
   ).sort((a, b) => a.localeCompare(b, "fr"));
@@ -129,17 +108,17 @@ export function MovieDetails() {
         setIsReleaseLoading(true);
         setReleaseError(null);
         try {
-          const trackerResponse = await searchMovieReleases(
+          const indexerResponse = await searchMovieReleases(
             movieData.originalTitle || movieData.title,
             12,
             movieData.id
           );
-          setReleaseResults(trackerResponse.items);
-        } catch (trackerError) {
+          setReleaseResults(indexerResponse.items);
+        } catch (indexerError) {
           setReleaseError(
-            trackerError instanceof Error
-              ? trackerError.message
-              : t("movieDetails.errors.trackerSearchFailed")
+            indexerError instanceof Error
+              ? indexerError.message
+              : t("movieDetails.errors.indexerSearchFailed")
           );
           setReleaseResults([]);
         } finally {
@@ -372,7 +351,7 @@ export function MovieDetails() {
           )}
 
           <TorrentResultsPanel
-            title={t("movieDetails.tracker.title")}
+            title={t("movieDetails.indexer.title")}
             qualityFilter={qualityFilter}
             onQualityFilterChange={setQualityFilter}
             languageFilter={languageFilter}
@@ -395,22 +374,22 @@ export function MovieDetails() {
             totalPages={totalPages}
             locale={language === "fr" ? "fr-FR" : "en-US"}
             labels={{
-              quality: t("movieDetails.tracker.quality"),
-              language: t("movieDetails.tracker.language"),
-              all: t("movieDetails.tracker.all"),
-              sort: t("movieDetails.tracker.sort"),
-              date: t("movieDetails.tracker.date"),
-              size: t("movieDetails.tracker.size"),
-              searching: t("movieDetails.tracker.searching"),
-              empty: t("movieDetails.tracker.empty"),
-              adding: t("movieDetails.tracker.adding"),
-              addToClient: t("movieDetails.tracker.addToClient"),
-              qualityBadge: (value) => t("movieDetails.tracker.qualityBadge", { value }),
-              languageBadge: (value) => t("movieDetails.tracker.languageBadge", { value }),
-              sizeBadge: (value) => t("movieDetails.tracker.sizeBadge", { value }),
-              seeders: (count) => t("movieDetails.tracker.seeders", { count }),
-              peers: (count) => t("movieDetails.tracker.peers", { count }),
-              categories: (value) => t("movieDetails.tracker.categories", { value }),
+              quality: t("movieDetails.indexer.quality"),
+              language: t("movieDetails.indexer.language"),
+              all: t("movieDetails.indexer.all"),
+              sort: t("movieDetails.indexer.sort"),
+              date: t("movieDetails.indexer.date"),
+              size: t("movieDetails.indexer.size"),
+              searching: t("movieDetails.indexer.searching"),
+              empty: t("movieDetails.indexer.empty"),
+              adding: t("movieDetails.indexer.adding"),
+              addToClient: t("movieDetails.indexer.addToClient"),
+              qualityBadge: (value) => t("movieDetails.indexer.qualityBadge", { value }),
+              languageBadge: (value) => t("movieDetails.indexer.languageBadge", { value }),
+              sizeBadge: (value) => t("movieDetails.indexer.sizeBadge", { value }),
+              seeders: (count) => t("movieDetails.indexer.seeders", { count }),
+              peers: (count) => t("movieDetails.indexer.peers", { count }),
+              categories: (value) => t("movieDetails.indexer.categories", { value }),
               previous: t("movieDetails.pagination.previous"),
               current: (current, total) => t("movieDetails.pagination.current", { current, total }),
               page: (page) => t("movieDetails.pagination.page", { page }),

@@ -14,6 +14,7 @@ export interface AuthResponse {
   mustConfigureTorrent: boolean;
   mustConfigureIndexer: boolean;
   shouldChangePassword: boolean;
+  legalAccepted: boolean;
   needsInitialSetup: boolean;
 }
 
@@ -110,6 +111,7 @@ export async function getCurrentAuth(): Promise<AuthResponse> {
       mustConfigureTmdb: false,
       mustConfigureTorrent: false,
       mustConfigureIndexer: false,
+      legalAccepted: false,
       needsInitialSetup: false,
     };
   }
@@ -127,6 +129,14 @@ export async function login(username: string, password: string) {
 
 export async function logout() {
   const response = await fetch(`${AUTH_BASE}/logout`, {
+    method: "POST",
+    credentials: "include",
+  });
+  return parseJson<{ ok: true }>(response);
+}
+
+export async function acceptLegal() {
+  const response = await fetch(`${AUTH_BASE}/accept-legal`, {
     method: "POST",
     credentials: "include",
   });

@@ -54,10 +54,11 @@ const en = {
     title: "Getting started wizard",
     preparing: "Preparing initial setup...",
     steps: {
+      legal: "Legal notice",
       security: "Security",
       tmdb: "TMDB key",
       torrent: "Torrent client",
-      indexer: "Tracker",
+      indexer: "Indexer",
     },
     progress: "Step {{current}} of {{total}}",
     stepLabel: "Step {{index}}",
@@ -93,7 +94,7 @@ const en = {
     },
     torrent: {
       cardTitle: "Configure the torrent client",
-      cardDescription: "These details are used to test connection and send downloads.",
+      cardDescription: "These details are used to test the connection and manage transfers you explicitly approve.",
       url: "URL",
       urlPlaceholder: "https://seedbox.example.com",
       port: "RPC port",
@@ -115,8 +116,8 @@ const en = {
       },
     },
     indexer: {
-      cardTitle: "Configure the tracker",
-      cardDescription: "Provide Torznab URL and API token to enable release search.",
+      cardTitle: "Configure the indexer",
+      cardDescription: "Provide the Torznab URL and API token to review and assess results from your authorized indexers.",
       url: "Torznab URL",
       urlPlaceholder: "https://indexer.example.com/api",
       token: "API token",
@@ -134,9 +135,20 @@ const en = {
       testing: "Testing and saving...",
       testAndFinish: "Test and finish setup",
       errors: {
-        urlTokenRequired: "Tracker URL and API token are required.",
-        configFailed: "Tracker configuration failed",
+        urlTokenRequired: "Indexer URL and API token are required.",
+        configFailed: "Indexer configuration failed",
       },
+      legalNote: "Only connect to authorized and lawful indexers. You are responsible for ensuring your use complies with applicable laws in your country.",
+    },
+    legal: {
+      cardTitle: "Terms of use",
+      cardDescription: "Before using SeedFlix, please read and acknowledge the following.",
+      term1: "SeedFlix is a personal media management tool. It must only be used with content you are legally authorized to access.",
+      term2: "You are solely responsible for ensuring that your use of connected indexers and download sources complies with applicable laws in your country.",
+      term3: "The authors of SeedFlix do not endorse or facilitate copyright infringement or unauthorized distribution of protected content.",
+      term4: "By continuing, you confirm that you will use this platform for personal and lawful purposes only.",
+      checkbox: "I understand and agree to use SeedFlix lawfully and in compliance with the laws applicable in my country.",
+      accept: "Accept and continue",
     },
   },
   downloads: {
@@ -214,11 +226,11 @@ const en = {
       torrentAdded: "Torrent added to client successfully.",
     },
     errors: {
-      trackerSearchFailed: "Tracker search failed",
+      indexerSearchFailed: "Indexer search failed",
       addTorrentFailed: "Unable to add this torrent",
     },
-    tracker: {
-      title: "Tracker results",
+    indexer: {
+      title: "Indexer results",
       quality: "Quality",
       language: "Language",
       all: "All",
@@ -280,11 +292,11 @@ const en = {
       torrentAdded: "Series torrent added to client successfully.",
     },
     errors: {
-      trackerSearchFailed: "Tracker search failed",
+      indexerSearchFailed: "Indexer search failed",
       addTorrentFailed: "Unable to add this torrent",
     },
-    tracker: {
-      title: "Tracker results",
+    indexer: {
+      title: "Indexer results",
       description: "Versions detected on Torznab for this series.",
       quality: "Quality",
       language: "Language",
@@ -346,10 +358,10 @@ const en = {
       emptyDescription: "Add series, seasons, or episodes from their details page",
       discover: "Discover series",
     },
-    trackerResults: {
-      title: "Found tracker results",
+    indexerResults: {
+      title: "Found indexer results",
       count: "{{count}} target(s)",
-      empty: "No torrent found yet. Searching continues automatically.",
+      empty: "No result available yet. Check back later or refresh after a new detection cycle.",
       actions: {
         add: "Add to client",
         adding: "Adding...",
@@ -461,7 +473,7 @@ const en = {
       },
       torrent: {
         title: "Torrent client",
-        description: "Configure your torrent client settings for automatic movie and series downloads.",
+        description: "Configure your torrent client to handle transfers you explicitly choose in SeedFlix.",
         url: "Client URL",
         port: "Port",
         authRequired: "Authentication required",
@@ -472,7 +484,7 @@ const en = {
       },
       indexer: {
         title: "Indexer",
-        description: "Configure your indexer for content search.",
+        description: "Configure your indexer to review results from authorized sources.",
         url: "Indexer URL",
         token: "API token",
         defaultQuality: "Default quality",

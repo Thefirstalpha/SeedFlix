@@ -12,6 +12,9 @@ export const isDebugMode =
 	["1", "true", "yes", "on"].includes(
 		String(process.env.DEBUG || "").toLowerCase()
 	);
+export const isRequestLogEnabled = !["0", "false", "no", "off"].includes(
+	String(process.env.REQUEST_LOGS || "true").toLowerCase()
+);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

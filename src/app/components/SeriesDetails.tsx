@@ -17,6 +17,10 @@ import {
   getSeriesWishlistStatus,
   removeFromSeriesWishlist,
 } from "../services/seriesWishlistService";
+import {
+  normalizeIndexerLanguage,
+  normalizeQuality,
+} from "../services/indexerNormalization";
 import { addTorrentToClient } from "../services/torrentService";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../i18n/LanguageProvider";
@@ -34,31 +38,6 @@ const EMPTY_STATUS: SeriesWishlistStatus = {
 
 const SERIES_QUALITY_FILTERS = ["all", "2160p", "1080p", "720p", "480p", "bluray", "webdl", "hdtv"];
 const SERIES_RELEASE_SEARCH_LIMIT = 100;
-
-function normalizeQuality(value: string | null | undefined) {
-  const raw = String(value || "").toLowerCase();
-  if (!raw) return "";
-  if (raw.includes("2160")) return "2160p";
-  if (raw.includes("1080")) return "1080p";
-  if (raw.includes("720")) return "720p";
-  if (raw.includes("480")) return "480p";
-  if (raw.includes("bluray") || raw.includes("brrip") || raw.includes("remux")) return "bluray";
-  if (raw.includes("webdl") || raw.includes("web-dl") || raw.includes("webrip")) return "webdl";
-  if (raw.includes("hdtv")) return "hdtv";
-  return raw;
-}
-
-function normalizeTrackerLanguage(value: string | null | undefined) {
-  const raw = String(value || "").toUpperCase();
-  if (!raw) return "";
-  if (raw.includes("VOSTFR")) return "VOSTFR";
-  if (raw.includes("VFF")) return "VFF";
-  if (raw.includes("VFQ")) return "VFQ";
-  if (raw.includes("MULTI")) return "MULTI";
-  if (raw === "VF" || raw.includes("FRENCH") || raw.includes("TRUEFRENCH")) return "VF";
-  if (raw === "VO") return "VO";
-  return raw;
-}
 
 function detectSeasonFromRelease(item: TorznabSeriesResult): string {
   const title = String(item.title || "");
@@ -135,14 +114,14 @@ export function SeriesDetails() {
       try {
         // Recherche ciblée avec le format "Series S01E" pour attraper les épisodes individuels
         const episodeQuery = `${series.originalTitle || series.title} ${seasonFilter}E`;
-        const trackerResponse = await searchSeriesReleases(episodeQuery, 50);
+        const indexerResponse = await searchSeriesReleases(episodeQuery, 50);
         
         // Fusionner avec les résultats existants en évitant les doublons
         setReleaseResults((prev) => {
           const existingGuids = new Set(prev.map(item => item.guid).filter(Boolean));
           const existingUrls = new Set(prev.map(item => item.downloadUrl).filter(Boolean));
           
-          const newItems = trackerResponse.items.filter(item => {
+          const newItems = indexerResponse.items.filter(item => {
             const guidExists = item.guid && existingGuids.has(item.guid);
             const urlExists = item.downloadUrl && existingUrls.has(item.downloadUrl);
             return !guidExists && !urlExists;
@@ -179,7 +158,7 @@ export function SeriesDetails() {
       const qualityOk = qualityFilter === "all" || normalizeQuality(item.quality) === qualityFilter;
       const seasonOk = seasonFilter === "all" || detectSeasonFromRelease(item) === seasonFilter;
       const languageOk =
-        languageFilter === "all" || normalizeTrackerLanguage(item.language) === languageFilter;
+        languageFilter === "all" || normalizeIndexerLanguage(item.language) === languageFilter;
       return qualityOk && seasonOk && languageOk;
     });
 
@@ -221,7 +200,7 @@ export function SeriesDetails() {
     const values = Array.from(
       new Set(
         releaseResults
-          .map((item) => normalizeTrackerLanguage(item.language))
+          .map((item) => normalizeIndexerLanguage(item.language))
           .filter(Boolean)
       )
     );
@@ -245,17 +224,17 @@ export function SeriesDetails() {
         setIsReleaseLoading(true);
         setReleaseError(null);
         try {
-          const trackerResponse = await searchSeriesReleases(
+          const indexerResponse = await searchSeriesReleases(
             seriesData.originalTitle || seriesData.title,
             SERIES_RELEASE_SEARCH_LIMIT,
             seriesData.id
           );
-          setReleaseResults(trackerResponse.items);
-        } catch (trackerLoadError) {
+          setReleaseResults(indexerResponse.items);
+        } catch (indexerLoadError) {
           setReleaseError(
-            trackerLoadError instanceof Error
-              ? trackerLoadError.message
-              : t("seriesDetails.errors.trackerSearchFailed")
+            indexerLoadError instanceof Error
+              ? indexerLoadError.message
+              : t("seriesDetails.errors.indexerSearchFailed")
           );
           setReleaseResults([]);
         } finally {
@@ -762,8 +741,8 @@ export function SeriesDetails() {
           </Card>
 
           <TorrentResultsPanel
-            title={t("seriesDetails.tracker.title")}
-            description={t("seriesDetails.tracker.description")}
+            title={t("seriesDetails.indexer.title")}
+            description={t("seriesDetails.indexer.description")}
             qualityFilter={qualityFilter}
             onQualityFilterChange={setQualityFilter}
             languageFilter={languageFilter}
@@ -790,22 +769,22 @@ export function SeriesDetails() {
             locale={language === "fr" ? "fr-FR" : "en-US"}
             labels={{
               season: t("seriesDetails.season"),
-              quality: t("seriesDetails.tracker.quality"),
-              language: t("seriesDetails.tracker.language"),
-              all: t("seriesDetails.tracker.all"),
-              sort: t("seriesDetails.tracker.sort"),
-              date: t("seriesDetails.tracker.date"),
-              size: t("seriesDetails.tracker.size"),
-              searching: t("seriesDetails.tracker.searching"),
-              empty: t("seriesDetails.tracker.empty"),
-              adding: t("seriesDetails.tracker.adding"),
-              addToClient: t("seriesDetails.tracker.addToClient"),
-              qualityBadge: (value) => t("seriesDetails.tracker.qualityBadge", { value }),
-              languageBadge: (value) => t("seriesDetails.tracker.languageBadge", { value }),
-              sizeBadge: (value) => t("seriesDetails.tracker.sizeBadge", { value }),
-              seeders: (count) => t("seriesDetails.tracker.seeders", { count }),
-              peers: (count) => t("seriesDetails.tracker.peers", { count }),
-              categories: (value) => t("seriesDetails.tracker.categories", { value }),
+              quality: t("seriesDetails.indexer.quality"),
+              language: t("seriesDetails.indexer.language"),
+              all: t("seriesDetails.indexer.all"),
+              sort: t("seriesDetails.indexer.sort"),
+              date: t("seriesDetails.indexer.date"),
+              size: t("seriesDetails.indexer.size"),
+              searching: t("seriesDetails.indexer.searching"),
+              empty: t("seriesDetails.indexer.empty"),
+              adding: t("seriesDetails.indexer.adding"),
+              addToClient: t("seriesDetails.indexer.addToClient"),
+              qualityBadge: (value) => t("seriesDetails.indexer.qualityBadge", { value }),
+              languageBadge: (value) => t("seriesDetails.indexer.languageBadge", { value }),
+              sizeBadge: (value) => t("seriesDetails.indexer.sizeBadge", { value }),
+              seeders: (count) => t("seriesDetails.indexer.seeders", { count }),
+              peers: (count) => t("seriesDetails.indexer.peers", { count }),
+              categories: (value) => t("seriesDetails.indexer.categories", { value }),
               previous: t("seriesDetails.pagination.previous"),
               current: (current, total) => t("seriesDetails.pagination.current", { current, total }),
               page: (page) => t("seriesDetails.pagination.page", { page }),

@@ -8,22 +8,22 @@ import { searchTorznabForQuery } from "./torznab.js";
 import { debugLog } from "../logger.js";
 import { getTranslator } from "../i18n.js";
 import {
-  extractTargetKeyFromTrackerStateKey,
-  extractUserKeyFromTrackerStateKey,
-} from "./trackerStateKey.js";
+  extractTargetKeyFromIndexerStateKey,
+  extractUserKeyFromIndexerStateKey,
+} from "./indexerStateKey.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const notificationsFilePath = path.join(dataDir, "notifications.json");
-const trackerSeenFilePath = path.join(dataDir, "tracker-rss-seen.json");
-const trackerRejectedFilePath = path.join(dataDir, "tracker-rss-rejected.json");
-const trackerResultsFilePath = path.join(dataDir, "tracker-rss-results.json");
-const trackerPollIntervalMs = 1000 * 60 * 0.5;
-const trackerSeenTtlMs = 1000 * 60 * 60 * 24 * 30;
-let trackerPollerStarted = false;
+const indexerSeenFilePath = path.join(dataDir, "indexer-rss-seen.json");
+const indexerRejectedFilePath = path.join(dataDir, "indexer-rss-rejected.json");
+const indexerResultsFilePath = path.join(dataDir, "indexer-rss-results.json");
+const indexerPollIntervalMs = 1000 * 60 * 0.5;
+const indexerSeenTtlMs = 1000 * 60 * 60 * 24 * 30;
+let indexerPollerStarted = false;
 
 async function ensureJsonStore(filePath, fallback) {
-  await fs.mkdir(dataDir, { recursive: true });
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
   try {
     await fs.access(filePath);
   } catch {
@@ -64,28 +64,28 @@ async function readUsers() {
   return readJsonArrayStore(usersFilePath, []);
 }
 
-async function readTrackerSeen() {
-  return readJsonObjectStore(trackerSeenFilePath);
+async function readIndexerSeen() {
+  return readJsonObjectStore(indexerSeenFilePath);
 }
 
-async function writeTrackerSeen(entries) {
-  await writeJsonStore(trackerSeenFilePath, {}, entries);
+async function writeIndexerSeen(entries) {
+  await writeJsonStore(indexerSeenFilePath, {}, entries);
 }
 
-async function readTrackerRejected() {
-  return readJsonObjectStore(trackerRejectedFilePath);
+async function readIndexerRejected() {
+  return readJsonObjectStore(indexerRejectedFilePath);
 }
 
-async function writeTrackerRejected(entries) {
-  await writeJsonStore(trackerRejectedFilePath, {}, entries);
+async function writeIndexerRejected(entries) {
+  await writeJsonStore(indexerRejectedFilePath, {}, entries);
 }
 
-async function readTrackerResults() {
-  return readJsonObjectStore(trackerResultsFilePath);
+async function readIndexerResults() {
+  return readJsonObjectStore(indexerResultsFilePath);
 }
 
-async function writeTrackerResults(entries) {
-  await writeJsonStore(trackerResultsFilePath, {}, entries);
+async function writeIndexerResults(entries) {
+  await writeJsonStore(indexerResultsFilePath, {}, entries);
 }
 
 function normalizeMatchText(value) {
@@ -120,7 +120,7 @@ function padMediaNumber(value) {
   return String(Number(value) || 0).padStart(2, "0");
 }
 
-function buildTrackerStateKey(userKey, targetKey, uniqueItemRef) {
+function buildIndexerStateKey(userKey, targetKey, uniqueItemRef) {
   return `${String(userKey ?? "")}:${String(targetKey || "").trim()}:${String(uniqueItemRef || "").trim()}`;
 }
 
@@ -337,7 +337,7 @@ function buildSearchQueryForTarget(target) {
   return String(target.title || "").trim();
 }
 
-function doesTrackerItemMatchTarget(item, target, candidates) {
+function doesIndexerItemMatchTarget(item, target, candidates) {
   if (!isLikelyMatch(item.title, candidates)) {
     return false;
   }
@@ -354,33 +354,33 @@ function doesTrackerItemMatchTarget(item, target, candidates) {
   return seasonNumber === target.seasonNumber && episodeNumber === target.episodeNumber;
 }
 
-function getTrackerNotificationTitleKey(targetType) {
+function getIndexerNotificationTitleKey(targetType) {
   switch (targetType) {
     case "movie":
-      return "notifications.trackerMovieAvailable";
+      return "notifications.indexerMovieAvailable";
     case "season":
-      return "notifications.trackerSeasonAvailable";
+      return "notifications.indexerSeasonAvailable";
     case "episode":
-      return "notifications.trackerEpisodeAvailable";
+      return "notifications.indexerEpisodeAvailable";
     default:
-      return "notifications.trackerSeriesAvailable";
+      return "notifications.indexerSeriesAvailable";
   }
 }
 
-function pruneTrackerStateEntries(entries, activeTargetKeysByUser, now) {
+function pruneIndexerStateEntries(entries, activeTargetKeysByUser, now) {
   const nextEntries = { ...entries };
   let expiredCount = 0;
   let removedTargetCount = 0;
 
   for (const key of Object.keys(nextEntries)) {
-    if (Number(nextEntries[key]) + trackerSeenTtlMs < now) {
+    if (Number(nextEntries[key]) + indexerSeenTtlMs < now) {
       delete nextEntries[key];
       expiredCount += 1;
       continue;
     }
 
-    const targetKey = extractTargetKeyFromTrackerStateKey(key);
-    const userKey = extractUserKeyFromTrackerStateKey(key);
+    const targetKey = extractTargetKeyFromIndexerStateKey(key);
+    const userKey = extractUserKeyFromIndexerStateKey(key);
     const userActiveTargets = activeTargetKeysByUser[userKey] || new Set();
     if (targetKey && !userActiveTargets.has(targetKey)) {
       delete nextEntries[key];
@@ -391,7 +391,7 @@ function pruneTrackerStateEntries(entries, activeTargetKeysByUser, now) {
   return { nextEntries, expiredCount, removedTargetCount };
 }
 
-function pruneTrackerResultsEntries(resultsEntries, activeTargetKeys) {
+function pruneIndexerResultsEntries(resultsEntries, activeTargetKeys) {
   const nextResults = { ...resultsEntries };
   let removedTargetCount = 0;
 
@@ -412,7 +412,7 @@ function pruneTrackerResultsEntries(resultsEntries, activeTargetKeys) {
   return { nextResults, removedTargetCount };
 }
 
-function upsertTrackerResultsForTarget(userResults, target, actionableItems, now) {
+function upsertIndexerResultsForTarget(userResults, target, actionableItems, now) {
   const targetKey = String(target?.key || "").trim();
   if (!targetKey || !Array.isArray(actionableItems) || actionableItems.length === 0) {
     return userResults;
@@ -424,18 +424,18 @@ function upsertTrackerResultsForTarget(userResults, target, actionableItems, now
   const byStateKey = new Map(
     existingItems
       .filter((item) => item && typeof item === "object")
-      .map((item) => [String(item.trackerStateKey || ""), item])
+      .map((item) => [String(item.indexerStateKey || ""), item])
   );
 
   for (const actionable of actionableItems) {
-    const trackerStateKey = String(actionable?.trackerStateKey || "").trim();
+    const indexerStateKey = String(actionable?.indexerStateKey || "").trim();
     const item = actionable?.item;
-    if (!trackerStateKey || !item) {
+    if (!indexerStateKey || !item) {
       continue;
     }
 
-    byStateKey.set(trackerStateKey, {
-      trackerStateKey,
+    byStateKey.set(indexerStateKey, {
+      indexerStateKey,
       title: String(item.title || ""),
       link: String(item.link || ""),
       downloadUrl: String(item.downloadUrl || item.link || ""),
@@ -466,7 +466,7 @@ function upsertTrackerResultsForTarget(userResults, target, actionableItems, now
   return nextUserResults;
 }
 
-async function pollTrackerForWishlist() {
+async function pollIndexerForWishlist() {
   try {
     debugLog("[RSS] Polling cycle started");
     const users = await readUsers();
@@ -475,10 +475,10 @@ async function pollTrackerForWishlist() {
       return;
     }
 
-    const [seen, rejected, trackerResults] = await Promise.all([
-      readTrackerSeen(),
-      readTrackerRejected(),
-      readTrackerResults(),
+    const [seen, rejected, indexerResults] = await Promise.all([
+      readIndexerSeen(),
+      readIndexerRejected(),
+      readIndexerResults(),
     ]);
 
     const targetsByUser = {};
@@ -507,15 +507,15 @@ async function pollTrackerForWishlist() {
       totalTargets,
       seenEntries: Object.keys(seen || {}).length,
       rejectedEntries: Object.keys(rejected || {}).length,
-      resultsUsers: Object.keys(trackerResults || {}).length,
+      resultsUsers: Object.keys(indexerResults || {}).length,
     });
 
     const now = Date.now();
-    const prunedSeen = pruneTrackerStateEntries(seen, activeTargetKeysByUser, now);
-    const prunedRejected = pruneTrackerStateEntries(rejected, activeTargetKeysByUser, now);
+    const prunedSeen = pruneIndexerStateEntries(seen, activeTargetKeysByUser, now);
+    const prunedRejected = pruneIndexerStateEntries(rejected, activeTargetKeysByUser, now);
     const nextSeen = prunedSeen.nextEntries;
     const nextRejected = prunedRejected.nextEntries;
-    const nextTrackerResults = { ...trackerResults };
+    const nextIndexerResults = { ...indexerResults };
 
     if (prunedSeen.expiredCount > 0) {
       debugLog("[RSS] Pruned expired seen entries", { prunedSeenCount: prunedSeen.expiredCount });
@@ -540,18 +540,18 @@ async function pollTrackerForWishlist() {
     }
 
     if (!totalTargets) {
-      const clearedTrackerResults = Object.fromEntries(
-        Object.keys(nextTrackerResults).map((username) => [username, {}])
+      const clearedIndexerResults = Object.fromEntries(
+        Object.keys(nextIndexerResults).map((username) => [username, {}])
       );
       await Promise.all([
-        writeTrackerSeen(nextSeen),
-        writeTrackerRejected(nextRejected),
-        writeTrackerResults(clearedTrackerResults),
+        writeIndexerSeen(nextSeen),
+        writeIndexerRejected(nextRejected),
+        writeIndexerResults(clearedIndexerResults),
       ]);
       debugLog("[RSS] No wishlist targets, skipping cycle", {
         remainingSeenEntries: Object.keys(nextSeen).length,
         remainingRejectedEntries: Object.keys(nextRejected).length,
-        remainingResultsUsers: Object.keys(clearedTrackerResults).length,
+        remainingResultsUsers: Object.keys(clearedIndexerResults).length,
       });
       return;
     }
@@ -575,14 +575,14 @@ async function pollTrackerForWishlist() {
       });
 
       const userResults =
-        nextTrackerResults[userStoreKey] && typeof nextTrackerResults[userStoreKey] === "object"
-          ? nextTrackerResults[userStoreKey]
+        nextIndexerResults[userStoreKey] && typeof nextIndexerResults[userStoreKey] === "object"
+          ? nextIndexerResults[userStoreKey]
           : {};
-      const prunedUserResults = pruneTrackerResultsEntries(userResults, activeTargetKeys);
-      nextTrackerResults[userStoreKey] = prunedUserResults.nextResults;
+      const prunedUserResults = pruneIndexerResultsEntries(userResults, activeTargetKeys);
+      nextIndexerResults[userStoreKey] = prunedUserResults.nextResults;
 
       if (prunedUserResults.removedTargetCount > 0) {
-        debugLog("[RSS] Pruned stale tracker result targets", {
+        debugLog("[RSS] Pruned stale indexer result targets", {
           username,
           removedTargetCount: prunedUserResults.removedTargetCount,
         });
@@ -635,7 +635,7 @@ async function pollTrackerForWishlist() {
           sourceTitle: result.sourceTitle || null,
         });
 
-        const matchedItems = result.items.filter((item) => doesTrackerItemMatchTarget(item, target, candidates));
+        const matchedItems = result.items.filter((item) => doesIndexerItemMatchTarget(item, target, candidates));
         if (!matchedItems.length) {
           debugLog("[RSS] Items found but no target-specific match", {
             username,
@@ -658,12 +658,12 @@ async function pollTrackerForWishlist() {
             continue;
           }
 
-          const candidateStateKey = buildTrackerStateKey(userStoreKey, target.key, uniqueItemRef);
+          const candidateStateKey = buildIndexerStateKey(userStoreKey, target.key, uniqueItemRef);
           if (nextRejected[candidateStateKey]) {
             debugLog("[RSS] Match skipped: rejected", {
               username,
               targetKey: target.key,
-              trackerStateKey: candidateStateKey,
+              indexerStateKey: candidateStateKey,
             });
             continue;
           }
@@ -678,7 +678,7 @@ async function pollTrackerForWishlist() {
 
           actionableItems.push({
             item: candidateItem,
-            trackerStateKey: candidateStateKey,
+            indexerStateKey: candidateStateKey,
           });
         }
 
@@ -692,7 +692,7 @@ async function pollTrackerForWishlist() {
         }
 
         const primaryMatch = actionableItems[0].item;
-        const primaryTrackerStateKey = actionableItems[0].trackerStateKey;
+        const primaryIndexerStateKey = actionableItems[0].indexerStateKey;
         const releasesPreview = actionableItems
           .slice(0, 6)
           .map(({ item }) => String(item.title || "").trim())
@@ -717,8 +717,8 @@ async function pollTrackerForWishlist() {
 
         const translator = getTranslator(undefined, user);
 
-        nextTrackerResults[userStoreKey] = upsertTrackerResultsForTarget(
-          nextTrackerResults[userStoreKey],
+        nextIndexerResults[userStoreKey] = upsertIndexerResultsForTarget(
+          nextIndexerResults[userStoreKey],
           target,
           actionableItems,
           now
@@ -726,29 +726,29 @@ async function pollTrackerForWishlist() {
 
         await notifyUser(user, {
           type: "search",
-          title: translator(getTrackerNotificationTitleKey(target.type)),
-          message: translator("notifications.trackerReleaseMessage", {
+          title: translator(getIndexerNotificationTitleKey(target.type)),
+          message: translator("notifications.indexerReleaseMessage", {
             title: target.label || target.title,
             count: actionableItems.length,
           }),
           data: {
-            source: "tracker-rss",
+            source: "indexer-rss",
             mediaType: target.type,
             mediaId: target.id,
             targetKey: target.key,
-            trackerStateKey: primaryTrackerStateKey,
-            trackerItem: {
+            indexerStateKey: primaryIndexerStateKey,
+            indexerItem: {
               title: primaryMatch.title,
               downloadUrl: primaryMatch.downloadUrl || primaryMatch.link || "",
               pubDate: primaryMatch.pubDate || null,
             },
-            trackerItems: actionableItems.map(({ item, trackerStateKey }) => ({
+            indexerItems: actionableItems.map(({ item, indexerStateKey }) => ({
               title: item.title,
               downloadUrl: item.downloadUrl || item.link || "",
               pubDate: item.pubDate || null,
-              trackerStateKey,
+              indexerStateKey,
             })),
-            trackerItemsPreview: releasesPreview,
+            indexerItemsPreview: releasesPreview,
             details,
           },
         });
@@ -761,7 +761,7 @@ async function pollTrackerForWishlist() {
         });
 
         for (const actionable of actionableItems) {
-          nextSeen[actionable.trackerStateKey] = now;
+          nextSeen[actionable.indexerStateKey] = now;
         }
       }
 
@@ -769,32 +769,32 @@ async function pollTrackerForWishlist() {
     }
 
     await Promise.all([
-      writeTrackerSeen(nextSeen),
-      writeTrackerRejected(nextRejected),
-      writeTrackerResults(nextTrackerResults),
+      writeIndexerSeen(nextSeen),
+      writeIndexerRejected(nextRejected),
+      writeIndexerResults(nextIndexerResults),
     ]);
     debugLog("[RSS] Polling cycle finished", {
       seenEntries: Object.keys(nextSeen).length,
       rejectedEntries: Object.keys(nextRejected).length,
-      resultsUsers: Object.keys(nextTrackerResults).length,
+      resultsUsers: Object.keys(nextIndexerResults).length,
     });
   } catch (error) {
-    debugLog("Tracker wishlist polling failed:", error);
+    debugLog("Indexer wishlist polling failed:", error);
   }
 }
 
-function startTrackerWishlistPolling() {
-  if (trackerPollerStarted) {
+function startIndexerWishlistPolling() {
+  if (indexerPollerStarted) {
     debugLog("[RSS] Poller already started, skip");
     return;
   }
 
-  trackerPollerStarted = true;
-  debugLog("[RSS] Poller started", { trackerPollIntervalMs });
-  void pollTrackerForWishlist();
+  indexerPollerStarted = true;
+  debugLog("[RSS] Poller started", { indexerPollIntervalMs });
+  void pollIndexerForWishlist();
   setInterval(() => {
-    void pollTrackerForWishlist();
-  }, trackerPollIntervalMs);
+    void pollIndexerForWishlist();
+  }, indexerPollIntervalMs);
 }
 
 // Charger les notifications
@@ -915,8 +915,8 @@ export async function deleteNotification(userId, notificationId) {
   return false;
 }
 
-export async function getTrackerResultsForUser(userId) {
-  const allResults = await readTrackerResults();
+export async function getIndexerResultsForUser(userId) {
+  const allResults = await readIndexerResults();
   const userKey = userStoreKey(userId);
 
   const userResults = allResults[userKey] && typeof allResults[userKey] === "object"
@@ -932,14 +932,19 @@ export async function getTrackerResultsForUser(userId) {
       title: String(entry.title || ""),
       label: String(entry.label || entry.title || ""),
       updatedAt: String(entry.updatedAt || ""),
-      items: Array.isArray(entry.items) ? entry.items : [],
+      items: Array.isArray(entry.items)
+        ? entry.items.map((item) => ({
+            ...item,
+            indexerStateKey: String(item?.indexerStateKey || ""),
+          }))
+        : [],
     }))
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }
 
-async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode) {
+async function mutateIndexerResultItem(userId, targetKey, indexerStateKey, mode) {
   const normalizedTargetKey = String(targetKey || "").trim();
-  const normalizedStateKey = String(trackerStateKey || "").trim();
+  const normalizedStateKey = String(indexerStateKey || "").trim();
   if (!normalizedTargetKey || !normalizedStateKey) {
     return { ok: false, reason: "invalid-input" };
   }
@@ -947,8 +952,8 @@ async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode)
   const normalizedUserKey = userStoreKey(userId);
 
   const [allResults, rejected] = await Promise.all([
-    readTrackerResults(),
-    readTrackerRejected(),
+    readIndexerResults(),
+    readIndexerRejected(),
   ]);
 
   const userResults = allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
@@ -962,7 +967,7 @@ async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode)
   }
 
   const index = bucket.items.findIndex(
-    (item) => String(item?.trackerStateKey || "").trim() === normalizedStateKey
+    (item) => String(item?.indexerStateKey || "").trim() === normalizedStateKey
   );
   if (index < 0) {
     return { ok: false, reason: "not-found" };
@@ -982,19 +987,19 @@ async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode)
   }
 
   await Promise.all([
-    writeTrackerResults(allResults),
-    mode === "reject" ? writeTrackerRejected(rejected) : Promise.resolve(),
+    writeIndexerResults(allResults),
+    mode === "reject" ? writeIndexerRejected(rejected) : Promise.resolve(),
   ]);
 
   return { ok: true };
 }
 
-export async function rejectTrackerResultItem(userId, targetKey, trackerStateKey, options = {}) {
-  return mutateTrackerResultItem(userId, targetKey, trackerStateKey, "reject");
+export async function rejectIndexerResultItem(userId, targetKey, indexerStateKey, options = {}) {
+  return mutateIndexerResultItem(userId, targetKey, indexerStateKey, "reject");
 }
 
-export async function validateTrackerResultItem(userId, targetKey, trackerStateKey, options = {}) {
-  return mutateTrackerResultItem(userId, targetKey, trackerStateKey, "validate");
+export async function validateIndexerResultItem(userId, targetKey, indexerStateKey, options = {}) {
+  return mutateIndexerResultItem(userId, targetKey, indexerStateKey, "validate");
 }
 
 // Supprimer toutes les notifications
@@ -1070,7 +1075,7 @@ function getColorByType(type) {
 
 // Enregistrer les routes
 export function registerNotificationRoutes(app) {
-  startTrackerWishlistPolling();
+  startIndexerWishlistPolling();
 
   // Notification de test (interne + Discord si configuré)
   app.post("/api/notifications/test", withAuth(async (req, res, auth) => {
@@ -1121,23 +1126,24 @@ export function registerNotificationRoutes(app) {
     }
   }));
 
-  app.get("/api/tracker-results", withAuth(async (req, res, auth) => {
+  const getIndexerResultsHandler = withAuth(async (req, res, auth) => {
     try {
-      const targets = await getTrackerResultsForUser(resolveNotificationUserKey(auth.user));
+      const targets = await getIndexerResultsForUser(resolveNotificationUserKey(auth.user));
       res.json({ ok: true, targets });
     } catch (error) {
-      console.error("Error getting tracker results:", error);
+      console.error("Error getting indexer results:", error);
       res.status(500).json({ error: error.message });
     }
-  }));
+  });
+  app.get("/api/indexer-results", getIndexerResultsHandler);
 
-  app.post("/api/tracker-results/reject", withAuth(async (req, res, auth) => {
+  const rejectIndexerResultHandler = withAuth(async (req, res, auth) => {
     try {
       const t = getTranslator(req, auth.user);
-      const result = await rejectTrackerResultItem(
+      const result = await rejectIndexerResultItem(
         resolveNotificationUserKey(auth.user),
         req.body?.targetKey,
-        req.body?.trackerStateKey
+        req.body?.indexerStateKey
       );
       if (!result.ok) {
         if (result.reason === "not-found") {
@@ -1148,28 +1154,30 @@ export function registerNotificationRoutes(app) {
 
       res.json({ ok: true, message: t("notifications.rejected") });
     } catch (error) {
-      console.error("Error rejecting tracker result:", error);
+      console.error("Error rejecting indexer result:", error);
       res.status(500).json({ error: error.message });
     }
-  }));
+  });
+  app.post("/api/indexer-results/reject", rejectIndexerResultHandler);
 
-  app.post("/api/tracker-results/validate", withAuth(async (req, res, auth) => {
+  const validateIndexerResultHandler = withAuth(async (req, res, auth) => {
     try {
-      const result = await validateTrackerResultItem(
+      const result = await validateIndexerResultItem(
         resolveNotificationUserKey(auth.user),
         req.body?.targetKey,
-        req.body?.trackerStateKey
+        req.body?.indexerStateKey
       );
       if (!result.ok) {
-        return res.status(404).json({ error: "Tracker result not found" });
+        return res.status(404).json({ error: "Indexer result not found" });
       }
 
       res.json({ ok: true });
     } catch (error) {
-      console.error("Error validating tracker result:", error);
+      console.error("Error validating indexer result:", error);
       res.status(500).json({ error: error.message });
     }
-  }));
+  });
+  app.post("/api/indexer-results/validate", validateIndexerResultHandler);
 
   // Marquer comme lue
   app.post("/api/notifications/:id/read", withAuth(async (req, res, auth) => {
