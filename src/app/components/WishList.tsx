@@ -550,6 +550,14 @@ export function WishList() {
                         navigate(`/movie/${movie.id}`);
                       }
                     }}
+                    tabIndex={isSelectionMode ? -1 : 0}
+                    role="button"
+                    onKeyDown={(e) => {
+                      if (!isSelectionMode && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault();
+                        navigate(`/movie/${movie.id}`);
+                      }
+                    }}
                   >
                     <WishListCard
                       poster={movie.poster}
@@ -664,6 +672,14 @@ export function WishList() {
                   className={isSeriesSelectionMode ? undefined : "cursor-pointer hover:bg-white/10 hover:scale-[1.01] transition-all rounded-lg"}
                   onClick={() => {
                     if (!isSeriesSelectionMode) {
+                      navigate(`/series/${group.seriesId}`);
+                    }
+                  }}
+                  tabIndex={isSeriesSelectionMode ? -1 : 0}
+                  role="button"
+                  onKeyDown={(e) => {
+                    if (!isSeriesSelectionMode && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
                       navigate(`/series/${group.seriesId}`);
                     }
                   }}
