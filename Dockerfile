@@ -32,13 +32,11 @@ RUN npm install -g npm@latest
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY server ./server
-COPY --from=build /app/dist ./dist
+COPY --chown=node:node server ./server
+COPY --chown=node:node --from=build /app/dist ./dist
 
-# Create non-root user for security.
-RUN adduser -D -u 1000 app
-RUN chown -R app:app /app
-USER app
+# Use the non-root user that already exists in the official Node image.
+USER node
 
 EXPOSE 4000
 CMD ["node", "server/index.js"]
