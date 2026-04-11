@@ -1,3 +1,11 @@
+// Compte le nombre de notifications non lues pour un utilisateur
+export async function getUnreadCount(userId) {
+  const userKey = userStoreKey(userId);
+  if (!userKey) return 0;
+  const notifications = await loadNotifications();
+  const userNotifications = Array.isArray(notifications[userKey]) ? notifications[userKey] : [];
+  return userNotifications.filter((n) => !n.isRead).length;
+}
 // Envoi d'une notification à un webhook Discord
 export async function sendDiscordNotification(webhookUrl, notification) {
   if (!webhookUrl || typeof webhookUrl !== "string") return null;
