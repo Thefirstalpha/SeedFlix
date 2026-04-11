@@ -29,27 +29,18 @@ function isDownloadingTorrent(torrent) {
   return !Boolean(torrent?.isFinished) && [3, 4].includes(Number(torrent?.status));
 }
 
-async function ensureAppTorrentsStore() {
+async function ensureJsonObjectStore(filePath) {
   await fs.mkdir(dataDir, { recursive: true });
   try {
-    await fs.access(appTorrentsFilePath);
+    await fs.access(filePath);
   } catch {
-    await fs.writeFile(appTorrentsFilePath, "{}", "utf-8");
+    await fs.writeFile(filePath, "{}", "utf-8");
   }
 }
 
-async function ensureCompletedTorrentStore() {
-  await fs.mkdir(dataDir, { recursive: true });
-  try {
-    await fs.access(torrentCompletedStoreFilePath);
-  } catch {
-    await fs.writeFile(torrentCompletedStoreFilePath, "{}", "utf-8");
-  }
-}
-
-async function readAppTorrentsStore() {
-  await ensureAppTorrentsStore();
-  const content = await fs.readFile(appTorrentsFilePath, "utf-8");
+async function readJsonObjectStore(filePath) {
+  await ensureJsonObjectStore(filePath);
+  const content = await fs.readFile(filePath, "utf-8");
   try {
     const parsed = JSON.parse(content);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -61,9 +52,25 @@ async function readAppTorrentsStore() {
   }
 }
 
+async function writeJsonObjectStore(filePath, data) {
+  await ensureJsonObjectStore(filePath);
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
+}
+
+async function readAppTorrentsStore() {
+  return readJsonObjectStore(appTorrentsFilePath);
+}
+
 async function writeAppTorrentsStore(data) {
-  await ensureAppTorrentsStore();
-  await fs.writeFile(appTorrentsFilePath, JSON.stringify(data, null, 2), "utf-8");
+  await writeJsonObjectStore(appTorrentsFilePath, data);
+}
+
+async function readCompletedTorrentStore() {
+  return readJsonObjectStore(torrentCompletedStoreFilePath);
+}
+
+async function writeCompletedTorrentStore(data) {
+  await writeJsonObjectStore(torrentCompletedStoreFilePath, data);
 }
 
 async function registerAppTorrentForUser(userId, torrent) {
@@ -219,25 +226,6 @@ async function notifyCompletedTorrents(auth, torrents) {
     await writeCompletedTorrentStore(completedStore);
   }
 }
-  async function readCompletedTorrentStore() {
-    await ensureCompletedTorrentStore();
-    const content = await fs.readFile(torrentCompletedStoreFilePath, "utf-8");
-    try {
-      const parsed = JSON.parse(content);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return {};
-      }
-      return parsed;
-    } catch {
-      return {};
-    }
-  }
-
-  async function writeCompletedTorrentStore(data) {
-    await ensureCompletedTorrentStore();
-    await fs.writeFile(torrentCompletedStoreFilePath, JSON.stringify(data, null, 2), "utf-8");
-  }
-
 
 async function postTransmissionRpc(url, headers, sessionId, body) {
   const controller = new AbortController();
@@ -429,15 +417,46 @@ function resolveDownloadDir(auth, mediaType) {
 
 async function createAndSendNotification(userId, notification) {
   try {
-    // Create in-app notification
     await addNotification(userId, notification);
-
-    // Send to Discord if webhook is configured
-    // Note: We don't have auth here, so we can't easily get the webhook
-    // This is a limitation of the current architecture
   } catch (error) {
     debugLog("Failed to create notification:", error);
   }
+}
+
+function readTorrentHash(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+async function unmanageTorrentForUser(userId, hash) {
+  const torrentHash = readTorrentHash(hash);
+  if (!torrentHash) {
+    return false;
+  }
+
+  await removeAppTorrentForUser(userId, torrentHash);
+  return true;
+}
+
+function registerManagedTorrentRemovalRoute(app, path, successMessageKey, errorMessageKey) {
+  app.post(path, withAuth(async (req, res, auth) => {
+    try {
+      const t = getTranslator(req, auth.user);
+
+      const removed = await unmanageTorrentForUser(auth.user.id, req.body?.hash);
+      if (!removed) {
+        res.status(400).json({ error: t("transmission.invalidHash") });
+        return;
+      }
+
+      res.json({ ok: true, message: t(successMessageKey) });
+    } catch (error) {
+      const t = getTranslator(req);
+      debugLog(`${path} torrent failed:`, error);
+      res.status(500).json({
+        error: t(errorMessageKey),
+      });
+    }
+  }));
 }
 
 export function registerTransmissionRoutes(app) {
@@ -828,49 +847,16 @@ export function registerTransmissionRoutes(app) {
     }
   }));
 
-  app.post("/api/torrent/clean", withAuth(async (req, res, auth) => {
-    try {
-      const t = getTranslator(req, auth.user);
-
-      const torrentHash = String(req.body?.hash || "").trim().toLowerCase();
-      if (!torrentHash) {
-        res.status(400).json({ error: t("transmission.invalidHash") });
-        return;
-      }
-
-      // Remove torrent from app store
-      await removeAppTorrentForUser(auth.user.id, torrentHash);
-
-      res.json({ ok: true, message: t("transmission.cleaned") });
-    } catch (error) {
-      const t = getTranslator(req);
-      debugLog("Clean torrent failed:", error);
-      res.status(500).json({
-        error: t("transmission.cleanFailed"),
-      });
-    }
-  }));
-
-  app.post("/api/torrent/unmanage", withAuth(async (req, res, auth) => {
-    try {
-      const t = getTranslator(req, auth.user);
-
-      const torrentHash = String(req.body?.hash || "").trim().toLowerCase();
-      if (!torrentHash) {
-        res.status(400).json({ error: t("transmission.invalidHash") });
-        return;
-      }
-
-      // Remove torrent from app store
-      await removeAppTorrentForUser(auth.user.id, torrentHash);
-
-      res.json({ ok: true, message: t("transmission.unmanaged") });
-    } catch (error) {
-      const t = getTranslator(req);
-      debugLog("Unmanage torrent failed:", error);
-      res.status(500).json({
-        error: t("transmission.unmanageFailed"),
-      });
-    }
-  }));
+  registerManagedTorrentRemovalRoute(
+    app,
+    "/api/torrent/clean",
+    "transmission.cleaned",
+    "transmission.cleanFailed"
+  );
+  registerManagedTorrentRemovalRoute(
+    app,
+    "/api/torrent/unmanage",
+    "transmission.unmanaged",
+    "transmission.unmanageFailed"
+  );
 }

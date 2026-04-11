@@ -27,64 +27,61 @@ async function ensureJsonStore(filePath, fallback) {
   }
 }
 
-async function readUsers() {
-  await ensureJsonStore(usersFilePath, []);
-  const content = await fs.readFile(usersFilePath, "utf-8");
+async function readJsonArrayStore(filePath, fallback = []) {
+  await ensureJsonStore(filePath, fallback);
+  const content = await fs.readFile(filePath, "utf-8");
 
   try {
     const parsed = JSON.parse(content);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed : fallback;
   } catch {
-    return [];
+    return fallback;
   }
+}
+
+async function readJsonObjectStore(filePath) {
+  await ensureJsonStore(filePath, {});
+  const content = await fs.readFile(filePath, "utf-8");
+
+  try {
+    const parsed = JSON.parse(content);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeJsonStore(filePath, fallback, value) {
+  await ensureJsonStore(filePath, fallback);
+  await fs.writeFile(filePath, JSON.stringify(value, null, 2), "utf-8");
+}
+
+async function readUsers() {
+  return readJsonArrayStore(usersFilePath, []);
 }
 
 async function readTrackerSeen() {
-  await ensureJsonStore(trackerSeenFilePath, {});
-  const content = await fs.readFile(trackerSeenFilePath, "utf-8");
-  try {
-    const parsed = JSON.parse(content);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
+  return readJsonObjectStore(trackerSeenFilePath);
 }
 
 async function writeTrackerSeen(entries) {
-  await ensureJsonStore(trackerSeenFilePath, {});
-  await fs.writeFile(trackerSeenFilePath, JSON.stringify(entries, null, 2), "utf-8");
+  await writeJsonStore(trackerSeenFilePath, {}, entries);
 }
 
 async function readTrackerRejected() {
-  await ensureJsonStore(trackerRejectedFilePath, {});
-  const content = await fs.readFile(trackerRejectedFilePath, "utf-8");
-  try {
-    const parsed = JSON.parse(content);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
+  return readJsonObjectStore(trackerRejectedFilePath);
 }
 
 async function writeTrackerRejected(entries) {
-  await ensureJsonStore(trackerRejectedFilePath, {});
-  await fs.writeFile(trackerRejectedFilePath, JSON.stringify(entries, null, 2), "utf-8");
+  await writeJsonStore(trackerRejectedFilePath, {}, entries);
 }
 
 async function readTrackerResults() {
-  await ensureJsonStore(trackerResultsFilePath, {});
-  const content = await fs.readFile(trackerResultsFilePath, "utf-8");
-  try {
-    const parsed = JSON.parse(content);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
+  return readJsonObjectStore(trackerResultsFilePath);
 }
 
 async function writeTrackerResults(entries) {
-  await ensureJsonStore(trackerResultsFilePath, {});
-  await fs.writeFile(trackerResultsFilePath, JSON.stringify(entries, null, 2), "utf-8");
+  await writeJsonStore(trackerResultsFilePath, {}, entries);
 }
 
 function normalizeMatchText(value) {
@@ -132,12 +129,7 @@ function userStoreKey(userId) {
 }
 
 function resolveNotificationUserKey(user) {
-  const byId = userStoreKey(user?.id);
-  if (byId) {
-    return byId;
-  }
-
-  return userStoreKey(user?.username);
+  return userStoreKey(user?.id);
 }
 
 function extractTargetKeyFromTrackerStateKey(stateKey) {
@@ -894,20 +886,10 @@ export async function addNotification(userId, notification) {
 export async function getNotifications(userId, options = {}) {
   const notifications = await loadNotifications();
   const userKey = userStoreKey(userId);
-  const legacyKey = userStoreKey(options.legacyUserKey);
 
   let userNotifs = [];
   if (Array.isArray(notifications[userKey])) {
     userNotifs = [...notifications[userKey]];
-  }
-  if (legacyKey && legacyKey !== userKey && Array.isArray(notifications[legacyKey])) {
-    userNotifs = [...userNotifs, ...notifications[legacyKey]];
-
-    // One-shot migration from legacy username bucket to user.id bucket.
-    const dedupById = new Map(userNotifs.map((item) => [String(item?.id || ""), item]));
-    notifications[userKey] = Array.from(dedupById.values());
-    delete notifications[legacyKey];
-    await saveNotifications(notifications);
   }
 
   if (options.unreadOnly) {
@@ -969,22 +951,13 @@ export async function deleteNotification(userId, notificationId) {
   return false;
 }
 
-export async function getTrackerResultsForUser(userId, options = {}) {
+export async function getTrackerResultsForUser(userId) {
   const allResults = await readTrackerResults();
   const userKey = userStoreKey(userId);
-  const legacyKey = userStoreKey(options.legacyUserKey);
 
-  const userResultsById = allResults[userKey] && typeof allResults[userKey] === "object"
+  const userResults = allResults[userKey] && typeof allResults[userKey] === "object"
     ? allResults[userKey]
     : {};
-  const userResultsLegacy =
-    legacyKey && legacyKey !== userKey && allResults[legacyKey] && typeof allResults[legacyKey] === "object"
-      ? allResults[legacyKey]
-      : {};
-  const userResults = {
-    ...userResultsLegacy,
-    ...userResultsById,
-  };
 
   return Object.values(userResults)
     .filter((entry) => entry && typeof entry === "object")
@@ -1000,7 +973,7 @@ export async function getTrackerResultsForUser(userId, options = {}) {
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }
 
-async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode, options = {}) {
+async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode) {
   const normalizedTargetKey = String(targetKey || "").trim();
   const normalizedStateKey = String(trackerStateKey || "").trim();
   if (!normalizedTargetKey || !normalizedStateKey) {
@@ -1008,22 +981,14 @@ async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode,
   }
 
   const normalizedUserKey = userStoreKey(userId);
-  const legacyUserKey = userStoreKey(options.legacyUserKey);
 
   const [allResults, rejected] = await Promise.all([
     readTrackerResults(),
     readTrackerRejected(),
   ]);
 
-  const currentBucketKey =
-    allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
-      ? normalizedUserKey
-      : legacyUserKey && allResults[legacyUserKey] && typeof allResults[legacyUserKey] === "object"
-        ? legacyUserKey
-        : normalizedUserKey;
-
-  const userResults = allResults[currentBucketKey] && typeof allResults[currentBucketKey] === "object"
-    ? { ...allResults[currentBucketKey] }
+  const userResults = allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
+    ? { ...allResults[normalizedUserKey] }
     : {};
   const bucket = userResults[normalizedTargetKey] && typeof userResults[normalizedTargetKey] === "object"
     ? { ...userResults[normalizedTargetKey] }
@@ -1047,9 +1012,6 @@ async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode,
     userResults[normalizedTargetKey] = bucket;
   }
   allResults[normalizedUserKey] = userResults;
-  if (legacyUserKey && legacyUserKey !== normalizedUserKey) {
-    delete allResults[legacyUserKey];
-  }
 
   if (mode === "reject") {
     rejected[normalizedStateKey] = Date.now();
@@ -1064,11 +1026,11 @@ async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode,
 }
 
 export async function rejectTrackerResultItem(userId, targetKey, trackerStateKey, options = {}) {
-  return mutateTrackerResultItem(userId, targetKey, trackerStateKey, "reject", options);
+  return mutateTrackerResultItem(userId, targetKey, trackerStateKey, "reject");
 }
 
 export async function validateTrackerResultItem(userId, targetKey, trackerStateKey, options = {}) {
-  return mutateTrackerResultItem(userId, targetKey, trackerStateKey, "validate", options);
+  return mutateTrackerResultItem(userId, targetKey, trackerStateKey, "validate");
 }
 
 // Supprimer toutes les notifications
@@ -1185,7 +1147,6 @@ export function registerNotificationRoutes(app) {
       const notifications = await getNotifications(userId, {
         limit,
         unreadOnly,
-        legacyUserKey: auth.user.username,
       });
       const unreadCount = await getUnreadCount(userId);
 
@@ -1198,9 +1159,7 @@ export function registerNotificationRoutes(app) {
 
   app.get("/api/tracker-results", withAuth(async (req, res, auth) => {
     try {
-      const targets = await getTrackerResultsForUser(resolveNotificationUserKey(auth.user), {
-        legacyUserKey: auth.user.username,
-      });
+      const targets = await getTrackerResultsForUser(resolveNotificationUserKey(auth.user));
       res.json({ ok: true, targets });
     } catch (error) {
       console.error("Error getting tracker results:", error);
@@ -1214,8 +1173,7 @@ export function registerNotificationRoutes(app) {
       const result = await rejectTrackerResultItem(
         resolveNotificationUserKey(auth.user),
         req.body?.targetKey,
-        req.body?.trackerStateKey,
-        { legacyUserKey: auth.user.username }
+        req.body?.trackerStateKey
       );
       if (!result.ok) {
         if (result.reason === "not-found") {
@@ -1236,8 +1194,7 @@ export function registerNotificationRoutes(app) {
       const result = await validateTrackerResultItem(
         resolveNotificationUserKey(auth.user),
         req.body?.targetKey,
-        req.body?.trackerStateKey,
-        { legacyUserKey: auth.user.username }
+        req.body?.trackerStateKey
       );
       if (!result.ok) {
         return res.status(404).json({ error: "Tracker result not found" });

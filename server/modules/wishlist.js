@@ -28,14 +28,6 @@ async function readJsonArrayStore(filePath) {
 
   try {
     const parsed = JSON.parse(content);
-    if (Array.isArray(parsed)) {
-      const migrated = {
-        admin: parsed,
-      };
-      await fs.writeFile(filePath, JSON.stringify(migrated, null, 2), "utf-8");
-      return migrated;
-    }
-
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};

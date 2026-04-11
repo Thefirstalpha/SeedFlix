@@ -95,20 +95,6 @@ function defaultUserRecord() {
   };
 }
 
-function isLegacyDefaultAdmin(user) {
-  return (
-    user?.username === "admin" &&
-    verifyPassword("admin123", user.passwordSalt, user.passwordHash)
-  );
-}
-
-function isCurrentDefaultAdmin(user) {
-  return (
-    user?.username === "admin" &&
-    verifyPassword("admin", user.passwordSalt, user.passwordHash)
-  );
-}
-
 async function ensureJsonStore(filePath, fallback) {
   await fs.mkdir(dataDir, { recursive: true });
   try {
@@ -168,64 +154,9 @@ async function readDefaultSettings() {
   }
 }
 
-async function normalizeUsersStore() {
-  const users = await readUsers();
-  let hasChanges = false;
-
-  const nextUsers = users.map((user) => {
-    if (!user || typeof user !== "object") {
-      return user;
-    }
-
-    if (isLegacyDefaultAdmin(user)) {
-      const { salt, hash } = hashPassword("admin");
-      hasChanges = true;
-      return {
-        ...user,
-        passwordSalt: salt,
-        passwordHash: hash,
-        mustChangePassword: true,
-      };
-    }
-
-    if (isCurrentDefaultAdmin(user) && user.mustChangePassword !== true) {
-      hasChanges = true;
-      return {
-        ...user,
-        mustChangePassword: true,
-      };
-    }
-
-    if (user.mustChangePassword === undefined) {
-      hasChanges = true;
-      return {
-        ...user,
-        mustChangePassword: false,
-      };
-    }
-
-    if (user.firstLoginPending === undefined) {
-      hasChanges = true;
-      return {
-        ...user,
-        firstLoginPending: user.username === "admin" ? false : Boolean(user.mustChangePassword),
-      };
-    }
-
-    return user;
-  });
-
-  if (hasChanges) {
-    await writeUsers(nextUsers);
-    return nextUsers;
-  }
-
-  return users;
-}
-
 async function ensureUsersStore() {
   await ensureJsonStore(usersFilePath, [defaultUserRecord()]);
-  const users = await normalizeUsersStore();
+  const users = await readUsers();
 
   if (users.length === 0) {
     await writeUsers([defaultUserRecord()]);
@@ -824,17 +755,6 @@ async function readGlobalConfig() {
     }
   } catch {
     parsed = defaultGlobalConfig();
-  }
-
-  // Migration one-shot depuis l'ancienne cle admin stockee en settings utilisateur.
-  if (!parsed.tmdbApiKey) {
-    const users = await readUsers();
-    const admin = users.find((u) => u.username === "admin");
-    const legacyKey = String(admin?.settings?.apiKeys?.tmdb || "").trim();
-    if (legacyKey) {
-      parsed.tmdbApiKey = legacyKey;
-      await writeGlobalConfig(parsed);
-    }
   }
 
   return parsed;
