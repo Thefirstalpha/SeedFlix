@@ -1,3 +1,35 @@
+// Envoi d'une notification à un webhook Discord
+export async function sendDiscordNotification(webhookUrl, notification) {
+  if (!webhookUrl || typeof webhookUrl !== "string") return null;
+  try {
+    const embed = {
+      title: notification.title || "",
+      description: notification.message || "",
+      color: notification.type === "error" ? 0xef4444 : notification.type === "success" ? 0x10b981 : notification.type === "warning" ? 0xf59e0b : 0x3b82f6,
+      timestamp: new Date().toISOString(),
+      fields: [],
+    };
+    if (notification.data && notification.data.details && typeof notification.data.details === "object") {
+      Object.entries(notification.data.details).forEach(([key, value]) => {
+        embed.fields.push({
+          name: key,
+          value: String(value),
+          inline: true,
+        });
+      });
+    }
+    const payload = { embeds: [embed] };
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return response.ok ? { success: true } : null;
+  } catch (error) {
+    console.error("Error sending Discord notification:", error.message);
+    return null;
+  }
+}
 import { withAuth } from "./auth.js";
 import { readSeriesWishlist, readWishlist } from "./wishlist.js";
 import { searchTorznabForQuery } from "./torznab.js";
@@ -932,54 +964,6 @@ export async function getIndexerResultsForUser(userId) {
     .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }
 
-async function mutateIndexerResultItem(userId, targetKey, indexerStateKey, mode) {
-  const normalizedTargetKey = String(targetKey || "").trim();
-  const normalizedStateKey = String(indexerStateKey || "").trim();
-  if (!normalizedTargetKey || !normalizedStateKey) {
-    return { ok: false, reason: "invalid-input" };
-  }
-
-  const normalizedUserKey = userStoreKey(userId);
-
-  return runInTransaction((tx) => {
-    const allResults = tx.readJson(indexerResultsFilePath, {});
-    const rejected = tx.readJson(indexerRejectedFilePath, {});
-
-    const userResults = allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
-      ? { ...allResults[normalizedUserKey] }
-      : {};
-    const bucket = userResults[normalizedTargetKey] && typeof userResults[normalizedTargetKey] === "object"
-      ? { ...userResults[normalizedTargetKey] }
-      : null;
-    if (!bucket || !Array.isArray(bucket.items)) {
-      return { ok: false, reason: "not-found" };
-    }
-
-    const index = bucket.items.findIndex(
-      (item) => String(item?.indexerStateKey || "").trim() === normalizedStateKey
-    );
-    if (index < 0) {
-      return { ok: false, reason: "not-found" };
-    }
-
-    bucket.items.splice(index, 1);
-    if (bucket.items.length === 0) {
-      delete userResults[normalizedTargetKey];
-    } else {
-      bucket.updatedAt = new Date().toISOString();
-      userResults[normalizedTargetKey] = bucket;
-    }
-    allResults[normalizedUserKey] = userResults;
-
-    if (mode === "reject") {
-      rejected[normalizedStateKey] = Date.now();
-      tx.writeJson(indexerRejectedFilePath, rejected);
-    }
-    tx.writeJson(indexerResultsFilePath, allResults);
-
-    return { ok: true };
-  });
-}
 
 
 // Fonction utilitaire commune pour modification du bucket
@@ -1075,28 +1059,6 @@ async function mutateIndexerResultItemsBatch(userId, targetKey, indexerStateKeys
       mode,
     });
   });
-}
-      Object.entries(notification.data.details).forEach(([key, value]) => {
-        embed.fields.push({
-          name: key,
-          value: String(value),
-          inline: true,
-        });
-      });
-    }
-
-    const payload = { embeds: [embed] };
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    return response.ok ? { success: true } : null;
-  } catch (error) {
-    console.error("Error sending Discord notification:", error.message);
-    return null;
-  }
 }
 
 // Obtenir la couleur selon le type

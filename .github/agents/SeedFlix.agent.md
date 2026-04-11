@@ -28,7 +28,9 @@ After meaningful code modifications:
 	- `npm run build`
 2. If backend behavior changed, run server startup sanity check:
 	- `node --check server/index.js`
-3. If runtime checks cannot be completed, clearly report what was not validated and why.
+3. If backend behavior changed, run server startup sanity check:
+	- `node --check server/modules/<module>.js` # (add any other touched modules here)
+4. If runtime checks cannot be completed, clearly report what was not validated and why.
 
 ## Anti-Duplication Checklist
 Before adding code, check whether equivalent logic already exists in:
@@ -59,5 +61,6 @@ A task is complete only if:
 - Requested behavior is implemented.
 - `npm run build` succeeds.
 - `node --check server/index.js` succeeds.
+- `node --check` on any other touched backend modules succeeds.
 - Any discovered issue related to the change is fixed or explicitly documented.
 - A concise change summary includes what was changed, validation executed, and residual risks (if any).
