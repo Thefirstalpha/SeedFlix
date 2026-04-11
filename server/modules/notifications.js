@@ -981,6 +981,74 @@ async function mutateIndexerResultItem(userId, targetKey, indexerStateKey, mode)
   });
 }
 
+
+// Fonction utilitaire commune pour modification du bucket
+function updateIndexerResultBucket({
+  tx,
+  allResults,
+  rejected,
+  normalizedUserKey,
+  normalizedTargetKey,
+  stateKeysToRemove,
+  mode,
+}) {
+  const userResults = allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
+    ? { ...allResults[normalizedUserKey] }
+    : {};
+  const bucket = userResults[normalizedTargetKey] && typeof userResults[normalizedTargetKey] === "object"
+    ? { ...userResults[normalizedTargetKey] }
+    : null;
+  if (!bucket || !Array.isArray(bucket.items)) {
+    return { ok: false, reason: "not-found" };
+  }
+  const removableStateKeys = new Set(stateKeysToRemove);
+  const originalLength = bucket.items.length;
+  bucket.items = bucket.items.filter(
+    (item) => !removableStateKeys.has(String(item?.indexerStateKey || "").trim())
+  );
+  if (bucket.items.length === originalLength) {
+    return { ok: false, reason: "not-found" };
+  }
+  if (bucket.items.length === 0) {
+    delete userResults[normalizedTargetKey];
+  } else {
+    bucket.updatedAt = new Date().toISOString();
+    userResults[normalizedTargetKey] = bucket;
+  }
+  allResults[normalizedUserKey] = userResults;
+  if (mode === "reject") {
+    const rejectedAt = Date.now();
+    for (const stateKey of removableStateKeys) {
+      rejected[stateKey] = rejectedAt;
+    }
+    tx.writeJson(indexerRejectedFilePath, rejected);
+  }
+  tx.writeJson(indexerResultsFilePath, allResults);
+  return { ok: true };
+}
+
+async function mutateIndexerResultItem(userId, targetKey, indexerStateKey, mode) {
+  const normalizedTargetKey = String(targetKey || "").trim();
+  const normalizedStateKey = String(indexerStateKey || "").trim();
+  if (!normalizedTargetKey || !normalizedStateKey) {
+    return { ok: false, reason: "invalid-input" };
+  }
+  const normalizedUserKey = userStoreKey(userId);
+  return runInTransaction((tx) => {
+    const allResults = tx.readJson(indexerResultsFilePath, {});
+    const rejected = tx.readJson(indexerRejectedFilePath, {});
+    return updateIndexerResultBucket({
+      tx,
+      allResults,
+      rejected,
+      normalizedUserKey,
+      normalizedTargetKey,
+      stateKeysToRemove: [normalizedStateKey],
+      mode,
+    });
+  });
+}
+
 async function mutateIndexerResultItemsBatch(userId, targetKey, indexerStateKeys, mode) {
   const normalizedTargetKey = String(targetKey || "").trim();
   const normalizedStateKeys = Array.from(
@@ -990,108 +1058,24 @@ async function mutateIndexerResultItemsBatch(userId, targetKey, indexerStateKeys
         .filter(Boolean)
     )
   );
-
   if (!normalizedTargetKey || normalizedStateKeys.length === 0) {
     return { ok: false, reason: "invalid-input" };
   }
-
   const normalizedUserKey = userStoreKey(userId);
-
   return runInTransaction((tx) => {
     const allResults = tx.readJson(indexerResultsFilePath, {});
     const rejected = tx.readJson(indexerRejectedFilePath, {});
-
-    const userResults = allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
-      ? { ...allResults[normalizedUserKey] }
-      : {};
-    const bucket = userResults[normalizedTargetKey] && typeof userResults[normalizedTargetKey] === "object"
-      ? { ...userResults[normalizedTargetKey] }
-      : null;
-
-    if (!bucket || !Array.isArray(bucket.items)) {
-      return { ok: false, reason: "not-found" };
-    }
-
-    const removableStateKeys = new Set(normalizedStateKeys);
-    const originalLength = bucket.items.length;
-    bucket.items = bucket.items.filter(
-      (item) => !removableStateKeys.has(String(item?.indexerStateKey || "").trim())
-    );
-
-    if (bucket.items.length === originalLength) {
-      return { ok: false, reason: "not-found" };
-    }
-
-    if (bucket.items.length === 0) {
-      delete userResults[normalizedTargetKey];
-    } else {
-      bucket.updatedAt = new Date().toISOString();
-      userResults[normalizedTargetKey] = bucket;
-    }
-    allResults[normalizedUserKey] = userResults;
-
-    if (mode === "reject") {
-      const rejectedAt = Date.now();
-      for (const stateKey of removableStateKeys) {
-        rejected[stateKey] = rejectedAt;
-      }
-      tx.writeJson(indexerRejectedFilePath, rejected);
-    }
-    tx.writeJson(indexerResultsFilePath, allResults);
-
-    return { ok: true };
+    return updateIndexerResultBucket({
+      tx,
+      allResults,
+      rejected,
+      normalizedUserKey,
+      normalizedTargetKey,
+      stateKeysToRemove: normalizedStateKeys,
+      mode,
+    });
   });
 }
-
-export async function rejectIndexerResultItem(userId, targetKey, indexerStateKey, options = {}) {
-  return mutateIndexerResultItem(userId, targetKey, indexerStateKey, "reject");
-}
-
-export async function rejectIndexerResultItems(userId, targetKey, indexerStateKeys, options = {}) {
-  return mutateIndexerResultItemsBatch(userId, targetKey, indexerStateKeys, "reject");
-}
-
-export async function validateIndexerResultItem(userId, targetKey, indexerStateKey, options = {}) {
-  return mutateIndexerResultItem(userId, targetKey, indexerStateKey, "validate");
-}
-
-// Supprimer toutes les notifications
-export async function clearNotifications(userId) {
-  const userKey = userStoreKey(userId);
-  mutateJsonStore(notificationsFilePath, {}, (notifications) => {
-    const nextNotifications = notifications && typeof notifications === "object" ? notifications : {};
-    if (nextNotifications[userKey]) {
-      delete nextNotifications[userKey];
-    }
-    return nextNotifications;
-  });
-}
-
-// Compter les non-lues
-export async function getUnreadCount(userId) {
-  const userNotifs = await getNotifications(userId);
-  return userNotifs.filter((n) => !n.isRead).length;
-}
-
-// Envoyer via Discord
-export async function sendDiscordNotification(webhookUrl, notification) {
-  if (!webhookUrl) {
-    return null;
-  }
-
-  try {
-    const embed = {
-      title: notification.title,
-      description: notification.message,
-      color: getColorByType(notification.type),
-      timestamp: new Date().toISOString(),
-      footer: {
-        text: "SeedFlix Notifications",
-      },
-    };
-
-    if (notification.data?.details) {
-      embed.fields = [];
       Object.entries(notification.data.details).forEach(([key, value]) => {
         embed.fields.push({
           name: key,

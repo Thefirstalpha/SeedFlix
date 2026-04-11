@@ -375,37 +375,37 @@ export function Settings() {
     void loadUsers();
   }, [isAuthenticated, user]);
 
+  // Extraction de la logique commune de chargement des namespaces
+  const fetchAndSetDatabaseNamespaces = async () => {
+    setIsLoadingDatabaseNamespaces(true);
+    try {
+      const response = await listDatabaseNamespaces();
+      const namespaces = Array.isArray(response.namespaces) ? response.namespaces : [];
+      setDatabaseNamespaces(namespaces);
+      if (namespaces.length === 0) {
+        setDatabaseRawValue("");
+        setDatabaseUpdatedAt("");
+      }
+      setSelectedDatabaseNamespace((current) => {
+        if (current && namespaces.some((entry) => entry.namespace === current)) {
+          return current;
+        }
+        return namespaces[0]?.namespace || "";
+      });
+    } catch (err) {
+      setDatabaseError(
+        err instanceof Error ? err.message : t("settings.database.loadFailed")
+      );
+    } finally {
+      setIsLoadingDatabaseNamespaces(false);
+    }
+  };
+
   useEffect(() => {
     if (!isAuthenticated || user?.username !== "admin") {
       return;
     }
-
-    const loadDatabaseNamespaces = async () => {
-      setIsLoadingDatabaseNamespaces(true);
-      try {
-        const response = await listDatabaseNamespaces();
-        const namespaces = Array.isArray(response.namespaces) ? response.namespaces : [];
-        setDatabaseNamespaces(namespaces);
-        if (namespaces.length === 0) {
-          setDatabaseRawValue("");
-          setDatabaseUpdatedAt("");
-        }
-        setSelectedDatabaseNamespace((current) => {
-          if (current && namespaces.some((entry) => entry.namespace === current)) {
-            return current;
-          }
-          return namespaces[0]?.namespace || "";
-        });
-      } catch (loadError) {
-        setDatabaseError(
-          loadError instanceof Error ? loadError.message : t("settings.database.loadFailed")
-        );
-      } finally {
-        setIsLoadingDatabaseNamespaces(false);
-      }
-    };
-
-    void loadDatabaseNamespaces();
+    void fetchAndSetDatabaseNamespaces();
   }, [isAuthenticated, t, user?.username]);
 
   useEffect(() => {
@@ -960,29 +960,8 @@ export function Settings() {
   const handleDatabaseNamespacesReload = async () => {
     setDatabaseError(null);
     setDatabaseMessage(null);
-    setIsLoadingDatabaseNamespaces(true);
-    try {
-      const response = await listDatabaseNamespaces();
-      const namespaces = Array.isArray(response.namespaces) ? response.namespaces : [];
-      setDatabaseNamespaces(namespaces);
-      if (namespaces.length === 0) {
-        setDatabaseRawValue("");
-        setDatabaseUpdatedAt("");
-      }
-      setSelectedDatabaseNamespace((current) => {
-        if (current && namespaces.some((entry) => entry.namespace === current)) {
-          return current;
-        }
-        return namespaces[0]?.namespace || "";
-      });
-      setDatabaseMessage(t("settings.database.listReloaded"));
-    } catch (reloadError) {
-      setDatabaseError(
-        reloadError instanceof Error ? reloadError.message : t("settings.database.loadFailed")
-      );
-    } finally {
-      setIsLoadingDatabaseNamespaces(false);
-    }
+    await fetchAndSetDatabaseNamespaces();
+    setDatabaseMessage(t("settings.database.listReloaded"));
   };
 
   const handleDatabasePrettyFormat = () => {
