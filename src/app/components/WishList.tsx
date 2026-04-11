@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { Download, Heart, Trash2, Tv, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { MovieCard } from "./MovieCard";
+import { WishListCard } from "./WishListCard";
 import { Checkbox } from "./ui/checkbox";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -537,27 +538,30 @@ export function WishList() {
           </div>
 
           {movies.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="space-y-4">
               {movies.map((movie) => {
                 const movieIndexerTarget = indexerTargetsByKey.get(`movie:${movie.id}`);
                 return (
-                <div key={movie.id} className="relative space-y-3">
-                  {isSelectionMode && (
-                    <div className="absolute top-2 left-2 z-10">
-                      <Card className="bg-white/90 border-none shadow-lg">
-                        <CardContent className="p-2">
-                          <Checkbox
-                            checked={selectedIds.includes(movie.id)}
-                            onCheckedChange={() => toggleSelection(movie.id)}
-                            className="border-slate-900"
-                          />
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
-                  <MovieCard movie={movie} />
-                  {movieIndexerTarget ? renderIndexerTarget(movieIndexerTarget) : null}
-                </div>
+                  <WishListCard
+                    key={movie.id}
+                    poster={movie.poster}
+                    title={movie.title}
+                    year={movie.year}
+                    rating={movie.rating}
+                    genre={movie.genre}
+                    type="movie"
+                  >
+                    {isSelectionMode && (
+                      <div className="mb-2" onClick={e => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.includes(movie.id)}
+                          onCheckedChange={() => toggleSelection(movie.id)}
+                          className="border-slate-900"
+                        />
+                      </div>
+                    )}
+                    {movieIndexerTarget ? renderIndexerTarget(movieIndexerTarget) : null}
+                  </WishListCard>
                 );
               })}
             </div>
