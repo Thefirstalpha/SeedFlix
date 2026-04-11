@@ -1,7 +1,7 @@
 import { API_BASE_URL } from "../config/tmdb";
 
-export interface TrackerResultItem {
-  trackerStateKey: string;
+export interface IndexerResultItem {
+  indexerStateKey: string;
   title: string;
   link: string;
   downloadUrl?: string;
@@ -16,14 +16,14 @@ export interface TrackerResultItem {
   categories?: string[];
 }
 
-export interface TrackerResultTarget {
+export interface IndexerResultTarget {
   targetKey: string;
   targetType: "movie" | "series" | "season" | "episode" | string;
   mediaId: number | null;
   title: string;
   label: string;
   updatedAt: string;
-  items: TrackerResultItem[];
+  items: IndexerResultItem[];
 }
 
 async function parseJson<T>(response: Response): Promise<T> {
@@ -34,45 +34,45 @@ async function parseJson<T>(response: Response): Promise<T> {
   return JSON.parse(text);
 }
 
-export async function getTrackerResults(): Promise<TrackerResultTarget[]> {
-  const response = await fetch(`${API_BASE_URL}/tracker-results`, {
+export async function getIndexerResults(): Promise<IndexerResultTarget[]> {
+  const response = await fetch(`${API_BASE_URL}/indexer-results`, {
     credentials: "include",
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch tracker results: ${response.status}`);
+    throw new Error(`Failed to fetch indexer results: ${response.status}`);
   }
 
-  const data = await parseJson<{ ok: boolean; targets: TrackerResultTarget[] }>(response);
+  const data = await parseJson<{ ok: boolean; targets: IndexerResultTarget[] }>(response);
   return Array.isArray(data?.targets) ? data.targets : [];
 }
 
-export async function rejectTrackerResult(targetKey: string, trackerStateKey: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/tracker-results/reject`, {
+export async function rejectIndexerResult(targetKey: string, indexerStateKey: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/indexer-results/reject`, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ targetKey, trackerStateKey }),
+    body: JSON.stringify({ targetKey, indexerStateKey }),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to reject tracker result: ${response.status}`);
+    throw new Error(`Failed to reject indexer result: ${response.status}`);
   }
 }
 
-export async function validateTrackerResult(targetKey: string, trackerStateKey: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/tracker-results/validate`, {
+export async function validateIndexerResult(targetKey: string, indexerStateKey: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/indexer-results/validate`, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ targetKey, trackerStateKey }),
+    body: JSON.stringify({ targetKey, indexerStateKey }),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to validate tracker result: ${response.status}`);
+    throw new Error(`Failed to validate indexer result: ${response.status}`);
   }
 }

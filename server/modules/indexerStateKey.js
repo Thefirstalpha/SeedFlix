@@ -1,4 +1,4 @@
-function parseTrackerStateKeyParts(stateKey) {
+function parseIndexerStateKeyParts(stateKey) {
   const parts = String(stateKey || "").split(":");
   if (parts.length < 4) {
     return null;
@@ -7,8 +7,8 @@ function parseTrackerStateKeyParts(stateKey) {
   return parts;
 }
 
-export function extractTargetKeyFromTrackerStateKey(stateKey) {
-  const parts = parseTrackerStateKeyParts(stateKey);
+export function extractTargetKeyFromIndexerStateKey(stateKey) {
+  const parts = parseIndexerStateKeyParts(stateKey);
   if (!parts) {
     return null;
   }
@@ -38,8 +38,8 @@ export function extractTargetKeyFromTrackerStateKey(stateKey) {
   return null;
 }
 
-export function extractUserKeyFromTrackerStateKey(stateKey) {
-  const parts = parseTrackerStateKeyParts(stateKey);
+export function extractUserKeyFromIndexerStateKey(stateKey) {
+  const parts = parseIndexerStateKeyParts(stateKey);
   if (!parts) {
     return "";
   }

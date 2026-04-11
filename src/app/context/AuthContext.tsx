@@ -23,6 +23,7 @@ interface AuthContextValue {
   mustConfigureTorrent: boolean;
   mustConfigureIndexer: boolean;
   shouldChangePassword: boolean;
+  legalAccepted: boolean;
   needsInitialSetup: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -42,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mustConfigureTorrent, setMustConfigureTorrent] = useState(false);
   const [mustConfigureIndexer, setMustConfigureIndexer] = useState(false);
   const [shouldChangePassword, setShouldChangePassword] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const [needsInitialSetup, setNeedsInitialSetup] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -57,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMustConfigureTorrent(auth.mustConfigureTorrent);
         setMustConfigureIndexer(auth.mustConfigureIndexer);
         setShouldChangePassword(auth.shouldChangePassword);
+        setLegalAccepted(auth.legalAccepted);
         setNeedsInitialSetup(auth.needsInitialSetup);
       } else {
         setUser(null);
@@ -66,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMustConfigureTorrent(false);
         setMustConfigureIndexer(false);
         setShouldChangePassword(false);
+        setLegalAccepted(false);
         setNeedsInitialSetup(false);
       }
     } finally {
@@ -85,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mustConfigureTorrent,
     mustConfigureIndexer,
     shouldChangePassword,
+    legalAccepted,
     needsInitialSetup,
     isAuthenticated: Boolean(user),
     isLoading,

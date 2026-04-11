@@ -58,7 +58,7 @@ const fr = {
       security: "Sécurité",
       tmdb: "Clé TMDB",
       torrent: "Client torrent",
-      indexer: "Tracker",
+      indexer: "Indexer",
     },
     progress: "Étape {{current}} sur {{total}}",
     stepLabel: "Étape {{index}}",
@@ -94,7 +94,7 @@ const fr = {
     },
     torrent: {
       cardTitle: "Configurez le client torrent",
-      cardDescription: "Ces informations servent à tester la connexion puis à envoyer les téléchargements.",
+      cardDescription: "Ces informations servent à tester la connexion puis à gérer les transferts que vous validez.",
       url: "URL",
       urlPlaceholder: "https://seedbox.example.com",
       port: "Port RPC",
@@ -116,8 +116,8 @@ const fr = {
       },
     },
     indexer: {
-      cardTitle: "Configurez le tracker",
-      cardDescription: "Fournissez l'URL Torznab et le jeton API pour activer la recherche de releases.",
+      cardTitle: "Configurez l'indexer",
+      cardDescription: "Fournissez l'URL Torznab et le jeton API pour consulter et évaluer les résultats provenant de vos indexeurs autorisés.",
       url: "URL Torznab",
       urlPlaceholder: "https://indexer.example.com/api",
       token: "Jeton API",
@@ -135,8 +135,8 @@ const fr = {
       testing: "Test et enregistrement...",
       testAndFinish: "Tester et terminer la configuration",
       errors: {
-        urlTokenRequired: "L'URL et le jeton API du tracker sont requis.",
-        configFailed: "Configuration du tracker impossible",
+        urlTokenRequired: "L'URL et le jeton API de l'indexer sont requis.",
+        configFailed: "Configuration de l'indexer impossible",
       },
       legalNote: "Ne connectez que des indexeurs autorisés et légaux. Il vous appartient de vous assurer que votre utilisation est conforme aux lois en vigueur dans votre pays.",
     },
@@ -226,11 +226,11 @@ const fr = {
       torrentAdded: "Torrent ajouté au client avec succès.",
     },
     errors: {
-      trackerSearchFailed: "Recherche tracker impossible",
+      indexerSearchFailed: "Recherche via l'indexer impossible",
       addTorrentFailed: "Impossible d'ajouter ce torrent",
     },
-    tracker: {
-      title: "Résultats Tracker",
+    indexer: {
+      title: "Résultats indexer",
       quality: "Qualité",
       language: "Langue",
       all: "Toutes",
@@ -292,11 +292,11 @@ const fr = {
       torrentAdded: "Torrent série ajouté au client avec succès.",
     },
     errors: {
-      trackerSearchFailed: "Recherche tracker impossible",
+      indexerSearchFailed: "Recherche via l'indexer impossible",
       addTorrentFailed: "Impossible d'ajouter ce torrent",
     },
-    tracker: {
-      title: "Résultats Tracker",
+    indexer: {
+      title: "Résultats indexer",
       description: "Versions détectées sur Torznab pour cette série.",
       quality: "Qualité",
       language: "Langue",
@@ -358,10 +358,10 @@ const fr = {
       emptyDescription: "Ajoutez des séries, saisons ou épisodes depuis leur page de détails",
       discover: "Découvrir des séries",
     },
-    trackerResults: {
-      title: "Résultats tracker trouvés",
+    indexerResults: {
+      title: "Résultats indexer trouvés",
       count: "{{count}} cible(s)",
-      empty: "Aucun torrent trouvé pour le moment. La recherche continue automatiquement.",
+      empty: "Aucun résultat disponible pour le moment. Revenez plus tard ou actualisez après une nouvelle détection.",
       actions: {
         add: "Ajouter au client",
         adding: "Ajout...",
@@ -473,7 +473,7 @@ const fr = {
       },
       torrent: {
         title: "Client torrent",
-        description: "Configurez vos paramètres de client torrent pour télécharger automatiquement films et séries.",
+        description: "Configurez votre client torrent pour gérer les transferts que vous choisissez explicitement dans SeedFlix.",
         url: "URL du client",
         port: "Port",
         authRequired: "Authentification requise",
@@ -484,7 +484,7 @@ const fr = {
       },
       indexer: {
         title: "Indexer",
-        description: "Configurez votre indexer pour la recherche de contenu.",
+        description: "Configurez votre indexer pour consulter des résultats issus de sources autorisées.",
         url: "URL de l'indexer",
         token: "Jeton API",
         defaultQuality: "Qualité par défaut",

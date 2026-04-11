@@ -4,6 +4,7 @@ import { Check, ExternalLink, KeyRound, RadioTower, Scale, Server, ShieldCheck }
 
 import { useAuth } from "../context/AuthContext";
 import {
+  acceptLegal,
   changePassword,
   getGlobalSettings,
   getSettings,
@@ -75,6 +76,7 @@ export function InitialSetup() {
     mustConfigureTmdb,
     mustConfigureTorrent,
     mustConfigureIndexer,
+    legalAccepted,
     needsInitialSetup,
   } = useAuth();
   const hasPendingSetup =
@@ -119,11 +121,13 @@ export function InitialSetup() {
   const [languageError, setLanguageError] = useState<string | null>(null);
   const [isLanguageSaving, setIsLanguageSaving] = useState(false);
   const [legalCheckboxChecked, setLegalCheckboxChecked] = useState(false);
+  const [isLegalSaving, setIsLegalSaving] = useState(false);
+  const [legalError, setLegalError] = useState<string | null>(null);
   const isAdmin = user?.username === "admin";
 
   const visibleSteps = useMemo(
     () => [
-      { key: "legal", title: t("setup.steps.legal"), icon: Scale, required: needsInitialSetup },
+      { key: "legal", title: t("setup.steps.legal"), icon: Scale, required: needsInitialSetup && !legalAccepted },
       { key: "password", title: t("setup.steps.security"), icon: ShieldCheck, required: mustChangePassword },
       { key: "tmdb", title: t("setup.steps.tmdb"), icon: KeyRound, required: mustConfigureTmdb },
       { key: "torrent", title: t("setup.steps.torrent"), icon: Server, required: mustConfigureTorrent },
@@ -131,7 +135,16 @@ export function InitialSetup() {
     ]
       .filter((step) => step.key !== "legal" || needsInitialSetup)
       .filter((step) => isAdmin || step.key !== "tmdb"),
-    [isAdmin, mustChangePassword, mustConfigureIndexer, mustConfigureTmdb, mustConfigureTorrent, needsInitialSetup, t]
+    [
+      isAdmin,
+      legalAccepted,
+      mustChangePassword,
+      mustConfigureIndexer,
+      mustConfigureTmdb,
+      mustConfigureTorrent,
+      needsInitialSetup,
+      t,
+    ]
   );
 
   const totalSteps = visibleSteps.length;
@@ -275,8 +288,18 @@ export function InitialSetup() {
     }
   };
 
-  const handleLegalAccept = () => {
-    goToNextVisibleStep();
+  const handleLegalAccept = async () => {
+    setLegalError(null);
+    setIsLegalSaving(true);
+    try {
+      await acceptLegal();
+      await refresh();
+      goToNextVisibleStep();
+    } catch (err) {
+      setLegalError(err instanceof Error ? err.message : t("common.loading"));
+    } finally {
+      setIsLegalSaving(false);
+    }
   };
 
   const handlePasswordSubmit = async (event: React.FormEvent) => {
@@ -569,12 +592,13 @@ export function InitialSetup() {
             <div className="flex justify-end">
               <Button
                 onClick={handleLegalAccept}
-                disabled={!legalCheckboxChecked}
+                disabled={!legalCheckboxChecked || isLegalSaving}
                 className="bg-cyan-600 text-white hover:bg-cyan-700"
               >
-                {t("setup.legal.accept")}
+                {isLegalSaving ? t("common.saving") : t("setup.legal.accept")}
               </Button>
             </div>
+            {legalError ? <p className="text-sm text-red-400">{legalError}</p> : null}
           </CardContent>
         </Card>
       ) : null}

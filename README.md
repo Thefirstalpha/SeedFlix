@@ -8,9 +8,9 @@
 [![Trivy Enabled](https://img.shields.io/badge/security-Trivy-1904DA?logo=trivy&logoColor=white)](./trivy.yaml)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D24-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
-SeedFlix is a self-hosted media catalog and personal download management application built with React, Vite, and Express.
+SeedFlix is a self-hosted media catalog and personal transfer management application built with React, Vite, and Express.
 
-It combines TMDB catalog browsing, Torznab-compatible indexer integration, Transmission client connectivity, user-level data isolation, and an admin-controlled configuration model in a single full-stack application.
+It combines TMDB catalog browsing, Torznab-compatible indexer integration, Transmission client connectivity for user-approved transfers, user-level data isolation, and an admin-controlled configuration model in a single full-stack application.
 
 > **Legal notice:** SeedFlix is intended for lawful, personal use only. Users are responsible for complying with the laws applicable in their jurisdiction.
 
@@ -22,8 +22,8 @@ SeedFlix is designed for users who want a lightweight web interface to:
 
 - browse movies and series from TMDB,
 - connect to authorized Torznab-compatible indexers,
-- manage personal downloads with a local Transmission instance,
-- track active and completed downloads,
+- manage user-approved transfers with a local Transmission instance,
+- track active and completed transfers,
 - keep wishlists and notifications isolated per user,
 - manage application access through an admin account.
 
@@ -34,8 +34,8 @@ The project targets a self-hosted setup and stores its runtime data locally unde
 - TMDB-powered movie and series discovery
 - Advanced filtering by genre, language, rating, and release window
 - Torznab-compatible indexer integration for release lookup
-- Transmission RPC integration for personal download management
-- Per-user wishlists, notifications, and managed download tracking
+- Transmission RPC integration for user-approved transfer management
+- Per-user wishlists, notifications, and managed transfer tracking
 - Admin-only user management and global application settings
 - HTTP-only session authentication
 - French and English interface support
@@ -160,17 +160,17 @@ docker run --rm -p 4000:4000 -v ${PWD}/data:/app/data seedflix:local
 - Filter by language, genre, rating, and release dates
 - Inspect detailed movie, series, season, and episode pages
 
-### Release Lookup
+### Release Review
 
 - Connect to authorized Torznab-compatible indexers
 - Match indexer results against your personal wishlist
-- Validate or reject release suggestions
-- Notify users when a matching release is available
+- Review and validate indexer suggestions manually
+- Notify users when a matching suggestion is detected on configured sources
 
-### Download Management
+### Transfer Management
 
-- Send personal downloads to a connected Transmission instance
-- Track active and completed managed downloads
+- Send user-approved transfers to a connected Transmission instance
+- Track active and completed managed transfers
 - Distinguish SeedFlix-managed items from other Transmission library content
 
 ### Administration
