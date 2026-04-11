@@ -6,7 +6,11 @@ COPY package*.json ./
 RUN npm ci
 
 FROM deps AS build
-COPY . .
+COPY index.html ./
+COPY vite.config.ts ./
+COPY postcss.config.mjs ./
+COPY src ./src
+COPY public ./public
 RUN npm run build
 
 FROM node:24-alpine AS runtime
@@ -28,8 +32,13 @@ RUN npm install -g npm@latest
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY server ./server
-COPY --from=build /app/dist ./dist
+RUN mkdir -p /app/server/modules /app/data && chown node:node /app/data
+COPY --chown=node:node --chmod=444 server/config.js server/defaultSettings.json server/i18n.js server/index.js server/logger.js ./server/
+COPY --chown=node:node --chmod=555 server/modules ./server/modules
+COPY --chown=node:node --chmod=555 --from=build /app/dist ./dist
+
+# Use the non-root user that already exists in the official Node image.
+USER node
 
 EXPOSE 4000
 CMD ["node", "server/index.js"]

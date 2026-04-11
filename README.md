@@ -1,223 +1,296 @@
 
-  # SeedFlix
+# SeedFlix
 
-A modern media management and discovery application built with React, Vite, and Express. Browse movies and TV series from TMDB, search movie releases across indexers, and manage downloads with your media client.
+[![CI](https://github.com/Thefirstalpha/SeedFlix/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Thefirstalpha/SeedFlix/actions/workflows/ci.yml)
+[![Docker Release](https://github.com/Thefirstalpha/SeedFlix/actions/workflows/release-dockerhub.yml/badge.svg)](https://github.com/Thefirstalpha/SeedFlix/actions/workflows/release-dockerhub.yml)
+[![SonarCloud Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=Thefirstalpha_SeedFlix&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Thefirstalpha_SeedFlix)
+[![SonarCloud Security Rating](https://sonarcloud.io/api/project_badges/measure?project=Thefirstalpha_SeedFlix&metric=security_rating)](https://sonarcloud.io/project/security_hotspots?id=Thefirstalpha_SeedFlix)
+[![Trivy Enabled](https://img.shields.io/badge/security-Trivy-1904DA?logo=trivy&logoColor=white)](./trivy.yaml)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D24-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
-## Features
+SeedFlix is a self-hosted media discovery and download management application built with React, Vite, and Express.
 
-- **Catalog Management**: Browse and search movies and TV series from TMDB database
-- **Media Discovery**: Filter content by genre, language, release year, and ratings
-- **Torrent Search**: Search movie/series releases across Torznab indexers with advanced filtering
-- **Client Integration**: Download support via Transmission RPC protocol
-- **User Management**: Secure authentication with password management
-- **Wishlist**: Save favorite movies and series for later discovery
-- **Download Tracking**: Monitor active and completed downloads
-- **Multi-language Support**: French and English UI with content language filtering
+It combines TMDB catalog browsing, Torznab-based release search, Transmission integration, user-level data isolation, and an admin-controlled configuration model in a single full-stack application.
 
-## Technology Stack
+![SeedFlix interface](./SeedFlix.png)
+
+## Overview
+
+SeedFlix is designed for users who want a lightweight web interface to:
+
+- browse movies and series from TMDB,
+- search releases through Torznab-compatible indexers,
+- send downloads to Transmission,
+- track managed downloads,
+- keep wishlists and notifications isolated per user,
+- manage application access through an admin account.
+
+The project targets a self-hosted setup and stores its runtime data locally under `data/` at the repository root.
+
+## Highlights
+
+- TMDB-powered movie and series discovery
+- Advanced filtering by genre, language, rating, and release window
+- Torznab release search for movies, series, seasons, and episodes
+- Transmission RPC integration for download submission and monitoring
+- Per-user wishlists, notifications, and managed download tracking
+- Admin-only user management and global application settings
+- HTTP-only session authentication
+- French and English interface support
+- Docker support with healthcheck and CI security scanning
+
+## Architecture
 
 ### Frontend
-- React 18+ with TypeScript
-- React Router 7 for navigation
-- Tailwind CSS for styling
-- Vite as build tool
-- Lucide React for icons
+
+- React
+- Vite
+- React Router
+- Tailwind CSS
 
 ### Backend
-- Node.js with Express 5
-- TMDB API integration
-- Torznab protocol support (XML parsing)
-- Transmission RPC client
-- Session-based authentication
 
-## Getting Started
+- Node.js
+- Express 5
+- JSON-based runtime storage under `data/`
+- Session cookie authentication
+
+### Integrations
+
+- TMDB
+- Torznab-compatible indexers
+- Transmission RPC
+- Discord webhook notifications
+
+## Quality And Security
+
+The repository already includes:
+
+- a GitHub Actions CI pipeline for build, backend syntax checks, smoke tests, Docker build, and dependency audit,
+- a dedicated SonarCloud workflow for static analysis once repository variables and secrets are configured,
+- Trivy filesystem and container image scanning in CI,
+- a production Dockerfile and Compose definition,
+- admin-only protection for sensitive API operations.
+
+## Quick Start
 
 ### Prerequisites
-- Node.js 16+ and npm
-- TMDB API key (get it at [themoviedb.org](https://www.themoviedb.org/settings/api))
-- (Optional) Transmission client for download management
-- (Optional) Torznab indexer access for release search
+
+- Node.js 24+
+- npm
+- A TMDB API key
+- Optionally: a Torznab indexer and a Transmission instance
 
 ### Installation
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd CatalogFinder
-```
-
-2. Install dependencies:
 ```bash
 npm install
 ```
 
-3. Configure environment:
+### Development
+
+Recommended on Windows:
+
+Terminal 1:
+
 ```bash
-cp .env.example .env
+npm run dev:server
 ```
 
-4. Add your TMDB API key to `.env`:
-```env
-TMDB_API_KEY=your_key_here
-```
+Terminal 2:
 
-### Running the Application
-
-**Full-stack mode** (frontend + backend together):
-```bash
-npm run dev:all
-```
-
-This starts:
-- Vite development server with hot reload
-- Express backend on `http://localhost:4000`
-- Frontend proxies API requests to backend
-
-**Frontend only**:
 ```bash
 npm run dev
 ```
 
-**Production build**:
+Combined mode is also available:
+
+```bash
+npm run dev:all
+```
+
+Note: depending on the terminal environment on Windows, `node --watch` may report a non-zero exit code even when both services are up. Running frontend and backend in separate terminals is the most reliable setup.
+
+### Production Build
+
 ```bash
 npm run build
-npm run preview
+```
+
+## Docker
+
+### Docker Compose
+
+```bash
+docker compose -f docker-compose.yml up --build
+```
+
+Run the command from the repository root so the `./data` volume is resolved correctly.
+
+The application is exposed on `http://localhost:4000`.
+
+Runtime data is persisted through:
+
+```text
+./data:/app/data
+```
+
+### Manual Docker Build
+
+```bash
+docker build --build-arg IMAGE_TAG=local -t seedflix:local .
+docker run --rm -p 4000:4000 -v ${PWD}/data:/app/data seedflix:local
 ```
 
 ## Configuration
 
-### Initial Login
-- Default credentials: `admin` / `admin`
-- On first login with default credentials, you must change your password in Settings
-- After password change, access is unrestricted
+### First Login
 
-### Settings
-Navigate to **Settings** to configure:
-- **Account**: Update username and password
-- **Transmission Client**: URL, port, RPC credentials (optional)
-- **Torznab Indexer**: API URL and token for release search
-- **Indexer Defaults**: Default quality preference for searches
-- **Download Folders**: Configure movie and series download destinations
+- Default account: `admin` / `admin`
+- On first login, the default password must be changed before normal access is granted.
 
-## Architecture
+### Application Settings
 
-```
-SeedFlix/
-├── src/                          # Frontend React application
-│   ├── app/
-│   │   ├── components/          # React components
-│   │   ├── services/            # API service layer
-│   │   ├── config/              # Configuration (TMDB, etc)
-│   │   ├── context/             # React context (Auth, etc)
-│   │   └── types/               # TypeScript types
-│   └── styles/
-├── server/                       # Backend Express application
-│   ├── modules/                 # Feature modules (auth, torznab, etc)
-│   ├── data/                    # Runtime data (users, wishlist, etc)
-│   ├── config.js                # Configuration
-│   ├── logger.js                # Debug logging
-│   └── index.js                 # Express entry point
-├── guidelines/                   # Development guidelines
-└── vite.config.ts               # Vite configuration
-```
+Most configuration is handled from the web UI after login:
 
-## Key Routes
+- TMDB API key
+- Transmission connection settings
+- Torznab endpoint and token
+- Default download folders
+- Notification channels
+- Language and user preferences
 
-### Authentication
-- `GET /api/auth/me` - Get current user
-- `POST /api/auth/login` - Login with credentials
-- `POST /api/auth/logout` - Logout
-- `POST /api/auth/change-password` - Change password
+### Supported Environment Variables
 
-### Media Discovery
-- `GET /api/tmdb/movies` - Get movies with filtering
-- `GET /api/tmdb/series` - Get series with filtering
-- `GET /api/tmdb/search` - Search TMDB database
-
-### Wishlist
-- `GET /api/wishlist` - Get saved movies
-- `POST /api/wishlist/:id` - Add/remove from wishlist
-- `GET /api/wishlist/series` - Get series wishlist
-- `POST /api/wishlist/series/:id` - Manage series wishlist
-
-### Torrent Search & Downloads
-- `POST /api/indexer/search` - Search releases via Torznab
-- `POST /api/indexer/test` - Test Torznab connection
-- `POST /api/torrent/add` - Add torrent to client
-- `GET /api/torrent/downloads` - Get active downloads
-
-### Settings
-- `GET /api/settings` - Get user settings
-- `PUT /api/settings` - Update settings
-- `POST /api/settings/factory-reset` - Reset to defaults
-
-## Usage
-
-### Browse Movies and Series
-1. Navigate to Home page to see the catalog
-2. Use filters (genre, language, year, rating) to narrow results
-3. Click on a movie/series card to view details
-
-### Search for Releases
-1. Open a movie or series detail page
-2. Scroll to "Tracker Releases" section
-3. Refine with quality/language filters if needed
-4. Click "Add to client" to download
-
-### Manage Downloads
-1. Go to Settings → Downloads section
-2. Monitor active and completed downloads
-3. Downloads are organized by media type (movies/series)
-
-### Configure Torznab
-1. Go to Settings → Indexer tab
-2. Enter your Torznab indexer URL and API token
-3. Use "Test Connection" to verify setup
-4. Set default quality preference
-
-## Development
-
-### Build System
-- Vite for fast builds
-- Tailwind CSS for styling
-- shadcn/ui component library
-- TypeScript for type safety
-
-### Debug Mode
-Enable enhanced logging:
-```bash
-npm run dev:all -- --debug
-```
-
-Or set environment variable:
-```bash
-DEBUG=1 npm run dev:all
-```
-
-## Testing & Validation
+SeedFlix can also read a few runtime environment variables:
 
 ```bash
-# Type checking
-npm run type-check
+PORT=4000
+DEBUG=false
+TMDB_API_KEY=your_tmdb_key
+APP_IMAGE_TAG=dev
+```
 
-# Build validation
-npm run build
+`TMDB_API_KEY` can be used to bootstrap the application, but the project also supports admin-managed configuration through the UI.
 
-# Development server
-npm run dev:all
+## Main Capabilities
+
+### Discovery
+
+- Browse popular movies and series
+- Search TMDB content
+- Filter by language, genre, rating, and release dates
+- Inspect detailed movie, series, season, and episode pages
+
+### Release Search
+
+- Query Torznab indexers from SeedFlix
+- Match releases against wishlists
+- Validate or reject tracker suggestions
+- Notify users when a matching release is found
+
+### Download Management
+
+- Add torrents or magnet links to Transmission
+- Track active and completed managed downloads
+- Distinguish SeedFlix-managed torrents from the rest of the client library
+
+### Administration
+
+- Create users
+- Delete users
+- Reset user passwords
+- Control global settings
+- Run a factory reset
+
+## Repository Structure
+
+```text
+.
+├── src/                    Frontend application
+│   └── app/                Routes, components, services, contexts, i18n
+├── data/                   Runtime JSON data stores
+├── server/                 Express backend
+│   ├── modules/            Feature modules
+│   └── defaultSettings.json
+├── docker/                 Container-related assets
+├── .github/workflows/      CI and release automation
+├── Dockerfile
+├── docker-compose.yml
+└── trivy.yaml
+```
+
+## API Surface
+
+Main API families include:
+
+- `/api/auth/*`
+- `/api/settings/*`
+- `/api/users/*`
+- `/api/wishlist*`
+- `/api/series-wishlist*`
+- `/api/notifications*`
+- `/api/tracker-results*`
+- `/api/indexer/*`
+- `/api/torrent/*`
+- `/api/movies/*`
+- `/api/series/*`
+
+## Public Repository Notes
+
+If you expose this repository publicly, it is recommended to:
+
+- keep real API keys and credentials out of tracked files,
+- avoid committing production `data/` content,
+- configure repository secrets before enabling release publishing,
+- enable branch protection on the default branch,
+- optionally connect SonarCloud for additional static analysis.
+
+## SonarCloud
+
+Yes, there is a free Sonar offering for public repositories: SonarCloud provides a free tier for open-source and public projects.
+
+This repository is now connected to SonarCloud.
+
+Files added for the integration:
+
+- `.github/workflows/sonarcloud.yml`
+- `sonar-project.properties`
+
+The repository is configured with the following SonarCloud identifiers:
+
+- `SONAR_ORGANIZATION`: `thefirstalpha`
+- `SONAR_PROJECT_KEY`: `Thefirstalpha_SeedFlix`
+
+If you need to reconfigure the integration in GitHub:
+
+1. Import the repository into SonarCloud.
+2. Add the repository secret `SONAR_TOKEN`.
+3. Add the repository variable `SONAR_ORGANIZATION`.
+4. Add the repository variable `SONAR_PROJECT_KEY`.
+
+Live badges currently available for this project include:
+
+- Quality Gate
+- Bugs
+- Vulnerabilities
+- Code Smells
+- Security Rating
+
+Example badge URLs for this repository:
+
+```text
+https://sonarcloud.io/api/project_badges/measure?project=Thefirstalpha_SeedFlix&metric=alert_status
+https://sonarcloud.io/api/project_badges/measure?project=Thefirstalpha_SeedFlix&metric=security_rating
 ```
 
 ## Legal Notice
 
-This application is a neutral media management tool that can be used with any legal content source. Users are responsible for:
-- Complying with applicable laws in their jurisdiction
-- Respecting copyright and intellectual property rights
-- Obtaining proper authorization for content access
-- Adhering to terms of service of indexers and media providers
+SeedFlix is a self-hosted management interface. Users remain responsible for:
 
-The author bears no responsibility for how this application is used. By using this software, you agree to use it responsibly and legally.
+- complying with the laws applicable in their jurisdiction,
+- respecting content rights and platform terms of service,
+- using indexers, trackers, and media sources lawfully.
 
----
-
-**Note**: This application requires configuration (TMDB API key, Torznab indexer, etc.) to function fully.
+This repository is provided as-is, without warranty.
   

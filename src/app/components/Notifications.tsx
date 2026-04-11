@@ -243,10 +243,10 @@ export default function Notifications() {
                 isTrackerSuggestion(notif) ? "cursor-pointer hover:bg-white/5" : ""
               }`}
             >
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold text-white">
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <h3 className="font-semibold text-white break-words">
                       {notif.title}
                     </h3>
                     <Badge className={getTypeBadgeColor(notif.type)}>
@@ -275,7 +275,7 @@ export default function Notifications() {
                   </p>
                 </div>
 
-                <div className="flex gap-2 shrink-0">
+                <div className="flex justify-end gap-2 sm:shrink-0">
                   <Button
                     onClick={(event) => {
                       event.stopPropagation();
@@ -283,7 +283,7 @@ export default function Notifications() {
                     }}
                     size="sm"
                     variant="ghost"
-                    className="text-red-300 hover:text-red-200 hover:bg-red-500/15"
+                    className="h-8 w-8 p-0 text-red-300 hover:text-red-200 hover:bg-red-500/15"
                     title={t("common.remove")}
                   >
                     <X className="w-4 h-4" />

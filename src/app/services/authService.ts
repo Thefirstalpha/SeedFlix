@@ -13,6 +13,7 @@ export interface AuthResponse {
   mustConfigureTmdb: boolean;
   mustConfigureTorrent: boolean;
   mustConfigureIndexer: boolean;
+  shouldChangePassword: boolean;
   needsInitialSetup: boolean;
 }
 
@@ -159,6 +160,23 @@ export async function updateSettings(settings: UserSettings) {
   return parseJson<UserSettings>(response);
 }
 
+export async function getGlobalSettings() {
+  const response = await fetch(`${SETTINGS_BASE}/global`, {
+    credentials: "include",
+  });
+  return parseJson<{ tmdbApiKey: string }>(response);
+}
+
+export async function updateGlobalSettings(payload: { tmdbApiKey: string }) {
+  const response = await fetch(`${SETTINGS_BASE}/global`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parseJson<{ tmdbApiKey: string }>(response);
+}
+
 export async function resetSettings() {
   const response = await fetch(`${SETTINGS_BASE}/reset`, {
     method: "POST",
@@ -201,4 +219,50 @@ export async function testTmdbApiKey(apiKey: string) {
     body: JSON.stringify({ apiKey }),
   });
   return parseJson<TmdbApiKeyTestResponse>(response, "Clé API invalide");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// User Management
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface User {
+  id: number;
+  username: string;
+}
+
+export interface CreatedUserResponse extends User {
+  generatedPassword: string;
+}
+
+export async function listUsers() {
+  const response = await fetch(`${API_BASE_URL}/users`, {
+    credentials: "include",
+  });
+  return parseJson<User[]>(response, "Impossible de charger la liste des utilisateurs");
+}
+
+export async function createUser(username: string) {
+  const response = await fetch(`${API_BASE_URL}/users`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username }),
+  });
+  return parseJson<CreatedUserResponse>(response, "Impossible de créer l'utilisateur");
+}
+
+export async function deleteUser(userId: number) {
+  const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  return parseJson<{ ok: true }>(response, "Impossible de supprimer l'utilisateur");
+}
+
+export async function resetUserPassword(userId: number) {
+  const response = await fetch(`${API_BASE_URL}/users/${userId}/reset-password`, {
+    method: "POST",
+    credentials: "include",
+  });
+  return parseJson<{ ok: true; generatedPassword: string }>(response, "Impossible de réinitialiser le mot de passe");
 }

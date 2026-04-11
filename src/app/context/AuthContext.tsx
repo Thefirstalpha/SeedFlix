@@ -22,6 +22,7 @@ interface AuthContextValue {
   mustConfigureTmdb: boolean;
   mustConfigureTorrent: boolean;
   mustConfigureIndexer: boolean;
+  shouldChangePassword: boolean;
   needsInitialSetup: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mustConfigureTmdb, setMustConfigureTmdb] = useState(false);
   const [mustConfigureTorrent, setMustConfigureTorrent] = useState(false);
   const [mustConfigureIndexer, setMustConfigureIndexer] = useState(false);
+  const [shouldChangePassword, setShouldChangePassword] = useState(false);
   const [needsInitialSetup, setNeedsInitialSetup] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -54,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMustConfigureTmdb(auth.mustConfigureTmdb);
         setMustConfigureTorrent(auth.mustConfigureTorrent);
         setMustConfigureIndexer(auth.mustConfigureIndexer);
+        setShouldChangePassword(auth.shouldChangePassword);
         setNeedsInitialSetup(auth.needsInitialSetup);
       } else {
         setUser(null);
@@ -62,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMustConfigureTmdb(false);
         setMustConfigureTorrent(false);
         setMustConfigureIndexer(false);
+        setShouldChangePassword(false);
         setNeedsInitialSetup(false);
       }
     } finally {
@@ -80,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mustConfigureTmdb,
     mustConfigureTorrent,
     mustConfigureIndexer,
+    shouldChangePassword,
     needsInitialSetup,
     isAuthenticated: Boolean(user),
     isLoading,
@@ -91,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMustConfigureTmdb(response.mustConfigureTmdb);
       setMustConfigureTorrent(response.mustConfigureTorrent);
       setMustConfigureIndexer(response.mustConfigureIndexer);
+      setShouldChangePassword(response.shouldChangePassword);
       setNeedsInitialSetup(response.needsInitialSetup);
       return response;
     },
@@ -102,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMustConfigureTmdb(false);
       setMustConfigureTorrent(false);
       setMustConfigureIndexer(false);
+      setShouldChangePassword(false);
       setNeedsInitialSetup(false);
     },
     refresh,
@@ -113,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mustConfigureTmdb,
     mustConfigureTorrent,
     mustConfigureIndexer,
+    shouldChangePassword,
     needsInitialSetup,
     isLoading,
   ]);

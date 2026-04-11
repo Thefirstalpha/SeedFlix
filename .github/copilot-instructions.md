@@ -6,7 +6,7 @@
 ## Stack et structure
 - Frontend: React, React Router, Tailwind.
 - Backend: Express dans server/index.js (ou modules server/* si refactor).
-- Donnees runtime locales: server/data/ (users, sessions, wishlist, seriesWishlist).
+- Donnees runtime locales: data/ a la racine du projet (users, sessions, wishlist, seriesWishlist).
 - Configuration usine versionnee: server/defaultSettings.json.
 
 ## Authentification

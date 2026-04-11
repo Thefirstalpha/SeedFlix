@@ -7,6 +7,11 @@ import {
   wishlistFilePath,
 } from "../config.js";
 import { getTranslator } from "../i18n.js";
+import { withAuth } from "./auth.js";
+import {
+  extractTargetKeyFromTrackerStateKey,
+  extractUserKeyFromTrackerStateKey,
+} from "./trackerStateKey.js";
 
 const trackerSeenFilePath = path.join(dataDir, "tracker-rss-seen.json");
 const trackerRejectedFilePath = path.join(dataDir, "tracker-rss-rejected.json");
@@ -17,7 +22,7 @@ async function ensureJsonArrayStore(filePath) {
   try {
     await fs.access(filePath);
   } catch {
-    await fs.writeFile(filePath, "[]", "utf-8");
+    await fs.writeFile(filePath, "{}", "utf-8");
   }
 }
 
@@ -27,15 +32,48 @@ async function readJsonArrayStore(filePath) {
 
   try {
     const parsed = JSON.parse(content);
-    return Array.isArray(parsed) ? parsed : [];
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch {
-    return [];
+    return {};
   }
 }
 
 async function writeJsonArrayStore(filePath, items) {
   await ensureJsonArrayStore(filePath);
   await fs.writeFile(filePath, JSON.stringify(items, null, 2), "utf-8");
+}
+
+function normalizeUserStoreKey(userId) {
+  return String(userId || "").trim();
+}
+
+function normalizeWishlistArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+async function readUserWishlistStore(filePath, userId) {
+  const allWishlists = await readJsonArrayStore(filePath);
+  const userKey = normalizeUserStoreKey(userId);
+  if (!userKey) {
+    return [];
+  }
+
+  return normalizeWishlistArray(allWishlists[userKey]);
+}
+
+async function writeUserWishlistStore(filePath, userId, items) {
+  const allWishlists = await readJsonArrayStore(filePath);
+  const userKey = normalizeUserStoreKey(userId);
+  if (!userKey) {
+    return;
+  }
+
+  allWishlists[userKey] = normalizeWishlistArray(items);
+  await writeJsonArrayStore(filePath, allWishlists);
+}
+
+async function clearAllUserWishlistStore(filePath) {
+  await writeJsonArrayStore(filePath, {});
 }
 
 async function ensureJsonObjectStore(filePath) {
@@ -62,37 +100,6 @@ async function readJsonObjectStore(filePath) {
 async function writeJsonObjectStore(filePath, value) {
   await ensureJsonObjectStore(filePath);
   await fs.writeFile(filePath, JSON.stringify(value, null, 2), "utf-8");
-}
-
-function extractTargetKeyFromTrackerStateKey(stateKey) {
-  const parts = String(stateKey || "").split(":");
-  if (parts.length < 4) {
-    return null;
-  }
-
-  const targetType = String(parts[1] || "").trim();
-  const segmentA = Number(parts[2]);
-  const segmentB = Number(parts[3]);
-  const segmentC = Number(parts[4]);
-
-  if ((targetType === "movie" || targetType === "series") && Number.isFinite(segmentA)) {
-    return `${targetType}:${segmentA}`;
-  }
-
-  if (targetType === "season" && Number.isFinite(segmentA) && Number.isFinite(segmentB)) {
-    return `${targetType}:${segmentA}:${segmentB}`;
-  }
-
-  if (
-    targetType === "episode" &&
-    Number.isFinite(segmentA) &&
-    Number.isFinite(segmentB) &&
-    Number.isFinite(segmentC)
-  ) {
-    return `${targetType}:${segmentA}:${segmentB}:${segmentC}`;
-  }
-
-  return null;
 }
 
 function buildSeriesTargetKey(entry) {
@@ -126,17 +133,23 @@ function buildSeriesTargetKey(entry) {
   return null;
 }
 
-async function purgeTrackerStateStore(filePath, targetKeys) {
+async function purgeTrackerStateStore(filePath, targetKeys, userId) {
   const keys = Array.from(new Set(Array.isArray(targetKeys) ? targetKeys : [])).filter(Boolean);
   if (!keys.length) {
     return 0;
   }
 
   const wanted = new Set(keys);
+  const wantedUserId = normalizeUserStoreKey(userId);
   const stateEntries = await readJsonObjectStore(filePath);
   let removedCount = 0;
 
   for (const seenKey of Object.keys(stateEntries)) {
+    const ownerId = extractUserKeyFromTrackerStateKey(seenKey);
+    if (wantedUserId && ownerId !== wantedUserId) {
+      continue;
+    }
+
     const targetKey = extractTargetKeyFromTrackerStateKey(seenKey);
     if (targetKey && wanted.has(targetKey)) {
       delete stateEntries[seenKey];
@@ -151,25 +164,30 @@ async function purgeTrackerStateStore(filePath, targetKeys) {
   return removedCount;
 }
 
-async function purgeTrackerStateForTargetKeys(targetKeys) {
+async function purgeTrackerStateForTargetKeys(targetKeys, userId) {
   await Promise.all([
-    purgeTrackerStateStore(trackerSeenFilePath, targetKeys),
-    purgeTrackerStateStore(trackerRejectedFilePath, targetKeys),
-    purgeTrackerResultsStore(targetKeys),
+    purgeTrackerStateStore(trackerSeenFilePath, targetKeys, userId),
+    purgeTrackerStateStore(trackerRejectedFilePath, targetKeys, userId),
+    purgeTrackerResultsStore(targetKeys, userId),
   ]);
 }
 
-async function purgeTrackerResultsStore(targetKeys) {
+async function purgeTrackerResultsStore(targetKeys, userId) {
   const keys = Array.from(new Set(Array.isArray(targetKeys) ? targetKeys : [])).filter(Boolean);
   if (!keys.length) {
     return 0;
   }
 
   const wanted = new Set(keys);
+  const wantedUserId = normalizeUserStoreKey(userId);
   const allResults = await readJsonObjectStore(trackerResultsFilePath);
   let removedCount = 0;
 
   for (const username of Object.keys(allResults)) {
+    if (wantedUserId && String(username) !== wantedUserId) {
+      continue;
+    }
+
     const userResults = allResults[username];
     if (!userResults || typeof userResults !== "object" || Array.isArray(userResults)) {
       continue;
@@ -192,20 +210,27 @@ async function purgeTrackerResultsStore(targetKeys) {
   return removedCount;
 }
 
-export async function readWishlist() {
-  return readJsonArrayStore(wishlistFilePath);
+export async function readWishlist(userId) {
+  return readUserWishlistStore(wishlistFilePath, userId);
 }
 
-export async function writeWishlist(wishlist) {
-  await writeJsonArrayStore(wishlistFilePath, wishlist);
+export async function writeWishlist(userId, wishlist) {
+  await writeUserWishlistStore(wishlistFilePath, userId, wishlist);
 }
 
-export async function readSeriesWishlist() {
-  return readJsonArrayStore(seriesWishlistFilePath);
+export async function readSeriesWishlist(userId) {
+  return readUserWishlistStore(seriesWishlistFilePath, userId);
 }
 
-export async function writeSeriesWishlist(wishlist) {
-  await writeJsonArrayStore(seriesWishlistFilePath, wishlist);
+export async function writeSeriesWishlist(userId, wishlist) {
+  await writeUserWishlistStore(seriesWishlistFilePath, userId, wishlist);
+}
+
+export async function resetAllWishlists() {
+  await Promise.all([
+    clearAllUserWishlistStore(wishlistFilePath),
+    clearAllUserWishlistStore(seriesWishlistFilePath),
+  ]);
 }
 
 function normalizeMovie(movie) {
@@ -297,31 +322,33 @@ function normalizeSeriesEntry(entry) {
 }
 
 export function registerWishlistRoutes(app) {
-  app.get("/api/wishlist", async (_req, res) => {
-    const t = getTranslator(_req);
+  app.get("/api/wishlist", withAuth(async (req, res, auth) => {
+    const t = getTranslator(req);
     try {
-      const wishlist = await readWishlist();
+      const userKey = auth.user.username;
+      const wishlist = await readWishlist(userKey);
       res.json(wishlist);
     } catch (error) {
       console.error("Read wishlist failed:", error);
       res.status(500).json({ error: t("wishlist.readWishlistFailed") });
     }
-  });
+  }));
 
-  app.post("/api/wishlist", async (req, res) => {
+  app.post("/api/wishlist", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
+      const userKey = auth.user.username;
       const movie = normalizeMovie(req.body);
       if (!movie) {
         res.status(400).json({ error: t("wishlist.invalidMoviePayload") });
         return;
       }
 
-      const wishlist = await readWishlist();
+      const wishlist = await readWishlist(userKey);
       const alreadyExists = wishlist.some((item) => item.id === movie.id);
       if (!alreadyExists) {
         wishlist.push(movie);
-        await writeWishlist(wishlist);
+        await writeWishlist(userKey, wishlist);
       }
 
       res.status(201).json({ ok: true, exists: alreadyExists });
@@ -329,23 +356,25 @@ export function registerWishlistRoutes(app) {
       console.error("Add wishlist movie failed:", error);
       res.status(500).json({ error: t("wishlist.addMovieFailed") });
     }
-  });
+  }));
 
-  app.delete("/api/wishlist/:id", async (req, res) => {
+  app.delete("/api/wishlist/:id", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
+      const userKey = auth.user.username;
+      const trackerUserKey = String(auth.user.id || "");
       const movieId = Number(req.params.id);
       if (!Number.isFinite(movieId)) {
         res.status(400).json({ error: t("wishlist.invalidMovieId") });
         return;
       }
 
-      const wishlist = await readWishlist();
+      const wishlist = await readWishlist(userKey);
       const updatedWishlist = wishlist.filter((movie) => movie.id !== movieId);
-      await writeWishlist(updatedWishlist);
+      await writeWishlist(userKey, updatedWishlist);
 
       if (updatedWishlist.length !== wishlist.length) {
-        await purgeTrackerStateForTargetKeys([`movie:${movieId}`]);
+        await purgeTrackerStateForTargetKeys([`movie:${movieId}`], trackerUserKey);
       }
 
       res.json({ ok: true });
@@ -353,71 +382,76 @@ export function registerWishlistRoutes(app) {
       console.error("Remove wishlist movie failed:", error);
       res.status(500).json({ error: t("wishlist.removeMovieFailed") });
     }
-  });
+  }));
 
-  app.delete("/api/wishlist", async (req, res) => {
+  app.delete("/api/wishlist", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
+      const userKey = auth.user.username;
+      const trackerUserKey = String(auth.user.id || "");
       const ids = Array.isArray(req.body?.ids)
         ? req.body.ids.map((id) => Number(id)).filter((id) => Number.isFinite(id))
         : [];
 
       const idsSet = new Set(ids);
-      const wishlist = await readWishlist();
+      const wishlist = await readWishlist(userKey);
       const updatedWishlist = wishlist.filter((movie) => !idsSet.has(movie.id));
-      await writeWishlist(updatedWishlist);
+      await writeWishlist(userKey, updatedWishlist);
 
       const removedMovieTargetKeys = wishlist
         .filter((movie) => idsSet.has(movie.id))
         .map((movie) => `movie:${movie.id}`);
-      await purgeTrackerStateForTargetKeys(removedMovieTargetKeys);
+      await purgeTrackerStateForTargetKeys(removedMovieTargetKeys, trackerUserKey);
 
       res.json({ ok: true });
     } catch (error) {
       console.error("Remove multiple wishlist movies failed:", error);
       res.status(500).json({ error: t("wishlist.removeMoviesFailed") });
     }
-  });
+  }));
 
-  app.get("/api/wishlist/:id", async (req, res) => {
+  app.get("/api/wishlist/:id", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
+      const userKey = auth.user.username;
       const movieId = Number(req.params.id);
       if (!Number.isFinite(movieId)) {
         res.status(400).json({ error: t("wishlist.invalidMovieId") });
         return;
       }
 
-      const wishlist = await readWishlist();
+      const wishlist = await readWishlist(userKey);
       const exists = wishlist.some((movie) => movie.id === movieId);
       res.json({ exists });
     } catch (error) {
       console.error("Check wishlist movie failed:", error);
       res.status(500).json({ error: t("wishlist.checkMovieFailed") });
     }
-  });
+  }));
 
-  app.get("/api/series-wishlist", async (_req, res) => {
-    const t = getTranslator(_req);
+  app.get("/api/series-wishlist", withAuth(async (req, res, auth) => {
+    const t = getTranslator(req);
     try {
-      const wishlist = await readSeriesWishlist();
+      const userKey = auth.user.username;
+      const wishlist = await readSeriesWishlist(userKey);
       res.json(wishlist);
     } catch (error) {
       console.error("Read series wishlist failed:", error);
       res.status(500).json({ error: t("wishlist.readSeriesWishlistFailed") });
     }
-  });
+  }));
 
-  app.get("/api/series-wishlist/series/:seriesId/status", async (req, res) => {
+  app.get("/api/series-wishlist/series/:seriesId/status", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
+      const userKey = auth.user.username;
       const seriesId = Number(req.params.seriesId);
       if (!Number.isFinite(seriesId)) {
         res.status(400).json({ error: t("wishlist.invalidSeriesId") });
         return;
       }
 
-      const wishlist = await readSeriesWishlist();
+      const wishlist = await readSeriesWishlist(userKey);
       const entries = wishlist.filter((entry) => entry.seriesId === seriesId);
 
       res.json({
@@ -436,18 +470,19 @@ export function registerWishlistRoutes(app) {
       console.error("Series wishlist status failed:", error);
       res.status(500).json({ error: t("wishlist.getSeriesStatusFailed") });
     }
-  });
+  }));
 
-  app.post("/api/series-wishlist", async (req, res) => {
+  app.post("/api/series-wishlist", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
+      const userKey = auth.user.username;
       const entry = normalizeSeriesEntry(req.body);
       if (!entry) {
         res.status(400).json({ error: t("wishlist.invalidSeriesPayload") });
         return;
       }
 
-      let wishlist = await readSeriesWishlist();
+      let wishlist = await readSeriesWishlist(userKey);
 
       if (entry.type === "series") {
         wishlist = wishlist.filter((item) => item.seriesId !== entry.seriesId);
@@ -484,28 +519,30 @@ export function registerWishlistRoutes(app) {
         }
       }
 
-      await writeSeriesWishlist(wishlist);
+      await writeSeriesWishlist(userKey, wishlist);
       res.status(201).json({ ok: true });
     } catch (error) {
       console.error("Add series wishlist entry failed:", error);
       res.status(500).json({ error: t("wishlist.addSeriesFailed") });
     }
-  });
+  }));
 
-  app.delete("/api/series-wishlist/entry/:entryId", async (req, res) => {
+  app.delete("/api/series-wishlist/entry/:entryId", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
+      const userKey = auth.user.username;
+      const trackerUserKey = String(auth.user.id || "");
       const entryId = req.params.entryId;
-      const wishlist = await readSeriesWishlist();
+      const wishlist = await readSeriesWishlist(userKey);
       const removedEntry = wishlist.find((entry) => entry.entryId === entryId);
       const updated = wishlist.filter((entry) => entry.entryId !== entryId);
-      await writeSeriesWishlist(updated);
+      await writeSeriesWishlist(userKey, updated);
 
       if (removedEntry) {
         const removedTargetKey = buildSeriesTargetKey(removedEntry);
         const updatedTargetKeys = new Set(updated.map((entry) => buildSeriesTargetKey(entry)).filter(Boolean));
         if (removedTargetKey && !updatedTargetKeys.has(removedTargetKey)) {
-          await purgeTrackerStateForTargetKeys([removedTargetKey]);
+          await purgeTrackerStateForTargetKeys([removedTargetKey], trackerUserKey);
         }
       }
 
@@ -514,19 +551,21 @@ export function registerWishlistRoutes(app) {
       console.error("Remove series wishlist entry failed:", error);
       res.status(500).json({ error: t("wishlist.removeSeriesEntryFailed") });
     }
-  });
+  }));
 
-  app.delete("/api/series-wishlist/bulk", async (req, res) => {
+  app.delete("/api/series-wishlist/bulk", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
+      const userKey = auth.user.username;
+      const trackerUserKey = String(auth.user.id || "");
       const entryIds = Array.isArray(req.body?.entryIds)
         ? req.body.entryIds.map((id) => String(id))
         : [];
       const entryIdsSet = new Set(entryIds);
-      const wishlist = await readSeriesWishlist();
+      const wishlist = await readSeriesWishlist(userKey);
       const removedEntries = wishlist.filter((entry) => entryIdsSet.has(entry.entryId));
       const updated = wishlist.filter((entry) => !entryIdsSet.has(entry.entryId));
-      await writeSeriesWishlist(updated);
+      await writeSeriesWishlist(userKey, updated);
 
       const updatedTargetKeys = new Set(updated.map((entry) => buildSeriesTargetKey(entry)).filter(Boolean));
       const removedTargetKeys = Array.from(
@@ -538,12 +577,12 @@ export function registerWishlistRoutes(app) {
         )
       );
 
-      await purgeTrackerStateForTargetKeys(removedTargetKeys);
+      await purgeTrackerStateForTargetKeys(removedTargetKeys, trackerUserKey);
 
       res.json({ ok: true });
     } catch (error) {
       console.error("Bulk remove series wishlist entries failed:", error);
       res.status(500).json({ error: t("wishlist.removeSeriesEntriesFailed") });
     }
-  });
+  }));
 }

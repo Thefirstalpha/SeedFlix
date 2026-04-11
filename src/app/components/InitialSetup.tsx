@@ -5,10 +5,12 @@ import { Check, ExternalLink, KeyRound, RadioTower, Server, ShieldCheck } from "
 import { useAuth } from "../context/AuthContext";
 import {
   changePassword,
+  getGlobalSettings,
   getSettings,
   testIndexerConnection,
   testTmdbApiKey,
   testTorrentConnection,
+  updateGlobalSettings,
   updateSettings,
   type UserSettings,
 } from "../services/authService";
@@ -19,8 +21,6 @@ import { Label } from "./ui/label";
 import { Progress } from "./ui/progress";
 import { Switch } from "./ui/switch";
 import { useI18n, type SupportedLanguage } from "../i18n/LanguageProvider";
-
-const TOTAL_STEPS = 4;
 
 function parseSupportedLanguage(input: unknown): SupportedLanguage {
   return input === "en" ? "en" : "fr";
@@ -87,6 +87,7 @@ export function InitialSetup() {
   const [activeStep, setActiveStep] = useState(0);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
 
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -116,28 +117,30 @@ export function InitialSetup() {
   const [languageMessage, setLanguageMessage] = useState<string | null>(null);
   const [languageError, setLanguageError] = useState<string | null>(null);
   const [isLanguageSaving, setIsLanguageSaving] = useState(false);
+  const isAdmin = user?.username === "admin";
 
-  const stepStatuses = useMemo(
+  const visibleSteps = useMemo(
     () => [
       { key: "password", title: t("setup.steps.security"), icon: ShieldCheck, required: mustChangePassword },
       { key: "tmdb", title: t("setup.steps.tmdb"), icon: KeyRound, required: mustConfigureTmdb },
       { key: "torrent", title: t("setup.steps.torrent"), icon: Server, required: mustConfigureTorrent },
       { key: "indexer", title: t("setup.steps.indexer"), icon: RadioTower, required: mustConfigureIndexer },
-    ],
-    [mustChangePassword, mustConfigureIndexer, mustConfigureTmdb, mustConfigureTorrent, t]
+    ].filter((step) => isAdmin || step.key !== "tmdb"),
+    [isAdmin, mustChangePassword, mustConfigureIndexer, mustConfigureTmdb, mustConfigureTorrent, t]
   );
 
+  const totalSteps = visibleSteps.length;
+
   const firstIncompleteStep = useMemo(() => {
-    const index = stepStatuses.findIndex((step) => step.required);
-    return index === -1 ? TOTAL_STEPS : index;
-  }, [stepStatuses]);
+    const index = visibleSteps.findIndex((step) => step.required);
+    return index === -1 ? totalSteps : index;
+  }, [totalSteps, visibleSteps]);
 
   useEffect(() => {
     const sourceSettings = settings || buildFallbackSettings(user?.username || "admin");
     const torrentSettings = sourceSettings.placeholders?.torrent || {};
     const indexerSettings = sourceSettings.placeholders?.indexer || {};
 
-    setTmdbApiKey(sourceSettings.apiKeys?.tmdb || "");
     setTorrentUrl(torrentSettings.url || "");
     setTorrentPort(torrentSettings.port || "");
     setTorrentAuthRequired(Boolean(torrentSettings.authRequired));
@@ -160,13 +163,17 @@ export function InitialSetup() {
       try {
         const response = await getSettings();
         setSettings(response);
+        if (user?.username === "admin") {
+          const globalSettings = await getGlobalSettings();
+          setTmdbApiKey(globalSettings.tmdbApiKey || "");
+        }
       } finally {
         setIsBootstrapping(false);
       }
     };
 
     void loadSettings();
-  }, [isAuthenticated, setSettings]);
+  }, [isAuthenticated, setSettings, user?.username]);
 
   useEffect(() => {
     if (!isLoading && !hasPendingSetup) {
@@ -174,10 +181,10 @@ export function InitialSetup() {
       return;
     }
 
-    if (!isLoading && firstIncompleteStep < TOTAL_STEPS) {
+    if (!isLoading && firstIncompleteStep < totalSteps) {
       setActiveStep(firstIncompleteStep);
     }
-  }, [firstIncompleteStep, hasPendingSetup, isLoading, location.state, navigate]);
+  }, [firstIncompleteStep, hasPendingSetup, isLoading, location.state, navigate, totalSteps]);
 
   if (!isLoading && !isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
@@ -195,9 +202,9 @@ export function InitialSetup() {
     );
   }
 
-  const currentStep = stepStatuses[activeStep];
+  const currentStep = visibleSteps[activeStep];
   const currentStepNumber = activeStep + 1;
-  const progressValue = (currentStepNumber / TOTAL_STEPS) * 100;
+  const progressValue = totalSteps > 0 ? (currentStepNumber / totalSteps) * 100 : 0;
   const currentSettings = settings || buildFallbackSettings(user?.username || "admin");
 
   const buildUpdatedSettings = (overrides: Partial<UserSettings>): UserSettings => ({
@@ -226,12 +233,12 @@ export function InitialSetup() {
   });
 
   const goToNextVisibleStep = () => {
-    if (activeStep >= TOTAL_STEPS - 1) {
+    if (activeStep >= totalSteps - 1) {
       navigate("/", { replace: true });
       return;
     }
 
-    setActiveStep((current) => Math.min(current + 1, TOTAL_STEPS - 1));
+    setActiveStep((current) => Math.min(current + 1, totalSteps - 1));
   };
 
   const saveLanguage = async (nextLanguage: SupportedLanguage) => {
@@ -277,10 +284,16 @@ export function InitialSetup() {
       return;
     }
 
+    if (user?.username !== "admin" && !currentPassword) {
+      setPasswordError(t("setup.password.errors.required"));
+      return;
+    }
+
     setIsPasswordSaving(true);
     try {
-      await changePassword("admin", newPassword);
+      await changePassword(user?.username === "admin" ? "admin" : currentPassword, newPassword);
       await refresh();
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       goToNextVisibleStep();
@@ -306,25 +319,10 @@ export function InitialSetup() {
     setIsTmdbSaving(true);
     try {
       const testResponse = await testTmdbApiKey(tmdbApiKey.trim());
-      const updatedSettings = buildUpdatedSettings({
-        apiKeys: {
-          tmdb: tmdbApiKey.trim(),
-        },
-      });
-      await updateSettings(updatedSettings);
-      setSettings(updatedSettings);
+      const savedGlobalSettings = await updateGlobalSettings({ tmdbApiKey: tmdbApiKey.trim() });
+      setTmdbApiKey(savedGlobalSettings.tmdbApiKey || "");
       setTmdbMessage(testResponse.message);
       await refresh();
-
-      if (mustConfigureTorrent) {
-        setActiveStep(2);
-        return;
-      }
-
-      if (mustConfigureIndexer) {
-        setActiveStep(3);
-        return;
-      }
 
       goToNextVisibleStep();
     } catch (submitError) {
@@ -473,19 +471,19 @@ export function InitialSetup() {
         <CardContent className="space-y-5 p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="mt-1 text-2xl font-semibold text-white">{currentStep.title}</h3>
+              <h3 className="mt-1 text-2xl font-semibold text-white">{currentStep?.title}</h3>
             </div>
             <div className="text-sm text-white/60">
               <p className="text-sm uppercase tracking-[0.22em] text-white/45">
-                {t("setup.progress", { current: currentStepNumber, total: TOTAL_STEPS })}
+                {t("setup.progress", { current: currentStepNumber, total: totalSteps })}
               </p>
             </div>
           </div>
 
           <Progress value={progressValue} className="bg-white/10" />
 
-          <div className="grid gap-3 md:grid-cols-4">
-            {stepStatuses.map((step, index) => {
+          <div className={`grid gap-3 ${totalSteps === 3 ? "md:grid-cols-3" : "md:grid-cols-4"}`}>
+            {visibleSteps.map((step, index) => {
               const Icon = step.icon;
               const isActive = index === activeStep;
               const isComplete = !step.required && index < firstIncompleteStep;
@@ -518,17 +516,35 @@ export function InitialSetup() {
         </CardContent>
       </Card>
 
-      {activeStep === 0 ? (
+      {currentStep?.key === "password" ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
-            <CardTitle>{t("setup.password.cardTitle")}</CardTitle>
+            <CardTitle>
+              {user?.username === "admin"
+                ? t("setup.password.cardTitle")
+                : t("setup.password.cardTitleUser")}
+            </CardTitle>
             <CardDescription className="text-white/60">
-              {t("setup.password.cardDescription")}
+              {user?.username === "admin"
+                ? t("setup.password.cardDescription")
+                : t("setup.password.cardDescriptionUser")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
+                {user?.username !== "admin" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="setup-current-password">{t("setup.password.currentPassword")}</Label>
+                    <Input
+                      id="setup-current-password"
+                      type="password"
+                      value={currentPassword}
+                      onChange={(event) => setCurrentPassword(event.target.value)}
+                      className="border-white/10 bg-slate-900 text-white"
+                    />
+                  </div>
+                ) : null}
                 <div className="space-y-2">
                   <Label htmlFor="setup-new-password">{t("setup.password.newPassword")}</Label>
                   <Input
@@ -562,7 +578,7 @@ export function InitialSetup() {
         </Card>
       ) : null}
 
-      {activeStep === 1 ? (
+      {currentStep?.key === "tmdb" ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
             <CardTitle>{t("setup.tmdb.cardTitle")}</CardTitle>
@@ -609,7 +625,7 @@ export function InitialSetup() {
         </Card>
       ) : null}
 
-      {activeStep === 2 ? (
+      {currentStep?.key === "torrent" ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
             <CardTitle>{t("setup.torrent.cardTitle")}</CardTitle>
@@ -709,7 +725,7 @@ export function InitialSetup() {
         </Card>
       ) : null}
 
-      {activeStep === 3 ? (
+      {currentStep?.key === "indexer" ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
             <CardTitle>{t("setup.indexer.cardTitle")}</CardTitle>

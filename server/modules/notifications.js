@@ -1,12 +1,16 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { requireAuth } from "./auth.js";
+import { withAuth } from "./auth.js";
 import { dataDir, usersFilePath } from "../config.js";
 import { readSeriesWishlist, readWishlist } from "./wishlist.js";
 import { searchTorznabForQuery } from "./torznab.js";
 import { debugLog } from "../logger.js";
 import { getTranslator } from "../i18n.js";
+import {
+  extractTargetKeyFromTrackerStateKey,
+  extractUserKeyFromTrackerStateKey,
+} from "./trackerStateKey.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,64 +31,61 @@ async function ensureJsonStore(filePath, fallback) {
   }
 }
 
-async function readUsers() {
-  await ensureJsonStore(usersFilePath, []);
-  const content = await fs.readFile(usersFilePath, "utf-8");
+async function readJsonArrayStore(filePath, fallback = []) {
+  await ensureJsonStore(filePath, fallback);
+  const content = await fs.readFile(filePath, "utf-8");
 
   try {
     const parsed = JSON.parse(content);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed : fallback;
   } catch {
-    return [];
+    return fallback;
   }
+}
+
+async function readJsonObjectStore(filePath) {
+  await ensureJsonStore(filePath, {});
+  const content = await fs.readFile(filePath, "utf-8");
+
+  try {
+    const parsed = JSON.parse(content);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeJsonStore(filePath, fallback, value) {
+  await ensureJsonStore(filePath, fallback);
+  await fs.writeFile(filePath, JSON.stringify(value, null, 2), "utf-8");
+}
+
+async function readUsers() {
+  return readJsonArrayStore(usersFilePath, []);
 }
 
 async function readTrackerSeen() {
-  await ensureJsonStore(trackerSeenFilePath, {});
-  const content = await fs.readFile(trackerSeenFilePath, "utf-8");
-  try {
-    const parsed = JSON.parse(content);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
+  return readJsonObjectStore(trackerSeenFilePath);
 }
 
 async function writeTrackerSeen(entries) {
-  await ensureJsonStore(trackerSeenFilePath, {});
-  await fs.writeFile(trackerSeenFilePath, JSON.stringify(entries, null, 2), "utf-8");
+  await writeJsonStore(trackerSeenFilePath, {}, entries);
 }
 
 async function readTrackerRejected() {
-  await ensureJsonStore(trackerRejectedFilePath, {});
-  const content = await fs.readFile(trackerRejectedFilePath, "utf-8");
-  try {
-    const parsed = JSON.parse(content);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
+  return readJsonObjectStore(trackerRejectedFilePath);
 }
 
 async function writeTrackerRejected(entries) {
-  await ensureJsonStore(trackerRejectedFilePath, {});
-  await fs.writeFile(trackerRejectedFilePath, JSON.stringify(entries, null, 2), "utf-8");
+  await writeJsonStore(trackerRejectedFilePath, {}, entries);
 }
 
 async function readTrackerResults() {
-  await ensureJsonStore(trackerResultsFilePath, {});
-  const content = await fs.readFile(trackerResultsFilePath, "utf-8");
-  try {
-    const parsed = JSON.parse(content);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
+  return readJsonObjectStore(trackerResultsFilePath);
 }
 
 async function writeTrackerResults(entries) {
-  await ensureJsonStore(trackerResultsFilePath, {});
-  await fs.writeFile(trackerResultsFilePath, JSON.stringify(entries, null, 2), "utf-8");
+  await writeJsonStore(trackerResultsFilePath, {}, entries);
 }
 
 function normalizeMatchText(value) {
@@ -119,39 +120,20 @@ function padMediaNumber(value) {
   return String(Number(value) || 0).padStart(2, "0");
 }
 
-function buildTrackerStateKey(username, targetKey, uniqueItemRef) {
-  return `${String(username || "").trim()}:${String(targetKey || "").trim()}:${String(uniqueItemRef || "").trim()}`;
+function buildTrackerStateKey(userKey, targetKey, uniqueItemRef) {
+  return `${String(userKey ?? "")}:${String(targetKey || "").trim()}:${String(uniqueItemRef || "").trim()}`;
 }
 
-function extractTargetKeyFromTrackerStateKey(stateKey) {
-  const parts = String(stateKey || "").split(":");
-  if (parts.length < 4) {
-    return null;
+function userStoreKey(userId) {
+  if (userId === null || userId === undefined) {
+    return "";
   }
 
-  const targetType = String(parts[1] || "").trim();
-  const segmentA = Number(parts[2]);
-  const segmentB = Number(parts[3]);
-  const segmentC = Number(parts[4]);
+  return String(userId);
+}
 
-  if ((targetType === "movie" || targetType === "series") && Number.isFinite(segmentA)) {
-    return `${targetType}:${segmentA}`;
-  }
-
-  if (targetType === "season" && Number.isFinite(segmentA) && Number.isFinite(segmentB)) {
-    return `${targetType}:${segmentA}:${segmentB}`;
-  }
-
-  if (
-    targetType === "episode" &&
-    Number.isFinite(segmentA) &&
-    Number.isFinite(segmentB) &&
-    Number.isFinite(segmentC)
-  ) {
-    return `${targetType}:${segmentA}:${segmentB}:${segmentC}`;
-  }
-
-  return null;
+function resolveNotificationUserKey(user) {
+  return userStoreKey(user?.id);
 }
 
 function parsePositiveNumber(value) {
@@ -296,7 +278,7 @@ function buildSeriesTarget(entry) {
 }
 
 async function notifyUser(user, notification) {
-  const userId = String(user?.username || "").trim();
+  const userId = resolveNotificationUserKey(user);
   if (!userId) {
     return;
   }
@@ -385,7 +367,7 @@ function getTrackerNotificationTitleKey(targetType) {
   }
 }
 
-function pruneTrackerStateEntries(entries, activeTargetKeys, now) {
+function pruneTrackerStateEntries(entries, activeTargetKeysByUser, now) {
   const nextEntries = { ...entries };
   let expiredCount = 0;
   let removedTargetCount = 0;
@@ -398,7 +380,9 @@ function pruneTrackerStateEntries(entries, activeTargetKeys, now) {
     }
 
     const targetKey = extractTargetKeyFromTrackerStateKey(key);
-    if (targetKey && !activeTargetKeys.has(targetKey)) {
+    const userKey = extractUserKeyFromTrackerStateKey(key);
+    const userActiveTargets = activeTargetKeysByUser[userKey] || new Set();
+    if (targetKey && !userActiveTargets.has(targetKey)) {
       delete nextEntries[key];
       removedTargetCount += 1;
     }
@@ -491,39 +475,44 @@ async function pollTrackerForWishlist() {
       return;
     }
 
-    const [movieWishlist, seriesWishlist, seen, rejected, trackerResults] = await Promise.all([
-      readWishlist(),
-      readSeriesWishlist(),
+    const [seen, rejected, trackerResults] = await Promise.all([
       readTrackerSeen(),
       readTrackerRejected(),
       readTrackerResults(),
     ]);
 
+    const targetsByUser = {};
+    const activeTargetKeysByUser = {};
+    let totalTargets = 0;
+
+    for (const user of users) {
+      const userStoreKey = resolveNotificationUserKey(user);
+      if (!userStoreKey) {
+        continue;
+      }
+
+      const [movieWishlist, seriesWishlist] = await Promise.all([
+        readWishlist(String(user?.username || "")),
+        readSeriesWishlist(String(user?.username || "")),
+      ]);
+
+      const userTargets = buildWishlistTargets(movieWishlist, seriesWishlist);
+      targetsByUser[userStoreKey] = userTargets;
+      activeTargetKeysByUser[userStoreKey] = new Set(userTargets.map((target) => target.key));
+      totalTargets += userTargets.length;
+    }
+
     debugLog("[RSS] Loaded stores", {
       users: users.length,
-      movieWishlist: Array.isArray(movieWishlist) ? movieWishlist.length : 0,
-      seriesWishlist: Array.isArray(seriesWishlist) ? seriesWishlist.length : 0,
+      totalTargets,
       seenEntries: Object.keys(seen || {}).length,
       rejectedEntries: Object.keys(rejected || {}).length,
       resultsUsers: Object.keys(trackerResults || {}).length,
     });
 
-    const targets = buildWishlistTargets(movieWishlist, seriesWishlist);
-    const activeTargetKeys = new Set(targets.map((target) => target.key));
-
-    debugLog("[RSS] Targets ready", {
-      totalTargets: targets.length,
-      preview: targets.slice(0, 5).map((target) => ({
-        key: target.key,
-        type: target.type,
-        id: target.id,
-        title: target.title,
-      })),
-    });
-
     const now = Date.now();
-    const prunedSeen = pruneTrackerStateEntries(seen, activeTargetKeys, now);
-    const prunedRejected = pruneTrackerStateEntries(rejected, activeTargetKeys, now);
+    const prunedSeen = pruneTrackerStateEntries(seen, activeTargetKeysByUser, now);
+    const prunedRejected = pruneTrackerStateEntries(rejected, activeTargetKeysByUser, now);
     const nextSeen = prunedSeen.nextEntries;
     const nextRejected = prunedRejected.nextEntries;
     const nextTrackerResults = { ...trackerResults };
@@ -550,7 +539,7 @@ async function pollTrackerForWishlist() {
       });
     }
 
-    if (!targets.length) {
+    if (!totalTargets) {
       const clearedTrackerResults = Object.fromEntries(
         Object.keys(nextTrackerResults).map((username) => [username, {}])
       );
@@ -569,6 +558,9 @@ async function pollTrackerForWishlist() {
 
     for (const user of users) {
       const username = String(user?.username || "unknown");
+      const userStoreKey = resolveNotificationUserKey(user);
+      const userTargets = Array.isArray(targetsByUser[userStoreKey]) ? targetsByUser[userStoreKey] : [];
+      const activeTargetKeys = activeTargetKeysByUser[userStoreKey] || new Set();
       const indexerSettings = user?.settings?.placeholders?.indexer || {};
       const indexerUrl = String(indexerSettings.url || "").trim();
       const indexerToken = String(indexerSettings.token || "").trim();
@@ -579,15 +571,15 @@ async function pollTrackerForWishlist() {
 
       debugLog("[RSS] User polling started", {
         username,
-        targetCount: targets.length,
+        targetCount: userTargets.length,
       });
 
       const userResults =
-        nextTrackerResults[username] && typeof nextTrackerResults[username] === "object"
-          ? nextTrackerResults[username]
+        nextTrackerResults[userStoreKey] && typeof nextTrackerResults[userStoreKey] === "object"
+          ? nextTrackerResults[userStoreKey]
           : {};
       const prunedUserResults = pruneTrackerResultsEntries(userResults, activeTargetKeys);
-      nextTrackerResults[username] = prunedUserResults.nextResults;
+      nextTrackerResults[userStoreKey] = prunedUserResults.nextResults;
 
       if (prunedUserResults.removedTargetCount > 0) {
         debugLog("[RSS] Pruned stale tracker result targets", {
@@ -598,7 +590,7 @@ async function pollTrackerForWishlist() {
 
       const authLike = { user: { settings: user.settings || {} } };
 
-      for (const target of targets) {
+      for (const target of userTargets) {
         const candidates = [target.title, target.originalTitle].filter(Boolean);
         if (!candidates.length) {
           debugLog("[RSS] Target skipped: no title candidates", {
@@ -666,7 +658,7 @@ async function pollTrackerForWishlist() {
             continue;
           }
 
-          const candidateStateKey = buildTrackerStateKey(user.username, target.key, uniqueItemRef);
+          const candidateStateKey = buildTrackerStateKey(userStoreKey, target.key, uniqueItemRef);
           if (nextRejected[candidateStateKey]) {
             debugLog("[RSS] Match skipped: rejected", {
               username,
@@ -725,8 +717,8 @@ async function pollTrackerForWishlist() {
 
         const translator = getTranslator(undefined, user);
 
-        nextTrackerResults[username] = upsertTrackerResultsForTarget(
-          nextTrackerResults[username],
+        nextTrackerResults[userStoreKey] = upsertTrackerResultsForTarget(
+          nextTrackerResults[userStoreKey],
           target,
           actionableItems,
           now
@@ -828,9 +820,13 @@ async function saveNotifications(notifications) {
 // Ajouter une notification
 export async function addNotification(userId, notification) {
   const notifications = await loadNotifications();
+  const userKey = userStoreKey(userId);
+  if (!userKey) {
+    return null;
+  }
 
-  if (!notifications[userId]) {
-    notifications[userId] = [];
+  if (!notifications[userKey]) {
+    notifications[userKey] = [];
   }
 
   const id = Date.now().toString();
@@ -844,7 +840,7 @@ export async function addNotification(userId, notification) {
     data: notification.data || {},
   };
 
-  notifications[userId].push(notif);
+  notifications[userKey].push(notif);
   await saveNotifications(notifications);
 
   return notif;
@@ -853,7 +849,12 @@ export async function addNotification(userId, notification) {
 // Obtenir les notifications d'un utilisateur
 export async function getNotifications(userId, options = {}) {
   const notifications = await loadNotifications();
-  let userNotifs = notifications[userId] || [];
+  const userKey = userStoreKey(userId);
+
+  let userNotifs = [];
+  if (Array.isArray(notifications[userKey])) {
+    userNotifs = [...notifications[userKey]];
+  }
 
   if (options.unreadOnly) {
     userNotifs = userNotifs.filter((n) => !n.isRead);
@@ -871,9 +872,10 @@ export async function getNotifications(userId, options = {}) {
 // Marquer comme lue
 export async function markAsRead(userId, notificationId) {
   const notifications = await loadNotifications();
+  const userKey = userStoreKey(userId);
 
-  if (notifications[userId]) {
-    const notif = notifications[userId].find((n) => n.id === notificationId);
+  if (notifications[userKey]) {
+    const notif = notifications[userKey].find((n) => n.id === notificationId);
     if (notif) {
       notif.isRead = true;
       await saveNotifications(notifications);
@@ -887,9 +889,10 @@ export async function markAsRead(userId, notificationId) {
 // Marquer toutes comme lues
 export async function markAllAsRead(userId) {
   const notifications = await loadNotifications();
+  const userKey = userStoreKey(userId);
 
-  if (notifications[userId]) {
-    notifications[userId].forEach((n) => {
+  if (notifications[userKey]) {
+    notifications[userKey].forEach((n) => {
       n.isRead = true;
     });
     await saveNotifications(notifications);
@@ -899,9 +902,10 @@ export async function markAllAsRead(userId) {
 // Supprimer une notification
 export async function deleteNotification(userId, notificationId) {
   const notifications = await loadNotifications();
+  const userKey = userStoreKey(userId);
 
-  if (notifications[userId]) {
-    notifications[userId] = notifications[userId].filter(
+  if (notifications[userKey]) {
+    notifications[userKey] = notifications[userKey].filter(
       (n) => n.id !== notificationId
     );
     await saveNotifications(notifications);
@@ -913,8 +917,10 @@ export async function deleteNotification(userId, notificationId) {
 
 export async function getTrackerResultsForUser(userId) {
   const allResults = await readTrackerResults();
-  const userResults = allResults[userId] && typeof allResults[userId] === "object"
-    ? allResults[userId]
+  const userKey = userStoreKey(userId);
+
+  const userResults = allResults[userKey] && typeof allResults[userKey] === "object"
+    ? allResults[userKey]
     : {};
 
   return Object.values(userResults)
@@ -938,13 +944,15 @@ async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode)
     return { ok: false, reason: "invalid-input" };
   }
 
+  const normalizedUserKey = userStoreKey(userId);
+
   const [allResults, rejected] = await Promise.all([
     readTrackerResults(),
     readTrackerRejected(),
   ]);
 
-  const userResults = allResults[userId] && typeof allResults[userId] === "object"
-    ? { ...allResults[userId] }
+  const userResults = allResults[normalizedUserKey] && typeof allResults[normalizedUserKey] === "object"
+    ? { ...allResults[normalizedUserKey] }
     : {};
   const bucket = userResults[normalizedTargetKey] && typeof userResults[normalizedTargetKey] === "object"
     ? { ...userResults[normalizedTargetKey] }
@@ -967,7 +975,7 @@ async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode)
     bucket.updatedAt = new Date().toISOString();
     userResults[normalizedTargetKey] = bucket;
   }
-  allResults[userId] = userResults;
+  allResults[normalizedUserKey] = userResults;
 
   if (mode === "reject") {
     rejected[normalizedStateKey] = Date.now();
@@ -981,20 +989,21 @@ async function mutateTrackerResultItem(userId, targetKey, trackerStateKey, mode)
   return { ok: true };
 }
 
-export async function rejectTrackerResultItem(userId, targetKey, trackerStateKey) {
+export async function rejectTrackerResultItem(userId, targetKey, trackerStateKey, options = {}) {
   return mutateTrackerResultItem(userId, targetKey, trackerStateKey, "reject");
 }
 
-export async function validateTrackerResultItem(userId, targetKey, trackerStateKey) {
+export async function validateTrackerResultItem(userId, targetKey, trackerStateKey, options = {}) {
   return mutateTrackerResultItem(userId, targetKey, trackerStateKey, "validate");
 }
 
 // Supprimer toutes les notifications
 export async function clearNotifications(userId) {
   const notifications = await loadNotifications();
+  const userKey = userStoreKey(userId);
 
-  if (notifications[userId]) {
-    delete notifications[userId];
+  if (notifications[userKey]) {
+    delete notifications[userKey];
     await saveNotifications(notifications);
   }
 }
@@ -1064,12 +1073,8 @@ export function registerNotificationRoutes(app) {
   startTrackerWishlistPolling();
 
   // Notification de test (interne + Discord si configuré)
-  app.post("/api/notifications/test", async (req, res) => {
+  app.post("/api/notifications/test", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const notification = {
@@ -1094,17 +1099,12 @@ export function registerNotificationRoutes(app) {
       console.error("Error sending test notification:", error);
       res.status(500).json({ error: error.message || t("notifications.testFailed") });
     }
-  });
+  }));
 
   // Récupérer les notifications
-  app.get("/api/notifications", async (req, res) => {
+  app.get("/api/notifications", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      const userId = auth.user.username;
+      const userId = resolveNotificationUserKey(auth.user);
       const limit = parseInt(req.query.limit) || 50;
       const unreadOnly = req.query.unreadOnly === "true";
 
@@ -1119,33 +1119,23 @@ export function registerNotificationRoutes(app) {
       console.error("Error getting notifications:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
-  app.get("/api/tracker-results", async (req, res) => {
+  app.get("/api/tracker-results", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      const targets = await getTrackerResultsForUser(auth.user.username);
+      const targets = await getTrackerResultsForUser(resolveNotificationUserKey(auth.user));
       res.json({ ok: true, targets });
     } catch (error) {
       console.error("Error getting tracker results:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
-  app.post("/api/tracker-results/reject", async (req, res) => {
+  app.post("/api/tracker-results/reject", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const t = getTranslator(req, auth.user);
       const result = await rejectTrackerResultItem(
-        auth.user.username,
+        resolveNotificationUserKey(auth.user),
         req.body?.targetKey,
         req.body?.trackerStateKey
       );
@@ -1161,17 +1151,12 @@ export function registerNotificationRoutes(app) {
       console.error("Error rejecting tracker result:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
-  app.post("/api/tracker-results/validate", async (req, res) => {
+  app.post("/api/tracker-results/validate", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const result = await validateTrackerResultItem(
-        auth.user.username,
+        resolveNotificationUserKey(auth.user),
         req.body?.targetKey,
         req.body?.trackerStateKey
       );
@@ -1184,17 +1169,12 @@ export function registerNotificationRoutes(app) {
       console.error("Error validating tracker result:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
   // Marquer comme lue
-  app.post("/api/notifications/:id/read", async (req, res) => {
+  app.post("/api/notifications/:id/read", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      const userId = auth.user.username;
+      const userId = resolveNotificationUserKey(auth.user);
       const notificationId = req.params.id;
 
       const notif = await markAsRead(userId, notificationId);
@@ -1209,34 +1189,24 @@ export function registerNotificationRoutes(app) {
       console.error("Error marking notification as read:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
   // Marquer toutes comme lues
-  app.post("/api/notifications/read-all", async (req, res) => {
+  app.post("/api/notifications/read-all", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      const userId = auth.user.username;
+      const userId = resolveNotificationUserKey(auth.user);
       await markAllAsRead(userId);
       res.json({ success: true });
     } catch (error) {
       console.error("Error marking all as read:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
   // Supprimer une notification
-  app.delete("/api/notifications/:id", async (req, res) => {
+  app.delete("/api/notifications/:id", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      const userId = auth.user.username;
+      const userId = resolveNotificationUserKey(auth.user);
       const notificationId = req.params.id;
 
       const success = await deleteNotification(userId, notificationId);
@@ -1251,23 +1221,18 @@ export function registerNotificationRoutes(app) {
       console.error("Error deleting notification:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
   // Vider toutes les notifications
-  app.delete("/api/notifications", async (req, res) => {
+  app.delete("/api/notifications", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
-      const userId = auth.user.username;
+      const userId = resolveNotificationUserKey(auth.user);
       await clearNotifications(userId);
       res.json({ success: true });
     } catch (error) {
       console.error("Error clearing notifications:", error);
       res.status(500).json({ error: error.message });
     }
-  });
+  }));
 
 }

@@ -7,6 +7,7 @@ import {
   dataDir,
   defaultSettingsFilePath,
   appTorrentsFilePath,
+  globalConfigFilePath,
   sessionDurationMs,
   sessionsFilePath,
   usersFilePath,
@@ -17,6 +18,15 @@ import { getTranslator } from "../i18n.js";
 function hashPassword(password, salt = randomBytes(16).toString("hex")) {
   const hash = scryptSync(password, salt, 64).toString("hex");
   return { salt, hash };
+}
+
+const SIMPLE_PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+
+function generateSimpleUserPassword(length = 10) {
+  const randomValues = randomBytes(length);
+  return Array.from(randomValues)
+    .map((value) => SIMPLE_PASSWORD_CHARS[value % SIMPLE_PASSWORD_CHARS.length])
+    .join("");
 }
 
 function verifyPassword(password, salt, expectedHash) {
@@ -80,22 +90,9 @@ function defaultUserRecord() {
     passwordSalt: salt,
     passwordHash: hash,
     mustChangePassword: true,
+    firstLoginPending: false,
     settings: buildDefaultSettings("admin"),
   };
-}
-
-function isLegacyDefaultAdmin(user) {
-  return (
-    user?.username === "admin" &&
-    verifyPassword("admin123", user.passwordSalt, user.passwordHash)
-  );
-}
-
-function isCurrentDefaultAdmin(user) {
-  return (
-    user?.username === "admin" &&
-    verifyPassword("admin", user.passwordSalt, user.passwordHash)
-  );
 }
 
 async function ensureJsonStore(filePath, fallback) {
@@ -157,64 +154,13 @@ async function readDefaultSettings() {
   }
 }
 
-async function normalizeUsersStore() {
-  const users = await readUsers();
-  let hasChanges = false;
-
-  const nextUsers = users.map((user) => {
-    if (!user || typeof user !== "object") {
-      return user;
-    }
-
-    if (isLegacyDefaultAdmin(user)) {
-      const { salt, hash } = hashPassword("admin");
-      hasChanges = true;
-      return {
-        ...user,
-        passwordSalt: salt,
-        passwordHash: hash,
-        mustChangePassword: true,
-      };
-    }
-
-    if (isCurrentDefaultAdmin(user) && user.mustChangePassword !== true) {
-      hasChanges = true;
-      return {
-        ...user,
-        mustChangePassword: true,
-      };
-    }
-
-    if (user.mustChangePassword === undefined) {
-      hasChanges = true;
-      return {
-        ...user,
-        mustChangePassword: false,
-      };
-    }
-
-    return user;
-  });
-
-  if (hasChanges) {
-    await writeUsers(nextUsers);
-    return nextUsers;
-  }
-
-  return users;
-}
-
 async function ensureUsersStore() {
   await ensureJsonStore(usersFilePath, [defaultUserRecord()]);
-  const users = await normalizeUsersStore();
+  const users = await readUsers();
 
   if (users.length === 0) {
     await writeUsers([defaultUserRecord()]);
   }
-}
-
-function isTmdbConfigured(user) {
-  return Boolean(user?.settings?.apiKeys?.tmdb?.trim());
 }
 
 function isTorrentConfigured(user) {
@@ -244,17 +190,23 @@ function isIndexerConfigured(user) {
   );
 }
 
-function buildSetupStatus(user) {
-  const mustChangePassword = Boolean(user?.mustChangePassword);
-  const mustConfigureTmdb = !isTmdbConfigured(user);
+async function buildSetupStatus(user) {
+  const isAdmin = user?.username === "admin";
+  const mustChangePassword = Boolean(user?.mustChangePassword || user?.firstLoginPending);
+  const globalConfig = await readGlobalConfig();
+  const isGlobalTmdbConfigured = Boolean(globalConfig.tmdbApiKey);
+  // TMDB is a global/admin setting - only admin needs to configure it
+  const mustConfigureTmdb = isAdmin && !isGlobalTmdbConfigured;
   const mustConfigureTorrent = !isTorrentConfigured(user);
   const mustConfigureIndexer = !isIndexerConfigured(user);
+  const shouldChangePassword = Boolean(user?.shouldChangePassword);
 
   return {
     mustChangePassword,
     mustConfigureTmdb,
     mustConfigureTorrent,
     mustConfigureIndexer,
+    shouldChangePassword,
     needsInitialSetup:
       mustChangePassword ||
       mustConfigureTmdb ||
@@ -359,7 +311,35 @@ async function requireAuth(req, res) {
   return auth;
 }
 
-export { getAuthenticatedUser, requireAuth };
+function withAuth(handler) {
+  return async (req, res) => {
+    const auth = await requireAuth(req, res);
+    if (!auth) {
+      return;
+    }
+
+    return handler(req, res, auth);
+  };
+}
+
+function withAdmin(handler) {
+  return withAuth(async (req, res, auth) => {
+    const t = getTranslator(req, auth.user);
+    if (auth.user.username !== "admin") {
+      res.status(403).json({ error: t("auth.adminRequired") });
+      return;
+    }
+
+    return handler(req, res, auth);
+  });
+}
+
+export { getAuthenticatedUser, requireAuth, withAuth, withAdmin };
+
+export async function getGlobalTmdbApiKey() {
+  const globalConfig = await readGlobalConfig();
+  return globalConfig.tmdbApiKey || "";
+}
 
 export function registerAuthRoutes(app) {
   app.get("/api/auth/me", async (req, res) => {
@@ -373,6 +353,7 @@ export function registerAuthRoutes(app) {
           mustConfigureTmdb: false,
           mustConfigureTorrent: false,
           mustConfigureIndexer: false,
+          shouldChangePassword: false,
           needsInitialSetup: false,
         });
         return;
@@ -381,7 +362,7 @@ export function registerAuthRoutes(app) {
       res.json({
         authenticated: true,
         user: sanitizeUser(auth.user),
-        ...buildSetupStatus(auth.user),
+        ...(await buildSetupStatus(auth.user)),
         settings: buildClientSettingsPayload(auth.user.settings),
       });
     } catch (error) {
@@ -422,7 +403,7 @@ export function registerAuthRoutes(app) {
 
       res.json({
         user: sanitizeUser(user),
-        ...buildSetupStatus(user),
+        ...(await buildSetupStatus(user)),
         settings: user.settings,
       });
     } catch (error) {
@@ -449,12 +430,8 @@ export function registerAuthRoutes(app) {
     }
   });
 
-  app.post("/api/auth/change-password", async (req, res) => {
+  app.post("/api/auth/change-password", withAuth(async (req, res, auth) => {
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
       const t = getTranslator(req, auth.user);
 
       const currentPassword = String(req.body?.currentPassword || "");
@@ -487,6 +464,8 @@ export function registerAuthRoutes(app) {
           passwordSalt: salt,
           passwordHash: hash,
           mustChangePassword: false,
+          shouldChangePassword: false,
+          firstLoginPending: false,
           settings: {
             ...user.settings,
             security: {
@@ -503,31 +482,21 @@ export function registerAuthRoutes(app) {
       debugLog("Change password failed:", error);
       res.status(500).json({ error: t("auth.failedChangePassword") });
     }
-  });
+  }));
 
-  app.get("/api/settings", async (req, res) => {
+  app.get("/api/settings", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       res.json(buildClientSettingsPayload(auth.user.settings));
     } catch (error) {
       debugLog("Read settings failed:", error);
       res.status(500).json({ error: t("auth.failedLoadSettings") });
     }
-  });
+  }));
 
-  app.put("/api/settings", async (req, res) => {
+  app.put("/api/settings", withAuth(async (req, res, auth) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
-
       const newSettings = sanitizeSettingsPayload(req.body);
       const users = await readUsers();
       const nextUsers = users.map((user) => {
@@ -546,17 +515,35 @@ export function registerAuthRoutes(app) {
       debugLog("Update settings failed:", error);
       res.status(500).json({ error: t("auth.failedUpdateSettings") });
     }
-  });
+  }));
 
-  app.post("/api/settings/reset", async (req, res) => {
+  app.get("/api/settings/global", withAdmin(async (req, res) => {
     const t = getTranslator(req);
     try {
-      const auth = await requireAuth(req, res);
-      if (!auth) {
-        return;
-      }
+      const globalConfig = await readGlobalConfig();
+      res.json({ tmdbApiKey: globalConfig.tmdbApiKey || "" });
+    } catch (error) {
+      debugLog("Read global settings failed:", error);
+      res.status(500).json({ error: t("auth.failedLoadSettings") });
+    }
+  }));
 
-      const { writeSeriesWishlist, writeWishlist } = await import("./wishlist.js");
+  app.put("/api/settings/global", withAdmin(async (req, res) => {
+    const t = getTranslator(req);
+    try {
+      const tmdbApiKey = String(req.body?.tmdbApiKey || "").trim();
+      await writeGlobalConfig({ tmdbApiKey });
+      res.json({ tmdbApiKey });
+    } catch (error) {
+      debugLog("Update global settings failed:", error);
+      res.status(500).json({ error: t("auth.failedUpdateSettings") });
+    }
+  }));
+
+  app.post("/api/settings/reset", withAdmin(async (req, res) => {
+    const t = getTranslator(req);
+    try {
+      const { resetAllWishlists } = await import("./wishlist.js");
 
       const defaults = await readDefaultSettings();
       const resetUser = {
@@ -571,9 +558,9 @@ export function registerAuthRoutes(app) {
       };
 
       await writeUsers([resetUser]);
-      await writeWishlist([]);
-      await writeSeriesWishlist([]);
+      await resetAllWishlists();
       await writeSessions([]);
+      await writeGlobalConfig(defaultGlobalConfig());
       await fs.writeFile(appTorrentsFilePath, "{}", "utf-8");
       clearSessionCookie(res);
 
@@ -592,5 +579,183 @@ export function registerAuthRoutes(app) {
       debugLog("Reset settings failed:", error);
       res.status(500).json({ error: t("auth.failedResetSettings") });
     }
-  });
+  }));
+
+  // ────────────────────────────────────────────────────────────────────────
+  // User Management (Admin only)
+  // ────────────────────────────────────────────────────────────────────────
+
+  app.get("/api/users", withAdmin(async (req, res) => {
+    const t = getTranslator(req);
+    try {
+      const users = await readUsers();
+      // Return all users except admin
+      const nonAdminUsers = users
+        .filter((user) => user.username !== "admin")
+        .map((user) => ({
+          id: user.id,
+          username: user.username,
+        }));
+
+      res.json(nonAdminUsers);
+    } catch (error) {
+      debugLog("List users failed:", error);
+      res.status(500).json({ error: t("auth.failedListUsers") });
+    }
+  }));
+
+  app.post("/api/users", withAdmin(async (req, res) => {
+    const t = getTranslator(req);
+    try {
+      const username = String(req.body?.username || "").trim();
+
+      if (!username) {
+        res.status(400).json({ error: t("auth.usernameRequired") });
+        return;
+      }
+
+      const users = await readUsers();
+      if (users.some((user) => user.username === username)) {
+        res.status(400).json({ error: t("auth.usernameAlreadyExists") });
+        return;
+      }
+
+      const generatedPassword = generateSimpleUserPassword();
+      const { salt, hash } = hashPassword(generatedPassword);
+      const newId = Math.max(0, ...users.map((user) => user.id)) + 1;
+      const newUser = {
+        id: newId,
+        username,
+        passwordSalt: salt,
+        passwordHash: hash,
+        mustChangePassword: true,
+        shouldChangePassword: false,
+        firstLoginPending: true,
+        settings: buildDefaultSettings(username),
+      };
+
+      const nextUsers = [...users, newUser];
+      await writeUsers(nextUsers);
+
+      res.json({
+        id: newUser.id,
+        username: newUser.username,
+        generatedPassword,
+      });
+    } catch (error) {
+      debugLog("Create user failed:", error);
+      res.status(500).json({ error: t("auth.failedCreateUser") });
+    }
+  }));
+
+  app.delete("/api/users/:id", withAdmin(async (req, res) => {
+    const t = getTranslator(req);
+    try {
+      const userId = parseInt(String(req.params.id), 10);
+
+      const users = await readUsers();
+      const userToDelete = users.find((user) => user.id === userId);
+
+      if (!userToDelete) {
+        res.status(404).json({ error: t("auth.userNotFound") });
+        return;
+      }
+
+      // Cannot delete admin user
+      if (userToDelete.username === "admin") {
+        res.status(400).json({ error: t("auth.cannotDeleteAdmin") });
+        return;
+      }
+
+      const nextUsers = users.filter((user) => user.id !== userId);
+      await writeUsers(nextUsers);
+
+      // Also remove user sessions
+      const sessions = await readSessions();
+      const nextSessions = sessions.filter((session) => session.userId !== userId);
+      await writeSessions(nextSessions);
+
+      res.json({ ok: true });
+    } catch (error) {
+      debugLog("Delete user failed:", error);
+      res.status(500).json({ error: t("auth.failedDeleteUser") });
+    }
+  }));
+
+  app.post("/api/users/:id/reset-password", withAdmin(async (req, res) => {
+    const t = getTranslator(req);
+    try {
+      const userId = parseInt(String(req.params.id), 10);
+
+      const users = await readUsers();
+      const user = users.find((u) => u.id === userId);
+
+      if (!user) {
+        res.status(404).json({ error: t("auth.userNotFound") });
+        return;
+      }
+
+      // Cannot reset admin password
+      if (user.username === "admin") {
+        res.status(400).json({ error: t("auth.cannotModifyAdmin") });
+        return;
+      }
+
+      const generatedPassword = generateSimpleUserPassword();
+      const { salt, hash } = hashPassword(generatedPassword);
+      const nextUsers = users.map((u) => {
+        if (u.id !== userId) {
+          return u;
+        }
+
+        return {
+          ...u,
+          passwordSalt: salt,
+          passwordHash: hash,
+          // Keep hard reset requirement for users who never completed first login setup.
+          mustChangePassword: Boolean(u.firstLoginPending),
+          shouldChangePassword: !Boolean(u.firstLoginPending),
+        };
+      });
+
+      await writeUsers(nextUsers);
+      res.json({ ok: true, generatedPassword });
+    } catch (error) {
+      debugLog("Reset user password failed:", error);
+      res.status(500).json({ error: t("auth.failedResetUserPassword") });
+    }
+  }));
+}
+
+function defaultGlobalConfig() {
+  return {
+    tmdbApiKey: "",
+  };
+}
+
+async function writeGlobalConfig(config) {
+  await ensureJsonStore(globalConfigFilePath, defaultGlobalConfig());
+  const safeConfig = {
+    tmdbApiKey: String(config?.tmdbApiKey || "").trim(),
+  };
+  await fs.writeFile(globalConfigFilePath, JSON.stringify(safeConfig, null, 2), "utf-8");
+}
+
+async function readGlobalConfig() {
+  await ensureJsonStore(globalConfigFilePath, defaultGlobalConfig());
+  const content = await fs.readFile(globalConfigFilePath, "utf-8");
+
+  let parsed = defaultGlobalConfig();
+  try {
+    const value = JSON.parse(content);
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      parsed = {
+        tmdbApiKey: String(value.tmdbApiKey || "").trim(),
+      };
+    }
+  } catch {
+    parsed = defaultGlobalConfig();
+  }
+
+  return parsed;
 }
