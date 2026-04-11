@@ -12,6 +12,9 @@ export interface SeriesWishlistEntry {
   seriesId: number;
   seriesTitle: string;
   seriesPoster: string;
+  year?: number;
+  rating?: number;
+  genre?: string;
   // season + episode
   seasonNumber?: number;
   seasonName?: string;

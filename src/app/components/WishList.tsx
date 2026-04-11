@@ -542,26 +542,35 @@ export function WishList() {
               {movies.map((movie) => {
                 const movieIndexerTarget = indexerTargetsByKey.get(`movie:${movie.id}`);
                 return (
-                  <WishListCard
+                  <div
                     key={movie.id}
-                    poster={movie.poster}
-                    title={movie.title}
-                    year={movie.year}
-                    rating={movie.rating}
-                    genre={movie.genre}
-                    type="movie"
+                    className={isSelectionMode ? undefined : "cursor-pointer hover:bg-white/10 hover:scale-[1.01] transition-all rounded-lg"}
+                    onClick={() => {
+                      if (!isSelectionMode) {
+                        navigate(`/movie/${movie.id}`);
+                      }
+                    }}
                   >
-                    {isSelectionMode && (
-                      <div className="mb-2" onClick={e => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.includes(movie.id)}
-                          onCheckedChange={() => toggleSelection(movie.id)}
-                          className="border-slate-900"
-                        />
-                      </div>
-                    )}
-                    {movieIndexerTarget ? renderIndexerTarget(movieIndexerTarget) : null}
-                  </WishListCard>
+                    <WishListCard
+                      poster={movie.poster}
+                      title={movie.title}
+                      year={movie.year}
+                      rating={movie.rating}
+                      genre={movie.genre}
+                      type="movie"
+                    >
+                      {isSelectionMode && (
+                        <div className="mb-2" onClick={e => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.includes(movie.id)}
+                            onCheckedChange={() => toggleSelection(movie.id)}
+                            className="border-slate-900"
+                          />
+                        </div>
+                      )}
+                      {movieIndexerTarget ? renderIndexerTarget(movieIndexerTarget) : null}
+                    </WishListCard>
+                  </div>
                 );
               })}
             </div>
@@ -650,115 +659,124 @@ export function WishList() {
                   .filter((target): target is IndexerResultTarget => Boolean(target));
 
                 return (
-                <WishListCard
+                <div
                   key={group.seriesId}
-                  poster={group.seriesPoster}
-                  title={group.seriesTitle}
-                  year={group.seriesEntry?.year || 0}
-                  rating={group.seriesEntry?.rating || 0}
-                  genre={group.seriesEntry?.genre || ''}
-                  type="series"
+                  className={isSeriesSelectionMode ? undefined : "cursor-pointer hover:bg-white/10 hover:scale-[1.01] transition-all rounded-lg"}
+                  onClick={() => {
+                    if (!isSeriesSelectionMode) {
+                      navigate(`/series/${group.seriesId}`);
+                    }
+                  }}
                 >
-                  {isSeriesSelectionMode && (
-                    <div
-                      className="mt-2"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <label className="inline-flex items-center gap-2 text-sm text-white/80">
-                        <Checkbox
-                          checked={isGroupFullySelected(group)}
-                          onCheckedChange={() => toggleSeriesGroup(group)}
-                          className="border-white/40"
-                        />
-                        {t("wishlistPage.series.selectWhole")}
-                      </label>
-                    </div>
-                  )}
-                  <div className="space-y-3 pl-1">
-                    {group.seriesEntry && (
+                  <WishListCard
+                    poster={group.seriesPoster}
+                    title={group.seriesTitle}
+                    year={group.seriesEntry?.year || 0}
+                    rating={group.seriesEntry?.rating || 0}
+                    genre={group.seriesEntry?.genre || ''}
+                    type="series"
+                  >
+                    {isSeriesSelectionMode && (
                       <div
-                        className="flex items-center gap-2"
+                        className="mt-2"
                         onClick={(event) => event.stopPropagation()}
                       >
-                        {isSeriesSelectionMode && (
+                        <label className="inline-flex items-center gap-2 text-sm text-white/80">
                           <Checkbox
-                            checked={selectedEntryIds.includes(group.seriesEntry.entryId)}
-                            onCheckedChange={() => toggleSeriesEntry(group.seriesEntry!.entryId)}
+                            checked={isGroupFullySelected(group)}
+                            onCheckedChange={() => toggleSeriesGroup(group)}
                             className="border-white/40"
                           />
-                        )}
-                        <Badge className="bg-cyan-600/20 text-cyan-200 border-cyan-500/30">
-                          <Tv className="w-3 h-3 mr-1" />
-                          {t("wishlistPage.series.fullSeries")}
-                        </Badge>
+                          {t("wishlistPage.series.selectWhole")}
+                        </label>
                       </div>
                     )}
-                    {group.seasons.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-white/60 text-xs uppercase tracking-wide">{t("wishlistPage.series.seasons")}</p>
-                        <div className="flex flex-wrap gap-2">
-                          {group.seasons.map((season) => (
-                            <div
-                              key={season.entryId}
-                              className="flex items-center gap-2"
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              {isSeriesSelectionMode && (
-                                <Checkbox
-                                  checked={selectedEntryIds.includes(season.entryId)}
-                                  onCheckedChange={() => toggleSeriesEntry(season.entryId)}
-                                  className="border-white/40"
-                                />
-                              )}
-                              <Badge
-                                variant="outline"
-                                className="border-purple-500/50 text-purple-300"
-                              >
-                                {season.seasonName ?? t("wishlistPage.series.seasonNumber", { number: season.seasonNumber || 0 })}
-                              </Badge>
-                            </div>
-                          ))}
+                    <div className="space-y-3 pl-1">
+                      {group.seriesEntry && (
+                        <div
+                          className="flex items-center gap-2"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {isSeriesSelectionMode && (
+                            <Checkbox
+                              checked={selectedEntryIds.includes(group.seriesEntry.entryId)}
+                              onCheckedChange={() => toggleSeriesEntry(group.seriesEntry!.entryId)}
+                              className="border-white/40"
+                            />
+                          )}
+                          <Badge className="bg-cyan-600/20 text-cyan-200 border-cyan-500/30">
+                            <Tv className="w-3 h-3 mr-1" />
+                            {t("wishlistPage.series.fullSeries")}
+                          </Badge>
                         </div>
-                      </div>
-                    )}
-                    {group.episodes.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-white/60 text-xs uppercase tracking-wide">{t("wishlistPage.series.episodes")}</p>
-                        <div className="flex flex-wrap gap-2">
-                          {group.episodes.map((episode) => (
-                            <div
-                              key={episode.entryId}
-                              className="flex items-center gap-2"
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              {isSeriesSelectionMode && (
-                                <Checkbox
-                                  checked={selectedEntryIds.includes(episode.entryId)}
-                                  onCheckedChange={() => toggleSeriesEntry(episode.entryId)}
-                                  className="border-white/40"
-                                />
-                              )}
-                              <Badge
-                                variant="outline"
-                                className="border-white/20 text-white/70"
+                      )}
+                      {group.seasons.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-white/60 text-xs uppercase tracking-wide">{t("wishlistPage.series.seasons")}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {group.seasons.map((season) => (
+                              <div
+                                key={season.entryId}
+                                className="flex items-center gap-2"
+                                onClick={(event) => event.stopPropagation()}
                               >
-                                {getEpisodeCode("", episode.seasonNumber, episode.episodeNumber)}
-                                {!spoilerModeEnabled && episode.episodeName
-                                  ? ` - ${episode.episodeName}`
-                                  : ""}
-                              </Badge>
-                            </div>
-                          ))}
+                                {isSeriesSelectionMode && (
+                                  <Checkbox
+                                    checked={selectedEntryIds.includes(season.entryId)}
+                                    onCheckedChange={() => toggleSeriesEntry(season.entryId)}
+                                    className="border-white/40"
+                                  />
+                                )}
+                                <Badge
+                                  variant="outline"
+                                  className="border-purple-500/50 text-purple-300"
+                                >
+                                  {season.seasonName ?? t("wishlistPage.series.seasonNumber", { number: season.seasonNumber || 0 })}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {groupIndexerTargets.length > 0 ? (
-                      <div className="space-y-3" onClick={(event) => event.stopPropagation()}>
-                        {groupIndexerTargets.map((target) => renderIndexerTarget(target, true))}
-                      </div>
-                    ) : null}
-                  </div>
-                </WishListCard>
+                      )}
+                      {group.episodes.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-white/60 text-xs uppercase tracking-wide">{t("wishlistPage.series.episodes")}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {group.episodes.map((episode) => (
+                              <div
+                                key={episode.entryId}
+                                className="flex items-center gap-2"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                {isSeriesSelectionMode && (
+                                  <Checkbox
+                                    checked={selectedEntryIds.includes(episode.entryId)}
+                                    onCheckedChange={() => toggleSeriesEntry(episode.entryId)}
+                                    className="border-white/40"
+                                  />
+                                )}
+                                <Badge
+                                  variant="outline"
+                                  className="border-white/20 text-white/70"
+                                >
+                                  {getEpisodeCode("", episode.seasonNumber, episode.episodeNumber)}
+                                  {!spoilerModeEnabled && episode.episodeName
+                                    ? ` - ${episode.episodeName}`
+                                    : ""}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {groupIndexerTargets.length > 0 ? (
+                        <div className="space-y-3" onClick={(event) => event.stopPropagation()}>
+                          {groupIndexerTargets.map((target) => renderIndexerTarget(target, true))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </WishListCard>
+                </div>
                 );
               })}
             </div>

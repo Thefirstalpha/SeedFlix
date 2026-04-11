@@ -261,6 +261,9 @@ function normalizeSeriesEntry(entry) {
     seriesId,
     seriesTitle: String(entry.seriesTitle || ""),
     seriesPoster: String(entry.seriesPoster || ""),
+    year: Number(entry.year || 0),
+    rating: Number(entry.rating || 0),
+    genre: String(entry.genre || "Inconnu"),
   };
 
   if (type === "season" || type === "episode") {

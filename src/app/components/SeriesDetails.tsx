@@ -328,6 +328,9 @@ export function SeriesDetails() {
         seriesId: series.id,
         seriesTitle: series.title,
         seriesPoster: series.poster,
+        year: series.year,
+        rating: series.rating,
+        genre: series.genre,
       });
     }
     await refreshStatus();
@@ -348,6 +351,9 @@ export function SeriesDetails() {
         seriesId: series.id,
         seriesTitle: series.title,
         seriesPoster: series.poster,
+        year: series.year,
+        rating: series.rating,
+        genre: series.genre,
         seasonNumber: selectedSeason,
         seasonName: seasonData?.name ?? t("seriesDetails.seasonNumber", { number: selectedSeason }),
       });
@@ -369,6 +375,9 @@ export function SeriesDetails() {
         seriesId: series.id,
         seriesTitle: series.title,
         seriesPoster: series.poster,
+        year: series.year,
+        rating: series.rating,
+        genre: series.genre,
         seasonNumber: selectedSeason,
         seasonName:
           availableSeasons.find((s) => s.seasonNumber === selectedSeason)
