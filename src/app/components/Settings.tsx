@@ -1,4 +1,38 @@
 import { useEffect, useState } from "react";
+// Fonction utilitaire générique pour la gestion des sauvegardes asynchrones
+async function handleAsyncSave<T = any>({
+  event,
+  setError,
+  setMessage,
+  setSaving,
+  doSave,
+  successMessage,
+  errorMessage,
+  onSuccess,
+}: {
+  event?: React.FormEvent;
+  setError: (msg: string | null) => void;
+  setMessage: (msg: string | null) => void;
+  setSaving: (saving: boolean) => void;
+  doSave: () => Promise<T>;
+  successMessage: string;
+  errorMessage: string;
+  onSuccess?: (result: T) => void;
+}) {
+  if (event) event.preventDefault();
+  setError(null);
+  setMessage(null);
+  setSaving(true);
+  try {
+    const result = await doSave();
+    if (onSuccess) onSuccess(result);
+    setMessage(successMessage);
+  } catch (submitError: any) {
+    setError(submitError instanceof Error ? submitError.message : errorMessage);
+  } finally {
+    setSaving(false);
+  }
+}
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Check, Copy } from "lucide-react";
 import { Button } from "./ui/button";
@@ -446,119 +480,109 @@ export function Settings() {
   };
 
   const handleTmdbSave = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setTmdbError(null);
-    setTmdbMessage(null);
-    setIsTmdbSaving(true);
-
     if (!tmdbApiKey.trim()) {
       setTmdbError(t("settings.messages.tmdbKeyRequired"));
       setIsTmdbSaving(false);
       return;
     }
-
-    try {
-      const savedGlobalSettings = await updateGlobalSettings({
-        tmdbApiKey: tmdbApiKey.trim(),
-      });
-      setTmdbApiKey(savedGlobalSettings.tmdbApiKey || "");
-      await refresh();
-      setTmdbMessage(t("settings.messages.tmdbSaved"));
-    } catch (submitError) {
-      setTmdbError(submitError instanceof Error ? submitError.message : t("settings.messages.configFailed"));
-    } finally {
-      setIsTmdbSaving(false);
-    }
+    await handleAsyncSave({
+      event,
+      setError: setTmdbError,
+      setMessage: setTmdbMessage,
+      setSaving: setIsTmdbSaving,
+      doSave: async () => {
+        const savedGlobalSettings = await updateGlobalSettings({
+          tmdbApiKey: tmdbApiKey.trim(),
+        });
+        setTmdbApiKey(savedGlobalSettings.tmdbApiKey || "");
+        await refresh();
+        return savedGlobalSettings;
+      },
+      successMessage: t("settings.messages.tmdbSaved"),
+      errorMessage: t("settings.messages.configFailed"),
+    });
   };
 
   const handleTorrentSave = async (event: React.FormEvent) => {
-    event.preventDefault();
     setResetError(null);
-    setTorrentError(null);
-    setTorrentMessage(null);
-    setIsTorrentSaving(true);
-
-    const updatedSettings: UserSettings = buildUpdatedSettings({
-      torrent: {
-        url: torrentUrl,
-        port: torrentPort,
-        authRequired: torrentAuthRequired,
-        username: torrentAuthRequired ? torrentUsername : undefined,
-        password: torrentAuthRequired ? torrentPassword : "",
-        moviesFolder: torrentMoviesFolder,
-        seriesFolder: torrentSeriesFolder,
+    await handleAsyncSave({
+      event,
+      setError: setTorrentError,
+      setMessage: setTorrentMessage,
+      setSaving: setIsTorrentSaving,
+      doSave: async () => {
+        const updatedSettings: UserSettings = buildUpdatedSettings({
+          torrent: {
+            url: torrentUrl,
+            port: torrentPort,
+            authRequired: torrentAuthRequired,
+            username: torrentAuthRequired ? torrentUsername : undefined,
+            password: torrentAuthRequired ? torrentPassword : "",
+            moviesFolder: torrentMoviesFolder,
+            seriesFolder: torrentSeriesFolder,
+          },
+        });
+        const savedSettings = await updateSettings(updatedSettings);
+        applyUpdatedSettings(savedSettings);
+        try {
+          const response = await testTorrentConnection({
+            url: torrentUrl,
+            port: torrentPort,
+            authRequired: torrentAuthRequired,
+            username: torrentUsername,
+            password: torrentPassword,
+          });
+          return { message: t("settings.messages.configurationSavedWithResponse", { response: response.message }) };
+        } catch (submitError) {
+          throw new Error(
+            submitError instanceof Error
+              ? t("settings.messages.savedButTestFailedWithReason", { reason: submitError.message })
+              : t("settings.messages.savedButTestFailed")
+          );
+        }
+      },
+      successMessage: t("settings.messages.configurationSavedWithResponse", { response: "" }), // sera remplacé par le message réel
+      errorMessage: t("settings.messages.updateFailed"),
+      onSuccess: (result: any) => {
+        if (result && result.message) setTorrentMessage(result.message);
       },
     });
-
-    try {
-      const savedSettings = await updateSettings(updatedSettings);
-      applyUpdatedSettings(savedSettings);
-    } catch (submitError) {
-      setTorrentError(
-        submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
-      );
-      setIsTorrentSaving(false);
-      return;
-    }
-
-    try {
-      const response = await testTorrentConnection({
-        url: torrentUrl,
-        port: torrentPort,
-        authRequired: torrentAuthRequired,
-        username: torrentUsername,
-        password: torrentPassword,
-      });
-      setTorrentMessage(t("settings.messages.configurationSavedWithResponse", { response: response.message }));
-    } catch (submitError) {
-      setTorrentError(
-        submitError instanceof Error
-          ? t("settings.messages.savedButTestFailedWithReason", { reason: submitError.message })
-          : t("settings.messages.savedButTestFailed")
-      );
-    } finally {
-      setIsTorrentSaving(false);
-    }
   };
 
   const handleIndexerSave = async (event: React.FormEvent) => {
-    event.preventDefault();
     setResetError(null);
-    setIndexerError(null);
-    setIndexerMessage(null);
-    setIsIndexerSaving(true);
-
-    const updatedSettings: UserSettings = buildUpdatedSettings({
-      indexer: {
-        url: indexerUrl,
-        token: indexerToken,
-        defaultQuality: indexerDefaultQuality,
+    await handleAsyncSave({
+      event,
+      setError: setIndexerError,
+      setMessage: setIndexerMessage,
+      setSaving: setIsIndexerSaving,
+      doSave: async () => {
+        const updatedSettings: UserSettings = buildUpdatedSettings({
+          indexer: {
+            url: indexerUrl,
+            token: indexerToken,
+            defaultQuality: indexerDefaultQuality,
+          },
+        });
+        const savedSettings = await updateSettings(updatedSettings);
+        applyUpdatedSettings(savedSettings);
+        try {
+          const response = await testIndexerConnection(indexerUrl, indexerToken);
+          return { message: t("settings.messages.configurationSavedWithResponse", { response: response.message }) };
+        } catch (submitError) {
+          throw new Error(
+            submitError instanceof Error
+              ? t("settings.messages.savedButTestFailedWithReason", { reason: submitError.message })
+              : t("settings.messages.savedButTestFailed")
+          );
+        }
+      },
+      successMessage: t("settings.messages.configurationSavedWithResponse", { response: "" }),
+      errorMessage: t("settings.messages.updateFailed"),
+      onSuccess: (result: any) => {
+        if (result && result.message) setIndexerMessage(result.message);
       },
     });
-
-    try {
-      const savedSettings = await updateSettings(updatedSettings);
-      applyUpdatedSettings(savedSettings);
-    } catch (submitError) {
-      setIndexerError(
-        submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
-      );
-      setIsIndexerSaving(false);
-      return;
-    }
-
-    try {
-      const response = await testIndexerConnection(indexerUrl, indexerToken);
-      setIndexerMessage(t("settings.messages.configurationSavedWithResponse", { response: response.message }));
-    } catch (submitError) {
-      setIndexerError(
-        submitError instanceof Error
-          ? t("settings.messages.savedButTestFailedWithReason", { reason: submitError.message })
-          : t("settings.messages.savedButTestFailed")
-      );
-    } finally {
-      setIsIndexerSaving(false);
-    }
   };
 
   const handleDiscordSave = async (event: React.FormEvent) => {

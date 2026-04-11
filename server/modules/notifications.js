@@ -19,6 +19,20 @@ const notificationsFilePath = "notifications.items";
 const indexerSeenFilePath = "indexer.rss.seen";
 const indexerRejectedFilePath = "indexer.rss.rejected";
 const indexerResultsFilePath = "indexer.rss.results";
+
+// Fabrique utilitaire pour générer des fonctions read/write typées
+function createJsonStoreAccessors(filePath, fallback) {
+  return {
+    read: async () => readJsonStoreTyped(filePath, fallback),
+    write: async (value) => writeJsonStoreTyped(filePath, value),
+  };
+}
+
+const usersStore = createJsonStoreAccessors(usersFilePath, []);
+const indexerSeenStore = createJsonStoreAccessors(indexerSeenFilePath, {});
+const indexerRejectedStore = createJsonStoreAccessors(indexerRejectedFilePath, {});
+const indexerResultsStore = createJsonStoreAccessors(indexerResultsFilePath, {});
+const notificationsStore = createJsonStoreAccessors(notificationsFilePath, {});
 const indexerPollIntervalMs = 1000 * 60 * 0.5;
 const indexerSeenTtlMs = 1000 * 60 * 60 * 24 * 30;
 let indexerPollerStarted = false;
@@ -39,40 +53,33 @@ function writeJsonStoreTyped(filePath, value) {
   writeJsonStoreDb(filePath, value);
 }
 
+
 async function readUsers() {
-  return readJsonStoreTyped(usersFilePath, []);
+  return usersStore.read();
 }
-
 async function readIndexerSeen() {
-  return readJsonStoreTyped(indexerSeenFilePath, {});
+  return indexerSeenStore.read();
 }
-
 async function writeIndexerSeen(entries) {
-  writeJsonStoreTyped(indexerSeenFilePath, entries);
+  return indexerSeenStore.write(entries);
 }
-
 async function readIndexerRejected() {
-  return readJsonStoreTyped(indexerRejectedFilePath, {});
+  return indexerRejectedStore.read();
 }
-
 async function writeIndexerRejected(entries) {
-  writeJsonStoreTyped(indexerRejectedFilePath, entries);
+  return indexerRejectedStore.write(entries);
 }
-
 async function readIndexerResults() {
-  return readJsonStoreTyped(indexerResultsFilePath, {});
+  return indexerResultsStore.read();
 }
-
 async function writeIndexerResults(entries) {
-  writeJsonStoreTyped(indexerResultsFilePath, entries);
+  return indexerResultsStore.write(entries);
 }
-
 async function loadNotifications() {
-  return readJsonStoreTyped(notificationsFilePath, {});
+  return notificationsStore.read();
 }
-
 async function saveNotifications(notifications) {
-  writeJsonStoreTyped(notificationsFilePath, notifications || {});
+  return notificationsStore.write(notifications || {});
 }
 
 function normalizeMatchText(value) {
