@@ -7,7 +7,7 @@ import { isDebugMode, isRequestLogEnabled, port } from "./config.js";
 import { debugLog, errorLog, infoLog, requestLog } from "./logger.js";
 import { initializeAuthStores, registerAuthRoutes } from "./modules/auth.js";
 import { initializeDatabase } from "./db.js";
-import { registerTransmissionRoutes } from "./modules/transmission.js";
+import { registerTransmissionRoutes, startCompletedTorrentsPolling } from "./modules/transmission.js";
 import { registerTorznabRoutes } from "./modules/torznab.js";
 import { registerTmdbRoutes } from "./modules/tmdb.js";
 import { registerWishlistRoutes } from "./modules/wishlist.js";
@@ -46,7 +46,9 @@ async function bootstrapAppData() {
   await initializeAuthStores();
 }
 
-await bootstrapAppData();
+
+// Démarre le polling de complétion des torrents (notification background)
+startCompletedTorrentsPolling({ intervalMs: 60000 }); // 1 min par défaut
 
 registerAuthRoutes(app);
 registerWishlistRoutes(app);

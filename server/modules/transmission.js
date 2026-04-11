@@ -1,3 +1,57 @@
+// Polling régulier pour notifier les torrents complétés même sans requête utilisateur
+import { readUsers } from "./auth.js";
+let completionPoller = null;
+
+/**
+ * Lance un polling régulier pour vérifier les torrents complétés pour tous les utilisateurs.
+ * @param {object} [options]
+ * @param {number} [options.intervalMs=60000] - Intervalle en ms
+ */
+export function startCompletedTorrentsPolling(options = {}) {
+  if (completionPoller) return; // déjà lancé
+  const intervalMs = options.intervalMs || 60000;
+  completionPoller = setInterval(async () => {
+    try {
+      const users = await readUsers();
+      for (const user of users) {
+        // On ne poll que si Transmission est configuré
+        const torrentSettings = user?.settings?.placeholders?.torrent || {};
+        if (!torrentSettings.url || !torrentSettings.port) continue;
+        const auth = { user };
+        try {
+          // On tente de récupérer la liste des torrents
+          const rpcUrl = buildTransmissionRpcUrl(torrentSettings.url, torrentSettings.port);
+          const authHeaders = createAuthHeaders(
+            torrentSettings.authRequired,
+            torrentSettings.username,
+            torrentSettings.password
+          );
+          const response = await executeTransmissionRpc(rpcUrl, authHeaders, {
+            method: "torrent-get",
+            arguments: {
+              fields: [
+                "id",
+                "hashString",
+                "name",
+                "status",
+                "percentDone",
+                "isFinished",
+              ],
+            },
+          });
+          const data = await response.json().catch(() => null);
+          if (response.ok && data?.result === "success" && Array.isArray(data?.arguments?.torrents)) {
+            await notifyCompletedTorrents(auth, data.arguments.torrents);
+          }
+        } catch (err) {
+          debugLog("[Poll] Erreur lors du polling Transmission pour l'utilisateur", user.username, err?.message || err);
+        }
+      }
+    } catch (err) {
+      debugLog("[Poll] Erreur lors du polling global Transmission:", err?.message || err);
+    }
+  }, intervalMs);
+}
 import { withAuth } from "./auth.js";
 import { debugLog } from "../logger.js";
 import { addNotification, sendDiscordNotification } from "./notifications.js";
