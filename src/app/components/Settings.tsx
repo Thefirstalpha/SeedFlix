@@ -1853,6 +1853,7 @@ export function Settings() {
 
         {user?.username === "admin" && (
           <TabsContent value="database">
+            {/* Desktop : Card avec grid */}
             <Card className="border-teal-500/30 bg-teal-950/15 text-white">
               <CardHeader>
                 <CardTitle className="text-teal-200">{t("settings.database.title")}</CardTitle>
@@ -1864,8 +1865,7 @@ export function Settings() {
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
                   {t("settings.database.warning")}
                 </div>
-
-                <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] overflow-x-auto max-w-full">
+                <div className="hidden lg:grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] overflow-x-auto max-w-full">
                   <DatabaseNamespaceList
                     t={t}
                     isLoading={isLoadingDatabaseNamespaces}
@@ -1892,6 +1892,31 @@ export function Settings() {
                 </div>
               </CardContent>
             </Card>
+            {/* Mobile/tablette : composants hors Card */}
+            <div className="flex flex-col gap-6 lg:hidden mt-6">
+              <DatabaseNamespaceList
+                t={t}
+                isLoading={isLoadingDatabaseNamespaces}
+                namespaces={databaseNamespaces}
+                selectedNamespace={selectedDatabaseNamespace}
+                onReload={handleDatabaseNamespacesReload}
+                onSelect={setSelectedDatabaseNamespace}
+              />
+              <DatabaseRawEditorPanel
+                t={t}
+                selectedNamespace={selectedDatabaseNamespace}
+                updatedAt={databaseUpdatedAt}
+                isLoadingValue={isLoadingDatabaseValue}
+                isSavingValue={isSavingDatabaseValue}
+                rawValue={databaseRawValue}
+                onRawValueChange={setDatabaseRawValue}
+                onReload={handleDatabaseReload}
+                onPrettyFormat={handleDatabasePrettyFormat}
+                onSave={handleDatabaseSave}
+                message={databaseMessage}
+                error={databaseError}
+              />
+            </div>
           </TabsContent>
         )}
 
