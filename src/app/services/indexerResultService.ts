@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "../config/tmdb";
+import { API_BASE_URL } from '../config/tmdb';
 
 export interface IndexerResultItem {
   indexerStateKey: string;
@@ -18,7 +18,7 @@ export interface IndexerResultItem {
 
 export interface IndexerResultTarget {
   targetKey: string;
-  targetType: "movie" | "series" | "season" | "episode" | string;
+  targetType: 'movie' | 'series' | 'season' | 'episode' | string;
   mediaId: number | null;
   title: string;
   label: string;
@@ -29,7 +29,7 @@ export interface IndexerResultTarget {
 async function parseJson<T>(response: Response): Promise<T> {
   const text = await response.text();
   if (!text) {
-    throw new Error("Empty response");
+    throw new Error('Empty response');
   }
   return JSON.parse(text);
 }
@@ -37,13 +37,13 @@ async function parseJson<T>(response: Response): Promise<T> {
 async function postIndexerAction(
   path: string,
   payload: Record<string, unknown>,
-  fallbackError: string
+  fallbackError: string,
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: "POST",
-    credentials: "include",
+    method: 'POST',
+    credentials: 'include',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
@@ -55,7 +55,7 @@ async function postIndexerAction(
 
 export async function getIndexerResults(): Promise<IndexerResultTarget[]> {
   const response = await fetch(`${API_BASE_URL}/indexer-results`, {
-    credentials: "include",
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -66,30 +66,39 @@ export async function getIndexerResults(): Promise<IndexerResultTarget[]> {
   return Array.isArray(data?.targets) ? data.targets : [];
 }
 
-export async function rejectIndexerResult(targetKey: string, indexerStateKey: string): Promise<void> {
+export async function rejectIndexerResult(
+  targetKey: string,
+  indexerStateKey: string,
+): Promise<void> {
   await postIndexerAction(
-    "/indexer-results/reject",
+    '/indexer-results/reject',
     { targetKey, indexerStateKey },
-    "Failed to reject indexer result"
+    'Failed to reject indexer result',
   );
 }
 
-export async function rejectAllIndexerResults(targetKey: string, indexerStateKeys: string[]): Promise<void> {
+export async function rejectAllIndexerResults(
+  targetKey: string,
+  indexerStateKeys: string[],
+): Promise<void> {
   if (!Array.isArray(indexerStateKeys) || indexerStateKeys.length === 0) {
     return;
   }
 
   await postIndexerAction(
-    "/indexer-results/reject-all",
+    '/indexer-results/reject-all',
     { targetKey, indexerStateKeys },
-    "Failed to reject all indexer results"
+    'Failed to reject all indexer results',
   );
 }
 
-export async function validateIndexerResult(targetKey: string, indexerStateKey: string): Promise<void> {
+export async function validateIndexerResult(
+  targetKey: string,
+  indexerStateKey: string,
+): Promise<void> {
   await postIndexerAction(
-    "/indexer-results/validate",
+    '/indexer-results/validate',
     { targetKey, indexerStateKey },
-    "Failed to validate indexer result"
+    'Failed to validate indexer result',
   );
 }

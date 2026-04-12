@@ -1,23 +1,24 @@
-import { useParams, Link, useNavigate } from "react-router";
-import { useState, useEffect, useMemo } from "react";
-import { ArrowLeft, Star, Calendar, Clock, User, Heart } from "lucide-react";
-import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
-import { Card, CardContent } from "./ui/card";
-import { TorrentResultsPanel } from "./TorrentResultsPanel";
-import { getMovieById, searchMovieReleases, type TorznabMovieResult } from "../services/movieService";
-import { addTorrentToClient } from "../services/torrentService";
-import { addToWishlist, removeFromWishlist, isInWishlist } from "../services/wishlistService";
+import { ArrowLeft, Star, Calendar, Clock, User, Heart } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, Link, useNavigate } from 'react-router';
+import { TorrentResultsPanel } from './TorrentResultsPanel';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Card, CardContent } from './ui/card';
+import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../i18n/LanguageProvider';
+import { normalizeIndexerLanguage, normalizeQuality } from '../services/indexerNormalization';
 import {
-  normalizeIndexerLanguage,
-  normalizeQuality,
-} from "../services/indexerNormalization";
-import { buildTorrentResultsLabels } from "../services/torrentResultsLabels";
-import { useAuth } from "../context/AuthContext";
-import { useI18n } from "../i18n/LanguageProvider";
-import type { Movie } from "../types/movie";
+  getMovieById,
+  searchMovieReleases,
+  type TorznabMovieResult,
+} from '../services/movieService';
+import { buildTorrentResultsLabels } from '../services/torrentResultsLabels';
+import { addTorrentToClient } from '../services/torrentService';
+import { addToWishlist, removeFromWishlist, isInWishlist } from '../services/wishlistService';
+import type { Movie } from '../types/movie';
 
-const MOVIE_QUALITY_FILTERS = ["all", "2160p", "1080p", "720p", "480p", "bluray", "webdl", "hdtv"];
+const MOVIE_QUALITY_FILTERS = ['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv'];
 
 export function MovieDetails() {
   const { id } = useParams();
@@ -33,24 +34,26 @@ export function MovieDetails() {
   const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
   const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
   const [torrentError, setTorrentError] = useState<string | null>(null);
-  const [qualityFilter, setQualityFilter] = useState("all");
-  const [languageFilter, setLanguageFilter] = useState("all");
+  const [qualityFilter, setQualityFilter] = useState('all');
+  const [languageFilter, setLanguageFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<"size" | "date">("date");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortBy, setSortBy] = useState<'size' | 'date'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
-    const preferred = String(settings?.placeholders?.indexer?.defaultQuality || "all").toLowerCase();
-    setQualityFilter(MOVIE_QUALITY_FILTERS.includes(preferred) ? preferred : "all");
+    const preferred = String(
+      settings?.placeholders?.indexer?.defaultQuality || 'all',
+    ).toLowerCase();
+    setQualityFilter(MOVIE_QUALITY_FILTERS.includes(preferred) ? preferred : 'all');
   }, [settings?.placeholders?.indexer?.defaultQuality]);
 
   const filteredReleaseResults = useMemo(() => {
     let results = releaseResults.filter((item) => {
       const languageOk =
-        languageFilter === "all" || normalizeIndexerLanguage(item.language) === languageFilter;
+        languageFilter === 'all' || normalizeIndexerLanguage(item.language) === languageFilter;
 
-      if (qualityFilter === "all") {
+      if (qualityFilter === 'all') {
         return languageOk;
       }
 
@@ -58,17 +61,17 @@ export function MovieDetails() {
     });
 
     // Apply sorting
-    if (sortBy === "size") {
+    if (sortBy === 'size') {
       results.sort((a, b) => {
         const sizeA = a.sizeBytes || 0;
         const sizeB = b.sizeBytes || 0;
-        return sortOrder === "desc" ? sizeB - sizeA : sizeA - sizeB;
+        return sortOrder === 'desc' ? sizeB - sizeA : sizeA - sizeB;
       });
-    } else if (sortBy === "date") {
+    } else if (sortBy === 'date') {
       results.sort((a, b) => {
         const dateA = a.pubDate ? new Date(a.pubDate).getTime() : 0;
         const dateB = b.pubDate ? new Date(b.pubDate).getTime() : 0;
-        return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
+        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
     }
 
@@ -78,7 +81,7 @@ export function MovieDetails() {
   const totalPages = Math.ceil(filteredReleaseResults.length / ITEMS_PER_PAGE);
   const paginatedResults = filteredReleaseResults.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    currentPage * ITEMS_PER_PAGE,
   );
 
   // Reset to page 1 when filters change
@@ -87,16 +90,12 @@ export function MovieDetails() {
   }, [qualityFilter, languageFilter, sortBy, sortOrder]);
 
   const availableReleaseLanguages = Array.from(
-    new Set(
-      releaseResults
-        .map((item) => normalizeIndexerLanguage(item.language))
-        .filter(Boolean)
-    )
-  ).sort((a, b) => a.localeCompare(b, "fr"));
+    new Set(releaseResults.map((item) => normalizeIndexerLanguage(item.language)).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b, 'fr'));
 
   const torrentPanelLabels = useMemo(
-    () => buildTorrentResultsLabels(t, { sectionKey: "movieDetails" }),
-    [t]
+    () => buildTorrentResultsLabels(t, { sectionKey: 'movieDetails' }),
+    [t],
   );
 
   useEffect(() => {
@@ -117,14 +116,14 @@ export function MovieDetails() {
           const indexerResponse = await searchMovieReleases(
             movieData.originalTitle || movieData.title,
             12,
-            movieData.id
+            movieData.id,
           );
           setReleaseResults(indexerResponse.items);
         } catch (indexerError) {
           setReleaseError(
             indexerError instanceof Error
               ? indexerError.message
-              : t("movieDetails.errors.indexerSearchFailed")
+              : t('movieDetails.errors.indexerSearchFailed'),
           );
           setReleaseResults([]);
         } finally {
@@ -151,8 +150,8 @@ export function MovieDetails() {
       setInWishlist(true);
     }
 
-    window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
-    window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
+    window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
+    window.dispatchEvent(new CustomEvent('seedflix:notifications-refresh-request'));
   };
 
   const handleAddTorrent = async (torrentUrl: string) => {
@@ -164,12 +163,12 @@ export function MovieDetails() {
       const response = await addTorrentToClient(torrentUrl);
       setTorrentStatus(
         response.duplicate
-          ? t("movieDetails.messages.duplicateTorrent")
-          : t("movieDetails.messages.torrentAdded")
+          ? t('movieDetails.messages.duplicateTorrent')
+          : t('movieDetails.messages.torrentAdded'),
       );
     } catch (error) {
       setTorrentError(
-        error instanceof Error ? error.message : t("movieDetails.errors.addTorrentFailed")
+        error instanceof Error ? error.message : t('movieDetails.errors.addTorrentFailed'),
       );
     } finally {
       setAddingTorrentLink(null);
@@ -197,11 +196,11 @@ export function MovieDetails() {
   if (!movie) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-2xl font-bold text-white mb-4">{t("movieDetails.notFoundTitle")}</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">{t('movieDetails.notFoundTitle')}</h2>
         <Link to="/">
           <Button className="bg-purple-600 hover:bg-purple-700 text-white">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            {t("movieDetails.backHome")}
+            {t('movieDetails.backHome')}
           </Button>
         </Link>
       </div>
@@ -212,13 +211,13 @@ export function MovieDetails() {
     <div className="space-y-8 overflow-x-hidden">
       {/* Back Button and Wishlist */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Button 
+        <Button
           onClick={() => navigate(-1)}
-          variant="outline" 
+          variant="outline"
           className="border-purple-500/30 bg-purple-600/10 text-white hover:bg-purple-600/20 hover:border-purple-500/50"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          {t("movieDetails.back")}
+          {t('movieDetails.back')}
         </Button>
 
         <Button
@@ -230,7 +229,7 @@ export function MovieDetails() {
           }`}
         >
           <Heart className={`w-5 h-5 mr-2 ${inWishlist ? 'fill-current' : ''}`} />
-          {inWishlist ? t("movieDetails.removeFromWishlist") : t("movieDetails.addToWishlist")}
+          {inWishlist ? t('movieDetails.removeFromWishlist') : t('movieDetails.addToWishlist')}
         </Button>
       </div>
 
@@ -238,11 +237,7 @@ export function MovieDetails() {
       {movie.backdrop && (
         <div className="relative mb-20 lg:mb-0">
           <div className="relative w-full h-44 sm:h-56 md:h-80 lg:h-96 rounded-lg overflow-hidden">
-            <img
-              src={movie.backdrop}
-              alt={movie.title}
-              className="w-full h-full object-cover"
-            />
+            <img src={movie.backdrop} alt={movie.title} className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent" />
             <div className="hidden lg:block absolute bottom-0 left-0 p-8">
               <h1 className="text-4xl font-bold text-white mb-2 line-clamp-2">{movie.title}</h1>
@@ -267,7 +262,9 @@ export function MovieDetails() {
       {/* Movie Header */}
       <div className="grid lg:grid-cols-3 gap-8 justify-items-center lg:justify-items-stretch">
         {/* Poster */}
-        <div className={`lg:col-span-1 max-w-[280px] sm:max-w-sm lg:max-w-none mx-auto lg:mx-0 w-full ${movie.backdrop ? "hidden lg:block" : ""}`}>
+        <div
+          className={`lg:col-span-1 max-w-[280px] sm:max-w-sm lg:max-w-none mx-auto lg:mx-0 w-full ${movie.backdrop ? 'hidden lg:block' : ''}`}
+        >
           <Card className="overflow-hidden bg-white/5 border-white/10">
             <img
               src={movie.poster}
@@ -278,7 +275,7 @@ export function MovieDetails() {
         </div>
 
         {/* Details */}
-        <div className={`lg:col-span-2 space-y-6 ${movie.backdrop ? "lg:pt-4" : ""}`}>
+        <div className={`lg:col-span-2 space-y-6 ${movie.backdrop ? 'lg:pt-4' : ''}`}>
           <div>
             {movie.backdrop ? (
               <div className="lg:hidden">
@@ -304,9 +301,7 @@ export function MovieDetails() {
                 <Clock className="w-5 h-5" />
                 <span>{movie.duration}</span>
               </div>
-              <Badge className="bg-purple-600 text-white">
-                {movie.genre}
-              </Badge>
+              <Badge className="bg-purple-600 text-white">{movie.genre}</Badge>
             </div>
           </div>
 
@@ -318,13 +313,15 @@ export function MovieDetails() {
               <span className="text-white/60">/10</span>
             </div>
             {movie.voteCount && (
-              <span className="text-white/60">{t("movieDetails.votes", { count: movie.voteCount.toLocaleString() })}</span>
+              <span className="text-white/60">
+                {t('movieDetails.votes', { count: movie.voteCount.toLocaleString() })}
+              </span>
             )}
           </div>
 
           {/* Plot */}
           <div>
-            <h2 className="text-2xl font-semibold text-white mb-3">{t("movieDetails.synopsis")}</h2>
+            <h2 className="text-2xl font-semibold text-white mb-3">{t('movieDetails.synopsis')}</h2>
             <p className="text-white/80 text-lg leading-relaxed break-words">{movie.plot}</p>
           </div>
 
@@ -333,7 +330,7 @@ export function MovieDetails() {
             <CardContent className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <User className="w-5 h-5 text-purple-400" />
-                <h3 className="text-xl font-semibold text-white">{t("movieDetails.director")}</h3>
+                <h3 className="text-xl font-semibold text-white">{t('movieDetails.director')}</h3>
               </div>
               <p className="text-white/80 text-lg break-words">{movie.director}</p>
             </CardContent>
@@ -343,12 +340,12 @@ export function MovieDetails() {
           {movie.actors.length > 0 && (
             <Card className="bg-white/5 border-white/10">
               <CardContent className="p-6">
-                <h3 className="text-xl font-semibold text-white mb-4">{t("movieDetails.cast")}</h3>
+                <h3 className="text-xl font-semibold text-white mb-4">{t('movieDetails.cast')}</h3>
                 <div className="flex flex-wrap gap-2">
                   {movie.actors.map((actor, index) => (
-                    <Badge 
-                      key={index} 
-                      variant="outline" 
+                    <Badge
+                      key={index}
+                      variant="outline"
                       className="max-w-full border-white/20 text-white bg-white/5 px-3 py-1 break-words"
                     >
                       {actor}
@@ -360,7 +357,7 @@ export function MovieDetails() {
           )}
 
           <TorrentResultsPanel
-            title={t("movieDetails.indexer.title")}
+            title={t('movieDetails.indexer.title')}
             qualityFilter={qualityFilter}
             onQualityFilterChange={setQualityFilter}
             languageFilter={languageFilter}
@@ -369,7 +366,7 @@ export function MovieDetails() {
             sortBy={sortBy}
             onSortByChange={setSortBy}
             sortOrder={sortOrder}
-            onSortOrderToggle={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+            onSortOrderToggle={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
             isReleaseLoading={isReleaseLoading}
             releaseError={releaseError}
             torrentStatus={torrentStatus}
@@ -381,7 +378,7 @@ export function MovieDetails() {
             currentPage={currentPage}
             onCurrentPageChange={setCurrentPage}
             totalPages={totalPages}
-            locale={language === "fr" ? "fr-FR" : "en-US"}
+            locale={language === 'fr' ? 'fr-FR' : 'en-US'}
             labels={torrentPanelLabels}
           />
 
@@ -395,7 +392,7 @@ export function MovieDetails() {
               }`}
             >
               <Heart className={`w-5 h-5 mr-2 ${inWishlist ? 'fill-current' : ''}`} />
-              {inWishlist ? t("movieDetails.removeFromWishlist") : t("movieDetails.addToWishlist")}
+              {inWishlist ? t('movieDetails.removeFromWishlist') : t('movieDetails.addToWishlist')}
             </Button>
           </div>
         </div>

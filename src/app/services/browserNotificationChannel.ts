@@ -4,16 +4,16 @@ export interface BrowserNotificationDevice {
   createdAt: string;
 }
 
-const BROWSER_DEVICE_ID_KEY = "seedflix:browser-device-id";
+const BROWSER_DEVICE_ID_KEY = 'seedflix:browser-device-id';
 
 function safeWindow(): Window | null {
-  return typeof window === "undefined" ? null : window;
+  return typeof window === 'undefined' ? null : window;
 }
 
 export function getOrCreateBrowserDeviceId(): string {
   const win = safeWindow();
   if (!win) {
-    return "";
+    return '';
   }
 
   const existing = win.localStorage.getItem(BROWSER_DEVICE_ID_KEY);
@@ -22,7 +22,7 @@ export function getOrCreateBrowserDeviceId(): string {
   }
 
   const generated =
-    typeof win.crypto?.randomUUID === "function"
+    typeof win.crypto?.randomUUID === 'function'
       ? win.crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
@@ -31,12 +31,12 @@ export function getOrCreateBrowserDeviceId(): string {
 }
 
 export function getDefaultBrowserDeviceName(): string {
-  if (typeof navigator === "undefined") {
-    return "Navigateur";
+  if (typeof navigator === 'undefined') {
+    return 'Navigateur';
   }
 
-  const platform = String(navigator.platform || "").trim();
-  const appName = String(navigator.appName || "Navigateur").trim();
+  const platform = String(navigator.platform || '').trim();
+  const appName = String(navigator.appName || 'Navigateur').trim();
   return platform ? `${appName} - ${platform}` : appName;
 }
 
@@ -47,13 +47,13 @@ export function parseBrowserDevices(value: unknown): BrowserNotificationDevice[]
 
   return value
     .map((entry) => {
-      if (!entry || typeof entry !== "object") {
+      if (!entry || typeof entry !== 'object') {
         return null;
       }
 
-      const id = String((entry as { id?: unknown }).id || "").trim();
-      const name = String((entry as { name?: unknown }).name || "").trim();
-      const createdAtRaw = String((entry as { createdAt?: unknown }).createdAt || "").trim();
+      const id = String((entry as { id?: unknown }).id || '').trim();
+      const name = String((entry as { name?: unknown }).name || '').trim();
+      const createdAtRaw = String((entry as { createdAt?: unknown }).createdAt || '').trim();
       const createdAt = createdAtRaw || new Date().toISOString();
 
       if (!id || !name) {

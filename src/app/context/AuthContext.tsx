@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   getCurrentAuth,
   login as loginRequest,
@@ -13,7 +6,7 @@ import {
   type AuthResponse,
   type AuthUser,
   type UserSettings,
-} from "../services/authService";
+} from '../services/authService';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -81,57 +74,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, []);
 
-  const value = useMemo<AuthContextValue>(() => ({
-    user,
-    settings,
-    mustChangePassword,
-    mustConfigureTmdb,
-    mustConfigureTorrent,
-    mustConfigureIndexer,
-    shouldChangePassword,
-    legalAccepted,
-    needsInitialSetup,
-    isAuthenticated: Boolean(user),
-    isLoading,
-    login: async (username: string, password: string) => {
-      const response = await loginRequest(username, password);
-      setUser(response.user || null);
-      setSettings(response.settings || null);
-      setMustChangePassword(response.mustChangePassword);
-      setMustConfigureTmdb(response.mustConfigureTmdb);
-      setMustConfigureTorrent(response.mustConfigureTorrent);
-      setMustConfigureIndexer(response.mustConfigureIndexer);
-      setShouldChangePassword(response.shouldChangePassword);
-      setLegalAccepted(Boolean(response.legalAccepted));
-      setNeedsInitialSetup(response.needsInitialSetup);
-      return response;
-    },
-    logout: async () => {
-      await logoutRequest();
-      setUser(null);
-      setSettings(null);
-      setMustChangePassword(false);
-      setMustConfigureTmdb(false);
-      setMustConfigureTorrent(false);
-      setMustConfigureIndexer(false);
-      setShouldChangePassword(false);
-      setLegalAccepted(false);
-      setNeedsInitialSetup(false);
-    },
-    refresh,
-    setSettings,
-  }), [
-    user,
-    settings,
-    mustChangePassword,
-    mustConfigureTmdb,
-    mustConfigureTorrent,
-    mustConfigureIndexer,
-    shouldChangePassword,
-    legalAccepted,
-    needsInitialSetup,
-    isLoading,
-  ]);
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      settings,
+      mustChangePassword,
+      mustConfigureTmdb,
+      mustConfigureTorrent,
+      mustConfigureIndexer,
+      shouldChangePassword,
+      legalAccepted,
+      needsInitialSetup,
+      isAuthenticated: Boolean(user),
+      isLoading,
+      login: async (username: string, password: string) => {
+        const response = await loginRequest(username, password);
+        setUser(response.user || null);
+        setSettings(response.settings || null);
+        setMustChangePassword(response.mustChangePassword);
+        setMustConfigureTmdb(response.mustConfigureTmdb);
+        setMustConfigureTorrent(response.mustConfigureTorrent);
+        setMustConfigureIndexer(response.mustConfigureIndexer);
+        setShouldChangePassword(response.shouldChangePassword);
+        setLegalAccepted(Boolean(response.legalAccepted));
+        setNeedsInitialSetup(response.needsInitialSetup);
+        return response;
+      },
+      logout: async () => {
+        await logoutRequest();
+        setUser(null);
+        setSettings(null);
+        setMustChangePassword(false);
+        setMustConfigureTmdb(false);
+        setMustConfigureTorrent(false);
+        setMustConfigureIndexer(false);
+        setShouldChangePassword(false);
+        setLegalAccepted(false);
+        setNeedsInitialSetup(false);
+      },
+      refresh,
+      setSettings,
+    }),
+    [
+      user,
+      settings,
+      mustChangePassword,
+      mustConfigureTmdb,
+      mustConfigureTorrent,
+      mustConfigureIndexer,
+      shouldChangePassword,
+      legalAccepted,
+      needsInitialSetup,
+      isLoading,
+    ],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -139,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within AuthProvider");
+    throw new Error('useAuth must be used within AuthProvider');
   }
   return context;
 }

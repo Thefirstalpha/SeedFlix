@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router";
-import { LockKeyhole, User } from "lucide-react";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { useAuth } from "../context/AuthContext";
-import { useI18n } from "../i18n/LanguageProvider";
+import { LockKeyhole, User } from 'lucide-react';
+import { useState } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router';
+import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../i18n/LanguageProvider';
 
 export function Login() {
   const navigate = useNavigate();
@@ -28,16 +28,22 @@ export function Login() {
     mustConfigureTmdb ||
     mustConfigureTorrent ||
     mustConfigureIndexer;
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isLoading && isAuthenticated) {
     if (hasPendingSetup) {
-      return <Navigate to="/setup" replace state={{ from: (location.state as { from?: string } | null)?.from || "/", forced: true }} />;
+      return (
+        <Navigate
+          to="/setup"
+          replace
+          state={{ from: (location.state as { from?: string } | null)?.from || '/', forced: true }}
+        />
+      );
     }
-    const nextPath = (location.state as { from?: string } | null)?.from || "/";
+    const nextPath = (location.state as { from?: string } | null)?.from || '/';
     return <Navigate to={nextPath} replace />;
   }
 
@@ -53,27 +59,23 @@ export function Login() {
         response.mustConfigureTmdb ||
         response.mustConfigureTorrent ||
         response.mustConfigureIndexer ||
-        (username === "admin" && password === "admin");
+        (username === 'admin' && password === 'admin');
 
       if (mustOpenSetup) {
-        navigate("/setup", {
+        navigate('/setup', {
           replace: true,
           state: {
-            from: (location.state as { from?: string } | null)?.from || "/",
+            from: (location.state as { from?: string } | null)?.from || '/',
             forced: true,
           },
         });
         return;
       }
 
-      const nextPath = (location.state as { from?: string } | null)?.from || "/";
+      const nextPath = (location.state as { from?: string } | null)?.from || '/';
       navigate(nextPath, { replace: true });
     } catch (submitError) {
-      setError(
-        submitError instanceof Error
-          ? submitError.message
-          : t("login.failed")
-      );
+      setError(submitError instanceof Error ? submitError.message : t('login.failed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -82,26 +84,18 @@ export function Login() {
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center px-4">
       <div className="mb-8 flex items-center gap-3">
-        <img
-          src="/favicon.svg"
-          alt={t("common.appName")}
-          className="h-12 w-12 rounded-sm"
-        />
-        <h1 className="text-4xl font-black text-white tracking-tighter">
-          {t("common.appName")}
-        </h1>
+        <img src="/favicon.svg" alt={t('common.appName')} className="h-12 w-12 rounded-sm" />
+        <h1 className="text-4xl font-black text-white tracking-tighter">{t('common.appName')}</h1>
       </div>
       <Card className="w-full max-w-md border-white/10 bg-white/5 text-white backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="text-2xl">{t("login.title")}</CardTitle>
-          <CardDescription className="text-white/60">
-            {t("login.description")}
-          </CardDescription>
+          <CardTitle className="text-2xl">{t('login.title')}</CardTitle>
+          <CardDescription className="text-white/60">{t('login.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">{t("login.username")}</Label>
+              <Label htmlFor="username">{t('login.username')}</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-white/40" />
                 <Input
@@ -114,7 +108,7 @@ export function Login() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">{t("login.password")}</Label>
+              <Label htmlFor="password">{t('login.password')}</Label>
               <div className="relative">
                 <LockKeyhole className="absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-white/40" />
                 <Input
@@ -134,7 +128,7 @@ export function Login() {
               disabled={isSubmitting}
               className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
             >
-              {isSubmitting ? t("login.submitting") : t("login.submit")}
+              {isSubmitting ? t('login.submitting') : t('login.submit')}
             </Button>
           </form>
         </CardContent>

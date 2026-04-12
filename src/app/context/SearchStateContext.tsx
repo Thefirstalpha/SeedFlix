@@ -1,20 +1,13 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from "react";
-import type { Movie } from "../types/movie";
-import type { Series } from "../types/series";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import type { Movie } from '../types/movie';
+import type { Series } from '../types/series';
 
 interface SearchState {
   query: string;
   debouncedQuery: string;
   activeSearchQuery: string;
   popularCacheKey: string;
-  contentFilter: "all" | "movie" | "series";
+  contentFilter: 'all' | 'movie' | 'series';
   genreFilter: string;
   languageFilter: string;
   yearFrom: string;
@@ -50,21 +43,23 @@ interface SearchState {
 
 interface SearchStateContextValue {
   state: SearchState;
-  updateSearchState: (updates: Partial<SearchState> | ((prev: SearchState) => Partial<SearchState>)) => void;
+  updateSearchState: (
+    updates: Partial<SearchState> | ((_prev: SearchState) => Partial<SearchState>),
+  ) => void;
   resetSearchState: () => void;
 }
 
 const DEFAULT_SEARCH_STATE: SearchState = {
-  query: "",
-  debouncedQuery: "",
-  activeSearchQuery: "",
-  popularCacheKey: "",
-  contentFilter: "all",
-  genreFilter: "all",
-  languageFilter: "all",
-  yearFrom: "",
-  yearTo: "",
-  minRating: "0",
+  query: '',
+  debouncedQuery: '',
+  activeSearchQuery: '',
+  popularCacheKey: '',
+  contentFilter: 'all',
+  genreFilter: 'all',
+  languageFilter: 'all',
+  yearFrom: '',
+  yearTo: '',
+  minRating: '0',
   filtersOpen: false,
 
   movieGenres: [],
@@ -89,9 +84,7 @@ const DEFAULT_SEARCH_STATE: SearchState = {
   seriesCarouselScrollLeft: 0,
 };
 
-const SearchStateContext = createContext<SearchStateContextValue | undefined>(
-  undefined
-);
+const SearchStateContext = createContext<SearchStateContextValue | undefined>(undefined);
 
 export function SearchStateProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SearchState>(DEFAULT_SEARCH_STATE);
@@ -99,35 +92,38 @@ export function SearchStateProvider({ children }: { children: ReactNode }) {
   // Load state from localStorage on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("searchState");
+      const saved = localStorage.getItem('searchState');
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<SearchState>;
         setState((prev) => ({ ...prev, ...parsed }));
       }
     } catch (error) {
-      console.error("Error loading search state from localStorage:", error);
+      console.error('Error loading search state from localStorage:', error);
     }
   }, []);
 
   // Save state to localStorage whenever it changes
   useEffect(() => {
     try {
-      localStorage.setItem("searchState", JSON.stringify(state));
+      localStorage.setItem('searchState', JSON.stringify(state));
     } catch (error) {
-      console.error("Error saving search state to localStorage:", error);
+      console.error('Error saving search state to localStorage:', error);
     }
   }, [state]);
 
-  const updateSearchState = useCallback((updates: Partial<SearchState> | ((prev: SearchState) => Partial<SearchState>)) => {
-    setState((prev) => {
-      const nextUpdates = typeof updates === 'function' ? updates(prev) : updates;
-      return { ...prev, ...nextUpdates };
-    });
-  }, []);
+  const updateSearchState = useCallback(
+    (updates: Partial<SearchState> | ((prev: SearchState) => Partial<SearchState>)) => {
+      setState((prev) => {
+        const nextUpdates = typeof updates === 'function' ? updates(prev) : updates;
+        return { ...prev, ...nextUpdates };
+      });
+    },
+    [],
+  );
 
   const resetSearchState = () => {
     setState(DEFAULT_SEARCH_STATE);
-    localStorage.removeItem("searchState");
+    localStorage.removeItem('searchState');
   };
 
   return (
@@ -146,9 +142,7 @@ export function SearchStateProvider({ children }: { children: ReactNode }) {
 export function useSearchState() {
   const context = useContext(SearchStateContext);
   if (context === undefined) {
-    throw new Error(
-      "useSearchState must be used within a SearchStateProvider"
-    );
+    throw new Error('useSearchState must be used within a SearchStateProvider');
   }
   return context;
 }

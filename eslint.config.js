@@ -19,6 +19,32 @@ export default [
         ecmaFeatures: { jsx: true },
         ecmaVersion: "latest",
         sourceType: "module"
+      },
+      // env supprimé : non supporté en flat config
+      globals: {
+        React: "readonly",
+        HTMLDivElement: "readonly",
+        HTMLImageElement: "readonly",
+        URLSearchParams: "readonly",
+        Node: "readonly",
+        Notification: "readonly",
+        Window: "readonly",
+        WheelEvent: "readonly",
+        window: "readonly",
+        document: "readonly",
+        console: "readonly",
+        setTimeout: "readonly",
+        setInterval: "readonly",
+        clearTimeout: "readonly",
+        clearInterval: "readonly",
+        fetch: "readonly",
+        navigator: "readonly",
+        CustomEvent: "readonly",
+        Event: "readonly",
+        MouseEvent: "readonly",
+        KeyboardEvent: "readonly",
+        localStorage: "readonly",
+        Response: "readonly"
       }
     },
     plugins: {
@@ -29,8 +55,9 @@ export default [
       "prettier": prettierPlugin
     },
     rules: {
+      "no-unused-vars": "off",
       "unused-imports/no-unused-imports": "error",
-      "unused-imports/no-unused-vars": ["warn", { "vars": "all", "varsIgnorePattern": "^_", "args": "after-used", "argsIgnorePattern": "^_" }],
+      "@typescript-eslint/no-unused-vars": ["error", { "vars": "all", "varsIgnorePattern": "^_", "args": "after-used", "argsIgnorePattern": "^_" }],
       "react/react-in-jsx-scope": "off",
       "import/order": ["warn", { "groups": ["builtin", "external", "internal"], "alphabetize": { "order": "asc", "caseInsensitive": true } }],
       "prettier/prettier": "warn"

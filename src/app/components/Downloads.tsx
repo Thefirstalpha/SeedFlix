@@ -1,10 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, CheckCircle2, Circle, Download, Loader2, Pause, Play, SlidersHorizontal, Trash2, Unlink } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  Circle,
+  Download,
+  Loader2,
+  Pause,
+  Play,
+  SlidersHorizontal,
+  Trash2,
+  Unlink,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Progress } from "./ui/progress";
-import { Button } from "./ui/button";
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Progress } from './ui/progress';
+import { useI18n } from '../i18n/LanguageProvider';
 import {
   getTorrentDownloads,
   pauseTorrent,
@@ -12,15 +24,14 @@ import {
   cleanTorrent,
   unmanageTorrent,
   type TorrentDownloadItem,
-} from "../services/torrentService";
-import { useI18n } from "../i18n/LanguageProvider";
+} from '../services/torrentService';
 
 function formatRate(bytesPerSec: number) {
   if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) {
-    return "0 B/s";
+    return '0 B/s';
   }
 
-  const units = ["B/s", "KB/s", "MB/s", "GB/s"];
+  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
   let value = bytesPerSec;
   let index = 0;
   while (value >= 1024 && index < units.length - 1) {
@@ -62,7 +73,7 @@ function DownloadCard({
   handlePause,
   handleResume,
   handleUnmanage,
-  handleClean
+  handleClean,
 }: {
   item: TorrentDownloadItem;
   t: any;
@@ -83,8 +94,8 @@ function DownloadCard({
       key={item.id}
       className={`border-white/10 text-white transition-all ${
         completed
-          ? "bg-gradient-to-r from-emerald-900/30 to-emerald-800/20 border-emerald-500/30"
-          : "bg-white/5"
+          ? 'bg-gradient-to-r from-emerald-900/30 to-emerald-800/20 border-emerald-500/30'
+          : 'bg-white/5'
       }`}
     >
       <CardHeader className="pb-2">
@@ -105,28 +116,36 @@ function DownloadCard({
           )}
           {completed && (
             <Badge className="border-emerald-500/50 bg-emerald-600/40 text-emerald-200">
-              ✓ {t("downloads.finished")}
+              ✓ {t('downloads.finished')}
             </Badge>
           )}
-          <Badge variant="outline" className={completed ? "border-emerald-500/40 text-emerald-300" : "border-white/30 text-white/80"}>
+          <Badge
+            variant="outline"
+            className={
+              completed ? 'border-emerald-500/40 text-emerald-300' : 'border-white/30 text-white/80'
+            }
+          >
             {item.statusLabel}
           </Badge>
           {!completed && !isPaused && (
             <>
               <Badge variant="outline" className="border-lime-500/40 text-lime-300">
-                {t("downloads.rate")}: {formatRate(item.rateDownload)}
+                {t('downloads.rate')}: {formatRate(item.rateDownload)}
               </Badge>
               <Badge variant="outline" className="border-amber-500/40 text-amber-300">
-                {t("downloads.eta")}: {formatEta(item.eta, t("downloads.unknown"), t("downloads.finished"))}
+                {t('downloads.eta')}:{' '}
+                {formatEta(item.eta, t('downloads.unknown'), t('downloads.finished'))}
               </Badge>
             </>
           )}
           <Badge variant="outline" className="border-purple-500/40 text-purple-300">
-            {t("downloads.peers")}: {item.peersConnected}
+            {t('downloads.peers')}: {item.peersConnected}
           </Badge>
         </div>
         {item.error > 0 && item.errorString ? (
-          <p className="text-sm text-red-300">{t("downloads.errorPrefix")}: {item.errorString}</p>
+          <p className="text-sm text-red-300">
+            {t('downloads.errorPrefix')}: {item.errorString}
+          </p>
         ) : null}
         <div className="flex flex-wrap gap-2 pt-2">
           {!completed && isActive && (
@@ -136,19 +155,19 @@ function DownloadCard({
               disabled={actionInProgress === `pause-${item.id}`}
               className={`border transition-all ${
                 actionInProgress === `pause-${item.id}`
-                  ? "bg-amber-600/20 text-amber-200/50 border-amber-500/20 cursor-wait"
-                  : "bg-amber-600/40 hover:bg-amber-600/60 text-amber-200 border-amber-500/30"
+                  ? 'bg-amber-600/20 text-amber-200/50 border-amber-500/20 cursor-wait'
+                  : 'bg-amber-600/40 hover:bg-amber-600/60 text-amber-200 border-amber-500/30'
               }`}
             >
               {actionInProgress === `pause-${item.id}` ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                  {t("downloads.pause")}
+                  {t('downloads.pause')}
                 </>
               ) : (
                 <>
                   <Pause className="w-4 h-4 mr-1" />
-                  {t("downloads.pause")}
+                  {t('downloads.pause')}
                 </>
               )}
             </Button>
@@ -160,19 +179,19 @@ function DownloadCard({
               disabled={actionInProgress === `resume-${item.id}`}
               className={`border transition-all ${
                 actionInProgress === `resume-${item.id}`
-                  ? "bg-cyan-600/20 text-cyan-200/50 border-cyan-500/20 cursor-wait"
-                  : "bg-cyan-600/40 hover:bg-cyan-600/60 text-cyan-200 border-cyan-500/30"
+                  ? 'bg-cyan-600/20 text-cyan-200/50 border-cyan-500/20 cursor-wait'
+                  : 'bg-cyan-600/40 hover:bg-cyan-600/60 text-cyan-200 border-cyan-500/30'
               }`}
             >
               {actionInProgress === `resume-${item.id}` ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                  {t("downloads.resume")}
+                  {t('downloads.resume')}
                 </>
               ) : (
                 <>
                   <Play className="w-4 h-4 mr-1" />
-                  {t("downloads.resume")}
+                  {t('downloads.resume')}
                 </>
               )}
             </Button>
@@ -180,50 +199,50 @@ function DownloadCard({
           {item.managedBySeedflix && (
             <Button
               size="sm"
-              onClick={() => handleUnmanage(item.hashString || "")}
+              onClick={() => handleUnmanage(item.hashString || '')}
               disabled={actionInProgress === `unmanage-${item.hashString}`}
               className={`border transition-all ${
                 actionInProgress === `unmanage-${item.hashString}`
-                  ? "bg-slate-600/20 text-slate-200/50 border-slate-500/20 cursor-wait"
-                  : "bg-slate-600/30 hover:bg-slate-600/50 text-slate-300 border-slate-500/20"
+                  ? 'bg-slate-600/20 text-slate-200/50 border-slate-500/20 cursor-wait'
+                  : 'bg-slate-600/30 hover:bg-slate-600/50 text-slate-300 border-slate-500/20'
               }`}
             >
               {actionInProgress === `unmanage-${item.hashString}` ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                  {t("downloads.dontTrack")}
+                  {t('downloads.dontTrack')}
                 </>
               ) : (
                 <>
                   <Unlink className="w-4 h-4 mr-1" />
-                  {t("downloads.dontTrack")}
+                  {t('downloads.dontTrack')}
                 </>
               )}
             </Button>
           )}
           <Button
             size="sm"
-            onClick={() => handleClean(item.hashString || "")}
+            onClick={() => handleClean(item.hashString || '')}
             disabled={actionInProgress === `clean-${item.hashString}`}
             className={`border transition-all ${
               actionInProgress === `clean-${item.hashString}`
                 ? completed
-                  ? "bg-red-600/20 text-red-200/50 border-red-500/20 cursor-wait"
-                  : "bg-red-600/10 text-red-300/50 border-red-500/10 cursor-wait"
+                  ? 'bg-red-600/20 text-red-200/50 border-red-500/20 cursor-wait'
+                  : 'bg-red-600/10 text-red-300/50 border-red-500/10 cursor-wait'
                 : completed
-                  ? "bg-red-600/40 hover:bg-red-600/60 text-red-200 border-red-500/30"
-                  : "bg-red-600/20 hover:bg-red-600/40 text-red-300 border-red-500/20"
+                  ? 'bg-red-600/40 hover:bg-red-600/60 text-red-200 border-red-500/30'
+                  : 'bg-red-600/20 hover:bg-red-600/40 text-red-300 border-red-500/20'
             }`}
           >
             {actionInProgress === `clean-${item.hashString}` ? (
               <>
                 <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                {t("downloads.remove")}
+                {t('downloads.remove')}
               </>
             ) : (
               <>
                 <Trash2 className="w-4 h-4 mr-1" />
-                {t("downloads.remove")}
+                {t('downloads.remove')}
               </>
             )}
           </Button>
@@ -233,7 +252,13 @@ function DownloadCard({
   );
 }
 
-function filterDownloads(downloads: TorrentDownloadItem[], showAllTorrents: boolean, showActive: boolean, showCompleted: boolean, isComplete: (item: TorrentDownloadItem) => boolean) {
+function filterDownloads(
+  downloads: TorrentDownloadItem[],
+  showAllTorrents: boolean,
+  showActive: boolean,
+  showCompleted: boolean,
+  isComplete: (item: TorrentDownloadItem) => boolean,
+) {
   return downloads
     .filter((item) => (showAllTorrents ? true : item.managedBySeedflix !== false))
     .filter((item) => {
@@ -260,20 +285,21 @@ export function Downloads() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
-  
+
   // Keep a ref to the current source filter value for polling
   const showAllTorrentsRef = useRef(showAllTorrents);
   // Track last action time to avoid race conditions with polling
   const lastActionTimeRef = useRef<number>(0);
   const ACTION_COOLDOWN_MS = 2000; // 2 seconds after an action, polling won't update state
-  
+
   useEffect(() => {
     showAllTorrentsRef.current = showAllTorrents;
   }, [showAllTorrents]);
 
   // A torrent is considered complete when there's nothing left to download
   const isComplete = (item: TorrentDownloadItem) => item.leftUntilDone === 0 || item.isFinished;
-  const isActiveDownload = (item: TorrentDownloadItem) => !isComplete(item) && [3, 4].includes(item.status);
+  const isActiveDownload = (item: TorrentDownloadItem) =>
+    !isComplete(item) && [3, 4].includes(item.status);
 
   const loadDownloads = async (includeAll: boolean = false) => {
     try {
@@ -287,7 +313,7 @@ export function Downloads() {
       setDownloads(response.torrents);
       setError(null);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : t("downloads.loadFailed"));
+      setError(loadError instanceof Error ? loadError.message : t('downloads.loadFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -319,21 +345,19 @@ export function Downloads() {
 
   const filteredDownloads = useMemo(
     () => filterDownloads(downloads, showAllTorrents, showActive, showCompleted, isComplete),
-    [downloads, showActive, showCompleted, showAllTorrents]
+    [downloads, showActive, showCompleted, showAllTorrents],
   );
 
   const activeCount = useMemo(
     () => downloads.filter((item) => isActiveDownload(item)).length,
-    [downloads]
+    [downloads],
   );
 
   const handlePause = async (id: number) => {
     setActionInProgress(`pause-${id}`);
     lastActionTimeRef.current = Date.now();
     // Optimistic update: immediately mark as paused (status = 0)
-    setDownloads((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status: 0 } : item))
-    );
+    setDownloads((prev) => prev.map((item) => (item.id === id ? { ...item, status: 0 } : item)));
     try {
       await pauseTorrent(id);
       // Wait before refresh to let server update state
@@ -341,7 +365,7 @@ export function Downloads() {
       const response = await getTorrentDownloads(showAllTorrentsRef.current);
       setDownloads(response.torrents);
     } catch (err) {
-      console.error("Erreur lors de la pause:", err);
+      console.error('Erreur lors de la pause:', err);
       // Refresh to restore correct state on error
       const response = await getTorrentDownloads(showAllTorrentsRef.current);
       setDownloads(response.torrents);
@@ -354,9 +378,7 @@ export function Downloads() {
     setActionInProgress(`resume-${id}`);
     lastActionTimeRef.current = Date.now();
     // Optimistic update: immediately mark as queued (status = 3)
-    setDownloads((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status: 3 } : item))
-    );
+    setDownloads((prev) => prev.map((item) => (item.id === id ? { ...item, status: 3 } : item)));
     try {
       await resumeTorrent(id);
       // Wait before refresh to let server update state
@@ -364,7 +386,7 @@ export function Downloads() {
       const response = await getTorrentDownloads(showAllTorrentsRef.current);
       setDownloads(response.torrents);
     } catch (err) {
-      console.error("Erreur lors de la reprise:", err);
+      console.error('Erreur lors de la reprise:', err);
       // Refresh to restore correct state on error
       const response = await getTorrentDownloads(showAllTorrentsRef.current);
       setDownloads(response.torrents);
@@ -383,7 +405,7 @@ export function Downloads() {
       // Wait before refresh to let server update state
       await new Promise((resolve) => setTimeout(resolve, 500));
     } catch (err) {
-      console.error("Erreur lors de la suppression:", err);
+      console.error('Erreur lors de la suppression:', err);
       // Refresh to restore if error
       const response = await getTorrentDownloads(showAllTorrentsRef.current);
       setDownloads(response.torrents);
@@ -397,16 +419,14 @@ export function Downloads() {
     lastActionTimeRef.current = Date.now();
     // Optimistic update: mark as no longer managed by SeedFlix
     setDownloads((prev) =>
-      prev.map((item) =>
-        item.hashString === hash ? { ...item, managedBySeedflix: false } : item
-      )
+      prev.map((item) => (item.hashString === hash ? { ...item, managedBySeedflix: false } : item)),
     );
     try {
       await unmanageTorrent(hash);
       // Wait before refresh to let server update state
       await new Promise((resolve) => setTimeout(resolve, 500));
     } catch (err) {
-      console.error("Erreur lors du retrait du suivi:", err);
+      console.error('Erreur lors du retrait du suivi:', err);
       // Refresh to restore if error
       const response = await getTorrentDownloads(showAllTorrentsRef.current);
       setDownloads(response.torrents);
@@ -420,15 +440,17 @@ export function Downloads() {
       <div className="flex items-center gap-3">
         <Download className="w-7 h-7 text-cyan-300" />
         <div>
-          <h2 className="text-3xl font-bold text-white">{t("downloads.title")}</h2>
-          <p className="text-white/60">{t("downloads.activeSummary", { active: activeCount, total: downloads.length })}</p>
+          <h2 className="text-3xl font-bold text-white">{t('downloads.title')}</h2>
+          <p className="text-white/60">
+            {t('downloads.activeSummary', { active: activeCount, total: downloads.length })}
+          </p>
         </div>
       </div>
 
       {isLoading ? (
         <div className="flex items-center gap-2 text-white/70">
           <Loader2 className="w-4 h-4 animate-spin" />
-          {t("downloads.loading")}
+          {t('downloads.loading')}
         </div>
       ) : null}
 
@@ -438,33 +460,45 @@ export function Downloads() {
         <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-white/80">
             <SlidersHorizontal className="w-4 h-4" />
-            {t("downloads.filters.label")}
+            {t('downloads.filters.label')}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
               onClick={() => setShowActive((prev) => !prev)}
-              className={showActive ? "bg-cyan-500/60 hover:bg-cyan-500/70 text-white gap-1" : "bg-white/10 text-white hover:bg-white/20"}
+              className={
+                showActive
+                  ? 'bg-cyan-500/60 hover:bg-cyan-500/70 text-white gap-1'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }
             >
               {showActive ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-              {t("downloads.filters.active")}
+              {t('downloads.filters.active')}
             </Button>
             <Button
               size="sm"
               onClick={() => setShowCompleted((prev) => !prev)}
-              className={showCompleted ? "bg-emerald-500/60 hover:bg-emerald-500/70 text-white gap-1" : "bg-white/10 text-white hover:bg-white/20"}
+              className={
+                showCompleted
+                  ? 'bg-emerald-500/60 hover:bg-emerald-500/70 text-white gap-1'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }
             >
               {showCompleted ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-              {t("downloads.filters.completed")}
+              {t('downloads.filters.completed')}
             </Button>
             <div className="w-px h-6 bg-white/20 mx-1" />
             <Button
               size="sm"
               onClick={() => setShowAllTorrents((prev) => !prev)}
-              className={showAllTorrents ? "bg-violet-500/60 hover:bg-violet-500/70 text-white gap-1" : "bg-white/10 text-white hover:bg-white/20"}
+              className={
+                showAllTorrents
+                  ? 'bg-violet-500/60 hover:bg-violet-500/70 text-white gap-1'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }
             >
               {showAllTorrents ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-              {t("downloads.filters.allTorrents")}
+              {t('downloads.filters.allTorrents')}
             </Button>
           </div>
         </div>
@@ -490,7 +524,7 @@ export function Downloads() {
       {!isLoading && !error && filteredDownloads.length === 0 ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardContent className="p-6 text-white/70">
-            {downloads.length === 0 ? t("downloads.empty") : t("downloads.filters.empty")}
+            {downloads.length === 0 ? t('downloads.empty') : t('downloads.filters.empty')}
           </CardContent>
         </Card>
       ) : null}

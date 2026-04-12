@@ -1,4 +1,4 @@
-export type SeriesWishlistType = "series" | "season" | "episode";
+export type SeriesWishlistType = 'series' | 'season' | 'episode';
 
 /**
  * entryId format:

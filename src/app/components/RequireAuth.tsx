@@ -1,5 +1,5 @@
-import { Navigate, Outlet, useLocation } from "react-router";
-import { useAuth } from "../context/AuthContext";
+import { Navigate, Outlet, useLocation } from 'react-router';
+import { useAuth } from '../context/AuthContext';
 
 export function RequireAuth() {
   const location = useLocation();
@@ -31,7 +31,7 @@ export function RequireAuth() {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  if (hasPendingSetup && location.pathname !== "/setup") {
+  if (hasPendingSetup && location.pathname !== '/setup') {
     return <Navigate to="/setup" replace state={{ from: location.pathname, forced: true }} />;
   }
 

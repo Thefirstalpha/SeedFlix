@@ -1,5 +1,64 @@
-import { DatabaseRawEditorPanel } from "./DatabaseRawEditorPanel";
-import { useEffect, useState } from "react";
+import { Check, Copy } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
+import { DatabaseNamespaceList } from './DatabaseNamespaceList';
+import { DatabaseRawEditorPanel } from './DatabaseRawEditorPanel';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from './ui/alert-dialog';
+import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Switch } from './ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { useAuth } from '../context/AuthContext';
+import { useI18n, type SupportedLanguage } from '../i18n/LanguageProvider';
+import {
+  changePassword,
+  getGlobalSettings,
+  getDatabaseNamespace,
+  getSettings,
+  resetSettings,
+  testIndexerConnection,
+  testTorrentConnection,
+  updateGlobalSettings,
+  updateDatabaseNamespace,
+  updateSettings,
+  listDatabaseNamespaces,
+  type DatabaseNamespaceEntry,
+  type UserSettings,
+  listUsers,
+  createUser,
+  deleteUser,
+  resetUserPassword,
+  type User,
+} from '../services/authService';
+import {
+  getDefaultBrowserDeviceName,
+  getOrCreateBrowserDeviceId,
+  parseBrowserDevices,
+  type BrowserNotificationDevice,
+} from '../services/browserNotificationChannel';
+import * as notificationService from '../services/notificationService';
+
 // Fonction utilitaire générique pour la gestion des sauvegardes asynchrones
 async function handleAsyncSave<T = any>({
   event,
@@ -34,81 +93,23 @@ async function handleAsyncSave<T = any>({
     setSaving(false);
   }
 }
-import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router";
-import { Check, Copy } from "lucide-react";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Switch } from "./ui/switch";
-import { Textarea } from "./ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "./ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
-import {
-  changePassword,
-  getGlobalSettings,
-  getDatabaseNamespace,
-  getSettings,
-  resetSettings,
-  testIndexerConnection,
-  testTorrentConnection,
-  updateGlobalSettings,
-  updateDatabaseNamespace,
-  updateSettings,
-  listDatabaseNamespaces,
-  type DatabaseNamespaceEntry,
-  type UserSettings,
-  listUsers,
-  createUser,
-  deleteUser,
-  resetUserPassword,
-  type User,
-} from "../services/authService";
-import * as notificationService from "../services/notificationService";
-import {
-  getDefaultBrowserDeviceName,
-  getOrCreateBrowserDeviceId,
-  parseBrowserDevices,
-  type BrowserNotificationDevice,
-} from "../services/browserNotificationChannel";
-import { useAuth } from "../context/AuthContext";
-import { useI18n, type SupportedLanguage } from "../i18n/LanguageProvider";
-import { DatabaseNamespaceList } from "./DatabaseNamespaceList";
 
 const QUALITY_OPTIONS = [
-  { value: "all", labelKey: "settings.quality.all" },
-  { value: "2160p", labelKey: "settings.quality.2160p" },
-  { value: "1080p", labelKey: "settings.quality.1080p" },
-  { value: "720p", labelKey: "settings.quality.720p" },
-  { value: "480p", labelKey: "settings.quality.480p" },
-  { value: "bluray", labelKey: "settings.quality.bluray" },
-  { value: "webdl", labelKey: "settings.quality.webdl" },
-  { value: "hdtv", labelKey: "settings.quality.hdtv" },
+  { value: 'all', labelKey: 'settings.quality.all' },
+  { value: '2160p', labelKey: 'settings.quality.2160p' },
+  { value: '1080p', labelKey: 'settings.quality.1080p' },
+  { value: '720p', labelKey: 'settings.quality.720p' },
+  { value: '480p', labelKey: 'settings.quality.480p' },
+  { value: 'bluray', labelKey: 'settings.quality.bluray' },
+  { value: 'webdl', labelKey: 'settings.quality.webdl' },
+  { value: 'hdtv', labelKey: 'settings.quality.hdtv' },
 ];
 
-const SETTINGS_TABS = ["general", "notifications", "api", "users", "database", "factory"] as const;
+const SETTINGS_TABS = ['general', 'notifications', 'api', 'users', 'database', 'factory'] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 function parseSupportedLanguage(input: unknown): SupportedLanguage {
-  return input === "en" ? "en" : "fr";
+  return input === 'en' ? 'en' : 'fr';
 }
 
 function isValidSettingsTab(value: string): value is SettingsTab {
@@ -116,12 +117,12 @@ function isValidSettingsTab(value: string): value is SettingsTab {
 }
 
 function isAdminOnlyTab(value: SettingsTab) {
-  return value === "users" || value === "database" || value === "factory";
+  return value === 'users' || value === 'database' || value === 'factory';
 }
 
 function normalizeSettingsTab(value: string | null): SettingsTab | null {
-  if (value === "security") {
-    return "general";
+  if (value === 'security') {
+    return 'general';
   }
 
   return value && isValidSettingsTab(value) ? value : null;
@@ -131,37 +132,38 @@ export function Settings() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isAuthenticated, isLoading, user, setSettings, refresh, shouldChangePassword } = useAuth();
+  const { isAuthenticated, isLoading, user, setSettings, refresh, shouldChangePassword } =
+    useAuth();
   const { t, availableLanguages, setLanguage } = useI18n();
   const [settings, setLocalSettings] = useState<UserSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [torrentUrl, setTorrentUrl] = useState("");
-  const [torrentPort, setTorrentPort] = useState("");
+  const [torrentUrl, setTorrentUrl] = useState('');
+  const [torrentPort, setTorrentPort] = useState('');
   const [torrentAuthRequired, setTorrentAuthRequired] = useState(false);
-  const [torrentUsername, setTorrentUsername] = useState("");
-  const [torrentPassword, setTorrentPassword] = useState("");
-  const [torrentMoviesFolder, setTorrentMoviesFolder] = useState("");
-  const [torrentSeriesFolder, setTorrentSeriesFolder] = useState("");
+  const [torrentUsername, setTorrentUsername] = useState('');
+  const [torrentPassword, setTorrentPassword] = useState('');
+  const [torrentMoviesFolder, setTorrentMoviesFolder] = useState('');
+  const [torrentSeriesFolder, setTorrentSeriesFolder] = useState('');
   const [torrentMessage, setTorrentMessage] = useState<string | null>(null);
   const [torrentError, setTorrentError] = useState<string | null>(null);
   const [isTorrentSaving, setIsTorrentSaving] = useState(false);
-  const [indexerUrl, setIndexerUrl] = useState("");
-  const [indexerToken, setIndexerToken] = useState("");
-  const [indexerDefaultQuality, setIndexerDefaultQuality] = useState("all");
+  const [indexerUrl, setIndexerUrl] = useState('');
+  const [indexerToken, setIndexerToken] = useState('');
+  const [indexerDefaultQuality, setIndexerDefaultQuality] = useState('all');
   const [indexerMessage, setIndexerMessage] = useState<string | null>(null);
   const [indexerError, setIndexerError] = useState<string | null>(null);
   const [isIndexerSaving, setIsIndexerSaving] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-  const [tmdbApiKey, setTmdbApiKey] = useState("");
+  const [tmdbApiKey, setTmdbApiKey] = useState('');
   const [tmdbMessage, setTmdbMessage] = useState<string | null>(null);
   const [tmdbError, setTmdbError] = useState<string | null>(null);
   const [isTmdbSaving, setIsTmdbSaving] = useState(false);
-  const [discordWebhookUrl, setDiscordWebhookUrl] = useState("");
+  const [discordWebhookUrl, setDiscordWebhookUrl] = useState('');
   const [discordTested, setDiscordTested] = useState(false);
   const [discordFormOpen, setDiscordFormOpen] = useState(false);
   const [discordMessage, setDiscordMessage] = useState<string | null>(null);
@@ -173,7 +175,7 @@ export function Settings() {
   const [browserError, setBrowserError] = useState<string | null>(null);
   const [isBrowserSaving, setIsBrowserSaving] = useState(false);
   const [browserDeviceId] = useState(getOrCreateBrowserDeviceId);
-  const [languageCode, setLanguageCode] = useState<SupportedLanguage>("fr");
+  const [languageCode, setLanguageCode] = useState<SupportedLanguage>('fr');
   const [spoilerMode, setSpoilerMode] = useState(false);
   const [preferencesMessage, setPreferencesMessage] = useState<string | null>(null);
   const [preferencesError, setPreferencesError] = useState<string | null>(null);
@@ -184,14 +186,16 @@ export function Settings() {
 
   // User Management State
   const [users, setUsers] = useState<User[]>([]);
-  const [newUsername, setNewUsername] = useState("");
+  const [newUsername, setNewUsername] = useState('');
   const [usersMessage, setUsersMessage] = useState<string | null>(null);
   const [usersError, setUsersError] = useState<string | null>(null);
   const [createdUserCredentials, setCreatedUserCredentials] = useState<{
     username: string;
     password: string;
   } | null>(null);
-  const [generatedPasswordContext, setGeneratedPasswordContext] = useState<"create" | "reset">("create");
+  const [generatedPasswordContext, setGeneratedPasswordContext] = useState<'create' | 'reset'>(
+    'create',
+  );
   const [isCreatedUserModalOpen, setIsCreatedUserModalOpen] = useState(false);
   const [isGeneratedPasswordCopied, setIsGeneratedPasswordCopied] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
@@ -201,58 +205,56 @@ export function Settings() {
   const [resetPasswordTargetId, setResetPasswordTargetId] = useState<number | null>(null);
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [databaseNamespaces, setDatabaseNamespaces] = useState<DatabaseNamespaceEntry[]>([]);
-  const [selectedDatabaseNamespace, setSelectedDatabaseNamespace] = useState("");
-  const [databaseRawValue, setDatabaseRawValue] = useState("");
-  const [databaseUpdatedAt, setDatabaseUpdatedAt] = useState("");
+  const [selectedDatabaseNamespace, setSelectedDatabaseNamespace] = useState('');
+  const [databaseRawValue, setDatabaseRawValue] = useState('');
+  const [databaseUpdatedAt, setDatabaseUpdatedAt] = useState('');
   const [databaseMessage, setDatabaseMessage] = useState<string | null>(null);
   const [databaseError, setDatabaseError] = useState<string | null>(null);
   const [isLoadingDatabaseNamespaces, setIsLoadingDatabaseNamespaces] = useState(false);
   const [isLoadingDatabaseValue, setIsLoadingDatabaseValue] = useState(false);
   const [isSavingDatabaseValue, setIsSavingDatabaseValue] = useState(false);
-  const isAdmin = user?.username === "admin";
+  const isAdmin = user?.username === 'admin';
 
-  const tabParam = searchParams.get("tab");
-  const activeTab: SettingsTab = normalizeSettingsTab(tabParam) || "general";
+  const tabParam = searchParams.get('tab');
+  const activeTab: SettingsTab = normalizeSettingsTab(tabParam) || 'general';
 
   useEffect(() => {
     const normalizedTab = normalizeSettingsTab(tabParam);
     const effectiveTab =
-      normalizedTab && !isAdmin && isAdminOnlyTab(normalizedTab)
-        ? "general"
-        : normalizedTab;
+      normalizedTab && !isAdmin && isAdminOnlyTab(normalizedTab) ? 'general' : normalizedTab;
     if (effectiveTab && tabParam === effectiveTab) {
       return;
     }
 
     const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("tab", effectiveTab || "general");
+    nextParams.set('tab', effectiveTab || 'general');
     setSearchParams(nextParams, { replace: true });
   }, [isAdmin, tabParam, searchParams, setSearchParams]);
 
   const applySettingsToForms = (incomingSettings: UserSettings) => {
     const torrentSettings = incomingSettings.placeholders?.torrent || {};
-    setTorrentUrl(torrentSettings.url || "");
-    setTorrentPort(torrentSettings.port || "");
+    setTorrentUrl(torrentSettings.url || '');
+    setTorrentPort(torrentSettings.port || '');
     setTorrentAuthRequired(torrentSettings.authRequired || false);
-    setTorrentUsername(torrentSettings.username || "");
-    setTorrentPassword(torrentSettings.password || "");
-    setTorrentMoviesFolder(torrentSettings.moviesFolder || "");
-    setTorrentSeriesFolder(torrentSettings.seriesFolder || "");
+    setTorrentUsername(torrentSettings.username || '');
+    setTorrentPassword(torrentSettings.password || '');
+    setTorrentMoviesFolder(torrentSettings.moviesFolder || '');
+    setTorrentSeriesFolder(torrentSettings.seriesFolder || '');
 
-    setIndexerUrl(incomingSettings.placeholders?.indexer?.url || "");
-    setIndexerToken(incomingSettings.placeholders?.indexer?.token || "");
-    setIndexerDefaultQuality(
-      incomingSettings.placeholders?.indexer?.defaultQuality || "all"
-    );
+    setIndexerUrl(incomingSettings.placeholders?.indexer?.url || '');
+    setIndexerToken(incomingSettings.placeholders?.indexer?.token || '');
+    setIndexerDefaultQuality(incomingSettings.placeholders?.indexer?.defaultQuality || 'all');
 
     const notifSettings = incomingSettings.placeholders?.notifications || {};
-    setDiscordWebhookUrl((notifSettings as any).discord?.webhookUrl || "");
+    setDiscordWebhookUrl((notifSettings as any).discord?.webhookUrl || '');
     setDiscordTested(
-      (notifSettings as any).enabledChannels?.includes("discord") &&
-      Boolean((notifSettings as any).discord?.webhookUrl)
+      (notifSettings as any).enabledChannels?.includes('discord') &&
+        Boolean((notifSettings as any).discord?.webhookUrl),
     );
     setBrowserDevices(parseBrowserDevices((notifSettings as any).browser?.devices));
-    setLanguageCode(parseSupportedLanguage((incomingSettings.placeholders?.preferences as any)?.language));
+    setLanguageCode(
+      parseSupportedLanguage((incomingSettings.placeholders?.preferences as any)?.language),
+    );
     setSpoilerMode(Boolean((incomingSettings.placeholders?.preferences as any)?.spoilerMode));
   };
 
@@ -268,21 +270,28 @@ export function Settings() {
       : [];
 
     const nextDiscordWebhookUrl =
-      params.discordWebhookUrl ?? String((current as any).discord?.webhookUrl || "");
-    const nextBrowserDevices = params.browserDevices ?? parseBrowserDevices((current as any).browser?.devices);
+      params.discordWebhookUrl ?? String((current as any).discord?.webhookUrl || '');
+    const nextBrowserDevices =
+      params.browserDevices ?? parseBrowserDevices((current as any).browser?.devices);
 
     const nextChannels = new Set(currentChannels);
 
-    if (params.includeDiscord === true || (params.includeDiscord !== false && Boolean(nextDiscordWebhookUrl.trim()))) {
-      nextChannels.add("discord");
+    if (
+      params.includeDiscord === true ||
+      (params.includeDiscord !== false && Boolean(nextDiscordWebhookUrl.trim()))
+    ) {
+      nextChannels.add('discord');
     } else {
-      nextChannels.delete("discord");
+      nextChannels.delete('discord');
     }
 
-    if (params.includeBrowser === true || (params.includeBrowser !== false && nextBrowserDevices.length > 0)) {
-      nextChannels.add("browser");
+    if (
+      params.includeBrowser === true ||
+      (params.includeBrowser !== false && nextBrowserDevices.length > 0)
+    ) {
+      nextChannels.add('browser');
     } else {
-      nextChannels.delete("browser");
+      nextChannels.delete('browser');
     }
 
     return {
@@ -297,10 +306,12 @@ export function Settings() {
     };
   };
 
-  const buildSettingsWithNotifications = (notificationsPayload: Record<string, unknown>): UserSettings => ({
-    profile: settings?.profile || { username: user?.username || "admin" },
+  const buildSettingsWithNotifications = (
+    notificationsPayload: Record<string, unknown>,
+  ): UserSettings => ({
+    profile: settings?.profile || { username: user?.username || 'admin' },
     security: settings?.security || { lastPasswordChangeAt: new Date().toISOString() },
-    apiKeys: settings?.apiKeys || { tmdb: "" },
+    apiKeys: settings?.apiKeys || { tmdb: '' },
     placeholders: {
       notifications: notificationsPayload,
       preferences: settings?.placeholders?.preferences || {},
@@ -309,12 +320,14 @@ export function Settings() {
     },
   });
 
-  const buildUpdatedSettings = (overrides: Partial<UserSettings["placeholders"]>): UserSettings => ({
-    profile: settings?.profile || { username: user?.username || "admin" },
+  const buildUpdatedSettings = (
+    overrides: Partial<UserSettings['placeholders']>,
+  ): UserSettings => ({
+    profile: settings?.profile || { username: user?.username || 'admin' },
     security: settings?.security || {
       lastPasswordChangeAt: new Date().toISOString(),
     },
-    apiKeys: settings?.apiKeys || { tmdb: "" },
+    apiKeys: settings?.apiKeys || { tmdb: '' },
     placeholders: {
       notifications: settings?.placeholders?.notifications || {},
       preferences: settings?.placeholders?.preferences || {},
@@ -341,13 +354,13 @@ export function Settings() {
         setSettings(response);
         applySettingsToForms(response);
 
-        if (user?.username === "admin") {
+        if (user?.username === 'admin') {
           const globalSettings = await getGlobalSettings();
-          setTmdbApiKey(globalSettings.tmdbApiKey || "");
+          setTmdbApiKey(globalSettings.tmdbApiKey || '');
         }
       } catch (loadError) {
         setError(
-          loadError instanceof Error ? loadError.message : t("settings.messages.loadFailed")
+          loadError instanceof Error ? loadError.message : t('settings.messages.loadFailed'),
         );
       }
     };
@@ -356,7 +369,7 @@ export function Settings() {
   }, [isAuthenticated, setSettings, user?.username, t]);
 
   useEffect(() => {
-    if (!isAuthenticated || user?.username !== "admin") {
+    if (!isAuthenticated || user?.username !== 'admin') {
       return;
     }
 
@@ -367,7 +380,7 @@ export function Settings() {
         setUsers(loadedUsers);
       } catch (loadError) {
         setUsersError(
-          loadError instanceof Error ? loadError.message : t("settings.messages.loadFailed")
+          loadError instanceof Error ? loadError.message : t('settings.messages.loadFailed'),
         );
       } finally {
         setIsLoadingUsers(false);
@@ -385,33 +398,31 @@ export function Settings() {
       const namespaces = Array.isArray(response.namespaces) ? response.namespaces : [];
       setDatabaseNamespaces(namespaces);
       if (namespaces.length === 0) {
-        setDatabaseRawValue("");
-        setDatabaseUpdatedAt("");
+        setDatabaseRawValue('');
+        setDatabaseUpdatedAt('');
       }
       setSelectedDatabaseNamespace((current) => {
         if (current && namespaces.some((entry) => entry.namespace === current)) {
           return current;
         }
-        return namespaces[0]?.namespace || "";
+        return namespaces[0]?.namespace || '';
       });
     } catch (err) {
-      setDatabaseError(
-        err instanceof Error ? err.message : t("settings.database.loadFailed")
-      );
+      setDatabaseError(err instanceof Error ? err.message : t('settings.database.loadFailed'));
     } finally {
       setIsLoadingDatabaseNamespaces(false);
     }
   };
 
   useEffect(() => {
-    if (!isAuthenticated || user?.username !== "admin") {
+    if (!isAuthenticated || user?.username !== 'admin') {
       return;
     }
     void fetchAndSetDatabaseNamespaces();
   }, [isAuthenticated, t, user?.username]);
 
   useEffect(() => {
-    if (!isAuthenticated || user?.username !== "admin" || !selectedDatabaseNamespace) {
+    if (!isAuthenticated || user?.username !== 'admin' || !selectedDatabaseNamespace) {
       return;
     }
 
@@ -421,11 +432,11 @@ export function Settings() {
       setDatabaseMessage(null);
       try {
         const entry = await getDatabaseNamespace(selectedDatabaseNamespace);
-        setDatabaseRawValue(entry.value || "");
-        setDatabaseUpdatedAt(entry.updatedAt || "");
+        setDatabaseRawValue(entry.value || '');
+        setDatabaseUpdatedAt(entry.updatedAt || '');
       } catch (loadError) {
         setDatabaseError(
-          loadError instanceof Error ? loadError.message : t("settings.database.entryLoadFailed")
+          loadError instanceof Error ? loadError.message : t('settings.database.entryLoadFailed'),
         );
       } finally {
         setIsLoadingDatabaseValue(false);
@@ -449,12 +460,7 @@ export function Settings() {
     }, 0);
 
     return () => window.clearTimeout(openTimer);
-  }, [
-    createdUserCredentials,
-    isCreateUserOpen,
-    isCreatedUserModalOpen,
-    resetPasswordTargetId,
-  ]);
+  }, [createdUserCredentials, isCreateUserOpen, isCreatedUserModalOpen, resetPasswordTargetId]);
 
   if (!isLoading && !isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
@@ -471,11 +477,13 @@ export function Settings() {
       setLocalSettings(refreshedSettings);
       setSettings(refreshedSettings);
       await refresh();
-      setCurrentPassword("");
-      setNewPassword("");
-      setMessage(t("settings.messages.passwordUpdated"));
+      setCurrentPassword('');
+      setNewPassword('');
+      setMessage(t('settings.messages.passwordUpdated'));
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed"));
+      setError(
+        submitError instanceof Error ? submitError.message : t('settings.messages.updateFailed'),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -483,7 +491,7 @@ export function Settings() {
 
   const handleTmdbSave = async (event: React.FormEvent) => {
     if (!tmdbApiKey.trim()) {
-      setTmdbError(t("settings.messages.tmdbKeyRequired"));
+      setTmdbError(t('settings.messages.tmdbKeyRequired'));
       setIsTmdbSaving(false);
       return;
     }
@@ -496,12 +504,12 @@ export function Settings() {
         const savedGlobalSettings = await updateGlobalSettings({
           tmdbApiKey: tmdbApiKey.trim(),
         });
-        setTmdbApiKey(savedGlobalSettings.tmdbApiKey || "");
+        setTmdbApiKey(savedGlobalSettings.tmdbApiKey || '');
         await refresh();
         return savedGlobalSettings;
       },
-      successMessage: t("settings.messages.tmdbSaved"),
-      errorMessage: t("settings.messages.configFailed"),
+      successMessage: t('settings.messages.tmdbSaved'),
+      errorMessage: t('settings.messages.configFailed'),
     });
   };
 
@@ -519,7 +527,7 @@ export function Settings() {
             port: torrentPort,
             authRequired: torrentAuthRequired,
             username: torrentAuthRequired ? torrentUsername : undefined,
-            password: torrentAuthRequired ? torrentPassword : "",
+            password: torrentAuthRequired ? torrentPassword : '',
             moviesFolder: torrentMoviesFolder,
             seriesFolder: torrentSeriesFolder,
           },
@@ -534,17 +542,21 @@ export function Settings() {
             username: torrentUsername,
             password: torrentPassword,
           });
-          return { message: t("settings.messages.configurationSavedWithResponse", { response: response.message }) };
+          return {
+            message: t('settings.messages.configurationSavedWithResponse', {
+              response: response.message,
+            }),
+          };
         } catch (submitError) {
           throw new Error(
             submitError instanceof Error
-              ? t("settings.messages.savedButTestFailedWithReason", { reason: submitError.message })
-              : t("settings.messages.savedButTestFailed")
+              ? t('settings.messages.savedButTestFailedWithReason', { reason: submitError.message })
+              : t('settings.messages.savedButTestFailed'),
           );
         }
       },
-      successMessage: t("settings.messages.configurationSavedWithResponse", { response: "" }), // sera remplacé par le message réel
-      errorMessage: t("settings.messages.updateFailed"),
+      successMessage: t('settings.messages.configurationSavedWithResponse', { response: '' }), // sera remplacé par le message réel
+      errorMessage: t('settings.messages.updateFailed'),
       onSuccess: (result: any) => {
         if (result && result.message) setTorrentMessage(result.message);
       },
@@ -570,17 +582,21 @@ export function Settings() {
         applyUpdatedSettings(savedSettings);
         try {
           const response = await testIndexerConnection(indexerUrl, indexerToken);
-          return { message: t("settings.messages.configurationSavedWithResponse", { response: response.message }) };
+          return {
+            message: t('settings.messages.configurationSavedWithResponse', {
+              response: response.message,
+            }),
+          };
         } catch (submitError) {
           throw new Error(
             submitError instanceof Error
-              ? t("settings.messages.savedButTestFailedWithReason", { reason: submitError.message })
-              : t("settings.messages.savedButTestFailed")
+              ? t('settings.messages.savedButTestFailedWithReason', { reason: submitError.message })
+              : t('settings.messages.savedButTestFailed'),
           );
         }
       },
-      successMessage: t("settings.messages.configurationSavedWithResponse", { response: "" }),
-      errorMessage: t("settings.messages.updateFailed"),
+      successMessage: t('settings.messages.configurationSavedWithResponse', { response: '' }),
+      errorMessage: t('settings.messages.updateFailed'),
       onSuccess: (result: any) => {
         if (result && result.message) setIndexerMessage(result.message);
       },
@@ -596,23 +612,23 @@ export function Settings() {
     try {
       // Validation
       if (!discordWebhookUrl.trim()) {
-        setDiscordError(t("settings.messages.discordWebhookRequired"));
+        setDiscordError(t('settings.messages.discordWebhookRequired'));
         setIsDiscordSaving(false);
         return;
       }
 
       // Test webhook
       const testResponse = await fetch(discordWebhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           embeds: [
             {
-              title: t("settings.notifications.discord.testTitle"),
-              description: t("settings.notifications.discord.testDescription"),
+              title: t('settings.notifications.discord.testTitle'),
+              description: t('settings.notifications.discord.testDescription'),
               color: 0x10b981,
               timestamp: new Date().toISOString(),
-              footer: { text: t("settings.notifications.discord.testFooter") },
+              footer: { text: t('settings.notifications.discord.testFooter') },
             },
           ],
         }),
@@ -620,7 +636,7 @@ export function Settings() {
 
       if (!testResponse.ok) {
         setDiscordError(
-          `Test échoué (${testResponse.status}). Vérifiez que l'URL est correcte et active.`
+          `Test échoué (${testResponse.status}). Vérifiez que l'URL est correcte et active.`,
         );
         setIsDiscordSaving(false);
         return;
@@ -638,14 +654,12 @@ export function Settings() {
       applyUpdatedSettings(savedSettings);
       await refresh();
       setDiscordTested(true);
-      setDiscordMessage(t("settings.messages.discordConfigured"));
+      setDiscordMessage(t('settings.messages.discordConfigured'));
       // Fermer le formulaire
       setDiscordFormOpen(false);
     } catch (submitError) {
       setDiscordError(
-        submitError instanceof Error
-          ? submitError.message
-          : t("settings.messages.configFailed")
+        submitError instanceof Error ? submitError.message : t('settings.messages.configFailed'),
       );
     } finally {
       setIsDiscordSaving(false);
@@ -658,15 +672,15 @@ export function Settings() {
     setIsBrowserSaving(true);
 
     try {
-      if (typeof window === "undefined" || !("Notification" in window)) {
-        setBrowserError(t("settings.messages.browserUnsupported"));
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        setBrowserError(t('settings.messages.browserUnsupported'));
         setIsBrowserSaving(false);
         return;
       }
 
       const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setBrowserError(t("settings.messages.browserPermissionDenied"));
+      if (permission !== 'granted') {
+        setBrowserError(t('settings.messages.browserPermissionDenied'));
         setIsBrowserSaving(false);
         return;
       }
@@ -698,12 +712,12 @@ export function Settings() {
       applyUpdatedSettings(savedSettings);
       await refresh();
       setBrowserDevices(nextDevices);
-      setBrowserMessage(t("settings.messages.browserSaved"));
+      setBrowserMessage(t('settings.messages.browserSaved'));
     } catch (submitError) {
       setBrowserError(
         submitError instanceof Error
           ? submitError.message
-          : t("settings.messages.browserConfigFailed")
+          : t('settings.messages.browserConfigFailed'),
       );
     } finally {
       setIsBrowserSaving(false);
@@ -727,12 +741,12 @@ export function Settings() {
       applyUpdatedSettings(savedSettings);
       await refresh();
       setBrowserDevices(nextDevices);
-      setBrowserMessage(t("settings.messages.browserRemoved"));
+      setBrowserMessage(t('settings.messages.browserRemoved'));
     } catch (submitError) {
       setBrowserError(
         submitError instanceof Error
           ? submitError.message
-          : t("settings.messages.browserRemoveFailed")
+          : t('settings.messages.browserRemoveFailed'),
       );
     } finally {
       setIsBrowserSaving(false);
@@ -740,8 +754,8 @@ export function Settings() {
   };
 
   const handleResetSettings = async () => {
-    if (user?.username !== "admin") {
-      setResetError(t("auth.adminRequired"));
+    if (user?.username !== 'admin') {
+      setResetError(t('auth.adminRequired'));
       return;
     }
 
@@ -755,10 +769,10 @@ export function Settings() {
     try {
       await resetSettings();
       await refresh();
-      navigate("/login", { replace: true, state: { reset: true } });
+      navigate('/login', { replace: true, state: { reset: true } });
     } catch (submitError) {
       setResetError(
-        submitError instanceof Error ? submitError.message : t("settings.messages.resetFailed")
+        submitError instanceof Error ? submitError.message : t('settings.messages.resetFailed'),
       );
     } finally {
       setIsResetting(false);
@@ -772,20 +786,23 @@ export function Settings() {
 
     try {
       const response = await notificationService.sendTestNotification();
-      setTestNotifMessage(response.message || t("settings.messages.testNotificationSent"));
-      window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
+      setTestNotifMessage(response.message || t('settings.messages.testNotificationSent'));
+      window.dispatchEvent(new CustomEvent('seedflix:notifications-refresh-request'));
     } catch (submitError) {
       setTestNotifError(
         submitError instanceof Error
           ? submitError.message
-          : t("settings.messages.testNotificationFailed")
+          : t('settings.messages.testNotificationFailed'),
       );
     } finally {
       setIsSendingTestNotif(false);
     }
   };
 
-  const savePreferences = async (nextPreferences: Record<string, unknown>, nextLanguage?: SupportedLanguage) => {
+  const savePreferences = async (
+    nextPreferences: Record<string, unknown>,
+    nextLanguage?: SupportedLanguage,
+  ) => {
     setPreferencesMessage(null);
     setPreferencesError(null);
     setIsPreferencesSaving(true);
@@ -801,12 +818,10 @@ export function Settings() {
       if (nextLanguage) {
         setLanguage(nextLanguage);
       }
-      setPreferencesMessage(t("settings.preferences.saved"));
+      setPreferencesMessage(t('settings.preferences.saved'));
     } catch (submitError) {
       setPreferencesError(
-        submitError instanceof Error
-          ? submitError.message
-          : t("settings.preferences.failed")
+        submitError instanceof Error ? submitError.message : t('settings.preferences.failed'),
       );
     } finally {
       setIsPreferencesSaving(false);
@@ -821,7 +836,7 @@ export function Settings() {
         language: nextLanguage,
         spoilerMode,
       },
-      nextLanguage
+      nextLanguage,
     );
   };
 
@@ -843,29 +858,29 @@ export function Settings() {
 
     try {
       if (!newUsername.trim()) {
-        setUsersError(t("auth.usernameRequired"));
+        setUsersError(t('auth.usernameRequired'));
         setIsCreatingUser(false);
         return;
       }
 
       const createdUser = await createUser(newUsername.trim());
       setUsers((currentUsers) => [...currentUsers, createdUser]);
-      setNewUsername("");
+      setNewUsername('');
       setIsCreateUserOpen(false);
       setUsersMessage(
-        t("settings.users.userCreated", {
+        t('settings.users.userCreated', {
           username: createdUser.username,
-        })
+        }),
       );
       setCreatedUserCredentials({
         username: createdUser.username,
         password: createdUser.generatedPassword,
       });
-      setGeneratedPasswordContext("create");
+      setGeneratedPasswordContext('create');
       setIsGeneratedPasswordCopied(false);
     } catch (submitError) {
       setUsersError(
-        submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
+        submitError instanceof Error ? submitError.message : t('settings.messages.updateFailed'),
       );
     } finally {
       setIsCreatingUser(false);
@@ -881,10 +896,10 @@ export function Settings() {
     try {
       await deleteUser(userId);
       setUsers(users.filter((u) => u.id !== userId));
-      setUsersMessage(t("settings.users.userDeleted", { username }));
+      setUsersMessage(t('settings.users.userDeleted', { username }));
     } catch (submitError) {
       setUsersError(
-        submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
+        submitError instanceof Error ? submitError.message : t('settings.messages.updateFailed'),
       );
     } finally {
       setIsDeletingUser(null);
@@ -902,19 +917,19 @@ export function Settings() {
       const targetUser = users.find((u) => u.id === resetPasswordTargetId);
       setResetPasswordTargetId(null);
       setUsersMessage(
-        t("settings.users.passwordReset", {
-          username: targetUser?.username || "utilisateur",
-        })
+        t('settings.users.passwordReset', {
+          username: targetUser?.username || 'utilisateur',
+        }),
       );
       setCreatedUserCredentials({
-        username: targetUser?.username || "utilisateur",
+        username: targetUser?.username || 'utilisateur',
         password: response.generatedPassword,
       });
-      setGeneratedPasswordContext("reset");
+      setGeneratedPasswordContext('reset');
       setIsGeneratedPasswordCopied(false);
     } catch (submitError) {
       setUsersError(
-        submitError instanceof Error ? submitError.message : t("settings.messages.updateFailed")
+        submitError instanceof Error ? submitError.message : t('settings.messages.updateFailed'),
       );
     } finally {
       setIsResettingPassword(false);
@@ -931,7 +946,7 @@ export function Settings() {
       setIsGeneratedPasswordCopied(true);
       setTimeout(() => setIsGeneratedPasswordCopied(false), 1500);
     } catch {
-      setUsersError(t("settings.messages.updateFailed"));
+      setUsersError(t('settings.messages.updateFailed'));
     }
   };
 
@@ -945,12 +960,12 @@ export function Settings() {
     setIsLoadingDatabaseValue(true);
     try {
       const entry = await getDatabaseNamespace(selectedDatabaseNamespace);
-      setDatabaseRawValue(entry.value || "");
-      setDatabaseUpdatedAt(entry.updatedAt || "");
-      setDatabaseMessage(t("settings.database.reloaded"));
+      setDatabaseRawValue(entry.value || '');
+      setDatabaseUpdatedAt(entry.updatedAt || '');
+      setDatabaseMessage(t('settings.database.reloaded'));
     } catch (reloadError) {
       setDatabaseError(
-        reloadError instanceof Error ? reloadError.message : t("settings.database.entryLoadFailed")
+        reloadError instanceof Error ? reloadError.message : t('settings.database.entryLoadFailed'),
       );
     } finally {
       setIsLoadingDatabaseValue(false);
@@ -961,7 +976,7 @@ export function Settings() {
     setDatabaseError(null);
     setDatabaseMessage(null);
     await fetchAndSetDatabaseNamespaces();
-    setDatabaseMessage(t("settings.database.listReloaded"));
+    setDatabaseMessage(t('settings.database.listReloaded'));
   };
 
   const handleDatabasePrettyFormat = () => {
@@ -970,7 +985,7 @@ export function Settings() {
       const prettyValue = JSON.stringify(JSON.parse(databaseRawValue), null, 2);
       setDatabaseRawValue(prettyValue);
     } catch {
-      setDatabaseError(t("settings.database.invalidJson"));
+      setDatabaseError(t('settings.database.invalidJson'));
     }
   };
 
@@ -983,20 +998,23 @@ export function Settings() {
     setDatabaseMessage(null);
     setIsSavingDatabaseValue(true);
     try {
-      const updatedEntry = await updateDatabaseNamespace(selectedDatabaseNamespace, databaseRawValue);
-      setDatabaseRawValue(updatedEntry.value || "");
-      setDatabaseUpdatedAt(updatedEntry.updatedAt || "");
+      const updatedEntry = await updateDatabaseNamespace(
+        selectedDatabaseNamespace,
+        databaseRawValue,
+      );
+      setDatabaseRawValue(updatedEntry.value || '');
+      setDatabaseUpdatedAt(updatedEntry.updatedAt || '');
       setDatabaseNamespaces((current) =>
         current.map((entry) =>
           entry.namespace === updatedEntry.namespace
             ? { namespace: updatedEntry.namespace, updatedAt: updatedEntry.updatedAt }
-            : entry
-        )
+            : entry,
+        ),
       );
-      setDatabaseMessage(t("settings.database.saved"));
+      setDatabaseMessage(t('settings.database.saved'));
     } catch (saveError) {
       setDatabaseError(
-        saveError instanceof Error ? saveError.message : t("settings.database.saveFailed")
+        saveError instanceof Error ? saveError.message : t('settings.database.saveFailed'),
       );
     } finally {
       setIsSavingDatabaseValue(false);
@@ -1006,9 +1024,9 @@ export function Settings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-white">{t("settings.title")}</h2>
+        <h2 className="text-3xl font-bold text-white">{t('settings.title')}</h2>
         <p className="mt-2 text-sm text-white/60">
-          {t("settings.about.versionLabel", { version: settings?.appInfo?.imageTag || "dev" })}
+          {t('settings.about.versionLabel', { version: settings?.appInfo?.imageTag || 'dev' })}
         </p>
       </div>
       <Tabs
@@ -1016,7 +1034,7 @@ export function Settings() {
         onValueChange={(value) => {
           if (isValidSettingsTab(value)) {
             const nextParams = new URLSearchParams(searchParams);
-            nextParams.set("tab", value);
+            nextParams.set('tab', value);
             setSearchParams(nextParams, { replace: true });
           }
         }}
@@ -1028,42 +1046,42 @@ export function Settings() {
               value="general"
               className="flex-none text-white data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
             >
-              {t("settings.tabs.general")}
+              {t('settings.tabs.general')}
             </TabsTrigger>
             <TabsTrigger
               value="notifications"
               className="flex-none text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white"
             >
-              {t("settings.tabs.notifications")}
+              {t('settings.tabs.notifications')}
             </TabsTrigger>
             <TabsTrigger
               value="api"
               className="flex-none text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white"
             >
-              {t("settings.tabs.configuration")}
+              {t('settings.tabs.configuration')}
             </TabsTrigger>
-            {user?.username === "admin" && (
+            {user?.username === 'admin' && (
               <TabsTrigger
                 value="users"
                 className="flex-none text-white data-[state=active]:bg-orange-600 data-[state=active]:text-white"
               >
-                {t("settings.tabs.users")}
+                {t('settings.tabs.users')}
               </TabsTrigger>
             )}
-            {user?.username === "admin" && (
+            {user?.username === 'admin' && (
               <TabsTrigger
                 value="database"
                 className="flex-none text-white data-[state=active]:bg-teal-600 data-[state=active]:text-white"
               >
-                {t("settings.tabs.database")}
+                {t('settings.tabs.database')}
               </TabsTrigger>
             )}
-            {user?.username === "admin" && (
+            {user?.username === 'admin' && (
               <TabsTrigger
                 value="factory"
                 className="flex-none text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
               >
-                {t("settings.tabs.factory")}
+                {t('settings.tabs.factory')}
               </TabsTrigger>
             )}
           </TabsList>
@@ -1072,19 +1090,21 @@ export function Settings() {
         <TabsContent value="general">
           <Card className="border-blue-500/30 bg-blue-950/15 text-white mb-6">
             <CardHeader>
-              <CardTitle className="text-blue-200">{t("settings.preferences.title")}</CardTitle>
+              <CardTitle className="text-blue-200">{t('settings.preferences.title')}</CardTitle>
               <CardDescription className="text-blue-100/70">
-                {t("settings.preferences.description")}
+                {t('settings.preferences.description')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-5 max-w-lg">
                 <div className="space-y-2">
-                  <Label htmlFor="settings-language">{t("settings.language.field")}</Label>
+                  <Label htmlFor="settings-language">{t('settings.language.field')}</Label>
                   <select
                     id="settings-language"
                     value={languageCode}
-                    onChange={(event) => void handleLanguageChange(parseSupportedLanguage(event.target.value))}
+                    onChange={(event) =>
+                      void handleLanguageChange(parseSupportedLanguage(event.target.value))
+                    }
                     disabled={isPreferencesSaving}
                     className="w-full bg-slate-900 border border-white/10 text-white rounded-md px-3 py-2"
                   >
@@ -1098,8 +1118,8 @@ export function Settings() {
 
                 <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/10 px-4 py-3 gap-4">
                   <div>
-                    <p className="font-medium text-white">{t("settings.spoilers.toggleLabel")}</p>
-                    <p className="text-sm text-white/55">{t("settings.spoilers.toggleHelp")}</p>
+                    <p className="font-medium text-white">{t('settings.spoilers.toggleLabel')}</p>
+                    <p className="text-sm text-white/55">{t('settings.spoilers.toggleHelp')}</p>
                   </div>
                   <Switch
                     checked={spoilerMode}
@@ -1108,8 +1128,12 @@ export function Settings() {
                   />
                 </div>
 
-                {isPreferencesSaving ? <p className="text-sm text-white/60">{t("common.saving")}</p> : null}
-                {preferencesMessage && <p className="text-sm text-emerald-300">{preferencesMessage}</p>}
+                {isPreferencesSaving ? (
+                  <p className="text-sm text-white/60">{t('common.saving')}</p>
+                ) : null}
+                {preferencesMessage && (
+                  <p className="text-sm text-emerald-300">{preferencesMessage}</p>
+                )}
                 {preferencesError && <p className="text-sm text-red-300">{preferencesError}</p>}
               </div>
             </CardContent>
@@ -1117,20 +1141,25 @@ export function Settings() {
 
           <Card className="border-emerald-500/30 bg-emerald-950/15 text-white">
             <CardHeader>
-              <CardTitle className="text-emerald-200">{t("settings.security.title")}</CardTitle>
+              <CardTitle className="text-emerald-200">{t('settings.security.title')}</CardTitle>
               <CardDescription className="text-emerald-100/70">
-                {t("settings.security.lastChange")}: {settings?.security?.lastPasswordChangeAt ? new Date(settings.security.lastPasswordChangeAt).toLocaleString(languageCode === "fr" ? "fr-FR" : "en-US") : t("settings.security.unknown")}
+                {t('settings.security.lastChange')}:{' '}
+                {settings?.security?.lastPasswordChangeAt
+                  ? new Date(settings.security.lastPasswordChangeAt).toLocaleString(
+                      languageCode === 'fr' ? 'fr-FR' : 'en-US',
+                    )
+                  : t('settings.security.unknown')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {shouldChangePassword ? (
                 <div className="mb-4 rounded-lg border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                  {t("settings.security.changePasswordSuggestion")}
+                  {t('settings.security.changePasswordSuggestion')}
                 </div>
               ) : null}
               <form onSubmit={handlePasswordUpdate} className="space-y-4 max-w-lg">
                 <div className="space-y-2">
-                  <Label htmlFor="current-password">{t("settings.security.currentPassword")}</Label>
+                  <Label htmlFor="current-password">{t('settings.security.currentPassword')}</Label>
                   <Input
                     id="current-password"
                     type="password"
@@ -1140,7 +1169,7 @@ export function Settings() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="new-password">{t("settings.security.newPassword")}</Label>
+                  <Label htmlFor="new-password">{t('settings.security.newPassword')}</Label>
                   <Input
                     id="new-password"
                     type="password"
@@ -1151,8 +1180,12 @@ export function Settings() {
                 </div>
                 {message && <p className="text-sm text-emerald-300">{message}</p>}
                 {error && <p className="text-sm text-red-300">{error}</p>}
-                <Button type="submit" disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                  {isSaving ? t("common.saving") : t("settings.security.update")}
+                <Button
+                  type="submit"
+                  disabled={isSaving}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {isSaving ? t('common.saving') : t('settings.security.update')}
                 </Button>
               </form>
             </CardContent>
@@ -1160,63 +1193,63 @@ export function Settings() {
         </TabsContent>
 
         <TabsContent value="api">
-          {user?.username === "admin" ? (
-          <Card className="border-blue-500/30 bg-blue-950/15 text-white">
-            <CardHeader>
-              <CardTitle className="text-blue-200">{t("settings.api.tmdb.title")}</CardTitle>
-              <CardDescription className="text-blue-100/70">
-                {t("settings.api.tmdb.description")} {" "}
-                    <a
-                      href="https://www.themoviedb.org/settings/api"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-300 hover:text-blue-200"
-                    >
-                      themoviedb.org
-                    </a>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleTmdbSave} className="space-y-6 max-w-lg">
-                <div className="space-y-2">
-                  <Label htmlFor="tmdb-api-key">{t("settings.api.tmdb.apiToken")}</Label>
-                  <Input
-                    id="tmdb-api-key"
-                    type="password"
-                    placeholder={t("settings.api.tmdb.placeholder")}
-                    value={tmdbApiKey}
-                    onChange={(event) => setTmdbApiKey(event.target.value)}
-                    className="bg-slate-900 border-white/10 text-white"
-                  />
-                </div>
+          {user?.username === 'admin' ? (
+            <Card className="border-blue-500/30 bg-blue-950/15 text-white">
+              <CardHeader>
+                <CardTitle className="text-blue-200">{t('settings.api.tmdb.title')}</CardTitle>
+                <CardDescription className="text-blue-100/70">
+                  {t('settings.api.tmdb.description')}{' '}
+                  <a
+                    href="https://www.themoviedb.org/settings/api"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-300 hover:text-blue-200"
+                  >
+                    themoviedb.org
+                  </a>
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleTmdbSave} className="space-y-6 max-w-lg">
+                  <div className="space-y-2">
+                    <Label htmlFor="tmdb-api-key">{t('settings.api.tmdb.apiToken')}</Label>
+                    <Input
+                      id="tmdb-api-key"
+                      type="password"
+                      placeholder={t('settings.api.tmdb.placeholder')}
+                      value={tmdbApiKey}
+                      onChange={(event) => setTmdbApiKey(event.target.value)}
+                      className="bg-slate-900 border-white/10 text-white"
+                    />
+                  </div>
 
-                {tmdbMessage && <p className="text-sm text-emerald-300">{tmdbMessage}</p>}
-                {tmdbError && <p className="text-sm text-red-300">{tmdbError}</p>}
+                  {tmdbMessage && <p className="text-sm text-emerald-300">{tmdbMessage}</p>}
+                  {tmdbError && <p className="text-sm text-red-300">{tmdbError}</p>}
 
-                <Button
-                  type="submit"
-                  disabled={isTmdbSaving}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  {isTmdbSaving ? t("common.saving") : t("settings.api.tmdb.save")}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+                  <Button
+                    type="submit"
+                    disabled={isTmdbSaving}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {isTmdbSaving ? t('common.saving') : t('settings.api.tmdb.save')}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
           ) : null}
 
           <Card className="border-blue-500/30 bg-blue-950/15 text-white mt-6">
             <CardHeader>
-              <CardTitle className="text-blue-200">{t("settings.api.torrent.title")}</CardTitle>
+              <CardTitle className="text-blue-200">{t('settings.api.torrent.title')}</CardTitle>
               <CardDescription className="text-blue-100/70">
-                {t("settings.api.torrent.description")}
+                {t('settings.api.torrent.description')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleTorrentSave} className="space-y-4 max-w-lg">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="torrent-url">{t("settings.api.torrent.url")}</Label>
+                    <Label htmlFor="torrent-url">{t('settings.api.torrent.url')}</Label>
                     <Input
                       id="torrent-url"
                       placeholder="http://localhost"
@@ -1226,7 +1259,7 @@ export function Settings() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="torrent-port">{t("settings.api.torrent.port")}</Label>
+                    <Label htmlFor="torrent-port">{t('settings.api.torrent.port')}</Label>
                     <Input
                       id="torrent-port"
                       type="number"
@@ -1247,14 +1280,14 @@ export function Settings() {
                     className="w-4 h-4 cursor-pointer"
                   />
                   <Label htmlFor="torrent-auth" className="cursor-pointer">
-                    {t("settings.api.torrent.authRequired")}
+                    {t('settings.api.torrent.authRequired')}
                   </Label>
                 </div>
 
                 {torrentAuthRequired && (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="torrent-username">{t("settings.api.torrent.username")}</Label>
+                      <Label htmlFor="torrent-username">{t('settings.api.torrent.username')}</Label>
                       <Input
                         id="torrent-username"
                         placeholder="admin"
@@ -1264,7 +1297,7 @@ export function Settings() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="torrent-password">{t("settings.api.torrent.password")}</Label>
+                      <Label htmlFor="torrent-password">{t('settings.api.torrent.password')}</Label>
                       <Input
                         id="torrent-password"
                         type="password"
@@ -1278,7 +1311,9 @@ export function Settings() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="torrent-movies-folder">{t("settings.api.torrent.moviesFolder")}</Label>
+                  <Label htmlFor="torrent-movies-folder">
+                    {t('settings.api.torrent.moviesFolder')}
+                  </Label>
                   <Input
                     id="torrent-movies-folder"
                     placeholder="/downloads/movies"
@@ -1289,7 +1324,9 @@ export function Settings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="torrent-series-folder">{t("settings.api.torrent.seriesFolder")}</Label>
+                  <Label htmlFor="torrent-series-folder">
+                    {t('settings.api.torrent.seriesFolder')}
+                  </Label>
                   <Input
                     id="torrent-series-folder"
                     placeholder="/downloads/series"
@@ -1302,8 +1339,14 @@ export function Settings() {
                 {torrentMessage && <p className="text-sm text-emerald-300">{torrentMessage}</p>}
                 {torrentError && <p className="text-sm text-red-300">{torrentError}</p>}
 
-                <Button type="submit" disabled={isTorrentSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  {isTorrentSaving ? t("settings.api.common.savingAndTesting") : t("settings.api.common.saveAndTest")}
+                <Button
+                  type="submit"
+                  disabled={isTorrentSaving}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isTorrentSaving
+                    ? t('settings.api.common.savingAndTesting')
+                    : t('settings.api.common.saveAndTest')}
                 </Button>
               </form>
             </CardContent>
@@ -1311,15 +1354,15 @@ export function Settings() {
 
           <Card className="border-blue-500/30 bg-blue-950/15 text-white mt-6">
             <CardHeader>
-              <CardTitle className="text-blue-200">{t("settings.api.indexer.title")}</CardTitle>
+              <CardTitle className="text-blue-200">{t('settings.api.indexer.title')}</CardTitle>
               <CardDescription className="text-blue-100/70">
-                {t("settings.api.indexer.description")}
+                {t('settings.api.indexer.description')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleIndexerSave} className="space-y-4 max-w-lg">
                 <div className="space-y-2">
-                  <Label htmlFor="indexer-url">{t("settings.api.indexer.url")}</Label>
+                  <Label htmlFor="indexer-url">{t('settings.api.indexer.url')}</Label>
                   <Input
                     id="indexer-url"
                     placeholder="https://indexer.example.com"
@@ -1330,7 +1373,7 @@ export function Settings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="indexer-token">{t("settings.api.indexer.token")}</Label>
+                  <Label htmlFor="indexer-token">{t('settings.api.indexer.token')}</Label>
                   <Input
                     id="indexer-token"
                     type="password"
@@ -1342,7 +1385,9 @@ export function Settings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="indexer-default-quality">{t("settings.api.indexer.defaultQuality")}</Label>
+                  <Label htmlFor="indexer-default-quality">
+                    {t('settings.api.indexer.defaultQuality')}
+                  </Label>
                   <select
                     id="indexer-default-quality"
                     value={indexerDefaultQuality}
@@ -1360,8 +1405,14 @@ export function Settings() {
                 {indexerMessage && <p className="text-sm text-emerald-300">{indexerMessage}</p>}
                 {indexerError && <p className="text-sm text-red-300">{indexerError}</p>}
 
-                <Button type="submit" disabled={isIndexerSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  {isIndexerSaving ? t("settings.api.common.savingAndTesting") : t("settings.api.common.saveAndTest")}
+                <Button
+                  type="submit"
+                  disabled={isIndexerSaving}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isIndexerSaving
+                    ? t('settings.api.common.savingAndTesting')
+                    : t('settings.api.common.saveAndTest')}
                 </Button>
               </form>
             </CardContent>
@@ -1371,16 +1422,16 @@ export function Settings() {
         <TabsContent value="notifications">
           <Card className="border-purple-500/30 bg-purple-950/15 text-white">
             <CardHeader>
-              <CardTitle className="text-purple-200">{t("settings.notifications.title")}</CardTitle>
+              <CardTitle className="text-purple-200">{t('settings.notifications.title')}</CardTitle>
               <CardDescription className="text-purple-100/70">
-                {t("settings.notifications.description")}
+                {t('settings.notifications.description')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleDiscordSave} className="space-y-6 max-w-lg">
                 <div
                   className={`space-y-4 p-4 bg-slate-800/50 rounded-md border border-purple-500/20 ${
-                    discordFormOpen ? "" : "cursor-pointer"
+                    discordFormOpen ? '' : 'cursor-pointer'
                   }`}
                   onClick={() => {
                     if (!discordFormOpen) {
@@ -1390,26 +1441,34 @@ export function Settings() {
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h4 className="font-medium text-white">{t("settings.notifications.discord.title")}</h4>
-                      <p className="text-sm text-purple-200/70">{t("settings.notifications.discord.description")}</p>
+                      <h4 className="font-medium text-white">
+                        {t('settings.notifications.discord.title')}
+                      </h4>
+                      <p className="text-sm text-purple-200/70">
+                        {t('settings.notifications.discord.description')}
+                      </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setDiscordFormOpen(true)}
                       className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${
                         discordTested
-                          ? "bg-emerald-600 text-white hover:bg-blue-600"
-                          : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                          ? 'bg-emerald-600 text-white hover:bg-blue-600'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                       }`}
                     >
-                      {discordTested ? t("settings.notifications.discord.enabled") : t("settings.notifications.discord.configure")}
+                      {discordTested
+                        ? t('settings.notifications.discord.enabled')
+                        : t('settings.notifications.discord.configure')}
                     </button>
                   </div>
 
                   {discordFormOpen && (
                     <div className="space-y-3">
                       <div className="space-y-2">
-                        <Label htmlFor="discord-webhook">{t("settings.notifications.discord.webhookLabel")}</Label>
+                        <Label htmlFor="discord-webhook">
+                          {t('settings.notifications.discord.webhookLabel')}
+                        </Label>
                         <Input
                           id="discord-webhook"
                           type="password"
@@ -1419,7 +1478,7 @@ export function Settings() {
                           className="bg-slate-900 border-white/10 text-white"
                         />
                         <p className="text-xs text-slate-400">
-                          {t("settings.notifications.discord.webhookHelp")}
+                          {t('settings.notifications.discord.webhookHelp')}
                         </p>
                       </div>
 
@@ -1436,11 +1495,13 @@ export function Settings() {
 
                       <div className="flex gap-2">
                         <Button
-                        type="submit"
-                        disabled={isDiscordSaving || !discordWebhookUrl.trim()}
-                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-                      >
-                        {isDiscordSaving ? t("settings.notifications.discord.testing") : t("settings.notifications.discord.testAndSave")}
+                          type="submit"
+                          disabled={isDiscordSaving || !discordWebhookUrl.trim()}
+                          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                        >
+                          {isDiscordSaving
+                            ? t('settings.notifications.discord.testing')
+                            : t('settings.notifications.discord.testAndSave')}
                         </Button>
                         <Button
                           type="button"
@@ -1452,7 +1513,7 @@ export function Settings() {
                           variant="ghost"
                           className="border border-white/10 bg-transparent text-white hover:bg-white/10 hover:text-white"
                         >
-                          {t("common.cancel")}
+                          {t('common.cancel')}
                         </Button>
                       </div>
                     </div>
@@ -1461,9 +1522,11 @@ export function Settings() {
 
                 <div className="space-y-4 p-4 bg-slate-800/50 rounded-md border border-purple-500/20">
                   <div>
-                    <h4 className="font-medium text-white">{t("settings.notifications.browser.title")}</h4>
+                    <h4 className="font-medium text-white">
+                      {t('settings.notifications.browser.title')}
+                    </h4>
                     <p className="text-sm text-purple-200/70">
-                      {t("settings.notifications.browser.description")}
+                      {t('settings.notifications.browser.description')}
                     </p>
                   </div>
 
@@ -1471,31 +1534,36 @@ export function Settings() {
                     <Input
                       value={browserDeviceName}
                       onChange={(e) => setBrowserDeviceName(e.target.value)}
-                      placeholder={t("settings.notifications.browser.devicePlaceholder")}
+                      placeholder={t('settings.notifications.browser.devicePlaceholder')}
                       disabled={browserDevices.some((device) => device.id === browserDeviceId)}
                       className="bg-slate-900 border-white/10 text-white disabled:opacity-60 disabled:cursor-not-allowed"
                     />
                     <Button
                       type="button"
                       onClick={handleAddBrowserChannel}
-                      disabled={isBrowserSaving || browserDevices.some((device) => device.id === browserDeviceId)}
+                      disabled={
+                        isBrowserSaving ||
+                        browserDevices.some((device) => device.id === browserDeviceId)
+                      }
                       className={`${
                         browserDevices.some((device) => device.id === browserDeviceId)
-                          ? "bg-emerald-600 hover:bg-emerald-600 text-white"
-                          : "bg-blue-600 hover:bg-blue-700 text-white"
+                          ? 'bg-emerald-600 hover:bg-emerald-600 text-white'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
                       }`}
                     >
                       {isBrowserSaving
-                        ? t("common.saving")
+                        ? t('common.saving')
                         : browserDevices.some((device) => device.id === browserDeviceId)
-                          ? t("settings.notifications.discord.enabled")
-                          : t("settings.notifications.browser.add")}
+                          ? t('settings.notifications.discord.enabled')
+                          : t('settings.notifications.browser.add')}
                     </Button>
                   </div>
 
                   <div className="space-y-2">
                     {browserDevices.length === 0 ? (
-                      <p className="text-sm text-white/60">{t("settings.notifications.browser.none")}</p>
+                      <p className="text-sm text-white/60">
+                        {t('settings.notifications.browser.none')}
+                      </p>
                     ) : (
                       browserDevices.map((device) => (
                         <div
@@ -1505,7 +1573,9 @@ export function Settings() {
                           <div className="min-w-0">
                             <p className="truncate text-sm text-white">{device.name}</p>
                             <p className="text-xs text-white/50">
-                              {device.id === browserDeviceId ? t("settings.notifications.browser.current") : t("settings.notifications.browser.registered")}
+                              {device.id === browserDeviceId
+                                ? t('settings.notifications.browser.current')
+                                : t('settings.notifications.browser.registered')}
                             </p>
                           </div>
                           <Button
@@ -1515,7 +1585,7 @@ export function Settings() {
                             disabled={isBrowserSaving}
                             className="text-red-300 hover:text-red-200 hover:bg-red-500/15"
                           >
-                            {t("common.remove")}
+                            {t('common.remove')}
                           </Button>
                         </div>
                       ))
@@ -1537,9 +1607,11 @@ export function Settings() {
 
                 <div className="space-y-3 p-4 bg-slate-800/50 rounded-md border border-purple-500/20">
                   <div>
-                    <h4 className="font-medium text-white">{t("settings.notifications.test.title")}</h4>
+                    <h4 className="font-medium text-white">
+                      {t('settings.notifications.test.title')}
+                    </h4>
                     <p className="text-sm text-purple-200/70">
-                      {t("settings.notifications.test.description")}
+                      {t('settings.notifications.test.description')}
                     </p>
                   </div>
 
@@ -1549,7 +1621,9 @@ export function Settings() {
                     disabled={isSendingTestNotif}
                     className="bg-purple-600 hover:bg-purple-700 text-white"
                   >
-                    {isSendingTestNotif ? t("settings.notifications.test.sending") : t("settings.notifications.test.trigger")}
+                    {isSendingTestNotif
+                      ? t('settings.notifications.test.sending')
+                      : t('settings.notifications.test.trigger')}
                   </Button>
 
                   {testNotifMessage && (
@@ -1569,25 +1643,21 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        {user?.username === "admin" && (
+        {user?.username === 'admin' && (
           <TabsContent value="users">
             <Card className="border-orange-500/30 bg-orange-950/15 text-white">
               <CardHeader>
-                <CardTitle className="text-orange-200">{t("settings.users.title")}</CardTitle>
+                <CardTitle className="text-orange-200">{t('settings.users.title')}</CardTitle>
                 <CardDescription className="text-orange-100/70">
-                  {t("settings.users.description")}
+                  {t('settings.users.description')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Create User Button + Dialog */}
                 <div className="flex items-center justify-between">
                   <div>
-                    {usersMessage && (
-                      <p className="text-sm text-emerald-300">{usersMessage}</p>
-                    )}
-                    {usersError && (
-                      <p className="text-sm text-red-300">{usersError}</p>
-                    )}
+                    {usersMessage && <p className="text-sm text-emerald-300">{usersMessage}</p>}
+                    {usersError && <p className="text-sm text-red-300">{usersError}</p>}
                   </div>
                   <Button
                     type="button"
@@ -1595,12 +1665,12 @@ export function Settings() {
                       setUsersMessage(null);
                       setUsersError(null);
                       setCreatedUserCredentials(null);
-                      setNewUsername("");
+                      setNewUsername('');
                       setIsCreateUserOpen(true);
                     }}
                     className="bg-orange-600 hover:bg-orange-700 text-white"
                   >
-                    {t("settings.users.createNew")}
+                    {t('settings.users.createNew')}
                   </Button>
                 </div>
 
@@ -1617,15 +1687,17 @@ export function Settings() {
                 >
                   <DialogContent className="border-orange-500/30 bg-slate-950 text-white">
                     <DialogHeader>
-                      <DialogTitle className="text-orange-200">{t("settings.users.createNew")}</DialogTitle>
+                      <DialogTitle className="text-orange-200">
+                        {t('settings.users.createNew')}
+                      </DialogTitle>
                       <DialogDescription className="text-white/70">
-                        {t("settings.users.createDescription")}
+                        {t('settings.users.createDescription')}
                       </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleCreateUser}>
                       <div className="space-y-4 py-2">
                         <div className="space-y-2">
-                          <Label htmlFor="new-username">{t("settings.users.username")}</Label>
+                          <Label htmlFor="new-username">{t('settings.users.username')}</Label>
                           <Input
                             id="new-username"
                             placeholder="john_doe"
@@ -1636,11 +1708,11 @@ export function Settings() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <p className="text-xs text-white/60">{t("settings.users.passwordGeneratedOnCreate")}</p>
+                          <p className="text-xs text-white/60">
+                            {t('settings.users.passwordGeneratedOnCreate')}
+                          </p>
                         </div>
-                        {usersError && (
-                          <p className="text-sm text-red-300">{usersError}</p>
-                        )}
+                        {usersError && <p className="text-sm text-red-300">{usersError}</p>}
                       </div>
                       <DialogFooter className="mt-4">
                         <Button
@@ -1650,14 +1722,14 @@ export function Settings() {
                           disabled={isCreatingUser}
                           className="border border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
                         >
-                          {t("common.cancel")}
+                          {t('common.cancel')}
                         </Button>
                         <Button
                           type="submit"
                           disabled={isCreatingUser}
                           className="bg-orange-600 hover:bg-orange-700 text-white"
                         >
-                          {isCreatingUser ? t("common.saving") : t("settings.users.create")}
+                          {isCreatingUser ? t('common.saving') : t('settings.users.create')}
                         </Button>
                       </DialogFooter>
                     </form>
@@ -1676,14 +1748,16 @@ export function Settings() {
                 >
                   <DialogContent className="border-emerald-500/30 bg-slate-950 text-white">
                     <DialogHeader>
-                      <DialogTitle className="text-emerald-200">{t("settings.users.generatedPasswordTitle")}</DialogTitle>
+                      <DialogTitle className="text-emerald-200">
+                        {t('settings.users.generatedPasswordTitle')}
+                      </DialogTitle>
                       <DialogDescription className="text-white/70">
-                        {generatedPasswordContext === "create"
-                          ? t("settings.users.generatedPasswordDescription", {
-                              username: createdUserCredentials?.username || "",
+                        {generatedPasswordContext === 'create'
+                          ? t('settings.users.generatedPasswordDescription', {
+                              username: createdUserCredentials?.username || '',
                             })
-                          : t("settings.users.generatedPasswordDescriptionReset", {
-                              username: createdUserCredentials?.username || "",
+                          : t('settings.users.generatedPasswordDescriptionReset', {
+                              username: createdUserCredentials?.username || '',
                             })}
                       </DialogDescription>
                     </DialogHeader>
@@ -1692,18 +1766,26 @@ export function Settings() {
                       type="button"
                       onClick={() => void handleCopyGeneratedPassword()}
                       className={
-                        "group rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 w-full text-left transition-all " +
-                        (isGeneratedPasswordCopied ? "ring-2 ring-emerald-400/60" : "hover:bg-emerald-400/10 focus-visible:ring-2 focus-visible:ring-emerald-400/60")
+                        'group rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 w-full text-left transition-all ' +
+                        (isGeneratedPasswordCopied
+                          ? 'ring-2 ring-emerald-400/60'
+                          : 'hover:bg-emerald-400/10 focus-visible:ring-2 focus-visible:ring-emerald-400/60')
                       }
-                      title={isGeneratedPasswordCopied ? t("common.copied") : t("common.copy")}
+                      title={isGeneratedPasswordCopied ? t('common.copied') : t('common.copy')}
                     >
-                      <p className="text-xs text-emerald-100/80">{t("settings.users.newPassword")}</p>
+                      <p className="text-xs text-emerald-100/80">
+                        {t('settings.users.newPassword')}
+                      </p>
                       <div className="mt-1 flex items-center justify-between gap-2">
                         <p className="font-mono text-lg text-emerald-100 select-all">
                           {createdUserCredentials?.password}
                         </p>
                         <span className="h-8 w-8 flex items-center justify-center text-emerald-100/70">
-                          {isGeneratedPasswordCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                          {isGeneratedPasswordCopied ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
                         </span>
                       </div>
                     </button>
@@ -1718,7 +1800,7 @@ export function Settings() {
                         }}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white"
                       >
-                        {t("common.close")}
+                        {t('common.close')}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -1736,18 +1818,21 @@ export function Settings() {
                 >
                   <DialogContent className="border-blue-500/30 bg-slate-950 text-white">
                     <DialogHeader>
-                      <DialogTitle className="text-blue-200">{t("settings.users.resetPasswordTitle")}</DialogTitle>
+                      <DialogTitle className="text-blue-200">
+                        {t('settings.users.resetPasswordTitle')}
+                      </DialogTitle>
                       <DialogDescription className="text-white/70">
-                        {t("settings.users.resetPasswordDescription", {
-                          username: users.find((u) => u.id === resetPasswordTargetId)?.username ?? "",
+                        {t('settings.users.resetPasswordDescription', {
+                          username:
+                            users.find((u) => u.id === resetPasswordTargetId)?.username ?? '',
                         })}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-3 py-2">
-                      <p className="text-sm text-white/70">{t("settings.users.passwordGeneratedOnReset")}</p>
-                      {usersError && (
-                        <p className="text-sm text-red-300">{usersError}</p>
-                      )}
+                      <p className="text-sm text-white/70">
+                        {t('settings.users.passwordGeneratedOnReset')}
+                      </p>
+                      {usersError && <p className="text-sm text-red-300">{usersError}</p>}
                     </div>
                     <DialogFooter>
                       <Button
@@ -1760,7 +1845,7 @@ export function Settings() {
                         disabled={isResettingPassword}
                         className="border border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
                       >
-                        {t("common.cancel")}
+                        {t('common.cancel')}
                       </Button>
                       <Button
                         type="button"
@@ -1768,7 +1853,7 @@ export function Settings() {
                         disabled={isResettingPassword}
                         className="bg-blue-600 hover:bg-blue-700 text-white"
                       >
-                        {isResettingPassword ? t("common.saving") : t("settings.users.resetButton")}
+                        {isResettingPassword ? t('common.saving') : t('settings.users.resetButton')}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -1776,12 +1861,12 @@ export function Settings() {
 
                 {/* Users List */}
                 <div className="space-y-4 p-4 bg-slate-800/50 rounded-md border border-orange-500/20">
-                  <h3 className="font-medium text-white">{t("settings.users.managingUsers")}</h3>
+                  <h3 className="font-medium text-white">{t('settings.users.managingUsers')}</h3>
 
                   {isLoadingUsers ? (
-                    <p className="text-sm text-white/60">{t("common.loading")}</p>
+                    <p className="text-sm text-white/60">{t('common.loading')}</p>
                   ) : users.length === 0 ? (
-                    <p className="text-sm text-white/60">{t("settings.users.noUsers")}</p>
+                    <p className="text-sm text-white/60">{t('settings.users.noUsers')}</p>
                   ) : (
                     <div className="space-y-2">
                       {users.map((listUser) => (
@@ -1802,7 +1887,7 @@ export function Settings() {
                               disabled={isDeletingUser === listUser.id}
                               className="text-blue-300 hover:text-blue-200 hover:bg-blue-500/15"
                             >
-                              {t("settings.users.resetButton")}
+                              {t('settings.users.resetButton')}
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
@@ -1812,23 +1897,23 @@ export function Settings() {
                                   disabled={isDeletingUser === listUser.id}
                                   className="text-red-300 hover:text-red-200 hover:bg-red-500/15"
                                 >
-                                  {t("common.delete")}
+                                  {t('common.delete')}
                                 </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent className="border-red-500/30 bg-slate-950 text-white">
                                 <AlertDialogHeader>
                                   <AlertDialogTitle className="text-red-200">
-                                    {t("settings.users.confirmDeleteTitle")}
+                                    {t('settings.users.confirmDeleteTitle')}
                                   </AlertDialogTitle>
                                   <AlertDialogDescription className="text-white/70">
-                                    {t("settings.users.confirmDeleteDescription", {
+                                    {t('settings.users.confirmDeleteDescription', {
                                       username: listUser.username,
                                     })}
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
-                                    {t("common.cancel")}
+                                    {t('common.cancel')}
                                   </AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() =>
@@ -1836,7 +1921,7 @@ export function Settings() {
                                     }
                                     className="bg-red-600 text-white hover:bg-red-700"
                                   >
-                                    {t("common.delete")}
+                                    {t('common.delete')}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -1852,19 +1937,19 @@ export function Settings() {
           </TabsContent>
         )}
 
-        {user?.username === "admin" && (
+        {user?.username === 'admin' && (
           <TabsContent value="database">
             {/* Desktop : Card avec grid */}
             <Card className="border-teal-500/30 bg-teal-950/15 text-white">
               <CardHeader>
-                <CardTitle className="text-teal-200">{t("settings.database.title")}</CardTitle>
+                <CardTitle className="text-teal-200">{t('settings.database.title')}</CardTitle>
                 <CardDescription className="text-teal-100/70">
-                  {t("settings.database.description")}
+                  {t('settings.database.description')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                  {t("settings.database.warning")}
+                  {t('settings.database.warning')}
                 </div>
                 <div className="hidden lg:grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] overflow-x-auto max-w-full">
                   <DatabaseNamespaceList
@@ -1921,56 +2006,55 @@ export function Settings() {
           </TabsContent>
         )}
 
-        {user?.username === "admin" && (
-        <TabsContent value="factory">
-          <Card className="border-red-500/30 bg-red-950/15 text-white">
-            <CardHeader>
-              <CardTitle className="text-red-200">{t("settings.factory.title")}</CardTitle>
-              <CardDescription className="text-red-100/70">
-                {t("settings.factory.description")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {resetError && <p className="text-sm text-red-300">{resetError}</p>}
+        {user?.username === 'admin' && (
+          <TabsContent value="factory">
+            <Card className="border-red-500/30 bg-red-950/15 text-white">
+              <CardHeader>
+                <CardTitle className="text-red-200">{t('settings.factory.title')}</CardTitle>
+                <CardDescription className="text-red-100/70">
+                  {t('settings.factory.description')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {resetError && <p className="text-sm text-red-300">{resetError}</p>}
 
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    disabled={isResetting}
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    {isResetting ? t("settings.factory.resetting") : t("settings.factory.reset")}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="border-red-500/30 bg-slate-950 text-white">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="text-red-200">
-                      {t("settings.factory.confirmTitle")}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription className="text-white/70">
-                      {t("settings.factory.confirmDescription")}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
-                      {t("common.cancel")}
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleResetSettings}
-                      className="bg-red-600 text-white hover:bg-red-700"
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      disabled={isResetting}
+                      className="bg-red-600 hover:bg-red-700 text-white"
                     >
-                      {t("settings.factory.confirmAction")}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                      {isResetting ? t('settings.factory.resetting') : t('settings.factory.reset')}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="border-red-500/30 bg-slate-950 text-white">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-red-200">
+                        {t('settings.factory.confirmTitle')}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="text-white/70">
+                        {t('settings.factory.confirmDescription')}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                        {t('common.cancel')}
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleResetSettings}
+                        className="bg-red-600 text-white hover:bg-red-700"
+                      >
+                        {t('settings.factory.confirmAction')}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </CardContent>
+            </Card>
+          </TabsContent>
         )}
-
       </Tabs>
     </div>
   );

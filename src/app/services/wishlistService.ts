@@ -1,5 +1,5 @@
-import type { Movie } from "../types/movie";
-import { API_BASE_URL } from "../config/tmdb";
+import { API_BASE_URL } from '../config/tmdb';
+import type { Movie } from '../types/movie';
 
 async function parseArrayResponse<T>(response: Response): Promise<T[]> {
   const data = await response.json();
@@ -10,10 +10,10 @@ async function parseArrayResponse<T>(response: Response): Promise<T[]> {
 export async function getWishlist(): Promise<Movie[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/wishlist`, {
-      credentials: "include",
+      credentials: 'include',
     });
     if (!response.ok) {
-      throw new Error("Failed to fetch wishlist");
+      throw new Error('Failed to fetch wishlist');
     }
     return parseArrayResponse<Movie>(response);
   } catch {
@@ -24,10 +24,10 @@ export async function getWishlist(): Promise<Movie[]> {
 // Ajouter un film à la liste de souhaits
 export async function addToWishlist(movie: Movie): Promise<void> {
   await fetch(`${API_BASE_URL}/wishlist`, {
-    method: "POST",
-    credentials: "include",
+    method: 'POST',
+    credentials: 'include',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(movie),
   });
@@ -36,18 +36,18 @@ export async function addToWishlist(movie: Movie): Promise<void> {
 // Retirer un film de la liste de souhaits
 export async function removeFromWishlist(movieId: number): Promise<void> {
   await fetch(`${API_BASE_URL}/wishlist/${movieId}`, {
-    method: "DELETE",
-    credentials: "include",
+    method: 'DELETE',
+    credentials: 'include',
   });
 }
 
 // Retirer plusieurs films de la liste de souhaits
 export async function removeMultipleFromWishlist(movieIds: number[]): Promise<void> {
   await fetch(`${API_BASE_URL}/wishlist`, {
-    method: "DELETE",
-    credentials: "include",
+    method: 'DELETE',
+    credentials: 'include',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({ ids: movieIds }),
   });
@@ -57,7 +57,7 @@ export async function removeMultipleFromWishlist(movieIds: number[]): Promise<vo
 export async function isInWishlist(movieId: number): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE_URL}/wishlist/${movieId}`, {
-      credentials: "include",
+      credentials: 'include',
     });
     if (!response.ok) {
       return false;

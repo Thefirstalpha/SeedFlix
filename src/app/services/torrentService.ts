@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "../config/tmdb";
+import { API_BASE_URL } from '../config/tmdb';
 
 export interface TorrentAddResponse {
   ok: boolean;
@@ -40,21 +40,21 @@ export interface TorrentDownloadsResponse {
 async function parseJson<T>(response: Response): Promise<T> {
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data?.error || "Request failed");
+    throw new Error(data?.error || 'Request failed');
   }
   return data;
 }
 
 export async function addTorrentToClient(
   torrentUrl: string,
-  mediaType: "movie" | "series" = "movie",
-  targetKey?: string
+  mediaType: 'movie' | 'series' = 'movie',
+  targetKey?: string,
 ) {
   const response = await fetch(`${API_BASE_URL}/torrent/add`, {
-    method: "POST",
-    credentials: "include",
+    method: 'POST',
+    credentials: 'include',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({ torrentUrl, mediaType, targetKey }),
   });
@@ -65,11 +65,11 @@ export async function addTorrentToClient(
 export async function getTorrentDownloads(includeAll = false) {
   const params = new URLSearchParams();
   if (includeAll) {
-    params.set("includeAll", "true");
+    params.set('includeAll', 'true');
   }
 
   const response = await fetch(`${API_BASE_URL}/torrent/downloads?${params.toString()}`, {
-    credentials: "include",
+    credentials: 'include',
   });
 
   return parseJson<TorrentDownloadsResponse>(response);
@@ -77,10 +77,10 @@ export async function getTorrentDownloads(includeAll = false) {
 
 export async function pauseTorrent(id: number) {
   const response = await fetch(`${API_BASE_URL}/torrent/pause`, {
-    method: "POST",
-    credentials: "include",
+    method: 'POST',
+    credentials: 'include',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({ id }),
   });
@@ -90,10 +90,10 @@ export async function pauseTorrent(id: number) {
 
 export async function resumeTorrent(id: number) {
   const response = await fetch(`${API_BASE_URL}/torrent/resume`, {
-    method: "POST",
-    credentials: "include",
+    method: 'POST',
+    credentials: 'include',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({ id }),
   });
@@ -103,10 +103,10 @@ export async function resumeTorrent(id: number) {
 
 export async function cleanTorrent(hash: string) {
   const response = await fetch(`${API_BASE_URL}/torrent/clean`, {
-    method: "POST",
-    credentials: "include",
+    method: 'POST',
+    credentials: 'include',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({ hash }),
   });
@@ -116,10 +116,10 @@ export async function cleanTorrent(hash: string) {
 
 export async function unmanageTorrent(hash: string) {
   const response = await fetch(`${API_BASE_URL}/torrent/unmanage`, {
-    method: "POST",
-    credentials: "include",
+    method: 'POST',
+    credentials: 'include',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({ hash }),
   });

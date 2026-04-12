@@ -1,8 +1,8 @@
-import { Tv, Star, Calendar } from "lucide-react";
-import { Link } from "react-router";
-import { Card, CardContent } from "./ui/card";
-import { Badge } from "./ui/badge";
-import type { Series } from "../types/series";
+import { Tv, Star, Calendar } from 'lucide-react';
+import { Link } from 'react-router';
+import { Badge } from './ui/badge';
+import { Card, CardContent } from './ui/card';
+import type { Series } from '../types/series';
 
 interface SeriesCardProps {
   series: Series;
@@ -30,10 +30,7 @@ export function SeriesCard({ series }: SeriesCardProps) {
               <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
               <span className="font-semibold text-white">{series.rating}</span>
             </div>
-            <Badge
-              variant="secondary"
-              className="bg-cyan-600/20 text-cyan-200 border-cyan-500/30"
-            >
+            <Badge variant="secondary" className="bg-cyan-600/20 text-cyan-200 border-cyan-500/30">
               <Tv className="w-3 h-3 mr-1" />
               {series.genre}
             </Badge>

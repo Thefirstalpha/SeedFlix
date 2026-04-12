@@ -1,6 +1,6 @@
-import type { Movie, TMDBMovie, TMDBMovieDetails, TMDBSearchResponse } from "../types/movie";
-import { TMDB_GENRES } from "../types/movie";
-import { API_BASE_URL, getTmdbImageUrl, getTmdbLanguageParam } from "../config/tmdb";
+import { API_BASE_URL, getTmdbImageUrl, getTmdbLanguageParam } from '../config/tmdb';
+import type { Movie, TMDBMovie, TMDBMovieDetails, TMDBSearchResponse } from '../types/movie';
+import { TMDB_GENRES } from '../types/movie';
 
 export interface MoviePageResult {
   movies: Movie[];
@@ -49,44 +49,46 @@ export interface DiscoverFilters {
 const MOCK_PAGE_SIZE = 8;
 
 const GENRE_MAP: { [key: number]: string } = {
-  28: "Action",
-  12: "Aventure",
-  16: "Animation",
-  35: "Comédie",
-  80: "Crime",
-  99: "Documentaire",
-  18: "Drame",
-  10751: "Familial",
-  14: "Fantastique",
-  36: "Histoire",
-  27: "Horreur",
-  10402: "Musique",
-  9648: "Mystère",
-  10749: "Romance",
-  878: "Science-Fiction",
-  10770: "Téléfilm",
-  53: "Thriller",
-  10752: "Guerre",
-  37: "Western"
+  28: 'Action',
+  12: 'Aventure',
+  16: 'Animation',
+  35: 'Comédie',
+  80: 'Crime',
+  99: 'Documentaire',
+  18: 'Drame',
+  10751: 'Familial',
+  14: 'Fantastique',
+  36: 'Histoire',
+  27: 'Horreur',
+  10402: 'Musique',
+  9648: 'Mystère',
+  10749: 'Romance',
+  878: 'Science-Fiction',
+  10770: 'Téléfilm',
+  53: 'Thriller',
+  10752: 'Guerre',
+  37: 'Western',
 };
 
 const TMDB_LANGUAGE_MAP: Record<string, string> = {
-  fr: "Francais",
-  en: "Anglais",
-  ja: "Japonais",
-  ko: "Coreen",
-  es: "Espagnol",
-  it: "Italien",
-  de: "Allemand",
-  pt: "Portugais",
-  ru: "Russe",
-  zh: "Chinois",
+  fr: 'Francais',
+  en: 'Anglais',
+  ja: 'Japonais',
+  ko: 'Coreen',
+  es: 'Espagnol',
+  it: 'Italien',
+  de: 'Allemand',
+  pt: 'Portugais',
+  ru: 'Russe',
+  zh: 'Chinois',
 };
 
 function mapTmdbLanguage(code: string | undefined) {
-  const normalized = String(code || "").toLowerCase().trim();
+  const normalized = String(code || '')
+    .toLowerCase()
+    .trim();
   if (!normalized) {
-    return "Inconnu";
+    return 'Inconnu';
   }
 
   return TMDB_LANGUAGE_MAP[normalized] || normalized.toUpperCase();
@@ -95,9 +97,10 @@ function mapTmdbLanguage(code: string | undefined) {
 // Convertir un film TMDB en notre format Movie
 function convertTMDBToMovie(tmdbMovie: TMDBMovie): Movie {
   const year = tmdbMovie.release_date ? new Date(tmdbMovie.release_date).getFullYear() : 0;
-  const genre = tmdbMovie.genre_ids && tmdbMovie.genre_ids.length > 0 
-    ? GENRE_MAP[tmdbMovie.genre_ids[0]] || "Inconnu"
-    : "Inconnu";
+  const genre =
+    tmdbMovie.genre_ids && tmdbMovie.genre_ids.length > 0
+      ? GENRE_MAP[tmdbMovie.genre_ids[0]] || 'Inconnu'
+      : 'Inconnu';
 
   return {
     id: tmdbMovie.id,
@@ -109,12 +112,12 @@ function convertTMDBToMovie(tmdbMovie: TMDBMovie): Movie {
     genre,
     poster: getTmdbImageUrl(tmdbMovie.poster_path),
     backdrop: getTmdbImageUrl(tmdbMovie.backdrop_path, 'original'),
-    director: "Non disponible",
+    director: 'Non disponible',
     actors: [],
-    plot: tmdbMovie.overview || "Aucun synopsis disponible.",
-    duration: "Non disponible",
+    plot: tmdbMovie.overview || 'Aucun synopsis disponible.',
+    duration: 'Non disponible',
     releaseDate: tmdbMovie.release_date,
-    voteCount: tmdbMovie.vote_count
+    voteCount: tmdbMovie.vote_count,
   };
 }
 
@@ -129,7 +132,7 @@ function paginateMovies(movies: Movie[], page: number): MoviePageResult {
     movies: pageMovies,
     page: safePage,
     totalPages,
-    totalResults
+    totalResults,
   };
 }
 
@@ -137,7 +140,7 @@ function paginateMovies(movies: Movie[], page: number): MoviePageResult {
 export async function getPopularMoviesPage(
   page = 1,
   filters: DiscoverFilters = {},
-  uiLanguage = "fr"
+  uiLanguage = 'fr',
 ): Promise<MoviePageResult> {
   const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
 
@@ -147,25 +150,23 @@ export async function getPopularMoviesPage(
   });
 
   if (Number.isFinite(filters.genreId)) {
-    params.set("with_genres", String(filters.genreId));
+    params.set('with_genres', String(filters.genreId));
   }
   if (Number.isFinite(filters.yearFrom)) {
-    params.set("primary_release_date_gte", `${filters.yearFrom}-01-01`);
+    params.set('primary_release_date_gte', `${filters.yearFrom}-01-01`);
   }
   if (Number.isFinite(filters.yearTo)) {
-    params.set("primary_release_date_lte", `${filters.yearTo}-12-31`);
+    params.set('primary_release_date_lte', `${filters.yearTo}-12-31`);
   }
   if (Number.isFinite(filters.minRating) && (filters.minRating || 0) > 0) {
-    params.set("vote_average_gte", String(filters.minRating));
+    params.set('vote_average_gte', String(filters.minRating));
   }
   if (filters.originalLanguage) {
-    params.set("with_original_language", filters.originalLanguage);
+    params.set('with_original_language', filters.originalLanguage);
   }
 
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/movies/popular?${params.toString()}`
-    );
+    const response = await fetch(`${API_BASE_URL}/movies/popular?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch popular movies');
@@ -176,7 +177,7 @@ export async function getPopularMoviesPage(
       movies: data.results.map(convertTMDBToMovie),
       page: data.page,
       totalPages: data.total_pages,
-      totalResults: data.total_results
+      totalResults: data.total_results,
     };
   } catch (error) {
     console.error('Error fetching popular movies:', error);
@@ -184,21 +185,21 @@ export async function getPopularMoviesPage(
   }
 }
 
-export async function getMovieGenres(uiLanguage = "fr"): Promise<GenreItem[]> {
+export async function getMovieGenres(uiLanguage = 'fr'): Promise<GenreItem[]> {
   const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/movies/genres?language=${encodeURIComponent(tmdbLanguage)}`
+      `${API_BASE_URL}/movies/genres?language=${encodeURIComponent(tmdbLanguage)}`,
     );
     if (!response.ok) {
-      throw new Error("Failed to fetch movie genres");
+      throw new Error('Failed to fetch movie genres');
     }
 
     const data = await response.json();
     return Array.isArray(data?.genres) ? data.genres : [];
   } catch (error) {
-    console.error("Error fetching movie genres:", error);
+    console.error('Error fetching movie genres:', error);
     return Object.entries(TMDB_GENRES).map(([id, name]) => ({
       id: Number(id),
       name,
@@ -209,7 +210,7 @@ export async function getMovieGenres(uiLanguage = "fr"): Promise<GenreItem[]> {
 export async function discoverMoviesPage(
   page = 1,
   filters: DiscoverFilters = {},
-  uiLanguage = "fr"
+  uiLanguage = 'fr',
 ): Promise<MoviePageResult> {
   const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
 
@@ -219,25 +220,25 @@ export async function discoverMoviesPage(
   });
 
   if (Number.isFinite(filters.genreId)) {
-    params.set("with_genres", String(filters.genreId));
+    params.set('with_genres', String(filters.genreId));
   }
   if (Number.isFinite(filters.yearFrom)) {
-    params.set("primary_release_date_gte", `${filters.yearFrom}-01-01`);
+    params.set('primary_release_date_gte', `${filters.yearFrom}-01-01`);
   }
   if (Number.isFinite(filters.yearTo)) {
-    params.set("primary_release_date_lte", `${filters.yearTo}-12-31`);
+    params.set('primary_release_date_lte', `${filters.yearTo}-12-31`);
   }
   if (Number.isFinite(filters.minRating) && (filters.minRating || 0) > 0) {
-    params.set("vote_average_gte", String(filters.minRating));
+    params.set('vote_average_gte', String(filters.minRating));
   }
   if (filters.originalLanguage) {
-    params.set("with_original_language", filters.originalLanguage);
+    params.set('with_original_language', filters.originalLanguage);
   }
 
   try {
     const response = await fetch(`${API_BASE_URL}/movies/discover?${params.toString()}`);
     if (!response.ok) {
-      throw new Error("Failed to discover movies");
+      throw new Error('Failed to discover movies');
     }
 
     const data: TMDBSearchResponse = await response.json();
@@ -248,19 +249,23 @@ export async function discoverMoviesPage(
       totalResults: data.total_results,
     };
   } catch (error) {
-    console.error("Error discovering movies:", error);
+    console.error('Error discovering movies:', error);
     return getPopularMoviesPage(page, {}, uiLanguage);
   }
 }
 
 // Compatibilité: conserver la version non paginée
-export async function getPopularMovies(uiLanguage = "fr"): Promise<Movie[]> {
+export async function getPopularMovies(uiLanguage = 'fr'): Promise<Movie[]> {
   const response = await getPopularMoviesPage(1, {}, uiLanguage);
   return response.movies;
 }
 
 // Rechercher des films
-export async function searchMoviesPage(query: string, page = 1, uiLanguage = "fr"): Promise<MoviePageResult> {
+export async function searchMoviesPage(
+  query: string,
+  page = 1,
+  uiLanguage = 'fr',
+): Promise<MoviePageResult> {
   const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
 
   if (!query.trim()) {
@@ -269,7 +274,7 @@ export async function searchMoviesPage(query: string, page = 1, uiLanguage = "fr
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/movies/search?language=${encodeURIComponent(tmdbLanguage)}&query=${encodeURIComponent(query)}&page=${page}`
+      `${API_BASE_URL}/movies/search?language=${encodeURIComponent(tmdbLanguage)}&query=${encodeURIComponent(query)}&page=${page}`,
     );
 
     if (!response.ok) {
@@ -281,7 +286,7 @@ export async function searchMoviesPage(query: string, page = 1, uiLanguage = "fr
       movies: data.results.map(convertTMDBToMovie),
       page: data.page,
       totalPages: data.total_pages,
-      totalResults: data.total_results
+      totalResults: data.total_results,
     };
   } catch (error) {
     console.error('Error searching movies:', error);
@@ -289,24 +294,24 @@ export async function searchMoviesPage(query: string, page = 1, uiLanguage = "fr
       movies: [],
       page,
       totalPages: 1,
-      totalResults: 0
+      totalResults: 0,
     };
   }
 }
 
 // Compatibilité: conserver la version non paginée
-export async function searchMovies(query: string, uiLanguage = "fr"): Promise<Movie[]> {
+export async function searchMovies(query: string, uiLanguage = 'fr'): Promise<Movie[]> {
   const response = await searchMoviesPage(query, 1, uiLanguage);
   return response.movies;
 }
 
 // Récupérer les détails d'un film
-export async function getMovieById(id: number, uiLanguage = "fr"): Promise<Movie | null> {
+export async function getMovieById(id: number, uiLanguage = 'fr'): Promise<Movie | null> {
   const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/movies/${id}?language=${encodeURIComponent(tmdbLanguage)}`
+      `${API_BASE_URL}/movies/${id}?language=${encodeURIComponent(tmdbLanguage)}`,
     );
 
     if (!response.ok) {
@@ -314,20 +319,21 @@ export async function getMovieById(id: number, uiLanguage = "fr"): Promise<Movie
     }
 
     const data: TMDBMovieDetails = await response.json();
-    
+
     // Extraire le réalisateur
-    const director = data.credits?.crew.find(person => person.job === 'Director')?.name || "Non disponible";
-    
+    const director =
+      data.credits?.crew.find((person) => person.job === 'Director')?.name || 'Non disponible';
+
     // Extraire les acteurs principaux (top 5)
-    const actors = data.credits?.cast.slice(0, 5).map(actor => actor.name) || [];
-    
+    const actors = data.credits?.cast.slice(0, 5).map((actor) => actor.name) || [];
+
     // Convertir la durée
     const hours = Math.floor(data.runtime / 60);
     const minutes = data.runtime % 60;
     const duration = `${hours}h ${minutes}min`;
 
     // Obtenir le genre principal
-    const genre = data.genres && data.genres.length > 0 ? data.genres[0].name : "Inconnu";
+    const genre = data.genres && data.genres.length > 0 ? data.genres[0].name : 'Inconnu';
 
     return {
       id: data.id,
@@ -341,10 +347,10 @@ export async function getMovieById(id: number, uiLanguage = "fr"): Promise<Movie
       backdrop: getTmdbImageUrl(data.backdrop_path, 'original'),
       director,
       actors,
-      plot: data.overview || "Aucun synopsis disponible.",
+      plot: data.overview || 'Aucun synopsis disponible.',
       duration,
       releaseDate: data.release_date,
-      voteCount: data.vote_count
+      voteCount: data.vote_count,
     };
   } catch (error) {
     console.error('Error fetching movie details:', error);
@@ -355,17 +361,16 @@ export async function getMovieById(id: number, uiLanguage = "fr"): Promise<Movie
 export async function searchMovieReleases(
   query: string,
   limit = 12,
-  tmdbId?: number | string
+  tmdbId?: number | string,
 ): Promise<TorznabMovieSearchResponse> {
-  const tmdbPart = tmdbId !== undefined && tmdbId !== null
-    ? `&tmdbId=${encodeURIComponent(String(tmdbId))}`
-    : "";
+  const tmdbPart =
+    tmdbId !== undefined && tmdbId !== null ? `&tmdbId=${encodeURIComponent(String(tmdbId))}` : '';
 
   const response = await fetch(
     `${API_BASE_URL}/indexer/search?query=${encodeURIComponent(query)}&limit=${limit}${tmdbPart}`,
     {
-      credentials: "include",
-    }
+      credentials: 'include',
+    },
   );
 
   const data = await response.json();
@@ -386,106 +391,114 @@ function getMockMovies(): Movie[] {
   return [
     {
       id: 1,
-      title: "Le Dernier Horizon",
+      title: 'Le Dernier Horizon',
       year: 2025,
       rating: 8.7,
-      language: "Anglais",
-      genre: "Science-Fiction",
-      poster: "https://images.unsplash.com/photo-1578374173713-32f6ae6f3971?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzY2llbmNlJTIwZmljdGlvbiUyMG1vdmllfGVufDF8fHx8MTc3NTQzMzE2OXww&ixlib=rb-4.1.0&q=80&w=1080",
-      director: "Sarah Chen",
-      actors: ["Tom Hardy", "Emma Stone", "Oscar Isaac"],
+      language: 'Anglais',
+      genre: 'Science-Fiction',
+      poster:
+        'https://images.unsplash.com/photo-1578374173713-32f6ae6f3971?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzY2llbmNlJTIwZmljdGlvbiUyMG1vdmllfGVufDF8fHx8MTc3NTQzMzE2OXww&ixlib=rb-4.1.0&q=80&w=1080',
+      director: 'Sarah Chen',
+      actors: ['Tom Hardy', 'Emma Stone', 'Oscar Isaac'],
       plot: "Dans un futur lointain, l'humanité doit trouver une nouvelle planète habitable avant que la Terre ne devienne inhabitable. Une équipe d'explorateurs courageux se lance dans un voyage interstellaire périlleux pour sauver l'espèce humaine.",
-      duration: "2h 28min"
+      duration: '2h 28min',
     },
     {
       id: 2,
-      title: "Ombres du Passé",
+      title: 'Ombres du Passé',
       year: 2024,
       rating: 7.9,
-      language: "Anglais",
-      genre: "Thriller",
-      poster: "https://images.unsplash.com/photo-1662937600299-7cb9ff0b1061?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0aHJpbGxlciUyMGRhcmslMjBjaW5lbWF8ZW58MXx8fHwxNzc1NDg3NTE0fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      director: "Michael Rodriguez",
-      actors: ["Jessica Chastain", "Jake Gyllenhaal", "Idris Elba"],
+      language: 'Anglais',
+      genre: 'Thriller',
+      poster:
+        'https://images.unsplash.com/photo-1662937600299-7cb9ff0b1061?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0aHJpbGxlciUyMGRhcmslMjBjaW5lbWF8ZW58MXx8fHwxNzc1NDg3NTE0fDA&ixlib=rb-4.1.0&q=80&w=1080',
+      director: 'Michael Rodriguez',
+      actors: ['Jessica Chastain', 'Jake Gyllenhaal', 'Idris Elba'],
       plot: "Une détective brillante doit résoudre une série de meurtres mystérieux qui semblent connectés à des événements de son propre passé. Plus elle s'approche de la vérité, plus elle réalise que le tueur la connaît intimement.",
-      duration: "2h 15min"
+      duration: '2h 15min',
     },
     {
       id: 3,
       title: "L'Épopée Fantastique",
       year: 2026,
       rating: 9.1,
-      language: "Anglais",
-      genre: "Aventure",
-      poster: "https://images.unsplash.com/photo-1773518011746-4f1c46ddced1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZHZlbnR1cmUlMjBtb3ZpZSUyMGVwaWN8ZW58MXx8fHwxNzc1NDg3NTE0fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      director: "Peter Jackson",
-      actors: ["Chris Hemsworth", "Zendaya", "Benedict Cumberbatch"],
+      language: 'Anglais',
+      genre: 'Aventure',
+      poster:
+        'https://images.unsplash.com/photo-1773518011746-4f1c46ddced1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZHZlbnR1cmUlMjBtb3ZpZSUyMGVwaWN8ZW58MXx8fHwxNzc1NDg3NTE0fDA&ixlib=rb-4.1.0&q=80&w=1080',
+      director: 'Peter Jackson',
+      actors: ['Chris Hemsworth', 'Zendaya', 'Benedict Cumberbatch'],
       plot: "Un jeune héros ordinaire découvre qu'il est le dernier d'une lignée de guerriers magiques. Il doit maîtriser ses pouvoirs et rassembler une équipe diverse pour empêcher un ancien mal de détruire tous les royaumes.",
-      duration: "3h 05min"
+      duration: '3h 05min',
     },
     {
       id: 4,
-      title: "Rires et Émotions",
+      title: 'Rires et Émotions',
       year: 2025,
       rating: 7.5,
-      language: "Francais",
-      genre: "Comédie",
-      poster: "https://images.unsplash.com/photo-1606397591059-2bc4e008bf60?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxyb21hbnRpYyUyMGNvbWVkeSUyMG1vdmllfGVufDF8fHx8MTc3NTQ0MjU1OHww&ixlib=rb-4.1.0&q=80&w=1080",
-      director: "Judd Apatow",
-      actors: ["Ryan Reynolds", "Sandra Bullock", "Kevin Hart"],
+      language: 'Francais',
+      genre: 'Comédie',
+      poster:
+        'https://images.unsplash.com/photo-1606397591059-2bc4e008bf60?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxyb21hbnRpYyUyMGNvbWVkeSUyMG1vdmllfGVufDF8fHx8MTc3NTQ0MjU1OHww&ixlib=rb-4.1.0&q=80&w=1080',
+      director: 'Judd Apatow',
+      actors: ['Ryan Reynolds', 'Sandra Bullock', 'Kevin Hart'],
       plot: "Deux anciens meilleurs amis se retrouvent après 10 ans et décident de rattraper le temps perdu en accomplissant une liste de défis fous qu'ils avaient créée quand ils étaient adolescents.",
-      duration: "1h 52min"
+      duration: '1h 52min',
     },
     {
       id: 5,
-      title: "Les Murmures de Minuit",
+      title: 'Les Murmures de Minuit',
       year: 2024,
       rating: 8.3,
-      language: "Anglais",
-      genre: "Horreur",
-      poster: "https://images.unsplash.com/photo-1630338679229-99fb150fbf88?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3Jyb3IlMjBtb3ZpZSUyMGRhcmt8ZW58MXx8fHwxNzc1NDE3ODkzfDA&ixlib=rb-4.1.0&q=80&w=1080",
-      director: "Ari Aster",
-      actors: ["Florence Pugh", "Toni Collette", "Bill Skarsgård"],
+      language: 'Anglais',
+      genre: 'Horreur',
+      poster:
+        'https://images.unsplash.com/photo-1630338679229-99fb150fbf88?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3Jyb3IlMjBtb3ZpZSUyMGRhcmt8ZW58MXx8fHwxNzc1NDE3ODkzfDA&ixlib=rb-4.1.0&q=80&w=1080',
+      director: 'Ari Aster',
+      actors: ['Florence Pugh', 'Toni Collette', 'Bill Skarsgård'],
       plot: "Une famille emménage dans une vieille maison isolée et commence à entendre d'étranges murmures la nuit. Ils découvrent bientôt que la maison cache un terrible secret lié à des rituels anciens.",
-      duration: "2h 18min"
+      duration: '2h 18min',
     },
     {
       id: 6,
-      title: "Le Cœur des Étoiles",
+      title: 'Le Cœur des Étoiles',
       year: 2025,
       rating: 8.0,
-      language: "Francais",
-      genre: "Drame",
-      poster: "https://images.unsplash.com/photo-1762356121454-877acbd554bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaW5lbWElMjBkcmFtYSUyMGZpbG18ZW58MXx8fHwxNzc1NDg3NTEzfDA&ixlib=rb-4.1.0&q=80&w=1080",
-      director: "Greta Gerwig",
-      actors: ["Saoirse Ronan", "Timothée Chalamet", "Meryl Streep"],
+      language: 'Francais',
+      genre: 'Drame',
+      poster:
+        'https://images.unsplash.com/photo-1762356121454-877acbd554bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaW5lbWElMjBkcmFtYSUyMGZpbG18ZW58MXx8fHwxNzc1NDg3NTEzfDA&ixlib=rb-4.1.0&q=80&w=1080',
+      director: 'Greta Gerwig',
+      actors: ['Saoirse Ronan', 'Timothée Chalamet', 'Meryl Streep'],
       plot: "Une jeune astronome talentueuse doit choisir entre sa carrière prometteuse et sa famille qui traverse une période difficile. Un film émouvant sur les sacrifices et l'amour familial.",
-      duration: "2h 10min"
+      duration: '2h 10min',
     },
     {
       id: 7,
       title: "L'Envol Magique",
       year: 2026,
       rating: 8.8,
-      language: "Anglais",
-      genre: "Animation",
-      poster: "https://images.unsplash.com/photo-1767557125491-b3483567d843?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhbmltYXRpb24lMjBjYXJ0b29uJTIwY29sb3JmdWx8ZW58MXx8fHwxNzc1NDI0Nzc5fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      director: "Pete Docter",
-      actors: ["Tom Hanks", "Scarlett Johansson", "Chris Pratt"],
+      language: 'Anglais',
+      genre: 'Animation',
+      poster:
+        'https://images.unsplash.com/photo-1767557125491-b3483567d843?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhbmltYXRpb24lMjBjYXJ0b29uJTIwY29sb3JmdWx8ZW58MXx8fHwxNzc1NDI0Nzc5fDA&ixlib=rb-4.1.0&q=80&w=1080',
+      director: 'Pete Docter',
+      actors: ['Tom Hanks', 'Scarlett Johansson', 'Chris Pratt'],
       plot: "Un jeune oiseau qui a peur de voler doit surmonter ses craintes pour sauver sa famille d'une tempête imminente. Une aventure colorée et touchante pour toute la famille.",
-      duration: "1h 35min"
+      duration: '1h 35min',
     },
     {
       id: 8,
-      title: "Code Rouge",
+      title: 'Code Rouge',
       year: 2025,
       rating: 7.7,
-      genre: "Action",
-      poster: "https://images.unsplash.com/photo-1765510296004-614b6cc204da?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGFjdGlvbnxlbnwxfHx8fDE3NzU0ODc1MTN8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      director: "Christopher McQuarrie",
-      actors: ["Tom Cruise", "Charlize Theron", "Jason Statham"],
-      plot: "Un agent secret chevronné doit empêcher une organisation terroriste de déclencher une arme nucléaire dans une grande métropole. Une course contre la montre avec des cascades spectaculaires.",
-      duration: "2h 22min"
-    }
+      genre: 'Action',
+      poster:
+        'https://images.unsplash.com/photo-1765510296004-614b6cc204da?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGFjdGlvbnxlbnwxfHx8fDE3NzU0ODc1MTN8MA&ixlib=rb-4.1.0&q=80&w=1080',
+      director: 'Christopher McQuarrie',
+      actors: ['Tom Cruise', 'Charlize Theron', 'Jason Statham'],
+      plot: 'Un agent secret chevronné doit empêcher une organisation terroriste de déclencher une arme nucléaire dans une grande métropole. Une course contre la montre avec des cascades spectaculaires.',
+      duration: '2h 22min',
+    },
   ];
 }
