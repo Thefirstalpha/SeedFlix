@@ -1,3 +1,4 @@
+import { DatabaseRawEditorPanel } from "./DatabaseRawEditorPanel";
 import { useEffect, useState } from "react";
 // Fonction utilitaire générique pour la gestion des sauvegardes asynchrones
 async function handleAsyncSave<T = any>({
@@ -90,6 +91,7 @@ import {
 } from "../services/browserNotificationChannel";
 import { useAuth } from "../context/AuthContext";
 import { useI18n, type SupportedLanguage } from "../i18n/LanguageProvider";
+import { DatabaseNamespaceList } from "./DatabaseNamespaceList";
 
 const QUALITY_OPTIONS = [
   { value: "all", labelKey: "settings.quality.all" },
@@ -1864,101 +1866,29 @@ export function Settings() {
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] overflow-x-auto max-w-full">
-                  <div className="w-full space-y-3 rounded-lg border border-white/10 bg-slate-900/40 p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-medium text-white">{t("settings.database.namespaces")}</h3>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => void handleDatabaseNamespacesReload()}
-                        className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
-                      >
-                        {t("settings.database.refreshList")}
-                      </Button>
-                    </div>
+                  <DatabaseNamespaceList
+                    t={t}
+                    isLoading={isLoadingDatabaseNamespaces}
+                    namespaces={databaseNamespaces}
+                    selectedNamespace={selectedDatabaseNamespace}
+                    onReload={handleDatabaseNamespacesReload}
+                    onSelect={setSelectedDatabaseNamespace}
+                  />
 
-                    {isLoadingDatabaseNamespaces ? (
-                      <p className="text-sm text-white/60">{t("common.loading")}</p>
-                    ) : databaseNamespaces.length === 0 ? (
-                      <p className="text-sm text-white/60">{t("settings.database.empty")}</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {databaseNamespaces.map((entry) => (
-                          <button
-                            key={entry.namespace}
-                            type="button"
-                            onClick={() => setSelectedDatabaseNamespace(entry.namespace)}
-                            className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
-                              selectedDatabaseNamespace === entry.namespace
-                                ? "border-teal-400/40 bg-teal-500/15 text-teal-100"
-                                : "border-white/10 bg-slate-950/50 text-white/80 hover:bg-white/5"
-                            }`}
-                          >
-                            <p className="font-mono text-sm">{entry.namespace}</p>
-                            <p className="mt-1 text-xs text-white/50">
-                              {t("settings.database.updatedAt", { value: entry.updatedAt || "-" })}
-                            </p>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="w-full space-y-4 rounded-lg border border-white/10 bg-slate-900/40 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <h3 className="font-medium text-white">
-                          {selectedDatabaseNamespace || t("settings.database.noSelection")}
-                        </h3>
-                        <p className="text-sm text-white/60">
-                          {t("settings.database.updatedAt", { value: databaseUpdatedAt || "-" })}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => void handleDatabaseReload()}
-                          disabled={!selectedDatabaseNamespace || isLoadingDatabaseValue || isSavingDatabaseValue}
-                          className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
-                        >
-                          {t("settings.database.reload")}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleDatabasePrettyFormat}
-                          disabled={!selectedDatabaseNamespace || isLoadingDatabaseValue || isSavingDatabaseValue}
-                          className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
-                        >
-                          {t("settings.database.prettyFormat")}
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={() => void handleDatabaseSave()}
-                          disabled={!selectedDatabaseNamespace || isLoadingDatabaseValue || isSavingDatabaseValue}
-                          className="bg-teal-600 hover:bg-teal-700 text-white"
-                        >
-                          {isSavingDatabaseValue ? t("common.saving") : t("common.save")}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="database-raw-value">{t("settings.database.rawEditor")}</Label>
-                      <Textarea
-                        id="database-raw-value"
-                        value={databaseRawValue}
-                        onChange={(event) => setDatabaseRawValue(event.target.value)}
-                        disabled={!selectedDatabaseNamespace || isLoadingDatabaseValue}
-                        className="min-h-[420px] bg-slate-950 border-white/10 font-mono text-sm text-white"
-                        spellCheck={false}
-                      />
-                    </div>
-
-                    {databaseMessage ? <p className="text-sm text-emerald-300">{databaseMessage}</p> : null}
-                    {databaseError ? <p className="text-sm text-red-300">{databaseError}</p> : null}
-                  </div>
+                  <DatabaseRawEditorPanel
+                    t={t}
+                    selectedNamespace={selectedDatabaseNamespace}
+                    updatedAt={databaseUpdatedAt}
+                    isLoadingValue={isLoadingDatabaseValue}
+                    isSavingValue={isSavingDatabaseValue}
+                    rawValue={databaseRawValue}
+                    onRawValueChange={setDatabaseRawValue}
+                    onReload={handleDatabaseReload}
+                    onPrettyFormat={handleDatabasePrettyFormat}
+                    onSave={handleDatabaseSave}
+                    message={databaseMessage}
+                    error={databaseError}
+                  />
                 </div>
               </CardContent>
             </Card>
