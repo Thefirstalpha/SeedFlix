@@ -853,9 +853,8 @@ export function Settings() {
       setNewUsername("");
       setIsCreateUserOpen(false);
       setUsersMessage(
-        t("settings.users.userCreatedWithPassword", {
+        t("settings.users.userCreated", {
           username: createdUser.username,
-          password: createdUser.generatedPassword,
         })
       );
       setCreatedUserCredentials({
@@ -903,9 +902,8 @@ export function Settings() {
       const targetUser = users.find((u) => u.id === resetPasswordTargetId);
       setResetPasswordTargetId(null);
       setUsersMessage(
-        t("settings.users.passwordResetWithPassword", {
+        t("settings.users.passwordReset", {
           username: targetUser?.username || "utilisateur",
-          password: response.generatedPassword,
         })
       );
       setCreatedUserCredentials({
@@ -1690,22 +1688,25 @@ export function Settings() {
                       </DialogDescription>
                     </DialogHeader>
 
-                    <div className="group rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyGeneratedPassword()}
+                      className={
+                        "group rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 w-full text-left transition-all " +
+                        (isGeneratedPasswordCopied ? "ring-2 ring-emerald-400/60" : "hover:bg-emerald-400/10 focus-visible:ring-2 focus-visible:ring-emerald-400/60")
+                      }
+                      title={isGeneratedPasswordCopied ? t("common.copied") : t("common.copy")}
+                    >
                       <p className="text-xs text-emerald-100/80">{t("settings.users.newPassword")}</p>
                       <div className="mt-1 flex items-center justify-between gap-2">
-                        <p className="font-mono text-lg text-emerald-100">{createdUserCredentials?.password}</p>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => void handleCopyGeneratedPassword()}
-                          title={isGeneratedPasswordCopied ? t("common.copied") : t("common.copy")}
-                          className="h-8 w-8 text-emerald-100/70 opacity-0 transition-opacity hover:bg-emerald-400/15 hover:text-emerald-100 group-hover:opacity-100 focus-visible:opacity-100"
-                        >
+                        <p className="font-mono text-lg text-emerald-100 select-all">
+                          {createdUserCredentials?.password}
+                        </p>
+                        <span className="h-8 w-8 flex items-center justify-center text-emerald-100/70">
                           {isGeneratedPasswordCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                        </Button>
+                        </span>
                       </div>
-                    </div>
+                    </button>
 
                     <DialogFooter>
                       <Button

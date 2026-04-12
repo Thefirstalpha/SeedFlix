@@ -549,10 +549,8 @@ const en = {
       confirmDeleteTitle: "Confirm deletion",
       confirmDeleteDescription: "Are you sure you want to delete the user {{username}}? This action cannot be undone.",
       userCreated: "User {{username}} created successfully.",
-      userCreatedWithPassword: "User {{username}} created successfully. Generated password: {{password}}",
       userDeleted: "User {{username}} deleted.",
       passwordReset: "Password for {{username}} reset successfully.",
-      passwordResetWithPassword: "Password for {{username}} has been reset. New password: {{password}}",
     },
     database: {
       title: "Raw database",

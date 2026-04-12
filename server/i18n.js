@@ -16,6 +16,7 @@ const messages = {
       failedLoadSettings: "Impossible de charger les parametres",
       failedUpdateSettings: "Impossible de mettre a jour les parametres",
       failedResetSettings: "Impossible de reinitialiser les parametres",
+      usernameAlreadyExists: "Ce nom d'utilisateur existe déjà.",
     },
     tmdb: {
       apiKeyNotConfigured: "La cle API TMDB n'est pas configuree. Configurez-la dans les parametres.",
@@ -298,7 +299,13 @@ function resolveMessage(language, key) {
     return acc[segment];
   }, fallback);
 
-  return typeof fromFallback === "string" ? fromFallback : key;
+  if (typeof fromFallback === "string") {
+    return fromFallback;
+  }
+
+  // Si la clé n'existe pas, logguer une erreur et retourner la clé + message explicite
+  console.error(`[i18n] Missing translation for key: '${key}' (lang: ${language})`);
+  return `[missing translation: ${key}]`;
 }
 
 export function getTranslator(req, user) {

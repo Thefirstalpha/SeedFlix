@@ -549,10 +549,8 @@ const fr = {
       confirmDeleteTitle: "Confirmer la suppression",
       confirmDeleteDescription: "Êtes-vous certain de vouloir supprimer l'utilisateur {{username}} ? Cette action est irréversible.",
       userCreated: "Utilisateur {{username}} créé avec succès.",
-      userCreatedWithPassword: "Utilisateur {{username}} créé avec succès. Mot de passe généré: {{password}}",
       userDeleted: "Utilisateur {{username}} supprimé.",
       passwordReset: "Mot de passe de {{username}} réinitialisé avec succès.",
-      passwordResetWithPassword: "Mot de passe de {{username}} réinitialisé. Nouveau mot de passe: {{password}}",
     },
     database: {
       title: "Base de données brute",
