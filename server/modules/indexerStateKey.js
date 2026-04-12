@@ -1,5 +1,5 @@
 function parseIndexerStateKeyParts(stateKey) {
-  const parts = String(stateKey || "").split(":");
+  const parts = String(stateKey || '').split(':');
   if (parts.length < 4) {
     return null;
   }
@@ -13,21 +13,21 @@ export function extractTargetKeyFromIndexerStateKey(stateKey) {
     return null;
   }
 
-  const targetType = String(parts[1] || "").trim();
+  const targetType = String(parts[1] || '').trim();
   const segmentA = Number(parts[2]);
   const segmentB = Number(parts[3]);
   const segmentC = Number(parts[4]);
 
-  if ((targetType === "movie" || targetType === "series") && Number.isFinite(segmentA)) {
+  if ((targetType === 'movie' || targetType === 'series') && Number.isFinite(segmentA)) {
     return `${targetType}:${segmentA}`;
   }
 
-  if (targetType === "season" && Number.isFinite(segmentA) && Number.isFinite(segmentB)) {
+  if (targetType === 'season' && Number.isFinite(segmentA) && Number.isFinite(segmentB)) {
     return `${targetType}:${segmentA}:${segmentB}`;
   }
 
   if (
-    targetType === "episode" &&
+    targetType === 'episode' &&
     Number.isFinite(segmentA) &&
     Number.isFinite(segmentB) &&
     Number.isFinite(segmentC)
@@ -41,8 +41,8 @@ export function extractTargetKeyFromIndexerStateKey(stateKey) {
 export function extractUserKeyFromIndexerStateKey(stateKey) {
   const parts = parseIndexerStateKeyParts(stateKey);
   if (!parts) {
-    return "";
+    return '';
   }
 
-  return String(parts[0] || "").trim();
+  return String(parts[0] || '').trim();
 }

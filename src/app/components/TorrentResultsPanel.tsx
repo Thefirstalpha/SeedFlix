@@ -1,8 +1,8 @@
-import { Calendar, Download, Loader2 } from "lucide-react";
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
-import { Card, CardContent } from "./ui/card";
-import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
+import { Calendar, Download, Loader2 } from 'lucide-react';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Card, CardContent } from './ui/card';
+import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 
 export interface TorrentReleaseItem {
   title: string;
@@ -57,9 +57,9 @@ interface TorrentResultsPanelProps {
   onSeasonFilterChange?: (value: string) => void;
   availableReleaseSeasons?: string[];
   availableReleaseLanguages: string[];
-  sortBy: "size" | "date";
-  onSortByChange: (value: "size" | "date") => void;
-  sortOrder: "asc" | "desc";
+  sortBy: 'size' | 'date';
+  onSortByChange: (value: 'size' | 'date') => void;
+  sortOrder: 'asc' | 'desc';
   onSortOrderToggle: () => void;
   isReleaseLoading: boolean;
   releaseError: string | null;
@@ -76,7 +76,7 @@ interface TorrentResultsPanelProps {
   labels: TorrentResultsLabels;
 }
 
-const QUALITY_OPTIONS = ["2160p", "1080p", "720p", "480p", "bluray", "webdl", "hdtv"];
+const QUALITY_OPTIONS = ['2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv'];
 
 export function TorrentResultsPanel({
   title,
@@ -118,9 +118,11 @@ export function TorrentResultsPanel({
         <div className="flex flex-wrap items-center gap-4">
           {onSeasonFilterChange && availableReleaseSeasons ? (
             <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-              <label className="text-sm text-white/70 whitespace-nowrap font-medium">{labels.season}</label>
+              <label className="text-sm text-white/70 whitespace-nowrap font-medium">
+                {labels.season}
+              </label>
               <select
-                value={seasonFilter || "all"}
+                value={seasonFilter || 'all'}
                 onChange={(event) => onSeasonFilterChange(event.target.value)}
                 className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
               >
@@ -135,7 +137,9 @@ export function TorrentResultsPanel({
           ) : null}
 
           <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-            <label className="text-sm text-white/70 font-medium whitespace-nowrap">{labels.quality}</label>
+            <label className="text-sm text-white/70 font-medium whitespace-nowrap">
+              {labels.quality}
+            </label>
             <select
               value={qualityFilter}
               onChange={(event) => onQualityFilterChange(event.target.value)}
@@ -144,14 +148,20 @@ export function TorrentResultsPanel({
               <option value="all">{labels.all}</option>
               {QUALITY_OPTIONS.map((quality) => (
                 <option key={quality} value={quality}>
-                  {quality === "bluray" ? "BluRay" : quality === "webdl" ? "WEB-DL" : quality.toUpperCase()}
+                  {quality === 'bluray'
+                    ? 'BluRay'
+                    : quality === 'webdl'
+                      ? 'WEB-DL'
+                      : quality.toUpperCase()}
                 </option>
               ))}
             </select>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-            <label className="text-sm text-white/70 font-medium whitespace-nowrap">{labels.language}</label>
+            <label className="text-sm text-white/70 font-medium whitespace-nowrap">
+              {labels.language}
+            </label>
             <select
               value={languageFilter}
               onChange={(event) => onLanguageFilterChange(event.target.value)}
@@ -173,7 +183,7 @@ export function TorrentResultsPanel({
               value={sortBy}
               onValueChange={(value) => {
                 if (value) {
-                  onSortByChange(value as "size" | "date");
+                  onSortByChange(value as 'size' | 'date');
                 }
               }}
               className="border border-white/20 rounded-md bg-slate-900/30"
@@ -198,14 +208,16 @@ export function TorrentResultsPanel({
               onClick={onSortOrderToggle}
               className="h-9 px-3 border border-white/20 text-white/80 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all"
             >
-              {sortOrder === "desc" ? "↓" : "↑"}
+              {sortOrder === 'desc' ? '↓' : '↑'}
             </Button>
           </div>
         </div>
 
         {isReleaseLoading ? <p className="text-sm text-white/60">{labels.searching}</p> : null}
         {releaseError ? <p className="text-sm text-red-300">{releaseError}</p> : null}
-        {torrentStatus && !releaseError ? <p className="text-sm text-emerald-300">{torrentStatus}</p> : null}
+        {torrentStatus && !releaseError ? (
+          <p className="text-sm text-emerald-300">{torrentStatus}</p>
+        ) : null}
         {torrentError ? <p className="text-sm text-red-300">{torrentError}</p> : null}
 
         {!isReleaseLoading && !releaseError && filteredResults.length === 0 ? (
@@ -284,7 +296,7 @@ export function TorrentResultsPanel({
 
                     {Array.isArray(item.categories) && item.categories.length > 0 ? (
                       <p className="text-xs text-white/50 line-clamp-1 break-all">
-                        {labels.categories(item.categories.join(", "))}
+                        {labels.categories(item.categories.join(', '))}
                       </p>
                     ) : null}
                   </div>
@@ -302,7 +314,9 @@ export function TorrentResultsPanel({
                 {labels.previous}
               </Button>
 
-              <span className="text-sm text-white/80">{labels.current(currentPage, totalPages)}</span>
+              <span className="text-sm text-white/80">
+                {labels.current(currentPage, totalPages)}
+              </span>
 
               <select
                 value={currentPage}

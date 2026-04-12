@@ -1,19 +1,21 @@
-import { withAuth } from "./auth.js";
-import { debugLog } from "../logger.js";
-import { getTranslator } from "../i18n.js";
+import { withAuth } from './auth.js';
+import { debugLog } from '../logger.js';
+import { getTranslator } from '../i18n.js';
 
 const torznabTimeoutMs = 8000;
 
 function redactTorznabUrl(url) {
   const clone = new URL(url.toString());
-  if (clone.searchParams.has("apikey")) {
-    clone.searchParams.set("apikey", "***");
+  if (clone.searchParams.has('apikey')) {
+    clone.searchParams.set('apikey', '***');
   }
   return clone.toString();
 }
 
 function truncateForLogs(value, maxLength = 1000) {
-  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+  const normalized = String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (normalized.length <= maxLength) {
     return normalized;
   }
@@ -22,10 +24,10 @@ function truncateForLogs(value, maxLength = 1000) {
 }
 
 function decodeXmlEntities(value) {
-  return String(value || "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
+  return String(value || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
 }
@@ -35,7 +37,7 @@ function bytesToHuman(size) {
     return null;
   }
 
-  const units = ["B", "KB", "MB", "GB", "TB"];
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let index = 0;
   let value = size;
 
@@ -48,47 +50,46 @@ function bytesToHuman(size) {
 }
 
 function extractQualityFromTitle(title) {
-  const normalized = String(title || "").toLowerCase();
+  const normalized = String(title || '').toLowerCase();
 
-  const resolution =
-    (normalized.match(/\b(2160p|1080p|720p|480p)\b/i)?.[1] || null);
+  const resolution = normalized.match(/\b(2160p|1080p|720p|480p)\b/i)?.[1] || null;
 
   const source =
-    (normalized.match(/\b(uhd|bluray|brrip|web[- .]?dl|webrip|hdtv|dvdrip|remux)\b/i)?.[1] || null);
+    normalized.match(/\b(uhd|bluray|brrip|web[- .]?dl|webrip|hdtv|dvdrip|remux)\b/i)?.[1] || null;
 
   if (resolution && source) {
-    return `${resolution.toUpperCase()} ${source.toUpperCase().replace(/[- .]/g, "")}`;
+    return `${resolution.toUpperCase()} ${source.toUpperCase().replace(/[- .]/g, '')}`;
   }
   if (resolution) {
     return resolution.toUpperCase();
   }
   if (source) {
-    return source.toUpperCase().replace(/[- .]/g, "");
+    return source.toUpperCase().replace(/[- .]/g, '');
   }
 
   return null;
 }
 
 function extractLanguageFromTitle(title) {
-  const normalized = String(title || "").toLowerCase();
+  const normalized = String(title || '').toLowerCase();
 
   if (/\bvostfr\b/i.test(normalized)) {
-    return "VOSTFR";
+    return 'VOSTFR';
   }
   if (/\bvfq\b/i.test(normalized)) {
-    return "VFQ";
+    return 'VFQ';
   }
   if (/\bvff\b/i.test(normalized)) {
-    return "VFF";
+    return 'VFF';
   }
   if (/\bmulti\b/i.test(normalized)) {
-    return "MULTI";
+    return 'MULTI';
   }
   if (/\btruefrench\b|\bfrench\b|\bvf\b/i.test(normalized)) {
-    return "VF";
+    return 'VF';
   }
   if (/\bvo\b/i.test(normalized)) {
-    return "VO";
+    return 'VO';
   }
 
   return null;
@@ -97,41 +98,39 @@ function extractLanguageFromTitle(title) {
 function buildTorznabSearchUrl(
   rawUrl,
   apiKey,
-  query = "",
+  query = '',
   limit = 1,
-  tmdbId = "",
+  tmdbId = '',
   offset = 0,
-  invalidUrlMessage = "URL Torznab invalide"
+  invalidUrlMessage = 'URL Torznab invalide',
 ) {
   let url;
 
   try {
-    url = new URL(String(rawUrl || "").trim());
+    url = new URL(String(rawUrl || '').trim());
   } catch {
     throw new Error(invalidUrlMessage);
   }
 
-  url.searchParams.set("t", "search");
-  url.searchParams.set("limit", String(limit));
-  url.searchParams.set("offset", String(Math.max(0, Number(offset) || 0)));
+  url.searchParams.set('t', 'search');
+  url.searchParams.set('limit', String(limit));
+  url.searchParams.set('offset', String(Math.max(0, Number(offset) || 0)));
   if (query) {
-    url.searchParams.set("q", query);
+    url.searchParams.set('q', query);
   }
   if (tmdbId) {
     // Many Torznab indexers support tmdbid filtering.
-    url.searchParams.set("tmdbid", String(tmdbId));
+    url.searchParams.set('tmdbid', String(tmdbId));
   }
   if (apiKey) {
-    url.searchParams.set("apikey", apiKey);
+    url.searchParams.set('apikey', apiKey);
   }
 
   return url;
 }
 
 function parseTorznabResponse(xmlText, invalidSearchResponseMessage) {
-  const errorMatch = xmlText.match(
-    /<error[^>]*code="([^"]+)"[^>]*description="([^"]+)"/i
-  );
+  const errorMatch = xmlText.match(/<error[^>]*code="([^"]+)"[^>]*description="([^"]+)"/i);
   if (errorMatch) {
     return {
       ok: false,
@@ -171,25 +170,27 @@ function parseTorznabItems(xmlText, maxItems = 5) {
     const seedersMatch = block.match(/torznab:attr[^>]*name="seeders"[^>]*value="([^"]+)"/i);
     const leechersMatch = block.match(/torznab:attr[^>]*name="peers"[^>]*value="([^"]+)"/i);
     const categoryMatches = [...block.matchAll(/<category[^>]*>([^<]+)<\/category>/gi)];
-    const attrMatches = [...block.matchAll(/torznab:attr[^>]*name="([^"]+)"[^>]*value="([^"]*)"/gi)];
+    const attrMatches = [
+      ...block.matchAll(/torznab:attr[^>]*name="([^"]+)"[^>]*value="([^"]*)"/gi),
+    ];
 
-    const title = decodeXmlEntities(titleMatch?.[1]?.trim() || "");
+    const title = decodeXmlEntities(titleMatch?.[1]?.trim() || '');
     if (!title) {
       continue;
     }
 
     const attributes = attrMatches.reduce((acc, match) => {
-      const key = String(match[1] || "").trim();
+      const key = String(match[1] || '').trim();
       if (!key) {
         return acc;
       }
 
-      acc[key] = decodeXmlEntities(match[2] || "");
+      acc[key] = decodeXmlEntities(match[2] || '');
       return acc;
     }, {});
 
     const lowerCaseAttributes = Object.fromEntries(
-      Object.entries(attributes).map(([key, value]) => [String(key || "").toLowerCase(), value])
+      Object.entries(attributes).map(([key, value]) => [String(key || '').toLowerCase(), value]),
     );
     const qualityFromAttributes =
       lowerCaseAttributes.resolution ||
@@ -197,9 +198,7 @@ function parseTorznabItems(xmlText, maxItems = 5) {
       lowerCaseAttributes.video ||
       null;
     const tmdbId = String(
-      lowerCaseAttributes.tmdbid ||
-      lowerCaseAttributes["tmdb-id"] ||
-      ""
+      lowerCaseAttributes.tmdbid || lowerCaseAttributes['tmdb-id'] || '',
     ).trim();
     const quality = qualityFromAttributes || extractQualityFromTitle(title);
     const language =
@@ -207,22 +206,22 @@ function parseTorznabItems(xmlText, maxItems = 5) {
       lowerCaseAttributes.lang ||
       lowerCaseAttributes.audio ||
       lowerCaseAttributes.languages ||
-      lowerCaseAttributes["languagefrench"] ||
+      lowerCaseAttributes['languagefrench'] ||
       extractLanguageFromTitle(title) ||
       null;
     const downloadUrl =
       lowerCaseAttributes.magneturl ||
-      decodeXmlEntities(enclosureUrlMatch?.[1] || "").trim() ||
-      decodeXmlEntities(linkMatch?.[1]?.trim() || "");
+      decodeXmlEntities(enclosureUrlMatch?.[1] || '').trim() ||
+      decodeXmlEntities(linkMatch?.[1]?.trim() || '');
 
     const size = Number(sizeMatch?.[1] || 0) || null;
 
     items.push({
       title,
-      link: decodeXmlEntities(linkMatch?.[1]?.trim() || ""),
+      link: decodeXmlEntities(linkMatch?.[1]?.trim() || ''),
       downloadUrl,
-      guid: decodeXmlEntities(guidMatch?.[1]?.trim() || ""),
-      pubDate: decodeXmlEntities(pubDateMatch?.[1]?.trim() || ""),
+      guid: decodeXmlEntities(guidMatch?.[1]?.trim() || ''),
+      pubDate: decodeXmlEntities(pubDateMatch?.[1]?.trim() || ''),
       size,
       sizeHuman: size ? bytesToHuman(size) : null,
       seeders: Number(seedersMatch?.[1] || 0) || null,
@@ -230,9 +229,7 @@ function parseTorznabItems(xmlText, maxItems = 5) {
       tmdbId: tmdbId || null,
       quality,
       language,
-      categories: categoryMatches
-        .map((match) => decodeXmlEntities(match[1] || ""))
-        .filter(Boolean),
+      categories: categoryMatches.map((match) => decodeXmlEntities(match[1] || '')).filter(Boolean),
       attributes,
     });
   }
@@ -257,7 +254,7 @@ async function fetchWithTimeout(url) {
   try {
     return await fetch(url, {
       headers: {
-        Accept: "application/xml, text/xml;q=0.9, */*;q=0.1",
+        Accept: 'application/xml, text/xml;q=0.9, */*;q=0.1',
       },
       signal: controller.signal,
     });
@@ -269,22 +266,20 @@ async function fetchWithTimeout(url) {
 function resolveIndexerSettings(auth, body) {
   const savedIndexer = auth.user.settings?.placeholders?.indexer || {};
 
-  const hasBodyUrl =
-    body && typeof body === "object" && Object.hasOwn(body, "url");
-  const hasBodyToken =
-    body && typeof body === "object" && Object.hasOwn(body, "token");
+  const hasBodyUrl = body && typeof body === 'object' && Object.hasOwn(body, 'url');
+  const hasBodyToken = body && typeof body === 'object' && Object.hasOwn(body, 'token');
 
   const urlSource = hasBodyUrl ? body.url : savedIndexer.url;
   const tokenSource = hasBodyToken ? body.token : savedIndexer.token;
 
-  const url = String(urlSource || "").trim();
-  const token = String(tokenSource || "").trim();
+  const url = String(urlSource || '').trim();
+  const token = String(tokenSource || '').trim();
 
   return { url, token };
 }
 
 export async function searchTorznabForQuery(auth, query, options = {}) {
-  const { limit = 10, tmdbId = "" } = options;
+  const { limit = 10, tmdbId = '' } = options;
   const t = options.t || ((key) => key);
   const { url, token } = resolveIndexerSettings(auth, {});
 
@@ -292,12 +287,12 @@ export async function searchTorznabForQuery(auth, query, options = {}) {
     return {
       ok: false,
       skipped: true,
-      message: t("torznab.indexerNotConfigured"),
+      message: t('torznab.indexerNotConfigured'),
       items: [],
     };
   }
 
-  const normalizedTmdbId = String(tmdbId || "").trim();
+  const normalizedTmdbId = String(tmdbId || '').trim();
   const normalizedLimit = Math.min(100, Math.max(1, Number(limit || 10)));
   const pageRequestLimit = Math.min(normalizedLimit, 100);
   const maxPages = 10;
@@ -312,18 +307,18 @@ export async function searchTorznabForQuery(auth, query, options = {}) {
     const searchUrl = buildTorznabSearchUrl(
       url,
       token,
-      String(query || "").trim(),
+      String(query || '').trim(),
       pageRequestLimit,
       normalizedTmdbId,
       offset,
-      t("torznab.invalidUrl")
+      t('torznab.invalidUrl'),
     );
 
     const response = await fetchWithTimeout(searchUrl);
     const xmlText = await response.text();
-    const parsed = parseTorznabResponse(xmlText, t("torznab.invalidSearchResponse"));
+    const parsed = parseTorznabResponse(xmlText, t('torznab.invalidSearchResponse'));
 
-    debugLog("Torznab search response", {
+    debugLog('Torznab search response', {
       page: pageCount + 1,
       offset,
       url: redactTorznabUrl(searchUrl),
@@ -336,7 +331,7 @@ export async function searchTorznabForQuery(auth, query, options = {}) {
       if (pageCount === 0) {
         return {
           ok: false,
-          message: parsed.message || t("torznab.genericError", { status: response.status }),
+          message: parsed.message || t('torznab.genericError', { status: response.status }),
           code: parsed.code || null,
           items: [],
         };
@@ -348,7 +343,7 @@ export async function searchTorznabForQuery(auth, query, options = {}) {
 
     const pageItems = parseTorznabItems(xmlText, pageRequestLimit);
     const filteredPageItems = normalizedTmdbId
-      ? pageItems.filter((item) => String(item.tmdbId || "").trim() === normalizedTmdbId)
+      ? pageItems.filter((item) => String(item.tmdbId || '').trim() === normalizedTmdbId)
       : pageItems;
 
     if (!filteredPageItems.length) {
@@ -390,121 +385,127 @@ export async function searchTorznabForQuery(auth, query, options = {}) {
 
   return {
     ok: true,
-    message: t("torznab.searchDone"),
+    message: t('torznab.searchDone'),
     sourceTitle: lastSourceTitle || null,
     items: aggregatedItems.slice(0, normalizedLimit),
   };
 }
 
 export function registerTorznabRoutes(app) {
-  app.get("/api/indexer/search", withAuth(async (req, res, auth) => {
-    try {
-      const t = getTranslator(req, auth.user);
+  app.get(
+    '/api/indexer/search',
+    withAuth(async (req, res, auth) => {
+      try {
+        const t = getTranslator(req, auth.user);
 
-      const query = String(req.query.query || "").trim();
-      const limit = Math.min(100, Math.max(1, Number(req.query.limit || 10)));
-      const tmdbId = String(req.query.tmdbId || "").trim();
+        const query = String(req.query.query || '').trim();
+        const limit = Math.min(100, Math.max(1, Number(req.query.limit || 10)));
+        const tmdbId = String(req.query.tmdbId || '').trim();
 
-      if (!query) {
-        res.status(400).json({ error: t("torznab.queryRequired") });
-        return;
-      }
+        if (!query) {
+          res.status(400).json({ error: t('torznab.queryRequired') });
+          return;
+        }
 
-      const result = await searchTorznabForQuery(auth, query, { limit, tmdbId, t });
-      if (!result.ok) {
-        res.status(400).json({
-          ok: false,
-          error: result.message,
-          code: result.code || null,
-          items: [],
+        const result = await searchTorznabForQuery(auth, query, { limit, tmdbId, t });
+        if (!result.ok) {
+          res.status(400).json({
+            ok: false,
+            error: result.message,
+            code: result.code || null,
+            items: [],
+          });
+          return;
+        }
+
+        res.json({
+          ok: true,
+          query,
+          tmdbId: tmdbId || null,
+          sourceTitle: result.sourceTitle || null,
+          items: result.items,
         });
-        return;
-      }
+      } catch (error) {
+        const t = getTranslator(req);
+        if (error instanceof Error && error.name === 'AbortError') {
+          res.status(504).json({ error: t('torznab.searchTimeout') });
+          return;
+        }
 
-      res.json({
-        ok: true,
-        query,
-        tmdbId: tmdbId || null,
-        sourceTitle: result.sourceTitle || null,
-        items: result.items,
-      });
-    } catch (error) {
-      const t = getTranslator(req);
-      if (error instanceof Error && error.name === "AbortError") {
-        res.status(504).json({ error: t("torznab.searchTimeout") });
-        return;
-      }
-
-      debugLog("Torznab search failed:", error);
-      res.status(500).json({
-        error: t("torznab.searchFailed"),
-      });
-    }
-  }));
-
-  app.post("/api/indexer/test", withAuth(async (req, res, auth) => {
-    try {
-      const t = getTranslator(req, auth.user);
-
-      const { url, token } = resolveIndexerSettings(auth, req.body);
-
-      if (!url) {
-        res.status(400).json({ error: t("torznab.urlRequired") });
-        return;
-      }
-
-      if (!token) {
-        res.status(400).json({ error: t("torznab.tokenRequired") });
-        return;
-      }
-
-      const searchUrl = buildTorznabSearchUrl(url, token, "", 1, "", 0, t("torznab.invalidUrl"));
-      debugLog("Torznab test request", {
-        url: redactTorznabUrl(searchUrl),
-      });
-
-      const response = await fetchWithTimeout(searchUrl);
-      const xmlText = await response.text();
-      debugLog("Torznab test response", {
-        status: response.status,
-        ok: response.ok,
-        body: truncateForLogs(xmlText),
-      });
-
-      const parsed = parseTorznabResponse(xmlText, t("torznab.invalidSearchResponse"));
-
-      if (!response.ok) {
-        res.status(response.status).json({
-          ok: false,
-          error: parsed.message || t("torznab.connectFailed", { status: response.status }),
+        debugLog('Torznab search failed:', error);
+        res.status(500).json({
+          error: t('torznab.searchFailed'),
         });
-        return;
       }
+    }),
+  );
 
-      if (!parsed.ok) {
-        res.status(400).json({ ok: false, error: parsed.message });
-        return;
+  app.post(
+    '/api/indexer/test',
+    withAuth(async (req, res, auth) => {
+      try {
+        const t = getTranslator(req, auth.user);
+
+        const { url, token } = resolveIndexerSettings(auth, req.body);
+
+        if (!url) {
+          res.status(400).json({ error: t('torznab.urlRequired') });
+          return;
+        }
+
+        if (!token) {
+          res.status(400).json({ error: t('torznab.tokenRequired') });
+          return;
+        }
+
+        const searchUrl = buildTorznabSearchUrl(url, token, '', 1, '', 0, t('torznab.invalidUrl'));
+        debugLog('Torznab test request', {
+          url: redactTorznabUrl(searchUrl),
+        });
+
+        const response = await fetchWithTimeout(searchUrl);
+        const xmlText = await response.text();
+        debugLog('Torznab test response', {
+          status: response.status,
+          ok: response.ok,
+          body: truncateForLogs(xmlText),
+        });
+
+        const parsed = parseTorznabResponse(xmlText, t('torznab.invalidSearchResponse'));
+
+        if (!response.ok) {
+          res.status(response.status).json({
+            ok: false,
+            error: parsed.message || t('torznab.connectFailed', { status: response.status }),
+          });
+          return;
+        }
+
+        if (!parsed.ok) {
+          res.status(400).json({ ok: false, error: parsed.message });
+          return;
+        }
+
+        res.json({
+          ok: true,
+          message: parsed.title
+            ? t('torznab.connectOkWithTitle', { title: parsed.title })
+            : t('torznab.connectOk'),
+          endpoint: searchUrl.origin,
+        });
+      } catch (error) {
+        const t = getTranslator(req);
+        if (error instanceof Error && error.name === 'AbortError') {
+          debugLog('Torznab test timeout', { timeoutMs: torznabTimeoutMs });
+          res.status(504).json({ error: t('torznab.testTimeout') });
+          return;
+        }
+
+        debugLog('Torznab test failed:', error);
+        res.status(500).json({
+          error: t('torznab.testFailed'),
+        });
       }
-
-      res.json({
-        ok: true,
-        message: parsed.title
-          ? t("torznab.connectOkWithTitle", { title: parsed.title })
-          : t("torznab.connectOk"),
-        endpoint: searchUrl.origin,
-      });
-    } catch (error) {
-      const t = getTranslator(req);
-      if (error instanceof Error && error.name === "AbortError") {
-        debugLog("Torznab test timeout", { timeoutMs: torznabTimeoutMs });
-        res.status(504).json({ error: t("torznab.testTimeout") });
-        return;
-      }
-
-      debugLog("Torznab test failed:", error);
-      res.status(500).json({
-        error: t("torznab.testFailed"),
-      });
-    }
-  }));
+    }),
+  );
 }

@@ -3,7 +3,7 @@
 FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install -g npm@latest && npm ci
 
 FROM deps AS build
 COPY index.html ./
@@ -12,6 +12,7 @@ COPY postcss.config.mjs ./
 COPY src ./src
 COPY public ./public
 RUN npm run build
+
 
 FROM node:24-alpine AS runtime
 ARG IMAGE_TAG=dev
@@ -22,12 +23,6 @@ ENV APP_IMAGE_TAG=${IMAGE_TAG}
 LABEL org.opencontainers.image.title="SeedFlix"
 LABEL org.opencontainers.image.description="SeedFlix full-stack app (React + Express)"
 LABEL org.opencontainers.image.version="${IMAGE_TAG}"
-
-# Pull in latest Alpine security fixes available at build time.
-RUN apk upgrade --no-cache
-
-# Update bundled npm to latest patched release so image scans do not fail on npm's own transitive deps.
-RUN npm install -g npm@latest
 
 COPY package*.json ./
 RUN npm ci --omit=dev

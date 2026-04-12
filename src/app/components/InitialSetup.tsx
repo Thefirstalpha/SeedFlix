@@ -1,8 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router";
-import { Check, ExternalLink, KeyRound, RadioTower, Scale, Server, ShieldCheck } from "lucide-react";
+import {
+  Check,
+  ExternalLink,
+  KeyRound,
+  RadioTower,
+  Scale,
+  Server,
+  ShieldCheck,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router';
 
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from '../context/AuthContext';
 import {
   acceptLegal,
   changePassword,
@@ -14,21 +22,21 @@ import {
   updateGlobalSettings,
   updateSettings,
   type UserSettings,
-} from "../services/authService";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Progress } from "./ui/progress";
-import { Checkbox } from "./ui/checkbox";
-import { Switch } from "./ui/switch";
-import { useI18n, type SupportedLanguage } from "../i18n/LanguageProvider";
+} from '../services/authService';
+import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Checkbox } from './ui/checkbox';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Progress } from './ui/progress';
+import { Switch } from './ui/switch';
+import { useI18n, type SupportedLanguage } from '../i18n/LanguageProvider';
 
 function parseSupportedLanguage(input: unknown): SupportedLanguage {
-  return input === "en" ? "en" : "fr";
+  return input === 'en' ? 'en' : 'fr';
 }
 
-function buildFallbackSettings(username = "admin"): UserSettings {
+function buildFallbackSettings(username = 'admin'): UserSettings {
   return {
     profile: {
       username,
@@ -37,26 +45,26 @@ function buildFallbackSettings(username = "admin"): UserSettings {
       lastPasswordChangeAt: new Date().toISOString(),
     },
     apiKeys: {
-      tmdb: "",
+      tmdb: '',
     },
     placeholders: {
       notifications: {},
       preferences: {
-        language: "fr",
+        language: 'fr',
       },
       torrent: {
-        url: "",
-        port: "",
+        url: '',
+        port: '',
         authRequired: false,
-        username: "",
-        password: "",
-        moviesFolder: "",
-        seriesFolder: "",
+        username: '',
+        password: '',
+        moviesFolder: '',
+        seriesFolder: '',
       },
       indexer: {
-        url: "",
-        token: "",
-        defaultQuality: "all",
+        url: '',
+        token: '',
+        defaultQuality: 'all',
       },
     },
   };
@@ -90,33 +98,33 @@ export function InitialSetup() {
   const [activeStep, setActiveStep] = useState(0);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
 
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
 
-  const [tmdbApiKey, setTmdbApiKey] = useState("");
+  const [tmdbApiKey, setTmdbApiKey] = useState('');
   const [tmdbError, setTmdbError] = useState<string | null>(null);
   const [tmdbMessage, setTmdbMessage] = useState<string | null>(null);
   const [isTmdbSaving, setIsTmdbSaving] = useState(false);
 
-  const [torrentUrl, setTorrentUrl] = useState("");
-  const [torrentPort, setTorrentPort] = useState("");
+  const [torrentUrl, setTorrentUrl] = useState('');
+  const [torrentPort, setTorrentPort] = useState('');
   const [torrentAuthRequired, setTorrentAuthRequired] = useState(false);
-  const [torrentUsername, setTorrentUsername] = useState("");
-  const [torrentPassword, setTorrentPassword] = useState("");
-  const [torrentMoviesFolder, setTorrentMoviesFolder] = useState("");
-  const [torrentSeriesFolder, setTorrentSeriesFolder] = useState("");
+  const [torrentUsername, setTorrentUsername] = useState('');
+  const [torrentPassword, setTorrentPassword] = useState('');
+  const [torrentMoviesFolder, setTorrentMoviesFolder] = useState('');
+  const [torrentSeriesFolder, setTorrentSeriesFolder] = useState('');
   const [torrentError, setTorrentError] = useState<string | null>(null);
   const [isTorrentSaving, setIsTorrentSaving] = useState(false);
 
-  const [indexerUrl, setIndexerUrl] = useState("");
-  const [indexerToken, setIndexerToken] = useState("");
-  const [indexerDefaultQuality, setIndexerDefaultQuality] = useState("all");
+  const [indexerUrl, setIndexerUrl] = useState('');
+  const [indexerToken, setIndexerToken] = useState('');
+  const [indexerDefaultQuality, setIndexerDefaultQuality] = useState('all');
   const [indexerError, setIndexerError] = useState<string | null>(null);
   const [isIndexerSaving, setIsIndexerSaving] = useState(false);
-  const [languageCode, setLanguageCode] = useState<SupportedLanguage>("fr");
+  const [languageCode, setLanguageCode] = useState<SupportedLanguage>('fr');
   const [languageMessage, setLanguageMessage] = useState<string | null>(null);
   const [languageError, setLanguageError] = useState<string | null>(null);
   const [isLanguageSaving, setIsLanguageSaving] = useState(false);
@@ -125,18 +133,39 @@ export function InitialSetup() {
   const [legalError, setLegalError] = useState<string | null>(null);
   const stepsScrollerRef = useRef<HTMLDivElement | null>(null);
   const stepItemRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const isAdmin = user?.username === "admin";
+  const isAdmin = user?.username === 'admin';
 
   const visibleSteps = useMemo(
-    () => [
-      { key: "legal", title: t("setup.steps.legal"), icon: Scale, required: needsInitialSetup && !legalAccepted },
-      { key: "password", title: t("setup.steps.security"), icon: ShieldCheck, required: mustChangePassword },
-      { key: "tmdb", title: t("setup.steps.tmdb"), icon: KeyRound, required: mustConfigureTmdb },
-      { key: "torrent", title: t("setup.steps.torrent"), icon: Server, required: mustConfigureTorrent },
-      { key: "indexer", title: t("setup.steps.indexer"), icon: RadioTower, required: mustConfigureIndexer },
-    ]
-      .filter((step) => step.key !== "legal" || needsInitialSetup)
-      .filter((step) => isAdmin || step.key !== "tmdb"),
+    () =>
+      [
+        {
+          key: 'legal',
+          title: t('setup.steps.legal'),
+          icon: Scale,
+          required: needsInitialSetup && !legalAccepted,
+        },
+        {
+          key: 'password',
+          title: t('setup.steps.security'),
+          icon: ShieldCheck,
+          required: mustChangePassword,
+        },
+        { key: 'tmdb', title: t('setup.steps.tmdb'), icon: KeyRound, required: mustConfigureTmdb },
+        {
+          key: 'torrent',
+          title: t('setup.steps.torrent'),
+          icon: Server,
+          required: mustConfigureTorrent,
+        },
+        {
+          key: 'indexer',
+          title: t('setup.steps.indexer'),
+          icon: RadioTower,
+          required: mustConfigureIndexer,
+        },
+      ]
+        .filter((step) => step.key !== 'legal' || needsInitialSetup)
+        .filter((step) => isAdmin || step.key !== 'tmdb'),
     [
       isAdmin,
       legalAccepted,
@@ -146,7 +175,7 @@ export function InitialSetup() {
       mustConfigureTorrent,
       needsInitialSetup,
       t,
-    ]
+    ],
   );
 
   const totalSteps = visibleSteps.length;
@@ -157,20 +186,20 @@ export function InitialSetup() {
   }, [totalSteps, visibleSteps]);
 
   useEffect(() => {
-    const sourceSettings = settings || buildFallbackSettings(user?.username || "admin");
+    const sourceSettings = settings || buildFallbackSettings(user?.username || 'admin');
     const torrentSettings = sourceSettings.placeholders?.torrent || {};
     const indexerSettings = sourceSettings.placeholders?.indexer || {};
 
-    setTorrentUrl(torrentSettings.url || "");
-    setTorrentPort(torrentSettings.port || "");
+    setTorrentUrl(torrentSettings.url || '');
+    setTorrentPort(torrentSettings.port || '');
     setTorrentAuthRequired(Boolean(torrentSettings.authRequired));
-    setTorrentUsername(torrentSettings.username || "");
-    setTorrentPassword(torrentSettings.password || "");
-    setTorrentMoviesFolder(torrentSettings.moviesFolder || "");
-    setTorrentSeriesFolder(torrentSettings.seriesFolder || "");
-    setIndexerUrl(indexerSettings.url || "");
-    setIndexerToken(indexerSettings.token || "");
-    setIndexerDefaultQuality(indexerSettings.defaultQuality || "all");
+    setTorrentUsername(torrentSettings.username || '');
+    setTorrentPassword(torrentSettings.password || '');
+    setTorrentMoviesFolder(torrentSettings.moviesFolder || '');
+    setTorrentSeriesFolder(torrentSettings.seriesFolder || '');
+    setIndexerUrl(indexerSettings.url || '');
+    setIndexerToken(indexerSettings.token || '');
+    setIndexerDefaultQuality(indexerSettings.defaultQuality || 'all');
     setLanguageCode(parseSupportedLanguage(sourceSettings.placeholders?.preferences?.language));
   }, [settings, user?.username]);
 
@@ -183,9 +212,9 @@ export function InitialSetup() {
       try {
         const response = await getSettings();
         setSettings(response);
-        if (user?.username === "admin") {
+        if (user?.username === 'admin') {
           const globalSettings = await getGlobalSettings();
-          setTmdbApiKey(globalSettings.tmdbApiKey || "");
+          setTmdbApiKey(globalSettings.tmdbApiKey || '');
         }
       } finally {
         setIsBootstrapping(false);
@@ -197,7 +226,7 @@ export function InitialSetup() {
 
   useEffect(() => {
     if (!isLoading && !hasPendingSetup) {
-      navigate("/", { replace: true });
+      navigate('/', { replace: true });
       return;
     }
 
@@ -215,9 +244,9 @@ export function InitialSetup() {
     }
 
     activeStepElement.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "center",
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'center',
     });
   }, [activeStep, totalSteps]);
 
@@ -226,7 +255,7 @@ export function InitialSetup() {
   }
 
   if (!isLoading && !hasPendingSetup) {
-    return <Navigate to={(location.state as { from?: string } | null)?.from || "/"} replace />;
+    return <Navigate to={(location.state as { from?: string } | null)?.from || '/'} replace />;
   }
 
   const shouldShowPreparingScreen = isBootstrapping || (isLoading && !isAuthenticated);
@@ -234,7 +263,7 @@ export function InitialSetup() {
   if (shouldShowPreparingScreen) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center text-white/70">
-        {t("setup.preparing")}
+        {t('setup.preparing')}
       </div>
     );
   }
@@ -242,17 +271,18 @@ export function InitialSetup() {
   const currentStep = visibleSteps[activeStep];
   const currentStepNumber = activeStep + 1;
   const progressValue = totalSteps > 0 ? (currentStepNumber / totalSteps) * 100 : 0;
-  const currentSettings = settings || buildFallbackSettings(user?.username || "admin");
+  const currentSettings = settings || buildFallbackSettings(user?.username || 'admin');
 
   const buildUpdatedSettings = (overrides: Partial<UserSettings>): UserSettings => ({
     ...currentSettings,
     ...overrides,
     apiKeys: {
-      ...(currentSettings.apiKeys || { tmdb: "" }),
+      ...(currentSettings.apiKeys || { tmdb: '' }),
       ...(overrides.apiKeys || {}),
     },
     placeholders: {
-      ...(currentSettings.placeholders || buildFallbackSettings(user?.username || "admin").placeholders),
+      ...(currentSettings.placeholders ||
+        buildFallbackSettings(user?.username || 'admin').placeholders),
       ...(overrides.placeholders || {}),
       preferences: {
         ...(currentSettings.placeholders?.preferences || {}),
@@ -271,7 +301,7 @@ export function InitialSetup() {
 
   const goToNextVisibleStep = () => {
     if (activeStep >= totalSteps - 1) {
-      navigate("/", { replace: true });
+      navigate('/', { replace: true });
       return;
     }
 
@@ -297,10 +327,10 @@ export function InitialSetup() {
       setSettings(updatedSettings);
       setLanguage(nextLanguage);
       await refresh();
-      setLanguageMessage(t("settings.language.success"));
+      setLanguageMessage(t('settings.language.success'));
     } catch (submitError) {
       setLanguageError(
-        submitError instanceof Error ? submitError.message : t("settings.language.failed")
+        submitError instanceof Error ? submitError.message : t('settings.language.failed'),
       );
     } finally {
       setIsLanguageSaving(false);
@@ -315,7 +345,7 @@ export function InitialSetup() {
       await refresh();
       goToNextVisibleStep();
     } catch (err) {
-      setLegalError(err instanceof Error ? err.message : t("common.loading"));
+      setLegalError(err instanceof Error ? err.message : t('common.loading'));
     } finally {
       setIsLegalSaving(false);
     }
@@ -326,31 +356,33 @@ export function InitialSetup() {
     setPasswordError(null);
 
     if (!newPassword) {
-      setPasswordError(t("setup.password.errors.required"));
+      setPasswordError(t('setup.password.errors.required'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordError(t("setup.password.errors.mismatch"));
+      setPasswordError(t('setup.password.errors.mismatch'));
       return;
     }
 
-    if (user?.username !== "admin" && !currentPassword) {
-      setPasswordError(t("setup.password.errors.required"));
+    if (user?.username !== 'admin' && !currentPassword) {
+      setPasswordError(t('setup.password.errors.required'));
       return;
     }
 
     setIsPasswordSaving(true);
     try {
-      await changePassword(user?.username === "admin" ? "admin" : currentPassword, newPassword);
+      await changePassword(user?.username === 'admin' ? 'admin' : currentPassword, newPassword);
       await refresh();
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
       goToNextVisibleStep();
     } catch (submitError) {
       setPasswordError(
-        submitError instanceof Error ? submitError.message : t("setup.password.errors.updateFailed")
+        submitError instanceof Error
+          ? submitError.message
+          : t('setup.password.errors.updateFailed'),
       );
     } finally {
       setIsPasswordSaving(false);
@@ -363,7 +395,7 @@ export function InitialSetup() {
     setTmdbMessage(null);
 
     if (!tmdbApiKey.trim()) {
-      setTmdbError(t("setup.tmdb.errors.required"));
+      setTmdbError(t('setup.tmdb.errors.required'));
       return;
     }
 
@@ -371,14 +403,14 @@ export function InitialSetup() {
     try {
       const testResponse = await testTmdbApiKey(tmdbApiKey.trim());
       const savedGlobalSettings = await updateGlobalSettings({ tmdbApiKey: tmdbApiKey.trim() });
-      setTmdbApiKey(savedGlobalSettings.tmdbApiKey || "");
+      setTmdbApiKey(savedGlobalSettings.tmdbApiKey || '');
       setTmdbMessage(testResponse.message);
       await refresh();
 
       goToNextVisibleStep();
     } catch (submitError) {
       setTmdbError(
-        submitError instanceof Error ? submitError.message : t("setup.tmdb.errors.configFailed")
+        submitError instanceof Error ? submitError.message : t('setup.tmdb.errors.configFailed'),
       );
     } finally {
       setIsTmdbSaving(false);
@@ -390,12 +422,12 @@ export function InitialSetup() {
     setTorrentError(null);
 
     if (!torrentUrl.trim() || !torrentPort.trim()) {
-      setTorrentError(t("setup.torrent.errors.urlPortRequired"));
+      setTorrentError(t('setup.torrent.errors.urlPortRequired'));
       return;
     }
 
     if (torrentAuthRequired && (!torrentUsername.trim() || !torrentPassword.trim())) {
-      setTorrentError(t("setup.torrent.errors.credentialsRequired"));
+      setTorrentError(t('setup.torrent.errors.credentialsRequired'));
       return;
     }
 
@@ -415,8 +447,8 @@ export function InitialSetup() {
             url: torrentUrl.trim(),
             port: torrentPort.trim(),
             authRequired: torrentAuthRequired,
-            username: torrentAuthRequired ? torrentUsername.trim() : "",
-            password: torrentAuthRequired ? torrentPassword : "",
+            username: torrentAuthRequired ? torrentUsername.trim() : '',
+            password: torrentAuthRequired ? torrentPassword : '',
             moviesFolder: torrentMoviesFolder.trim(),
             seriesFolder: torrentSeriesFolder.trim(),
           },
@@ -428,7 +460,7 @@ export function InitialSetup() {
       goToNextVisibleStep();
     } catch (submitError) {
       setTorrentError(
-        submitError instanceof Error ? submitError.message : t("setup.torrent.errors.configFailed")
+        submitError instanceof Error ? submitError.message : t('setup.torrent.errors.configFailed'),
       );
     } finally {
       setIsTorrentSaving(false);
@@ -440,7 +472,7 @@ export function InitialSetup() {
     setIndexerError(null);
 
     if (!indexerUrl.trim() || !indexerToken.trim()) {
-      setIndexerError(t("setup.indexer.errors.urlTokenRequired"));
+      setIndexerError(t('setup.indexer.errors.urlTokenRequired'));
       return;
     }
 
@@ -461,10 +493,10 @@ export function InitialSetup() {
       setSettings(updatedSettings);
       await refresh();
 
-      navigate("/", { replace: true });
+      navigate('/', { replace: true });
     } catch (submitError) {
       setIndexerError(
-        submitError instanceof Error ? submitError.message : t("setup.indexer.errors.configFailed")
+        submitError instanceof Error ? submitError.message : t('setup.indexer.errors.configFailed'),
       );
     } finally {
       setIsIndexerSaving(false);
@@ -474,27 +506,25 @@ export function InitialSetup() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex items-center justify-center gap-3">
-        <img
-          src="/favicon.svg"
-          alt={t("common.appName")}
-          className="h-12 w-12 rounded-sm"
-        />
-        <h1 className="text-4xl font-black text-white tracking-tighter">{t("common.appName")}</h1>
+        <img src="/favicon.svg" alt={t('common.appName')} className="h-12 w-12 rounded-sm" />
+        <h1 className="text-4xl font-black text-white tracking-tighter">{t('common.appName')}</h1>
       </div>
 
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-3">
           <div className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-cyan-200">
-            {t("setup.badge")}
+            {t('setup.badge')}
           </div>
           <div>
-            <h2 className="text-4xl font-black tracking-tight text-white">{t("setup.title")}</h2>
+            <h2 className="text-4xl font-black tracking-tight text-white">{t('setup.title')}</h2>
           </div>
         </div>
 
         <div className="w-full max-w-[220px] rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white backdrop-blur-sm md:mt-1">
           <div className="space-y-1.5">
-            <Label htmlFor="setup-language" className="text-xs text-white/70">{t("settings.language.field")}</Label>
+            <Label htmlFor="setup-language" className="text-xs text-white/70">
+              {t('settings.language.field')}
+            </Label>
             <select
               id="setup-language"
               value={languageCode}
@@ -513,7 +543,9 @@ export function InitialSetup() {
               ))}
             </select>
           </div>
-          {languageMessage ? <p className="mt-1.5 text-xs text-emerald-300">{languageMessage}</p> : null}
+          {languageMessage ? (
+            <p className="mt-1.5 text-xs text-emerald-300">{languageMessage}</p>
+          ) : null}
           {languageError ? <p className="mt-1.5 text-xs text-red-300">{languageError}</p> : null}
         </div>
       </div>
@@ -526,83 +558,82 @@ export function InitialSetup() {
             </div>
             <div className="text-sm text-white/60">
               <p className="text-sm uppercase tracking-[0.22em] text-white/45">
-                {t("setup.progress", { current: currentStepNumber, total: totalSteps })}
+                {t('setup.progress', { current: currentStepNumber, total: totalSteps })}
               </p>
             </div>
           </div>
 
           <Progress value={progressValue} className="bg-white/10" />
 
-          <div
-            ref={stepsScrollerRef}
-            className="overflow-x-auto pb-1 [scrollbar-width:thin]"
-          >
+          <div ref={stepsScrollerRef} className="overflow-x-auto pb-1 [scrollbar-width:thin]">
             <div className="flex min-w-full gap-3">
-            {visibleSteps.map((step, index) => {
-              const Icon = step.icon;
-              const isActive = index === activeStep;
-              const isComplete = !step.required && index < firstIncompleteStep;
+              {visibleSteps.map((step, index) => {
+                const Icon = step.icon;
+                const isActive = index === activeStep;
+                const isComplete = !step.required && index < firstIncompleteStep;
 
-              return (
-                <div
-                  key={step.key}
-                  ref={(node) => {
-                    stepItemRefs.current[index] = node;
-                  }}
-                  className={`rounded-xl border px-4 py-3 text-left transition ${
-                    isActive
-                      ? "border-cyan-400/60 bg-cyan-400/10"
-                      : "border-white/10 bg-black/10 hover:bg-white/5"
-                  } min-w-[220px] shrink-0`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-lg bg-white/10 p-2">
-                        <Icon className="h-4 w-4 text-cyan-200" />
+                return (
+                  <div
+                    key={step.key}
+                    ref={(node) => {
+                      stepItemRefs.current[index] = node;
+                    }}
+                    className={`rounded-xl border px-4 py-3 text-left transition ${
+                      isActive
+                        ? 'border-cyan-400/60 bg-cyan-400/10'
+                        : 'border-white/10 bg-black/10 hover:bg-white/5'
+                    } min-w-[220px] shrink-0`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-lg bg-white/10 p-2">
+                          <Icon className="h-4 w-4 text-cyan-200" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-white/45">
+                            {t('setup.stepLabel', { index: index + 1 })}
+                          </p>
+                          <p className="font-medium text-white whitespace-nowrap">{step.title}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs text-white/45">{t("setup.stepLabel", { index: index + 1 })}</p>
-                        <p className="font-medium text-white whitespace-nowrap">{step.title}</p>
-                      </div>
+                      {isComplete ? <Check className="h-4 w-4 text-emerald-300" /> : null}
                     </div>
-                    {isComplete ? <Check className="h-4 w-4 text-emerald-300" /> : null}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {currentStep?.key === "legal" ? (
+      {currentStep?.key === 'legal' ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Scale className="h-5 w-5 text-cyan-300" />
-              {t("setup.legal.cardTitle")}
+              {t('setup.legal.cardTitle')}
             </CardTitle>
             <CardDescription className="text-white/60">
-              {t("setup.legal.cardDescription")}
+              {t('setup.legal.cardDescription')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <ul className="space-y-2.5 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/75">
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
-                <span>{t("setup.legal.term1")}</span>
+                <span>{t('setup.legal.term1')}</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
-                <span>{t("setup.legal.term2")}</span>
+                <span>{t('setup.legal.term2')}</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
-                <span>{t("setup.legal.term3")}</span>
+                <span>{t('setup.legal.term3')}</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
-                <span>{t("setup.legal.term4")}</span>
+                <span>{t('setup.legal.term4')}</span>
               </li>
             </ul>
             <div className="flex items-start gap-3">
@@ -612,8 +643,11 @@ export function InitialSetup() {
                 onCheckedChange={(checked) => setLegalCheckboxChecked(Boolean(checked))}
                 className="mt-0.5"
               />
-              <Label htmlFor="legal-accept-checkbox" className="cursor-pointer text-sm leading-snug text-white/80">
-                {t("setup.legal.checkbox")}
+              <Label
+                htmlFor="legal-accept-checkbox"
+                className="cursor-pointer text-sm leading-snug text-white/80"
+              >
+                {t('setup.legal.checkbox')}
               </Label>
             </div>
             <div className="flex justify-end">
@@ -622,7 +656,7 @@ export function InitialSetup() {
                 disabled={!legalCheckboxChecked || isLegalSaving}
                 className="bg-cyan-600 text-white hover:bg-cyan-700"
               >
-                {isLegalSaving ? t("common.saving") : t("setup.legal.accept")}
+                {isLegalSaving ? t('common.saving') : t('setup.legal.accept')}
               </Button>
             </div>
             {legalError ? <p className="text-sm text-red-400">{legalError}</p> : null}
@@ -630,26 +664,28 @@ export function InitialSetup() {
         </Card>
       ) : null}
 
-      {currentStep?.key === "password" ? (
+      {currentStep?.key === 'password' ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
             <CardTitle>
-              {user?.username === "admin"
-                ? t("setup.password.cardTitle")
-                : t("setup.password.cardTitleUser")}
+              {user?.username === 'admin'
+                ? t('setup.password.cardTitle')
+                : t('setup.password.cardTitleUser')}
             </CardTitle>
             <CardDescription className="text-white/60">
-              {user?.username === "admin"
-                ? t("setup.password.cardDescription")
-                : t("setup.password.cardDescriptionUser")}
+              {user?.username === 'admin'
+                ? t('setup.password.cardDescription')
+                : t('setup.password.cardDescriptionUser')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
-                {user?.username !== "admin" ? (
+                {user?.username !== 'admin' ? (
                   <div className="space-y-2">
-                    <Label htmlFor="setup-current-password">{t("setup.password.currentPassword")}</Label>
+                    <Label htmlFor="setup-current-password">
+                      {t('setup.password.currentPassword')}
+                    </Label>
                     <Input
                       id="setup-current-password"
                       type="password"
@@ -660,7 +696,7 @@ export function InitialSetup() {
                   </div>
                 ) : null}
                 <div className="space-y-2">
-                  <Label htmlFor="setup-new-password">{t("setup.password.newPassword")}</Label>
+                  <Label htmlFor="setup-new-password">{t('setup.password.newPassword')}</Label>
                   <Input
                     id="setup-new-password"
                     type="password"
@@ -671,7 +707,7 @@ export function InitialSetup() {
                 </div>
               </div>
               <div className="space-y-2 md:max-w-md">
-                <Label htmlFor="setup-confirm-password">{t("setup.password.confirm")}</Label>
+                <Label htmlFor="setup-confirm-password">{t('setup.password.confirm')}</Label>
                 <Input
                   id="setup-confirm-password"
                   type="password"
@@ -682,9 +718,13 @@ export function InitialSetup() {
               </div>
               {passwordError ? <p className="text-sm text-red-300">{passwordError}</p> : null}
               <div className="flex items-center justify-between gap-3">
-                <div className="text-sm text-white/55">{t("setup.password.minimum")}</div>
-                <Button type="submit" disabled={isPasswordSaving} className="bg-cyan-600 text-white hover:bg-cyan-700">
-                  {isPasswordSaving ? t("common.saving") : t("setup.password.saveAndContinue")}
+                <div className="text-sm text-white/55">{t('setup.password.minimum')}</div>
+                <Button
+                  type="submit"
+                  disabled={isPasswordSaving}
+                  className="bg-cyan-600 text-white hover:bg-cyan-700"
+                >
+                  {isPasswordSaving ? t('common.saving') : t('setup.password.saveAndContinue')}
                 </Button>
               </div>
             </form>
@@ -692,26 +732,26 @@ export function InitialSetup() {
         </Card>
       ) : null}
 
-      {currentStep?.key === "tmdb" ? (
+      {currentStep?.key === 'tmdb' ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
-            <CardTitle>{t("setup.tmdb.cardTitle")}</CardTitle>
+            <CardTitle>{t('setup.tmdb.cardTitle')}</CardTitle>
             <CardDescription className="text-white/60">
-              {t("setup.tmdb.cardDescription")}
+              {t('setup.tmdb.cardDescription')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleTmdbSubmit} className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="setup-tmdb-key">{t("setup.tmdb.keyLabel")}</Label>
+                  <Label htmlFor="setup-tmdb-key">{t('setup.tmdb.keyLabel')}</Label>
                   <a
                     href="https://developer.themoviedb.org/docs/getting-started"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-sm text-cyan-300 transition-colors hover:text-cyan-200"
                   >
-                    {t("setup.tmdb.documentation")}
+                    {t('setup.tmdb.documentation')}
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 </div>
@@ -720,18 +760,20 @@ export function InitialSetup() {
                   type="password"
                   value={tmdbApiKey}
                   onChange={(event) => setTmdbApiKey(event.target.value)}
-                  placeholder={t("setup.tmdb.placeholder")}
+                  placeholder={t('setup.tmdb.placeholder')}
                   className="border-white/10 bg-slate-900 text-white"
                 />
-                <p className="text-xs text-white/55">
-                  {t("setup.tmdb.helper")}
-                </p>
+                <p className="text-xs text-white/55">{t('setup.tmdb.helper')}</p>
               </div>
               {tmdbMessage ? <p className="text-sm text-emerald-300">{tmdbMessage}</p> : null}
               {tmdbError ? <p className="text-sm text-red-300">{tmdbError}</p> : null}
               <div className="flex items-center justify-end gap-3">
-                <Button type="submit" disabled={isTmdbSaving} className="bg-cyan-600 text-white hover:bg-cyan-700">
-                  {isTmdbSaving ? t("setup.tmdb.testing") : t("setup.tmdb.saveAndContinue")}
+                <Button
+                  type="submit"
+                  disabled={isTmdbSaving}
+                  className="bg-cyan-600 text-white hover:bg-cyan-700"
+                >
+                  {isTmdbSaving ? t('setup.tmdb.testing') : t('setup.tmdb.saveAndContinue')}
                 </Button>
               </div>
             </form>
@@ -739,34 +781,34 @@ export function InitialSetup() {
         </Card>
       ) : null}
 
-      {currentStep?.key === "torrent" ? (
+      {currentStep?.key === 'torrent' ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
-            <CardTitle>{t("setup.torrent.cardTitle")}</CardTitle>
+            <CardTitle>{t('setup.torrent.cardTitle')}</CardTitle>
             <CardDescription className="text-white/60">
-              {t("setup.torrent.cardDescription")}
+              {t('setup.torrent.cardDescription')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleTorrentSubmit} className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="setup-torrent-url">{t("setup.torrent.url")}</Label>
+                  <Label htmlFor="setup-torrent-url">{t('setup.torrent.url')}</Label>
                   <Input
                     id="setup-torrent-url"
                     value={torrentUrl}
                     onChange={(event) => setTorrentUrl(event.target.value)}
-                    placeholder={t("setup.torrent.urlPlaceholder")}
+                    placeholder={t('setup.torrent.urlPlaceholder')}
                     className="border-white/10 bg-slate-900 text-white"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="setup-torrent-port">{t("setup.torrent.port")}</Label>
+                  <Label htmlFor="setup-torrent-port">{t('setup.torrent.port')}</Label>
                   <Input
                     id="setup-torrent-port"
                     value={torrentPort}
                     onChange={(event) => setTorrentPort(event.target.value)}
-                    placeholder={t("setup.torrent.portPlaceholder")}
+                    placeholder={t('setup.torrent.portPlaceholder')}
                     className="border-white/10 bg-slate-900 text-white"
                   />
                 </div>
@@ -774,8 +816,8 @@ export function InitialSetup() {
 
               <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/10 px-4 py-3">
                 <div>
-                  <p className="font-medium text-white">{t("setup.torrent.authRequired")}</p>
-                  <p className="text-sm text-white/55">{t("setup.torrent.authDescription")}</p>
+                  <p className="font-medium text-white">{t('setup.torrent.authRequired')}</p>
+                  <p className="text-sm text-white/55">{t('setup.torrent.authDescription')}</p>
                 </div>
                 <Switch checked={torrentAuthRequired} onCheckedChange={setTorrentAuthRequired} />
               </div>
@@ -783,7 +825,7 @@ export function InitialSetup() {
               {torrentAuthRequired ? (
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="setup-torrent-username">{t("setup.torrent.username")}</Label>
+                    <Label htmlFor="setup-torrent-username">{t('setup.torrent.username')}</Label>
                     <Input
                       id="setup-torrent-username"
                       value={torrentUsername}
@@ -792,7 +834,7 @@ export function InitialSetup() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="setup-torrent-password">{t("setup.torrent.password")}</Label>
+                    <Label htmlFor="setup-torrent-password">{t('setup.torrent.password')}</Label>
                     <Input
                       id="setup-torrent-password"
                       type="password"
@@ -806,22 +848,22 @@ export function InitialSetup() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="setup-movies-folder">{t("setup.torrent.moviesFolder")}</Label>
+                  <Label htmlFor="setup-movies-folder">{t('setup.torrent.moviesFolder')}</Label>
                   <Input
                     id="setup-movies-folder"
                     value={torrentMoviesFolder}
                     onChange={(event) => setTorrentMoviesFolder(event.target.value)}
-                    placeholder={t("setup.torrent.moviesFolderPlaceholder")}
+                    placeholder={t('setup.torrent.moviesFolderPlaceholder')}
                     className="border-white/10 bg-slate-900 text-white"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="setup-series-folder">{t("setup.torrent.seriesFolder")}</Label>
+                  <Label htmlFor="setup-series-folder">{t('setup.torrent.seriesFolder')}</Label>
                   <Input
                     id="setup-series-folder"
                     value={torrentSeriesFolder}
                     onChange={(event) => setTorrentSeriesFolder(event.target.value)}
-                    placeholder={t("setup.torrent.seriesFolderPlaceholder")}
+                    placeholder={t('setup.torrent.seriesFolderPlaceholder')}
                     className="border-white/10 bg-slate-900 text-white"
                   />
                 </div>
@@ -830,8 +872,14 @@ export function InitialSetup() {
               {torrentError ? <p className="text-sm text-red-300">{torrentError}</p> : null}
 
               <div className="flex items-center justify-end gap-3">
-                <Button type="submit" disabled={isTorrentSaving} className="bg-cyan-600 text-white hover:bg-cyan-700">
-                  {isTorrentSaving ? t("setup.torrent.testing") : t("setup.torrent.testAndContinue")}
+                <Button
+                  type="submit"
+                  disabled={isTorrentSaving}
+                  className="bg-cyan-600 text-white hover:bg-cyan-700"
+                >
+                  {isTorrentSaving
+                    ? t('setup.torrent.testing')
+                    : t('setup.torrent.testAndContinue')}
                 </Button>
               </div>
             </form>
@@ -839,29 +887,29 @@ export function InitialSetup() {
         </Card>
       ) : null}
 
-      {currentStep?.key === "indexer" ? (
+      {currentStep?.key === 'indexer' ? (
         <Card className="border-white/10 bg-white/5 text-white">
           <CardHeader>
-            <CardTitle>{t("setup.indexer.cardTitle")}</CardTitle>
+            <CardTitle>{t('setup.indexer.cardTitle')}</CardTitle>
             <CardDescription className="text-white/60">
-              {t("setup.indexer.cardDescription")}
+              {t('setup.indexer.cardDescription')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleIndexerSubmit} className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="setup-indexer-url">{t("setup.indexer.url")}</Label>
+                  <Label htmlFor="setup-indexer-url">{t('setup.indexer.url')}</Label>
                   <Input
                     id="setup-indexer-url"
                     value={indexerUrl}
                     onChange={(event) => setIndexerUrl(event.target.value)}
-                    placeholder={t("setup.indexer.urlPlaceholder")}
+                    placeholder={t('setup.indexer.urlPlaceholder')}
                     className="border-white/10 bg-slate-900 text-white"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="setup-indexer-token">{t("setup.indexer.token")}</Label>
+                  <Label htmlFor="setup-indexer-token">{t('setup.indexer.token')}</Label>
                   <Input
                     id="setup-indexer-token"
                     type="password"
@@ -873,26 +921,26 @@ export function InitialSetup() {
               </div>
 
               <div className="space-y-2 md:max-w-xs">
-                <Label htmlFor="setup-indexer-quality">{t("setup.indexer.defaultQuality")}</Label>
+                <Label htmlFor="setup-indexer-quality">{t('setup.indexer.defaultQuality')}</Label>
                 <select
                   id="setup-indexer-quality"
                   value={indexerDefaultQuality}
                   onChange={(event) => setIndexerDefaultQuality(event.target.value)}
                   className="h-10 w-full rounded-md border border-white/10 bg-slate-900 px-3 text-white outline-none"
                 >
-                  <option value="all">{t("setup.indexer.allQualities")}</option>
-                  <option value="2160p">{t("setup.indexer.quality.2160p")}</option>
-                  <option value="1080p">{t("setup.indexer.quality.1080p")}</option>
-                  <option value="720p">{t("setup.indexer.quality.720p")}</option>
-                  <option value="480p">{t("setup.indexer.quality.480p")}</option>
-                  <option value="bluray">{t("setup.indexer.quality.bluray")}</option>
-                  <option value="webdl">{t("setup.indexer.quality.webdl")}</option>
-                  <option value="hdtv">{t("setup.indexer.quality.hdtv")}</option>
+                  <option value="all">{t('setup.indexer.allQualities')}</option>
+                  <option value="2160p">{t('setup.indexer.quality.2160p')}</option>
+                  <option value="1080p">{t('setup.indexer.quality.1080p')}</option>
+                  <option value="720p">{t('setup.indexer.quality.720p')}</option>
+                  <option value="480p">{t('setup.indexer.quality.480p')}</option>
+                  <option value="bluray">{t('setup.indexer.quality.bluray')}</option>
+                  <option value="webdl">{t('setup.indexer.quality.webdl')}</option>
+                  <option value="hdtv">{t('setup.indexer.quality.hdtv')}</option>
                 </select>
               </div>
 
               <p className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-200/90">
-                {t("setup.indexer.legalNote")}
+                {t('setup.indexer.legalNote')}
               </p>
 
               {indexerError ? <p className="text-sm text-red-300">{indexerError}</p> : null}
@@ -903,7 +951,7 @@ export function InitialSetup() {
                   disabled={isIndexerSaving}
                   className="bg-cyan-600 text-white hover:bg-cyan-700"
                 >
-                  {isIndexerSaving ? t("setup.indexer.testing") : t("setup.indexer.testAndFinish")}
+                  {isIndexerSaving ? t('setup.indexer.testing') : t('setup.indexer.testAndFinish')}
                 </Button>
               </div>
             </form>

@@ -9,7 +9,13 @@
     "dev:server": "node --watch server/index.js",
     "dev:server:debug": "node --watch server/index.js --debug",
     "dev:all": "concurrently \"npm:dev:server\" \"npm:dev\"",
-    "dev:all:debug": "concurrently \"npm:dev:server:debug\" \"npm:dev\""
+    "dev:all:debug": "concurrently \"npm:dev:server:debug\" \"npm:dev\"",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:fix": "npm run lint:frontend:fix && npm run lint:backend:fix",
+    "lint:backend": "eslint --config eslint.backend.config.js server/",
+    "lint:backend:fix": "eslint --config eslint.backend.config.js server/ --fix",
+    "lint:frontend": "eslint --config eslint.frontend.config.js src/",
+    "lint:frontend:fix": "eslint --config eslint.frontend.config.js src/ --fix"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
@@ -73,8 +79,17 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.1.12",
+    "@typescript-eslint/eslint-plugin": "^8.58.1",
+    "@typescript-eslint/parser": "^8.58.1",
     "@vitejs/plugin-react": "4.7.0",
     "concurrently": "9.2.1",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "prettier": "^3.8.2",
     "tailwindcss": "4.1.12",
     "vite": "^6.4.2"
   },

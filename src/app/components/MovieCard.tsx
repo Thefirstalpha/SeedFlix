@@ -1,8 +1,8 @@
-import { Link } from "react-router";
-import { Star, Calendar } from "lucide-react";
-import { Card, CardContent } from "./ui/card";
-import { Badge } from "./ui/badge";
-import type { Movie } from "../types/movie";
+import { Star, Calendar } from 'lucide-react';
+import { Link } from 'react-router';
+import { Badge } from './ui/badge';
+import { Card, CardContent } from './ui/card';
+import type { Movie } from '../types/movie';
 
 interface MovieCardProps {
   movie: Movie;
@@ -20,9 +20,7 @@ export function MovieCard({ movie }: MovieCardProps) {
           />
         </div>
         <CardContent className="p-4 space-y-2">
-          <h3 className="font-semibold text-white line-clamp-1">
-            {movie.title}
-          </h3>
+          <h3 className="font-semibold text-white line-clamp-1">{movie.title}</h3>
           <div className="flex items-center gap-2 text-sm text-white/60">
             <Calendar className="w-4 h-4" />
             <span>{movie.year}</span>
@@ -32,7 +30,10 @@ export function MovieCard({ movie }: MovieCardProps) {
               <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
               <span className="font-semibold text-white">{movie.rating}</span>
             </div>
-            <Badge variant="secondary" className="bg-purple-600/20 text-purple-300 border-purple-500/30">
+            <Badge
+              variant="secondary"
+              className="bg-purple-600/20 text-purple-300 border-purple-500/30"
+            >
               {movie.genre}
             </Badge>
           </div>

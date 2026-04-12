@@ -1,95 +1,101 @@
-import { useEffect, useMemo, useRef } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
-import { MovieCard } from "./MovieCard";
-import { SeriesCard } from "./SeriesCard";
-import {
-  getMovieGenres,
-  getPopularMoviesPage,
-  searchMoviesPage,
-} from "../services/movieService";
-import {
-  getPopularSeriesPage,
-  getSeriesGenres,
-  searchSeriesPage,
-} from "../services/seriesService";
-import { useI18n } from "../i18n/LanguageProvider";
-import { useSearchState } from "../context/SearchStateContext";
-import type { Movie } from "../types/movie";
-import type { Series } from "../types/series";
+import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useMemo, useRef } from 'react';
+import { MovieCard } from './MovieCard';
+import { SeriesCard } from './SeriesCard';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { useSearchState } from '../context/SearchStateContext';
+import { useI18n } from '../i18n/LanguageProvider';
+import { getMovieGenres, getPopularMoviesPage, searchMoviesPage } from '../services/movieService';
+import { getPopularSeriesPage, getSeriesGenres, searchSeriesPage } from '../services/seriesService';
 
-type ContentFilter = "all" | "movie" | "series";
 const CAROUSEL_WHEEL_SPEED = 3.8;
 
-const DEFAULT_LANGUAGE_OPTIONS = ["fr", "en", "ja", "ko", "es", "it", "de", "pt", "ru", "zh", "unknown"];
+const DEFAULT_LANGUAGE_OPTIONS = [
+  'fr',
+  'en',
+  'ja',
+  'ko',
+  'es',
+  'it',
+  'de',
+  'pt',
+  'ru',
+  'zh',
+  'unknown',
+];
 
 function toSortedUnique(items: string[]): string[] {
-  return Array.from(new Set(items)).sort((a, b) => a.localeCompare(b, "fr"));
+  return Array.from(new Set(items)).sort((a, b) => a.localeCompare(b, 'fr'));
 }
 
 function normalizeLanguageCode(language: string | null | undefined): string {
-  const normalized = String(language || "").trim().toLowerCase();
+  const normalized = String(language || '')
+    .trim()
+    .toLowerCase();
 
   if (!normalized) {
-    return "unknown";
+    return 'unknown';
   }
 
   const map: Record<string, string> = {
-    fr: "fr",
-    francais: "fr",
-    "français": "fr",
-    french: "fr",
-    en: "en",
-    anglais: "en",
-    english: "en",
-    ja: "ja",
-    japonais: "ja",
-    japanese: "ja",
-    ko: "ko",
-    coreen: "ko",
-    "coréen": "ko",
-    korean: "ko",
-    es: "es",
-    espagnol: "es",
-    spanish: "es",
-    it: "it",
-    italien: "it",
-    italian: "it",
-    de: "de",
-    allemand: "de",
-    german: "de",
-    pt: "pt",
-    portugais: "pt",
-    portuguese: "pt",
-    ru: "ru",
-    russe: "ru",
-    russian: "ru",
-    zh: "zh",
-    chinois: "zh",
-    chinese: "zh",
-    inconnu: "unknown",
-    unknown: "unknown",
+    fr: 'fr',
+    francais: 'fr',
+    français: 'fr',
+    french: 'fr',
+    en: 'en',
+    anglais: 'en',
+    english: 'en',
+    ja: 'ja',
+    japonais: 'ja',
+    japanese: 'ja',
+    ko: 'ko',
+    coreen: 'ko',
+    coréen: 'ko',
+    korean: 'ko',
+    es: 'es',
+    espagnol: 'es',
+    spanish: 'es',
+    it: 'it',
+    italien: 'it',
+    italian: 'it',
+    de: 'de',
+    allemand: 'de',
+    german: 'de',
+    pt: 'pt',
+    portugais: 'pt',
+    portuguese: 'pt',
+    ru: 'ru',
+    russe: 'ru',
+    russian: 'ru',
+    zh: 'zh',
+    chinois: 'zh',
+    chinese: 'zh',
+    inconnu: 'unknown',
+    unknown: 'unknown',
   };
 
   return map[normalized] || normalized;
 }
 
-function getLanguageLabel(language: string, t: (key: string, vars?: Record<string, string | number>) => string): string {
+function getLanguageLabel(
+  language: string,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
   const normalized = normalizeLanguageCode(language);
 
   const map: Record<string, string> = {
-    fr: t("home.languages.french"),
-    en: t("home.languages.english"),
-    ja: t("home.languages.japanese"),
-    ko: t("home.languages.korean"),
-    es: t("home.languages.spanish"),
-    it: t("home.languages.italian"),
-    de: t("home.languages.german"),
-    pt: t("home.languages.portuguese"),
-    ru: t("home.languages.russian"),
-    zh: t("home.languages.chinese"),
-    unknown: t("home.languages.unknown"),
+    fr: t('home.languages.french'),
+    en: t('home.languages.english'),
+    ja: t('home.languages.japanese'),
+    ko: t('home.languages.korean'),
+    es: t('home.languages.spanish'),
+    it: t('home.languages.italian'),
+    de: t('home.languages.german'),
+    pt: t('home.languages.portuguese'),
+    ru: t('home.languages.russian'),
+    zh: t('home.languages.chinese'),
+    unknown: t('home.languages.unknown'),
   };
 
   return map[normalized] || language;
@@ -107,14 +113,12 @@ function yearToDateBounds(yearFrom: string, yearTo: string) {
 
 function toTmdbOriginalLanguageCode(language: string): string | undefined {
   const normalized = normalizeLanguageCode(language);
-  if (!normalized || normalized === "all" || normalized === "unknown") {
+  if (!normalized || normalized === 'all' || normalized === 'unknown') {
     return undefined;
   }
 
   return normalized;
 }
-
-
 
 export function Home() {
   const { t, language } = useI18n();
@@ -147,7 +151,6 @@ export function Home() {
     isLoadingMoreMovies,
     isLoadingMoreSeries,
     isSearching,
-    isLoadingGenres,
   } = state;
 
   const movieCarouselRef = useRef<HTMLDivElement | null>(null);
@@ -160,16 +163,16 @@ export function Home() {
   const stableSearchQuery = debouncedQuery.trim();
   const hasActiveSearch = activeSearchQuery.length > 0;
   const isSearchPending = hasTypedSearch && stableSearchQuery !== trimmedQuery;
-  const showMovies = contentFilter !== "series";
-  const showSeries = contentFilter !== "movie";
+  const showMovies = contentFilter !== 'series';
+  const showSeries = contentFilter !== 'movie';
 
   const selectedMovieGenreId = useMemo(() => {
-    if (genreFilter === "all") return undefined;
+    if (genreFilter === 'all') return undefined;
     return movieGenres.find((genre) => genre.name === genreFilter)?.id;
   }, [genreFilter, movieGenres]);
 
   const selectedSeriesGenreId = useMemo(() => {
-    if (genreFilter === "all") return undefined;
+    if (genreFilter === 'all') return undefined;
     return seriesGenres.find((genre) => genre.name === genreFilter)?.id;
   }, [genreFilter, seriesGenres]);
 
@@ -197,7 +200,7 @@ export function Home() {
       yearEnd,
       ratingThreshold,
       selectedOriginalLanguageCode,
-    ]
+    ],
   );
 
   useEffect(() => {
@@ -213,7 +216,7 @@ export function Home() {
           seriesGenres: seriesGenresResponse,
         });
       } catch (error) {
-        console.error("Error loading genres:", error);
+        console.error('Error loading genres:', error);
       } finally {
         updateSearchState({ isLoadingGenres: false });
       }
@@ -223,23 +226,31 @@ export function Home() {
   }, [language]);
 
   const fetchMovieRecommendations = async (page = 1) => {
-    return getPopularMoviesPage(page, {
-      genreId: selectedMovieGenreId,
-      yearFrom: yearStart,
-      yearTo: yearEnd,
-      minRating: ratingThreshold,
-      originalLanguage: selectedOriginalLanguageCode,
-    }, language);
+    return getPopularMoviesPage(
+      page,
+      {
+        genreId: selectedMovieGenreId,
+        yearFrom: yearStart,
+        yearTo: yearEnd,
+        minRating: ratingThreshold,
+        originalLanguage: selectedOriginalLanguageCode,
+      },
+      language,
+    );
   };
 
   const fetchSeriesRecommendations = async (page = 1) => {
-    return getPopularSeriesPage(page, {
-      genreId: selectedSeriesGenreId,
-      yearFrom: yearStart,
-      yearTo: yearEnd,
-      minRating: ratingThreshold,
-      originalLanguage: selectedOriginalLanguageCode,
-    }, language);
+    return getPopularSeriesPage(
+      page,
+      {
+        genreId: selectedSeriesGenreId,
+        yearFrom: yearStart,
+        yearTo: yearEnd,
+        minRating: ratingThreshold,
+        originalLanguage: selectedOriginalLanguageCode,
+      },
+      language,
+    );
   };
 
   const loadMovieRecommendations = async (page = 1, append = false) => {
@@ -259,13 +270,15 @@ export function Home() {
 
       const response = await fetchMovieRecommendations(page);
       updateSearchState((prev) => ({
-        recommendedMovies: append ? [...prev.recommendedMovies, ...response.movies] : response.movies,
+        recommendedMovies: append
+          ? [...prev.recommendedMovies, ...response.movies]
+          : response.movies,
         moviePage: response.page,
         movieTotalPages: response.totalPages,
         isLoadingMoreMovies: false,
       }));
     } catch (error) {
-      console.error("Error loading movie recommendations:", error);
+      console.error('Error loading movie recommendations:', error);
       if (!append) {
         updateSearchState({ recommendedMovies: [] });
       }
@@ -290,13 +303,15 @@ export function Home() {
 
       const response = await fetchSeriesRecommendations(page);
       updateSearchState((prev) => ({
-        recommendedSeries: append ? [...prev.recommendedSeries, ...response.series] : response.series,
+        recommendedSeries: append
+          ? [...prev.recommendedSeries, ...response.series]
+          : response.series,
         seriesPage: response.page,
         seriesTotalPages: response.totalPages,
         isLoadingMoreSeries: false,
       }));
     } catch (error) {
-      console.error("Error loading series recommendations:", error);
+      console.error('Error loading series recommendations:', error);
       if (!append) {
         updateSearchState({ recommendedSeries: [] });
       }
@@ -334,7 +349,7 @@ export function Home() {
         seriesTotalPages: 1,
         isLoadingInitial: true,
       });
-      
+
       if (movieCarouselRef.current) {
         movieCarouselRef.current.scrollLeft = 0;
       }
@@ -354,14 +369,7 @@ export function Home() {
     };
 
     loadInitialRecommendations();
-  }, [
-    hasTypedSearch,
-    hasActiveSearch,
-    showMovies,
-    showSeries,
-    popularCacheKey,
-    popularRequestKey,
-  ]);
+  }, [hasTypedSearch, hasActiveSearch, showMovies, showSeries, popularCacheKey, popularRequestKey]);
 
   useEffect(() => {
     if (!trimmedQuery) {
@@ -369,8 +377,8 @@ export function Home() {
         skipNextPopularReloadRef.current = true;
       }
       updateSearchState({
-        debouncedQuery: "",
-        activeSearchQuery: "",
+        debouncedQuery: '',
+        activeSearchQuery: '',
         searchMovies: [],
         searchSeries: [],
         isSearching: false,
@@ -415,7 +423,7 @@ export function Home() {
           return;
         }
 
-        console.error("Error searching mixed content:", error);
+        console.error('Error searching mixed content:', error);
         updateSearchState({
           searchMovies: [],
           searchSeries: [],
@@ -454,17 +462,14 @@ export function Home() {
     }
   };
 
-  const scrollCarousel = (
-    container: HTMLDivElement | null,
-    direction: "left" | "right"
-  ) => {
+  const scrollCarousel = (container: HTMLDivElement | null, direction: 'left' | 'right') => {
     if (!container) {
       return;
     }
 
     container.scrollBy({
-      left: (direction === "right" ? 1 : -1) * container.clientWidth * 0.85,
-      behavior: "smooth",
+      left: (direction === 'right' ? 1 : -1) * container.clientWidth * 0.85,
+      behavior: 'smooth',
     });
   };
 
@@ -505,8 +510,8 @@ export function Home() {
         }
       };
 
-      container.addEventListener("wheel", onWheel, { passive: false });
-      return () => container.removeEventListener("wheel", onWheel);
+      container.addEventListener('wheel', onWheel, { passive: false });
+      return () => container.removeEventListener('wheel', onWheel);
     };
 
     const cleanupMovie = attachWheelBlocker(movieCarouselRef.current);
@@ -547,12 +552,12 @@ export function Home() {
     const movieCarousel = movieCarouselRef.current;
     const seriesCarousel = seriesCarouselRef.current;
 
-    movieCarousel?.addEventListener("scroll", onMovieScroll);
-    seriesCarousel?.addEventListener("scroll", onSeriesScroll);
+    movieCarousel?.addEventListener('scroll', onMovieScroll);
+    seriesCarousel?.addEventListener('scroll', onSeriesScroll);
 
     return () => {
-      movieCarousel?.removeEventListener("scroll", onMovieScroll);
-      seriesCarousel?.removeEventListener("scroll", onSeriesScroll);
+      movieCarousel?.removeEventListener('scroll', onMovieScroll);
+      seriesCarousel?.removeEventListener('scroll', onSeriesScroll);
     };
   }, []);
 
@@ -570,20 +575,24 @@ export function Home() {
   }, [movieGenres, seriesGenres, showMovies, showSeries]);
 
   const availableLanguages = useMemo(() => {
-    const movieLanguages = showMovies ? baseMovies.map((movie) => normalizeLanguageCode(movie.language)) : [];
-    const seriesLanguages = showSeries ? baseSeries.map((show) => normalizeLanguageCode(show.language)) : [];
+    const movieLanguages = showMovies
+      ? baseMovies.map((movie) => normalizeLanguageCode(movie.language))
+      : [];
+    const seriesLanguages = showSeries
+      ? baseSeries.map((show) => normalizeLanguageCode(show.language))
+      : [];
     return toSortedUnique([...DEFAULT_LANGUAGE_OPTIONS, ...movieLanguages, ...seriesLanguages]);
   }, [baseMovies, baseSeries, showMovies, showSeries]);
 
   useEffect(() => {
-    if (genreFilter !== "all" && !availableGenres.includes(genreFilter)) {
-      updateSearchState({ genreFilter: "all" });
+    if (genreFilter !== 'all' && !availableGenres.includes(genreFilter)) {
+      updateSearchState({ genreFilter: 'all' });
     }
   }, [availableGenres, genreFilter]);
 
   useEffect(() => {
-    if (languageFilter !== "all" && !availableLanguages.includes(languageFilter)) {
-      updateSearchState({ languageFilter: "all" });
+    if (languageFilter !== 'all' && !availableLanguages.includes(languageFilter)) {
+      updateSearchState({ languageFilter: 'all' });
     }
   }, [availableLanguages, languageFilter]);
 
@@ -593,60 +602,69 @@ export function Home() {
   const filteredMovies = useMemo(() => {
     return baseMovies.filter((movie) => {
       const matchesLanguage =
-        languageFilter === "all" || normalizeLanguageCode(movie.language) === languageFilter;
+        languageFilter === 'all' || normalizeLanguageCode(movie.language) === languageFilter;
 
       if (!shouldShowSearchResults) {
         const matchesRating = ratingThreshold === 0 || movie.rating >= ratingThreshold;
         return matchesLanguage && matchesRating;
       }
 
-      const matchesGenre = genreFilter === "all" || movie.genre === genreFilter;
+      const matchesGenre = genreFilter === 'all' || movie.genre === genreFilter;
       const matchesYear = movie.year >= localYearStart && movie.year <= localYearEnd;
       const matchesRating = movie.rating >= ratingThreshold;
       return matchesGenre && matchesYear && matchesRating && matchesLanguage;
     });
-  }, [baseMovies, genreFilter, shouldShowSearchResults, languageFilter, localYearStart, localYearEnd, ratingThreshold]);
+  }, [
+    baseMovies,
+    genreFilter,
+    shouldShowSearchResults,
+    languageFilter,
+    localYearStart,
+    localYearEnd,
+    ratingThreshold,
+  ]);
 
   const filteredSeries = useMemo(() => {
     return baseSeries.filter((show) => {
       const matchesLanguage =
-        languageFilter === "all" || normalizeLanguageCode(show.language) === languageFilter;
+        languageFilter === 'all' || normalizeLanguageCode(show.language) === languageFilter;
 
       if (!shouldShowSearchResults) {
         const matchesRating = ratingThreshold === 0 || show.rating >= ratingThreshold;
         return matchesLanguage && matchesRating;
       }
 
-      const matchesGenre = genreFilter === "all" || show.genre === genreFilter;
+      const matchesGenre = genreFilter === 'all' || show.genre === genreFilter;
       const matchesYear = show.year >= localYearStart && show.year <= localYearEnd;
       const matchesRating = show.rating >= ratingThreshold;
       return matchesGenre && matchesYear && matchesRating && matchesLanguage;
     });
-  }, [baseSeries, genreFilter, shouldShowSearchResults, languageFilter, localYearStart, localYearEnd, ratingThreshold]);
+  }, [
+    baseSeries,
+    genreFilter,
+    shouldShowSearchResults,
+    languageFilter,
+    localYearStart,
+    localYearEnd,
+    ratingThreshold,
+  ]);
 
-  const emptyMessage = shouldShowSearchResults
-    ? t("home.emptySearch")
-    : t("home.emptyFilters");
-
-
-
-
+  const emptyMessage = shouldShowSearchResults ? t('home.emptySearch') : t('home.emptyFilters');
 
   return (
     <div className="space-y-8">
-
       <div className="max-w-5xl mx-auto space-y-4">
         <div className="relative overflow-hidden rounded-xl">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
           <Input
             type="text"
-            placeholder={t("home.searchPlaceholder")}
+            placeholder={t('home.searchPlaceholder')}
             value={query}
             onChange={(event) => updateSearchState({ query: event.target.value })}
             className="pl-10 h-12 bg-white/10 border-white/20 text-white placeholder:text-white/50"
           />
           <div
-            className={`search-wave-overlay pointer-events-none absolute inset-0 rounded-xl transition-opacity duration-500 ${isSearchBusy ? "opacity-100" : "opacity-0"}`}
+            className={`search-wave-overlay pointer-events-none absolute inset-0 rounded-xl transition-opacity duration-500 ${isSearchBusy ? 'opacity-100' : 'opacity-0'}`}
             aria-hidden="true"
           />
         </div>
@@ -660,11 +678,13 @@ export function Home() {
           >
             <span className="flex items-center gap-2 text-sm font-semibold">
               <SlidersHorizontal className="w-4 h-4" />
-              {t("home.filters")}
+              {t('home.filters')}
             </span>
             <span className="flex items-center gap-2 text-xs text-white/70">
-              {filtersOpen ? t("home.hide") : t("home.show")}
-              <ChevronDown className={`w-4 h-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
+              {filtersOpen ? t('home.hide') : t('home.show')}
+              <ChevronDown
+                className={`w-4 h-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
+              />
             </span>
           </Button>
 
@@ -673,24 +693,36 @@ export function Home() {
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  onClick={() => updateSearchState({ contentFilter: "all" })}
-                  className={contentFilter === "all" ? "bg-white text-slate-900 hover:bg-white/90" : "bg-white/10 text-white hover:bg-white/20"}
+                  onClick={() => updateSearchState({ contentFilter: 'all' })}
+                  className={
+                    contentFilter === 'all'
+                      ? 'bg-white text-slate-900 hover:bg-white/90'
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  }
                 >
-                  {t("home.all")}
+                  {t('home.all')}
                 </Button>
                 <Button
                   size="sm"
-                  onClick={() => updateSearchState({ contentFilter: "movie" })}
-                  className={contentFilter === "movie" ? "bg-purple-500 text-white hover:bg-purple-600" : "bg-white/10 text-white hover:bg-white/20"}
+                  onClick={() => updateSearchState({ contentFilter: 'movie' })}
+                  className={
+                    contentFilter === 'movie'
+                      ? 'bg-purple-500 text-white hover:bg-purple-600'
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  }
                 >
-                  {t("home.movies")}
+                  {t('home.movies')}
                 </Button>
                 <Button
                   size="sm"
-                  onClick={() => updateSearchState({ contentFilter: "series" })}
-                  className={contentFilter === "series" ? "bg-cyan-500 text-slate-900 hover:bg-cyan-400" : "bg-white/10 text-white hover:bg-white/20"}
+                  onClick={() => updateSearchState({ contentFilter: 'series' })}
+                  className={
+                    contentFilter === 'series'
+                      ? 'bg-cyan-500 text-slate-900 hover:bg-cyan-400'
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  }
                 >
-                  {t("home.series")}
+                  {t('home.series')}
                 </Button>
               </div>
 
@@ -700,7 +732,7 @@ export function Home() {
                   onChange={(event) => updateSearchState({ genreFilter: event.target.value })}
                   className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
                 >
-                  <option value="all">{t("home.allGenres")}</option>
+                  <option value="all">{t('home.allGenres')}</option>
                   {availableGenres.map((genre) => (
                     <option key={genre} value={genre}>
                       {genre}
@@ -713,7 +745,7 @@ export function Home() {
                   onChange={(event) => updateSearchState({ languageFilter: event.target.value })}
                   className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
                 >
-                  <option value="all">{t("home.allLanguages")}</option>
+                  <option value="all">{t('home.allLanguages')}</option>
                   {availableLanguages.map((language) => (
                     <option key={language} value={language}>
                       {getLanguageLabel(language, t)}
@@ -725,7 +757,7 @@ export function Home() {
                   type="number"
                   min={1900}
                   max={2100}
-                  placeholder={t("home.minYear")}
+                  placeholder={t('home.minYear')}
                   value={yearFrom}
                   onChange={(event) => updateSearchState({ yearFrom: event.target.value })}
                   className="h-10 bg-slate-900 border-white/20 text-white"
@@ -735,7 +767,7 @@ export function Home() {
                   type="number"
                   min={1900}
                   max={2100}
-                  placeholder={t("home.maxYear")}
+                  placeholder={t('home.maxYear')}
                   value={yearTo}
                   onChange={(event) => updateSearchState({ yearTo: event.target.value })}
                   className="h-10 bg-slate-900 border-white/20 text-white"
@@ -746,11 +778,11 @@ export function Home() {
                   onChange={(event) => updateSearchState({ minRating: event.target.value })}
                   className="h-10 rounded-md border border-white/20 bg-slate-900 px-3 text-white"
                 >
-                  <option value="0">{t("home.allRatings")}</option>
-                  <option value="6">{t("home.minRating", { value: 6 })}</option>
-                  <option value="7">{t("home.minRating", { value: 7 })}</option>
-                  <option value="8">{t("home.minRating", { value: 8 })}</option>
-                  <option value="9">{t("home.minRating", { value: 9 })}</option>
+                  <option value="0">{t('home.allRatings')}</option>
+                  <option value="6">{t('home.minRating', { value: 6 })}</option>
+                  <option value="7">{t('home.minRating', { value: 7 })}</option>
+                  <option value="8">{t('home.minRating', { value: 8 })}</option>
+                  <option value="9">{t('home.minRating', { value: 9 })}</option>
                 </select>
               </div>
             </>
@@ -770,7 +802,7 @@ export function Home() {
         <div className="space-y-8">
           {showMovies && (
             <section className="space-y-4">
-              <h3 className="text-2xl font-semibold text-white">{t("home.popularMovies")}</h3>
+              <h3 className="text-2xl font-semibold text-white">{t('home.popularMovies')}</h3>
 
               {filteredMovies.length > 0 ? (
                 <div className="space-y-4">
@@ -779,7 +811,7 @@ export function Home() {
                       type="button"
                       size="icon"
                       variant="outline"
-                      onClick={() => scrollCarousel(movieCarouselRef.current, "left")}
+                      onClick={() => scrollCarousel(movieCarouselRef.current, 'left')}
                       className="hidden lg:inline-flex shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
                     >
                       <ChevronLeft className="w-4 h-4" />
@@ -796,10 +828,11 @@ export function Home() {
                     >
                       <div className="flex gap-3 sm:gap-4 py-4 pr-4 lg:pr-4 pl-4 lg:pl-0">
                         {filteredMovies.map((movie) => (
-                          <div key={movie.id} className="min-w-[172px] max-w-[172px] sm:min-w-[196px] sm:max-w-[196px] md:min-w-[220px] md:max-w-[220px] shrink-0">
-                            <MovieCard
-                              movie={movie}
-                            />
+                          <div
+                            key={movie.id}
+                            className="min-w-[172px] max-w-[172px] sm:min-w-[196px] sm:max-w-[196px] md:min-w-[220px] md:max-w-[220px] shrink-0"
+                          >
+                            <MovieCard movie={movie} />
                           </div>
                         ))}
                       </div>
@@ -809,7 +842,7 @@ export function Home() {
                       type="button"
                       size="icon"
                       variant="outline"
-                      onClick={() => scrollCarousel(movieCarouselRef.current, "right")}
+                      onClick={() => scrollCarousel(movieCarouselRef.current, 'right')}
                       className="hidden lg:inline-flex shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -821,7 +854,7 @@ export function Home() {
                       type="button"
                       size="icon"
                       variant="outline"
-                      onClick={() => scrollCarousel(movieCarouselRef.current, "left")}
+                      onClick={() => scrollCarousel(movieCarouselRef.current, 'left')}
                       className="border-white/15 bg-white/5 text-white hover:bg-white/10"
                     >
                       <ChevronLeft className="w-4 h-4" />
@@ -830,7 +863,7 @@ export function Home() {
                       type="button"
                       size="icon"
                       variant="outline"
-                      onClick={() => scrollCarousel(movieCarouselRef.current, "right")}
+                      onClick={() => scrollCarousel(movieCarouselRef.current, 'right')}
                       className="border-white/15 bg-white/5 text-white hover:bg-white/10"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -845,7 +878,7 @@ export function Home() {
 
           {showSeries && (
             <section className="space-y-4">
-              <h3 className="text-2xl font-semibold text-white">{t("home.popularSeries")}</h3>
+              <h3 className="text-2xl font-semibold text-white">{t('home.popularSeries')}</h3>
 
               {filteredSeries.length > 0 ? (
                 <div className="space-y-4">
@@ -854,7 +887,7 @@ export function Home() {
                       type="button"
                       size="icon"
                       variant="outline"
-                      onClick={() => scrollCarousel(seriesCarouselRef.current, "left")}
+                      onClick={() => scrollCarousel(seriesCarouselRef.current, 'left')}
                       className="hidden lg:inline-flex shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
                     >
                       <ChevronLeft className="w-4 h-4" />
@@ -871,10 +904,11 @@ export function Home() {
                     >
                       <div className="flex gap-3 sm:gap-4 py-4 pr-4 lg:pr-4 pl-4 lg:pl-0">
                         {filteredSeries.map((show) => (
-                          <div key={show.id} className="min-w-[172px] max-w-[172px] sm:min-w-[196px] sm:max-w-[196px] md:min-w-[220px] md:max-w-[220px] shrink-0">
-                            <SeriesCard
-                              series={show}
-                            />
+                          <div
+                            key={show.id}
+                            className="min-w-[172px] max-w-[172px] sm:min-w-[196px] sm:max-w-[196px] md:min-w-[220px] md:max-w-[220px] shrink-0"
+                          >
+                            <SeriesCard series={show} />
                           </div>
                         ))}
                       </div>
@@ -884,7 +918,7 @@ export function Home() {
                       type="button"
                       size="icon"
                       variant="outline"
-                      onClick={() => scrollCarousel(seriesCarouselRef.current, "right")}
+                      onClick={() => scrollCarousel(seriesCarouselRef.current, 'right')}
                       className="hidden lg:inline-flex shrink-0 border-white/15 bg-white/5 text-white hover:bg-white/10"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -896,7 +930,7 @@ export function Home() {
                       type="button"
                       size="icon"
                       variant="outline"
-                      onClick={() => scrollCarousel(seriesCarouselRef.current, "left")}
+                      onClick={() => scrollCarousel(seriesCarouselRef.current, 'left')}
                       className="border-white/15 bg-white/5 text-white hover:bg-white/10"
                     >
                       <ChevronLeft className="w-4 h-4" />
@@ -905,7 +939,7 @@ export function Home() {
                       type="button"
                       size="icon"
                       variant="outline"
-                      onClick={() => scrollCarousel(seriesCarouselRef.current, "right")}
+                      onClick={() => scrollCarousel(seriesCarouselRef.current, 'right')}
                       className="border-white/15 bg-white/5 text-white hover:bg-white/10"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -924,44 +958,38 @@ export function Home() {
         <div className="space-y-8">
           {showMovies && (
             <section className="space-y-4">
-              <h4 className="text-xl font-semibold text-white">{t("home.movies")}</h4>
+              <h4 className="text-xl font-semibold text-white">{t('home.movies')}</h4>
               {filteredMovies.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredMovies.map((movie) => (
-                    <MovieCard
-                      key={movie.id}
-                      movie={movie}
-                    />
+                    <MovieCard key={movie.id} movie={movie} />
                   ))}
                 </div>
               ) : (
-                <p className="text-white/60">{t("home.noMoviesMatch")}</p>
+                <p className="text-white/60">{t('home.noMoviesMatch')}</p>
               )}
             </section>
           )}
 
           {showSeries && (
             <section className="space-y-4">
-              <h4 className="text-xl font-semibold text-white">{t("home.series")}</h4>
+              <h4 className="text-xl font-semibold text-white">{t('home.series')}</h4>
               {filteredSeries.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredSeries.map((show) => (
-                    <SeriesCard
-                      key={show.id}
-                      series={show}
-                    />
+                    <SeriesCard key={show.id} series={show} />
                   ))}
                 </div>
               ) : (
-                <p className="text-white/60">{t("home.noSeriesMatch")}</p>
+                <p className="text-white/60">{t('home.noSeriesMatch')}</p>
               )}
             </section>
           )}
 
-          {((showMovies && filteredMovies.length === 0) &&
-            (showSeries && filteredSeries.length === 0)) && (
-            <p className="text-white/60">{emptyMessage}</p>
-          )}
+          {showMovies &&
+            filteredMovies.length === 0 &&
+            showSeries &&
+            filteredSeries.length === 0 && <p className="text-white/60">{emptyMessage}</p>}
         </div>
       )}
     </div>

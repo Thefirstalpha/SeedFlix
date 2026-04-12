@@ -1,4 +1,4 @@
-import { API_BASE_URL, getTmdbImageUrl, getTmdbLanguageParam } from "../config/tmdb";
+import { API_BASE_URL, getTmdbImageUrl, getTmdbLanguageParam } from '../config/tmdb';
 import type {
   Series,
   SeriesDetails,
@@ -7,7 +7,7 @@ import type {
   TMDBSeriesDetails,
   TMDBSeriesSeasonDetails,
   TMDBSeriesSearchResponse,
-} from "../types/series";
+} from '../types/series';
 
 export interface SeriesPageResult {
   series: Series[];
@@ -54,54 +54,54 @@ export interface TorznabSeriesSearchResponse {
 }
 
 const TV_GENRE_MAP: { [key: number]: string } = {
-  10759: "Action & Aventure",
-  16: "Animation",
-  35: "Comédie",
-  80: "Crime",
-  99: "Documentaire",
-  18: "Drame",
-  10751: "Familial",
-  10762: "Enfants",
-  9648: "Mystère",
-  10763: "News",
-  10764: "Réalité",
-  10765: "Science-Fiction",
-  10766: "Soap",
-  10767: "Talk-show",
-  10768: "Guerre & Politique",
-  37: "Western",
+  10759: 'Action & Aventure',
+  16: 'Animation',
+  35: 'Comédie',
+  80: 'Crime',
+  99: 'Documentaire',
+  18: 'Drame',
+  10751: 'Familial',
+  10762: 'Enfants',
+  9648: 'Mystère',
+  10763: 'News',
+  10764: 'Réalité',
+  10765: 'Science-Fiction',
+  10766: 'Soap',
+  10767: 'Talk-show',
+  10768: 'Guerre & Politique',
+  37: 'Western',
 };
 
 const TMDB_LANGUAGE_MAP: Record<string, string> = {
-  fr: "Francais",
-  en: "Anglais",
-  ja: "Japonais",
-  ko: "Coreen",
-  es: "Espagnol",
-  it: "Italien",
-  de: "Allemand",
-  pt: "Portugais",
-  ru: "Russe",
-  zh: "Chinois",
+  fr: 'Francais',
+  en: 'Anglais',
+  ja: 'Japonais',
+  ko: 'Coreen',
+  es: 'Espagnol',
+  it: 'Italien',
+  de: 'Allemand',
+  pt: 'Portugais',
+  ru: 'Russe',
+  zh: 'Chinois',
 };
 
 function mapTmdbLanguage(code: string | undefined) {
-  const normalized = String(code || "").toLowerCase().trim();
+  const normalized = String(code || '')
+    .toLowerCase()
+    .trim();
   if (!normalized) {
-    return "Inconnu";
+    return 'Inconnu';
   }
 
   return TMDB_LANGUAGE_MAP[normalized] || normalized.toUpperCase();
 }
 
 function convertTMDBToSeries(tmdbSeries: TMDBSeries): Series {
-  const year = tmdbSeries.first_air_date
-    ? new Date(tmdbSeries.first_air_date).getFullYear()
-    : 0;
+  const year = tmdbSeries.first_air_date ? new Date(tmdbSeries.first_air_date).getFullYear() : 0;
   const genre =
     tmdbSeries.genre_ids && tmdbSeries.genre_ids.length > 0
-      ? TV_GENRE_MAP[tmdbSeries.genre_ids[0]] || "Inconnu"
-      : "Inconnu";
+      ? TV_GENRE_MAP[tmdbSeries.genre_ids[0]] || 'Inconnu'
+      : 'Inconnu';
 
   return {
     id: tmdbSeries.id,
@@ -115,13 +115,9 @@ function convertTMDBToSeries(tmdbSeries: TMDBSeries): Series {
 }
 
 function convertTMDBToSeriesDetails(tmdbSeries: TMDBSeriesDetails): SeriesDetails {
-  const year = tmdbSeries.first_air_date
-    ? new Date(tmdbSeries.first_air_date).getFullYear()
-    : 0;
+  const year = tmdbSeries.first_air_date ? new Date(tmdbSeries.first_air_date).getFullYear() : 0;
   const genre =
-    tmdbSeries.genres && tmdbSeries.genres.length > 0
-      ? tmdbSeries.genres[0].name
-      : "Inconnu";
+    tmdbSeries.genres && tmdbSeries.genres.length > 0 ? tmdbSeries.genres[0].name : 'Inconnu';
 
   return {
     id: tmdbSeries.id,
@@ -132,8 +128,8 @@ function convertTMDBToSeriesDetails(tmdbSeries: TMDBSeriesDetails): SeriesDetail
     language: mapTmdbLanguage(tmdbSeries.original_language),
     genre,
     poster: getTmdbImageUrl(tmdbSeries.poster_path),
-    backdrop: getTmdbImageUrl(tmdbSeries.backdrop_path, "original"),
-    plot: tmdbSeries.overview || "Aucun synopsis disponible.",
+    backdrop: getTmdbImageUrl(tmdbSeries.backdrop_path, 'original'),
+    plot: tmdbSeries.overview || 'Aucun synopsis disponible.',
     voteCount: tmdbSeries.vote_count,
     firstAirDate: tmdbSeries.first_air_date,
     status: tmdbSeries.status,
@@ -145,7 +141,7 @@ function convertTMDBToSeriesDetails(tmdbSeries: TMDBSeriesDetails): SeriesDetail
         id: season.id,
         seasonNumber: season.season_number,
         name: season.name,
-        overview: season.overview || "Aucune description disponible.",
+        overview: season.overview || 'Aucune description disponible.',
         poster: getTmdbImageUrl(season.poster_path),
         airDate: season.air_date,
         episodeCount: season.episode_count,
@@ -153,20 +149,16 @@ function convertTMDBToSeriesDetails(tmdbSeries: TMDBSeriesDetails): SeriesDetail
   };
 }
 
-function convertTMDBToEpisodes(
-  seasonDetails: TMDBSeriesSeasonDetails
-): SeriesEpisode[] {
+function convertTMDBToEpisodes(seasonDetails: TMDBSeriesSeasonDetails): SeriesEpisode[] {
   return (seasonDetails.episodes || []).map((episode) => ({
     id: episode.id,
     episodeNumber: episode.episode_number,
     name: episode.name,
-    overview: episode.overview || "Aucune description disponible.",
+    overview: episode.overview || 'Aucune description disponible.',
     airDate: episode.air_date,
     runtime: episode.runtime,
     rating: Math.round((episode.vote_average || 0) * 10) / 10,
-    still: episode.still_path
-      ? getTmdbImageUrl(episode.still_path)
-      : undefined,
+    still: episode.still_path ? getTmdbImageUrl(episode.still_path) : undefined,
   }));
 }
 
@@ -174,23 +166,23 @@ function getMockSeries(): Series[] {
   return [
     {
       id: 900001,
-      title: "Chroniques du Néon",
+      title: 'Chroniques du Néon',
       year: 2026,
       rating: 8.4,
-      language: "Anglais",
-      genre: "Science-Fiction",
+      language: 'Anglais',
+      genre: 'Science-Fiction',
       poster:
-        "https://images.unsplash.com/photo-1515630278258-407f66498911?auto=format&fit=crop&w=800&q=80",
+        'https://images.unsplash.com/photo-1515630278258-407f66498911?auto=format&fit=crop&w=800&q=80',
     },
     {
       id: 900002,
-      title: "Brigade Nocturne",
+      title: 'Brigade Nocturne',
       year: 2025,
       rating: 7.9,
-      language: "Francais",
-      genre: "Crime",
+      language: 'Francais',
+      genre: 'Crime',
       poster:
-        "https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=800&q=80",
+        'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=800&q=80',
     },
   ];
 }
@@ -198,7 +190,7 @@ function getMockSeries(): Series[] {
 export async function getPopularSeriesPage(
   page = 1,
   filters: SeriesDiscoverFilters = {},
-  uiLanguage = "fr"
+  uiLanguage = 'fr',
 ): Promise<SeriesPageResult> {
   const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
 
@@ -208,28 +200,26 @@ export async function getPopularSeriesPage(
   });
 
   if (Number.isFinite(filters.genreId)) {
-    params.set("with_genres", String(filters.genreId));
+    params.set('with_genres', String(filters.genreId));
   }
   if (Number.isFinite(filters.yearFrom)) {
-    params.set("first_air_date_gte", `${filters.yearFrom}-01-01`);
+    params.set('first_air_date_gte', `${filters.yearFrom}-01-01`);
   }
   if (Number.isFinite(filters.yearTo)) {
-    params.set("first_air_date_lte", `${filters.yearTo}-12-31`);
+    params.set('first_air_date_lte', `${filters.yearTo}-12-31`);
   }
   if (Number.isFinite(filters.minRating) && (filters.minRating || 0) > 0) {
-    params.set("vote_average_gte", String(filters.minRating));
+    params.set('vote_average_gte', String(filters.minRating));
   }
   if (filters.originalLanguage) {
-    params.set("with_original_language", filters.originalLanguage);
+    params.set('with_original_language', filters.originalLanguage);
   }
 
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/series/popular?${params.toString()}`
-    );
+    const response = await fetch(`${API_BASE_URL}/series/popular?${params.toString()}`);
 
     if (!response.ok) {
-      throw new Error("Failed to fetch popular series");
+      throw new Error('Failed to fetch popular series');
     }
 
     const data: TMDBSeriesSearchResponse = await response.json();
@@ -240,7 +230,7 @@ export async function getPopularSeriesPage(
       totalResults: data.total_results,
     };
   } catch (error) {
-    console.error("Error fetching popular series:", error);
+    console.error('Error fetching popular series:', error);
     return {
       series: page === 1 ? getMockSeries() : [],
       page,
@@ -250,21 +240,21 @@ export async function getPopularSeriesPage(
   }
 }
 
-export async function getSeriesGenres(uiLanguage = "fr"): Promise<SeriesGenreItem[]> {
+export async function getSeriesGenres(uiLanguage = 'fr'): Promise<SeriesGenreItem[]> {
   const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/series/genres?language=${encodeURIComponent(tmdbLanguage)}`
+      `${API_BASE_URL}/series/genres?language=${encodeURIComponent(tmdbLanguage)}`,
     );
     if (!response.ok) {
-      throw new Error("Failed to fetch series genres");
+      throw new Error('Failed to fetch series genres');
     }
 
     const data = await response.json();
     return Array.isArray(data?.genres) ? data.genres : [];
   } catch (error) {
-    console.error("Error fetching series genres:", error);
+    console.error('Error fetching series genres:', error);
     return Object.entries(TV_GENRE_MAP).map(([id, name]) => ({
       id: Number(id),
       name,
@@ -275,7 +265,7 @@ export async function getSeriesGenres(uiLanguage = "fr"): Promise<SeriesGenreIte
 export async function discoverSeriesPage(
   page = 1,
   filters: SeriesDiscoverFilters = {},
-  uiLanguage = "fr"
+  uiLanguage = 'fr',
 ): Promise<SeriesPageResult> {
   const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
 
@@ -285,25 +275,25 @@ export async function discoverSeriesPage(
   });
 
   if (Number.isFinite(filters.genreId)) {
-    params.set("with_genres", String(filters.genreId));
+    params.set('with_genres', String(filters.genreId));
   }
   if (Number.isFinite(filters.yearFrom)) {
-    params.set("first_air_date_gte", `${filters.yearFrom}-01-01`);
+    params.set('first_air_date_gte', `${filters.yearFrom}-01-01`);
   }
   if (Number.isFinite(filters.yearTo)) {
-    params.set("first_air_date_lte", `${filters.yearTo}-12-31`);
+    params.set('first_air_date_lte', `${filters.yearTo}-12-31`);
   }
   if (Number.isFinite(filters.minRating) && (filters.minRating || 0) > 0) {
-    params.set("vote_average_gte", String(filters.minRating));
+    params.set('vote_average_gte', String(filters.minRating));
   }
   if (filters.originalLanguage) {
-    params.set("with_original_language", filters.originalLanguage);
+    params.set('with_original_language', filters.originalLanguage);
   }
 
   try {
     const response = await fetch(`${API_BASE_URL}/series/discover?${params.toString()}`);
     if (!response.ok) {
-      throw new Error("Failed to discover series");
+      throw new Error('Failed to discover series');
     }
 
     const data: TMDBSeriesSearchResponse = await response.json();
@@ -314,12 +304,16 @@ export async function discoverSeriesPage(
       totalResults: data.total_results,
     };
   } catch (error) {
-    console.error("Error discovering series:", error);
+    console.error('Error discovering series:', error);
     return getPopularSeriesPage(page, {}, uiLanguage);
   }
 }
 
-export async function searchSeriesPage(query: string, page = 1, uiLanguage = "fr"): Promise<SeriesPageResult> {
+export async function searchSeriesPage(
+  query: string,
+  page = 1,
+  uiLanguage = 'fr',
+): Promise<SeriesPageResult> {
   const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
 
   if (!query.trim()) {
@@ -329,12 +323,12 @@ export async function searchSeriesPage(query: string, page = 1, uiLanguage = "fr
   try {
     const response = await fetch(
       `${API_BASE_URL}/series/search?language=${encodeURIComponent(tmdbLanguage)}&query=${encodeURIComponent(
-        query
-      )}&page=${page}`
+        query,
+      )}&page=${page}`,
     );
 
     if (!response.ok) {
-      throw new Error("Failed to search series");
+      throw new Error('Failed to search series');
     }
 
     const data: TMDBSeriesSearchResponse = await response.json();
@@ -345,7 +339,7 @@ export async function searchSeriesPage(query: string, page = 1, uiLanguage = "fr
       totalResults: data.total_results,
     };
   } catch (error) {
-    console.error("Error searching series:", error);
+    console.error('Error searching series:', error);
     return {
       series: [],
       page,
@@ -355,22 +349,22 @@ export async function searchSeriesPage(query: string, page = 1, uiLanguage = "fr
   }
 }
 
-export async function getSeriesById(id: number, uiLanguage = "fr"): Promise<SeriesDetails | null> {
+export async function getSeriesById(id: number, uiLanguage = 'fr'): Promise<SeriesDetails | null> {
   const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/series/${id}?language=${encodeURIComponent(tmdbLanguage)}`
+      `${API_BASE_URL}/series/${id}?language=${encodeURIComponent(tmdbLanguage)}`,
     );
 
     if (!response.ok) {
-      throw new Error("Failed to fetch series details");
+      throw new Error('Failed to fetch series details');
     }
 
     const data: TMDBSeriesDetails = await response.json();
     return convertTMDBToSeriesDetails(data);
   } catch (error) {
-    console.error("Error fetching series details:", error);
+    console.error('Error fetching series details:', error);
     return null;
   }
 }
@@ -378,23 +372,23 @@ export async function getSeriesById(id: number, uiLanguage = "fr"): Promise<Seri
 export async function getSeriesSeasonEpisodes(
   seriesId: number,
   seasonNumber: number,
-  uiLanguage = "fr"
+  uiLanguage = 'fr',
 ): Promise<SeriesEpisode[]> {
   const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/series/${seriesId}/seasons/${seasonNumber}?language=${encodeURIComponent(tmdbLanguage)}`
+      `${API_BASE_URL}/series/${seriesId}/seasons/${seasonNumber}?language=${encodeURIComponent(tmdbLanguage)}`,
     );
 
     if (!response.ok) {
-      throw new Error("Failed to fetch season episodes");
+      throw new Error('Failed to fetch season episodes');
     }
 
     const data: TMDBSeriesSeasonDetails = await response.json();
     return convertTMDBToEpisodes(data);
   } catch (error) {
-    console.error("Error fetching season episodes:", error);
+    console.error('Error fetching season episodes:', error);
     return [];
   }
 }
@@ -402,17 +396,16 @@ export async function getSeriesSeasonEpisodes(
 export async function searchSeriesReleases(
   query: string,
   limit = 12,
-  tmdbId?: number | string
+  tmdbId?: number | string,
 ): Promise<TorznabSeriesSearchResponse> {
-  const tmdbPart = tmdbId !== undefined && tmdbId !== null
-    ? `&tmdbId=${encodeURIComponent(String(tmdbId))}`
-    : "";
+  const tmdbPart =
+    tmdbId !== undefined && tmdbId !== null ? `&tmdbId=${encodeURIComponent(String(tmdbId))}` : '';
 
   const response = await fetch(
     `${API_BASE_URL}/indexer/search?query=${encodeURIComponent(query)}&limit=${limit}${tmdbPart}`,
     {
-      credentials: "include",
-    }
+      credentials: 'include',
+    },
   );
 
   const data = await response.json();

@@ -1,37 +1,35 @@
-import { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
-import { Download, Heart, Trash2, Tv, X } from "lucide-react";
-import { Button } from "./ui/button";
-import { MovieCard } from "./MovieCard";
-import { WishListCard } from "./WishListCard";
-import { Checkbox } from "./ui/checkbox";
-import { Card, CardContent } from "./ui/card";
-import { Badge } from "./ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { getWishlist, removeMultipleFromWishlist } from "../services/wishlistService";
-import {
-  getSeriesWishlist,
-  removeMultipleFromSeriesWishlist,
-} from "../services/seriesWishlistService";
-import { addTorrentToClient } from "../services/torrentService";
+import { Download, Heart, Trash2, Tv, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { WishListCard } from './WishListCard';
+import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../i18n/LanguageProvider';
 import {
   getIndexerResults,
   rejectAllIndexerResults,
   rejectIndexerResult,
   validateIndexerResult,
   type IndexerResultTarget,
-} from "../services/indexerResultService";
-import { useAuth } from "../context/AuthContext";
-import { useI18n } from "../i18n/LanguageProvider";
-import type { Movie } from "../types/movie";
-import type { SeriesWishlistEntry } from "../types/seriesWishlist";
+} from '../services/indexerResultService';
+import {
+  getSeriesWishlist,
+  removeMultipleFromSeriesWishlist,
+} from '../services/seriesWishlistService';
+import { addTorrentToClient } from '../services/torrentService';
+import { getWishlist, removeMultipleFromWishlist } from '../services/wishlistService';
+import type { Movie } from '../types/movie';
+import type { SeriesWishlistEntry } from '../types/seriesWishlist';
 
 export function WishList() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t } = useI18n();
   const { settings } = useAuth();
-  const [activeTab, setActiveTab] = useState("movies");
+  const [activeTab, setActiveTab] = useState('movies');
 
   const [movies, setMovies] = useState<Movie[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -51,14 +49,14 @@ export function WishList() {
   }, []);
 
   useEffect(() => {
-    const requestedTab = searchParams.get("tab");
-    if (requestedTab === "movies" || requestedTab === "series") {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab === 'movies' || requestedTab === 'series') {
       setActiveTab(requestedTab);
     }
   }, [searchParams]);
 
   useEffect(() => {
-    const targetKey = searchParams.get("target");
+    const targetKey = searchParams.get('target');
     if (!targetKey) {
       return;
     }
@@ -70,10 +68,15 @@ export function WishList() {
         return;
       }
 
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
-      element.classList.add("ring-2", "ring-cyan-400", "ring-offset-2", "ring-offset-slate-950");
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.classList.add('ring-2', 'ring-cyan-400', 'ring-offset-2', 'ring-offset-slate-950');
       window.setTimeout(() => {
-        element.classList.remove("ring-2", "ring-cyan-400", "ring-offset-2", "ring-offset-slate-950");
+        element.classList.remove(
+          'ring-2',
+          'ring-cyan-400',
+          'ring-offset-2',
+          'ring-offset-slate-950',
+        );
       }, 2200);
     }, 150);
 
@@ -98,13 +101,13 @@ export function WishList() {
       setIndexerTargets(results);
       setIndexerError(null);
     } catch (error) {
-      setIndexerError(error instanceof Error ? error.message : "Failed to load indexer results");
+      setIndexerError(error instanceof Error ? error.message : 'Failed to load indexer results');
     }
   };
 
   const toggleSelection = (movieId: number) => {
     if (selectedIds.includes(movieId)) {
-      setSelectedIds(selectedIds.filter(id => id !== movieId));
+      setSelectedIds(selectedIds.filter((id) => id !== movieId));
     } else {
       setSelectedIds([...selectedIds, movieId]);
     }
@@ -114,7 +117,7 @@ export function WishList() {
     if (selectedIds.length === movies.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(movies.map(m => m.id));
+      setSelectedIds(movies.map((m) => m.id));
     }
   };
 
@@ -123,8 +126,8 @@ export function WishList() {
       await removeMultipleFromWishlist(selectedIds);
       await Promise.all([loadWishlist(), loadIndexerResults()]);
       setIsSelectionMode(false);
-      window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
-      window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
+      window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
+      window.dispatchEvent(new CustomEvent('seedflix:notifications-refresh-request'));
     }
   };
 
@@ -137,9 +140,7 @@ export function WishList() {
 
   const toggleSeriesEntry = (entryId: string) => {
     setSelectedEntryIds((prev) =>
-      prev.includes(entryId)
-        ? prev.filter((id) => id !== entryId)
-        : [...prev, entryId]
+      prev.includes(entryId) ? prev.filter((id) => id !== entryId) : [...prev, entryId],
     );
   };
 
@@ -156,8 +157,8 @@ export function WishList() {
       await removeMultipleFromSeriesWishlist(selectedEntryIds);
       await Promise.all([loadSeriesWishlist(), loadIndexerResults()]);
       setIsSeriesSelectionMode(false);
-      window.dispatchEvent(new CustomEvent("seedflix:wishlist-refresh-request"));
-      window.dispatchEvent(new CustomEvent("seedflix:notifications-refresh-request"));
+      window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
+      window.dispatchEvent(new CustomEvent('seedflix:notifications-refresh-request'));
     }
   };
 
@@ -182,7 +183,7 @@ export function WishList() {
     try {
       await rejectAllIndexerResults(
         target.targetKey,
-        target.items.map((item) => item.indexerStateKey)
+        target.items.map((item) => item.indexerStateKey),
       );
       await loadIndexerResults();
     } finally {
@@ -193,25 +194,25 @@ export function WishList() {
   const handleAddTorrentFromWishlist = async (
     target: IndexerResultTarget,
     torrentUrl: string,
-    indexerStateKey: string
+    indexerStateKey: string,
   ) => {
     const key = `${target.targetKey}:${indexerStateKey}:add`;
     setActionKey(key);
     try {
-      const mediaType = target.targetType === "movie" ? "movie" : "series";
+      const mediaType = target.targetType === 'movie' ? 'movie' : 'series';
       await addTorrentToClient(torrentUrl, mediaType, target.targetKey);
-      
+
       // Validate indexer result (best effort)
       try {
         await validateIndexerResult(target.targetKey, indexerStateKey);
       } catch {
         // Silent fail - indexer validation is optional
       }
-      
+
       // Reload data (best effort - continue even if one fails)
       await Promise.allSettled([loadIndexerResults(), loadWishlist(), loadSeriesWishlist()]);
     } catch (error) {
-      console.error("Error adding torrent from wishlist:", error);
+      console.error('Error adding torrent from wishlist:', error);
       // Data stays visible even if error occurs
     } finally {
       setActionKey(null);
@@ -234,23 +235,21 @@ export function WishList() {
     }>
   >((groups, entry) => {
     const existing = groups.find((g) => g.seriesId === entry.seriesId);
-    const group =
-      existing ||
-      {
-        seriesId: entry.seriesId,
-        seriesTitle: entry.seriesTitle,
-        seriesPoster: entry.seriesPoster,
-        seasons: [],
-        episodes: [],
-      };
+    const group = existing || {
+      seriesId: entry.seriesId,
+      seriesTitle: entry.seriesTitle,
+      seriesPoster: entry.seriesPoster,
+      seasons: [],
+      episodes: [],
+    };
 
     if (!existing) {
       groups.push(group);
     }
 
-    if (entry.type === "series") {
+    if (entry.type === 'series') {
       group.seriesEntry = entry;
-    } else if (entry.type === "season") {
+    } else if (entry.type === 'season') {
       group.seasons.push(entry);
     } else {
       group.episodes.push(entry);
@@ -259,7 +258,7 @@ export function WishList() {
     return groups;
   }, []);
 
-  groupedSeries.sort((a, b) => a.seriesTitle.localeCompare(b.seriesTitle, "fr"));
+  groupedSeries.sort((a, b) => a.seriesTitle.localeCompare(b.seriesTitle, 'fr'));
   for (const group of groupedSeries) {
     group.seasons.sort((a, b) => (a.seasonNumber || 0) - (b.seasonNumber || 0));
     group.episodes.sort((a, b) => {
@@ -271,12 +270,12 @@ export function WishList() {
 
   const uniqueSeriesCount = groupedSeries.length;
   const movieCountLabel = t(
-    movies.length > 1 ? "wishlistPage.summary.movies_many" : "wishlistPage.summary.movies_one",
-    { count: movies.length }
+    movies.length > 1 ? 'wishlistPage.summary.movies_many' : 'wishlistPage.summary.movies_one',
+    { count: movies.length },
   );
   const seriesCountLabel = t(
-    uniqueSeriesCount > 1 ? "wishlistPage.summary.series_many" : "wishlistPage.summary.series_one",
-    { count: uniqueSeriesCount }
+    uniqueSeriesCount > 1 ? 'wishlistPage.summary.series_many' : 'wishlistPage.summary.series_one',
+    { count: uniqueSeriesCount },
   );
 
   const getGroupEntryIds = (group: {
@@ -320,26 +319,28 @@ export function WishList() {
     });
   };
 
-  const indexerTargetsByKey = new Map(
-    indexerTargets.map((target) => [target.targetKey, target])
-  );
+  const indexerTargetsByKey = new Map(indexerTargets.map((target) => [target.targetKey, target]));
 
   const spoilerModeEnabled = Boolean(
-    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode
+    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode,
   );
 
-  const getEpisodeCode = (targetKey: string, fallbackSeason?: number | null, fallbackEpisode?: number | null) => {
-    const match = String(targetKey || "").match(/^episode:\d+:(\d+):(\d+)$/i);
+  const getEpisodeCode = (
+    targetKey: string,
+    fallbackSeason?: number | null,
+    fallbackEpisode?: number | null,
+  ) => {
+    const match = String(targetKey || '').match(/^episode:\d+:(\d+):(\d+)$/i);
     const season = match?.[1] ? Number(match[1]) : Number(fallbackSeason || 0);
     const episode = match?.[2] ? Number(match[2]) : Number(fallbackEpisode || 0);
     if (!Number.isFinite(season) || !Number.isFinite(episode) || season <= 0 || episode <= 0) {
-      return "";
+      return '';
     }
-    return `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+    return `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
   };
 
   const getSpoilerSafeIndexerLabel = (target: IndexerResultTarget) => {
-    if (!spoilerModeEnabled || target.targetType !== "episode") {
+    if (!spoilerModeEnabled || target.targetType !== 'episode') {
       return target.label || target.title;
     }
 
@@ -377,9 +378,9 @@ export function WishList() {
               disabled={actionKey === `${target.targetKey}:reject-all`}
               className="border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 hover:text-red-100"
             >
-              {actionKey === `${target.targetKey}:reject-all` 
-                ? t("wishlistPage.indexerResults.actions.rejectingAll")
-                : t("wishlistPage.indexerResults.actions.rejectAll")}
+              {actionKey === `${target.targetKey}:reject-all`
+                ? t('wishlistPage.indexerResults.actions.rejectingAll')
+                : t('wishlistPage.indexerResults.actions.rejectAll')}
             </Button>
           </div>
         </div>
@@ -411,8 +412,8 @@ export function WishList() {
                   >
                     <Download className="w-4 h-4 mr-2" />
                     {actionKey === addKey
-                      ? t("wishlistPage.indexerResults.actions.adding")
-                      : t("wishlistPage.indexerResults.actions.add")}
+                      ? t('wishlistPage.indexerResults.actions.adding')
+                      : t('wishlistPage.indexerResults.actions.add')}
                   </Button>
 
                   <Button
@@ -427,7 +428,7 @@ export function WishList() {
                     disabled={actionKey === rejectKey}
                     className="border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 hover:text-red-100"
                   >
-                    {t("wishlistPage.indexerResults.actions.reject")}
+                    {t('wishlistPage.indexerResults.actions.reject')}
                   </Button>
 
                   {item.quality ? (
@@ -437,10 +438,7 @@ export function WishList() {
                   ) : null}
 
                   {item.language ? (
-                    <Badge
-                      variant="outline"
-                      className="border-emerald-500/40 text-emerald-300"
-                    >
+                    <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
                       {item.language}
                     </Badge>
                   ) : null}
@@ -465,7 +463,7 @@ export function WishList() {
         <div className="flex items-center gap-3">
           <Heart className="w-8 h-8 text-purple-400 fill-purple-400" />
           <div>
-            <h2 className="text-3xl font-bold text-white">{t("wishlistPage.title")}</h2>
+            <h2 className="text-3xl font-bold text-white">{t('wishlistPage.title')}</h2>
             <p className="text-white/60">
               {movieCountLabel} • {seriesCountLabel}
             </p>
@@ -479,19 +477,19 @@ export function WishList() {
             value="movies"
             className="text-white data-[state=active]:bg-purple-600 data-[state=active]:text-white"
           >
-            {t("wishlistPage.tabs.movies", { count: movies.length })}
+            {t('wishlistPage.tabs.movies', { count: movies.length })}
           </TabsTrigger>
           <TabsTrigger
             value="series"
             className="text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white"
           >
-            {t("wishlistPage.tabs.series", { count: uniqueSeriesCount })}
+            {t('wishlistPage.tabs.series', { count: uniqueSeriesCount })}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="movies" className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-bold text-white">{t("wishlistPage.movies.title")}</h3>
+            <h3 className="text-2xl font-bold text-white">{t('wishlistPage.movies.title')}</h3>
 
             {movies.length > 0 && (
               <div className="flex gap-2">
@@ -502,7 +500,7 @@ export function WishList() {
                     className="bg-purple-600 hover:bg-purple-700 text-white"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    {t("wishlistPage.actions.manage")}
+                    {t('wishlistPage.actions.manage')}
                   </Button>
                 ) : (
                   <>
@@ -512,7 +510,7 @@ export function WishList() {
                       className="bg-purple-600 hover:bg-purple-700 text-white"
                     >
                       <X className="w-4 h-4 mr-2" />
-                      {t("common.cancel")}
+                      {t('common.cancel')}
                     </Button>
                     <Button
                       onClick={toggleSelectAll}
@@ -520,8 +518,8 @@ export function WishList() {
                       className="bg-purple-600 hover:bg-purple-700 text-white"
                     >
                       {selectedIds.length === movies.length
-                        ? t("wishlistPage.actions.deselectAll")
-                        : t("wishlistPage.actions.selectAll")}
+                        ? t('wishlistPage.actions.deselectAll')
+                        : t('wishlistPage.actions.selectAll')}
                     </Button>
                     <Button
                       onClick={handleRemoveSelected}
@@ -529,7 +527,7 @@ export function WishList() {
                       className="bg-red-600 hover:bg-red-700 text-white"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      {t("wishlistPage.actions.removeCount", { count: selectedIds.length })}
+                      {t('wishlistPage.actions.removeCount', { count: selectedIds.length })}
                     </Button>
                   </>
                 )}
@@ -544,7 +542,11 @@ export function WishList() {
                 return (
                   <div
                     key={movie.id}
-                    className={isSelectionMode ? undefined : "cursor-pointer hover:bg-white/10 hover:scale-[1.01] transition-all rounded-lg"}
+                    className={
+                      isSelectionMode
+                        ? undefined
+                        : 'cursor-pointer hover:bg-white/10 hover:scale-[1.01] transition-all rounded-lg'
+                    }
                     onClick={() => {
                       if (!isSelectionMode) {
                         navigate(`/movie/${movie.id}`);
@@ -553,7 +555,7 @@ export function WishList() {
                     tabIndex={isSelectionMode ? -1 : 0}
                     role="button"
                     onKeyDown={(e) => {
-                      if (!isSelectionMode && (e.key === "Enter" || e.key === " ")) {
+                      if (!isSelectionMode && (e.key === 'Enter' || e.key === ' ')) {
                         e.preventDefault();
                         navigate(`/movie/${movie.id}`);
                       }
@@ -570,10 +572,10 @@ export function WishList() {
                       {isSelectionMode && (
                         <div
                           className="mb-2"
-                          onClick={e => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
                           tabIndex={0}
-                          onKeyDown={e => {
-                            if (e.key === "Enter" || e.key === " ") {
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
                               e.stopPropagation();
                             }
                           }}
@@ -595,14 +597,12 @@ export function WishList() {
             <div className="text-center py-12">
               <Heart className="w-16 h-16 text-white/20 mx-auto mb-4" />
               <h3 className="text-2xl font-semibold text-white mb-2">
-                {t("wishlistPage.movies.emptyTitle")}
+                {t('wishlistPage.movies.emptyTitle')}
               </h3>
-              <p className="text-white/60 mb-6">
-                {t("wishlistPage.movies.emptyDescription")}
-              </p>
+              <p className="text-white/60 mb-6">{t('wishlistPage.movies.emptyDescription')}</p>
               <Link to="/">
                 <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-                  {t("wishlistPage.movies.discover")}
+                  {t('wishlistPage.movies.discover')}
                 </Button>
               </Link>
             </div>
@@ -612,7 +612,7 @@ export function WishList() {
 
         <TabsContent value="series" className="space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <h3 className="text-2xl font-bold text-white">{t("wishlistPage.series.title")}</h3>
+            <h3 className="text-2xl font-bold text-white">{t('wishlistPage.series.title')}</h3>
 
             {seriesEntries.length > 0 && (
               <div className="flex gap-2 flex-wrap">
@@ -623,7 +623,7 @@ export function WishList() {
                     className="bg-cyan-600 hover:bg-cyan-700 text-white"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    {t("wishlistPage.actions.manage")}
+                    {t('wishlistPage.actions.manage')}
                   </Button>
                 ) : (
                   <>
@@ -633,7 +633,7 @@ export function WishList() {
                       className="bg-cyan-600 hover:bg-cyan-700 text-white"
                     >
                       <X className="w-4 h-4 mr-2" />
-                      {t("common.cancel")}
+                      {t('common.cancel')}
                     </Button>
                     <Button
                       onClick={toggleSelectAllSeries}
@@ -641,8 +641,8 @@ export function WishList() {
                       className="bg-cyan-600 hover:bg-cyan-700 text-white"
                     >
                       {selectedEntryIds.length === seriesEntries.length
-                        ? t("wishlistPage.actions.deselectAll")
-                        : t("wishlistPage.actions.selectAll")}
+                        ? t('wishlistPage.actions.deselectAll')
+                        : t('wishlistPage.actions.selectAll')}
                     </Button>
                     <Button
                       onClick={handleRemoveSelectedSeries}
@@ -650,7 +650,7 @@ export function WishList() {
                       className="bg-red-600 hover:bg-red-700 text-white"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      {t("wishlistPage.actions.removeCount", { count: selectedEntryIds.length })}
+                      {t('wishlistPage.actions.removeCount', { count: selectedEntryIds.length })}
                     </Button>
                   </>
                 )}
@@ -664,144 +664,201 @@ export function WishList() {
                 const seriesIndexerKeys = Array.from(
                   new Set([
                     `series:${group.seriesId}`,
-                    ...group.seasons.map((season) => `season:${group.seriesId}:${season.seasonNumber}`),
+                    ...group.seasons.map(
+                      (season) => `season:${group.seriesId}:${season.seasonNumber}`,
+                    ),
                     ...group.episodes.map(
                       (episode) =>
-                        `episode:${group.seriesId}:${episode.seasonNumber}:${episode.episodeNumber}`
+                        `episode:${group.seriesId}:${episode.seasonNumber}:${episode.episodeNumber}`,
                     ),
-                  ])
+                  ]),
                 );
                 const groupIndexerTargets = seriesIndexerKeys
                   .map((key) => indexerTargetsByKey.get(key))
                   .filter((target): target is IndexerResultTarget => Boolean(target));
 
                 return (
-                <div
-                  key={group.seriesId}
-                  className={isSeriesSelectionMode ? undefined : "cursor-pointer hover:bg-white/10 hover:scale-[1.01] transition-all rounded-lg"}
-                  onClick={() => {
-                    if (!isSeriesSelectionMode) {
-                      navigate(`/series/${group.seriesId}`);
+                  <div
+                    key={group.seriesId}
+                    className={
+                      isSeriesSelectionMode
+                        ? undefined
+                        : 'cursor-pointer hover:bg-white/10 hover:scale-[1.01] transition-all rounded-lg'
                     }
-                  }}
-                  tabIndex={isSeriesSelectionMode ? -1 : 0}
-                  role="button"
-                  onKeyDown={(e) => {
-                    if (!isSeriesSelectionMode && (e.key === "Enter" || e.key === " ")) {
-                      e.preventDefault();
-                      navigate(`/series/${group.seriesId}`);
-                    }
-                  }}
-                >
-                  <WishListCard
-                    poster={group.seriesPoster}
-                    title={group.seriesTitle}
-                    year={group.seriesEntry?.year || 0}
-                    rating={group.seriesEntry?.rating || 0}
-                    genre={group.seriesEntry?.genre || ''}
-                    type="series"
+                    onClick={() => {
+                      if (!isSeriesSelectionMode) {
+                        navigate(`/series/${group.seriesId}`);
+                      }
+                    }}
+                    tabIndex={isSeriesSelectionMode ? -1 : 0}
+                    role="button"
+                    onKeyDown={(e) => {
+                      if (!isSeriesSelectionMode && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        navigate(`/series/${group.seriesId}`);
+                      }
+                    }}
                   >
-                    {isSeriesSelectionMode && (
-                      <div
-                        className="mt-2"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <label className="inline-flex items-center gap-2 text-sm text-white/80">
-                          <Checkbox
-                            checked={isGroupFullySelected(group)}
-                            onCheckedChange={() => toggleSeriesGroup(group)}
-                            className="border-white/40"
-                          />
-                          {t("wishlistPage.series.selectWhole")}
-                        </label>
-                      </div>
-                    )}
-                    <div className="space-y-3 pl-1">
-                      {group.seriesEntry && (
+                    <WishListCard
+                      poster={group.seriesPoster}
+                      title={group.seriesTitle}
+                      year={group.seriesEntry?.year || 0}
+                      rating={group.seriesEntry?.rating || 0}
+                      genre={group.seriesEntry?.genre || ''}
+                      type="series"
+                    >
+                      {isSeriesSelectionMode && (
                         <div
-                          className="flex items-center gap-2"
+                          className="mt-2"
                           onClick={(event) => event.stopPropagation()}
+                          tabIndex={0}
+                          role="presentation"
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.stopPropagation();
+                            }
+                          }}
                         >
-                          {isSeriesSelectionMode && (
+                          <label className="inline-flex items-center gap-2 text-sm text-white/80">
                             <Checkbox
-                              checked={selectedEntryIds.includes(group.seriesEntry.entryId)}
-                              onCheckedChange={() => toggleSeriesEntry(group.seriesEntry!.entryId)}
+                              checked={isGroupFullySelected(group)}
+                              onCheckedChange={() => toggleSeriesGroup(group)}
                               className="border-white/40"
                             />
-                          )}
-                          <Badge className="bg-cyan-600/20 text-cyan-200 border-cyan-500/30">
-                            <Tv className="w-3 h-3 mr-1" />
-                            {t("wishlistPage.series.fullSeries")}
-                          </Badge>
+                            {t('wishlistPage.series.selectWhole')}
+                          </label>
                         </div>
                       )}
-                      {group.seasons.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-white/60 text-xs uppercase tracking-wide">{t("wishlistPage.series.seasons")}</p>
-                          <div className="flex flex-wrap gap-2">
-                            {group.seasons.map((season) => (
-                              <div
-                                key={season.entryId}
-                                className="flex items-center gap-2"
-                                onClick={(event) => event.stopPropagation()}
-                              >
-                                {isSeriesSelectionMode && (
-                                  <Checkbox
-                                    checked={selectedEntryIds.includes(season.entryId)}
-                                    onCheckedChange={() => toggleSeriesEntry(season.entryId)}
-                                    className="border-white/40"
-                                  />
-                                )}
-                                <Badge
-                                  variant="outline"
-                                  className="border-purple-500/50 text-purple-300"
-                                >
-                                  {season.seasonName ?? t("wishlistPage.series.seasonNumber", { number: season.seasonNumber || 0 })}
-                                </Badge>
-                              </div>
-                            ))}
+                      <div className="space-y-3 pl-1">
+                        {group.seriesEntry && (
+                          <div
+                            className="flex items-center gap-2"
+                            onClick={(event) => event.stopPropagation()}
+                            tabIndex={0}
+                            role="presentation"
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.stopPropagation();
+                              }
+                            }}
+                          >
+                            {isSeriesSelectionMode && (
+                              <Checkbox
+                                checked={selectedEntryIds.includes(group.seriesEntry.entryId)}
+                                onCheckedChange={() =>
+                                  toggleSeriesEntry(group.seriesEntry!.entryId)
+                                }
+                                className="border-white/40"
+                              />
+                            )}
+                            <Badge className="bg-cyan-600/20 text-cyan-200 border-cyan-500/30">
+                              <Tv className="w-3 h-3 mr-1" />
+                              {t('wishlistPage.series.fullSeries')}
+                            </Badge>
                           </div>
-                        </div>
-                      )}
-                      {group.episodes.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-white/60 text-xs uppercase tracking-wide">{t("wishlistPage.series.episodes")}</p>
-                          <div className="flex flex-wrap gap-2">
-                            {group.episodes.map((episode) => (
-                              <div
-                                key={episode.entryId}
-                                className="flex items-center gap-2"
-                                onClick={(event) => event.stopPropagation()}
-                              >
-                                {isSeriesSelectionMode && (
-                                  <Checkbox
-                                    checked={selectedEntryIds.includes(episode.entryId)}
-                                    onCheckedChange={() => toggleSeriesEntry(episode.entryId)}
-                                    className="border-white/40"
-                                  />
-                                )}
-                                <Badge
-                                  variant="outline"
-                                  className="border-white/20 text-white/70"
+                        )}
+                        {group.seasons.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-white/60 text-xs uppercase tracking-wide">
+                              {t('wishlistPage.series.seasons')}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {group.seasons.map((season) => (
+                                <div
+                                  key={season.entryId}
+                                  className="flex items-center gap-2"
+                                  onClick={(event) => event.stopPropagation()}
+                                  tabIndex={0}
+                                  role="presentation"
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter" || event.key === " ") {
+                                      event.stopPropagation();
+                                    }
+                                  }}
                                 >
-                                  {getEpisodeCode("", episode.seasonNumber, episode.episodeNumber)}
-                                  {!spoilerModeEnabled && episode.episodeName
-                                    ? ` - ${episode.episodeName}`
-                                    : ""}
-                                </Badge>
-                              </div>
-                            ))}
+                                  {isSeriesSelectionMode && (
+                                    <Checkbox
+                                      checked={selectedEntryIds.includes(season.entryId)}
+                                      onCheckedChange={() => toggleSeriesEntry(season.entryId)}
+                                      className="border-white/40"
+                                    />
+                                  )}
+                                  <Badge
+                                    variant="outline"
+                                    className="border-purple-500/50 text-purple-300"
+                                  >
+                                    {season.seasonName ??
+                                      t('wishlistPage.series.seasonNumber', {
+                                        number: season.seasonNumber || 0,
+                                      })}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      {groupIndexerTargets.length > 0 ? (
-                        <div className="space-y-3" onClick={(event) => event.stopPropagation()}>
-                          {groupIndexerTargets.map((target) => renderIndexerTarget(target, true))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </WishListCard>
-                </div>
+                        )}
+                        {group.episodes.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-white/60 text-xs uppercase tracking-wide">
+                              {t('wishlistPage.series.episodes')}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {group.episodes.map((episode) => (
+                                <div
+                                  key={episode.entryId}
+                                  className="flex items-center gap-2"
+                                  onClick={(event) => event.stopPropagation()}
+                                  tabIndex={0}
+                                  role="presentation"
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter" || event.key === " ") {
+                                      event.stopPropagation();
+                                    }
+                                  }}
+                                >
+                                  {isSeriesSelectionMode && (
+                                    <Checkbox
+                                      checked={selectedEntryIds.includes(episode.entryId)}
+                                      onCheckedChange={() => toggleSeriesEntry(episode.entryId)}
+                                      className="border-white/40"
+                                    />
+                                  )}
+                                  <Badge
+                                    variant="outline"
+                                    className="border-white/20 text-white/70"
+                                  >
+                                    {getEpisodeCode(
+                                      '',
+                                      episode.seasonNumber,
+                                      episode.episodeNumber,
+                                    )}
+                                    {!spoilerModeEnabled && episode.episodeName
+                                      ? ` - ${episode.episodeName}`
+                                      : ''}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {groupIndexerTargets.length > 0 ? (
+                          <div
+                            className="space-y-3"
+                            onClick={(event) => event.stopPropagation()}
+                            tabIndex={0}
+                            role="presentation"
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.stopPropagation();
+                              }
+                            }}
+                          >
+                            {groupIndexerTargets.map((target) => renderIndexerTarget(target, true))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </WishListCard>
+                  </div>
                 );
               })}
             </div>
@@ -809,14 +866,12 @@ export function WishList() {
             <div className="text-center py-12">
               <Tv className="w-16 h-16 text-white/20 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-white mb-2">
-                {t("wishlistPage.series.emptyTitle")}
+                {t('wishlistPage.series.emptyTitle')}
               </h3>
-              <p className="text-white/60 mb-6">
-                {t("wishlistPage.series.emptyDescription")}
-              </p>
+              <p className="text-white/60 mb-6">{t('wishlistPage.series.emptyDescription')}</p>
               <Link to="/">
                 <Button className="bg-cyan-600 hover:bg-cyan-700 text-white">
-                  {t("wishlistPage.series.discover")}
+                  {t('wishlistPage.series.discover')}
                 </Button>
               </Link>
             </div>

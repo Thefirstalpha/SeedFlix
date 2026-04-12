@@ -1,15 +1,15 @@
-import type { TorrentResultsLabels } from "../components/TorrentResultsPanel";
+import type { TorrentResultsLabels } from '../components/TorrentResultsPanel';
 
 type Translator = (key: string, params?: Record<string, unknown>) => string;
 
 type BuildOptions = {
-  sectionKey: "movieDetails" | "seriesDetails";
+  sectionKey: 'movieDetails' | 'seriesDetails';
   includeSeason?: boolean;
 };
 
 export function buildTorrentResultsLabels(
   t: Translator,
-  options: BuildOptions
+  options: BuildOptions,
 ): TorrentResultsLabels {
   const baseIndexerKey = `${options.sectionKey}.indexer`;
   const basePaginationKey = `${options.sectionKey}.pagination`;
@@ -36,7 +36,7 @@ export function buildTorrentResultsLabels(
     current: (current, total) => t(`${basePaginationKey}.current`, { current, total }),
     page: (page) => t(`${basePaginationKey}.page`, { page }),
     next: t(`${basePaginationKey}.next`),
-    sortByDateAria: "Sort by date",
-    sortBySizeAria: "Sort by size",
+    sortByDateAria: 'Sort by date',
+    sortBySizeAria: 'Sort by size',
   };
 }
