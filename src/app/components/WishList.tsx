@@ -708,7 +708,17 @@ export function WishList() {
                       type="series"
                     >
                       {isSeriesSelectionMode && (
-                        <div className="mt-2" onClick={(event) => event.stopPropagation()}>
+                        <div
+                          className="mt-2"
+                          onClick={(event) => event.stopPropagation()}
+                          tabIndex={0}
+                          role="presentation"
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.stopPropagation();
+                            }
+                          }}
+                        >
                           <label className="inline-flex items-center gap-2 text-sm text-white/80">
                             <Checkbox
                               checked={isGroupFullySelected(group)}
@@ -724,6 +734,13 @@ export function WishList() {
                           <div
                             className="flex items-center gap-2"
                             onClick={(event) => event.stopPropagation()}
+                            tabIndex={0}
+                            role="presentation"
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.stopPropagation();
+                              }
+                            }}
                           >
                             {isSeriesSelectionMode && (
                               <Checkbox
@@ -751,6 +768,13 @@ export function WishList() {
                                   key={season.entryId}
                                   className="flex items-center gap-2"
                                   onClick={(event) => event.stopPropagation()}
+                                  tabIndex={0}
+                                  role="presentation"
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter" || event.key === " ") {
+                                      event.stopPropagation();
+                                    }
+                                  }}
                                 >
                                   {isSeriesSelectionMode && (
                                     <Checkbox
@@ -784,6 +808,13 @@ export function WishList() {
                                   key={episode.entryId}
                                   className="flex items-center gap-2"
                                   onClick={(event) => event.stopPropagation()}
+                                  tabIndex={0}
+                                  role="presentation"
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter" || event.key === " ") {
+                                      event.stopPropagation();
+                                    }
+                                  }}
                                 >
                                   {isSeriesSelectionMode && (
                                     <Checkbox
@@ -811,7 +842,17 @@ export function WishList() {
                           </div>
                         )}
                         {groupIndexerTargets.length > 0 ? (
-                          <div className="space-y-3" onClick={(event) => event.stopPropagation()}>
+                          <div
+                            className="space-y-3"
+                            onClick={(event) => event.stopPropagation()}
+                            tabIndex={0}
+                            role="presentation"
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.stopPropagation();
+                              }
+                            }}
+                          >
                             {groupIndexerTargets.map((target) => renderIndexerTarget(target, true))}
                           </div>
                         ) : null}

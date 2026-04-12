@@ -30,7 +30,9 @@ After meaningful code modifications:
 	- `node --check server/index.js`
 3. If backend behavior changed, run server startup sanity check:
 	- `node --check server/modules/<module>.js` # (add any other touched modules here)
-4. If runtime checks cannot be completed, clearly report what was not validated and why.
+4. Run linting:
+	- `npm run lint:fix` results in no errors or warnings. correct any issues or explicitly document why they are not fixed.
+5. If runtime checks cannot be completed, clearly report what was not validated and why.
 
 ## Anti-Duplication Checklist
 Before adding code, check whether equivalent logic already exists in:
@@ -62,5 +64,6 @@ A task is complete only if:
 - `npm run build` succeeds.
 - `node --check server/index.js` succeeds.
 - `node --check` on any other touched backend modules succeeds.
+- `npm run lint:fix` results in no errors or warnings.
 - Any discovered issue related to the change is fixed or explicitly documented.
 - A concise change summary includes what was changed, validation executed, and residual risks (if any).
