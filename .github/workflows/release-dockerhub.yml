@@ -36,6 +36,7 @@ jobs:
           tags: |
             type=raw,value=${{ github.event.release.tag_name }}
             type=raw,value=latest
+            type=raw,value=dev
 
       - name: Build and push image
         uses: docker/build-push-action@v6
@@ -54,7 +55,7 @@ jobs:
           echo "- Repository: ${{ secrets.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
           echo "- Tag release: ${{ github.event.release.tag_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- Additional tag: latest" >> $GITHUB_STEP_SUMMARY
-
+          echo "- Additional tag: dev" >> $GITHUB_STEP_SUMMARY
   docker-build-and-push-dev:
     name: Build and Push Docker image (dev)
     runs-on: ubuntu-latest
