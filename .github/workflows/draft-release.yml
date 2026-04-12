@@ -25,15 +25,6 @@ jobs:
           echo "$COMMITS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Prepare release template from file
-        id: template
-        run: |
-          cp .github/release-template.md release_template.md
-          sed -i "s|\${{VERSION}}|${{ github.ref_name }}|g" release_template.md
-          sed -i "s|\${{PREVIOUS_TAG}}|${{ steps.get_tag.outputs.tag }}|g" release_template.md
-          sed -i "s|\${{CHANGELOG}}|${{ steps.get_commits.outputs.commits }}|g" release_template.md
-          sed -i "s|\${{DATE}}|$(date -u)|g" release_template.md
-
       - name: Upload release template artifact
         uses: actions/upload-artifact@v4
         with:
