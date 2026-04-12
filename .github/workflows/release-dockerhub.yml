@@ -4,6 +4,7 @@ on:
   release:
     types:
       - published
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,7 +14,7 @@ jobs:
     name: Build and Push Docker image
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
+    if: github.event_name == 'release'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,3 +54,37 @@ jobs:
           echo "- Repository: ${{ secrets.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
           echo "- Tag release: ${{ github.event.release.tag_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- Additional tag: latest" >> $GITHUB_STEP_SUMMARY
+
+  docker-build-and-push-dev:
+    name: Build and Push Docker image (dev)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image (dev)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          pull: true
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/seedflix:dev
+          build-args: |
+            IMAGE_TAG=dev
+
+      - name: Publish summary (dev)
+        run: |
+          echo "### Docker image published (dev)" >> $GITHUB_STEP_SUMMARY
+          echo "- Repository: ${{ secrets.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
+          echo "- Tag: dev" >> $GITHUB_STEP_SUMMARY
