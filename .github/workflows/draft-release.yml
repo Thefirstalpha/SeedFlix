@@ -1,0 +1,62 @@
+name: Draft Release with AI Template
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-release-draft:
+    name: Generate Release Draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          git fetch --tags
+          echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+
+      - name: Get commits since last tag
+        id: get_commits
+        run: |
+          COMMITS=$(git log ${{ steps.get_tag.outputs.tag }}..HEAD --pretty=format:'- %s (%an)')
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Prepare release template from file
+        id: template
+        run: |
+          cp .github/release-template.md release_template.md
+          sed -i "s|\${{VERSION}}|${{ github.ref_name }}|g" release_template.md
+          sed -i "s|\${{PREVIOUS_TAG}}|${{ steps.get_tag.outputs.tag }}|g" release_template.md
+          sed -i "s|\${{CHANGELOG}}|${{ steps.get_commits.outputs.commits }}|g" release_template.md
+          sed -i "s|\${{DATE}}|$(date -u)|g" release_template.md
+
+      - name: Upload release template artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-template
+          path: release_template.md
+
+
+      - name: Copilot - Complete Highlights section
+        id: copilot
+        uses: github/copilot-cli-action@v1
+        with:
+          prompt: |
+            Complete this release note in fluent English, summarizing the most important changes for end users.
+            Use the changelog below as context. 
+            Write 2-4 bullet points, clear and concise.
+            
+            ## Changelog
+            ${{ steps.get_commits.outputs.commits }}
+          file: .github/release-template.md
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          body_path: release_template.md
+          draft: true
