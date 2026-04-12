@@ -10,8 +10,12 @@
     "dev:server:debug": "node --watch server/index.js --debug",
     "dev:all": "concurrently \"npm:dev:server\" \"npm:dev\"",
     "dev:all:debug": "concurrently \"npm:dev:server:debug\" \"npm:dev\"",
-    "lint": "eslint --ext .ts,.tsx src/",
-    "lint:fix": "eslint --ext .ts,.tsx src/ --fix"
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:fix": "npm run lint:frontend:fix && npm run lint:backend:fix",
+    "lint:backend": "eslint --config eslint.backend.config.js server/",
+    "lint:backend:fix": "eslint --config eslint.backend.config.js server/ --fix",
+    "lint:frontend": "eslint --config eslint.frontend.config.js src/",
+    "lint:frontend:fix": "eslint --config eslint.frontend.config.js src/ --fix"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

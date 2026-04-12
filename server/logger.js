@@ -1,4 +1,4 @@
-import { isDebugMode } from "./config.js";
+import { isDebugMode } from './config.js';
 
 function nowIso() {
   return new Date().toISOString();

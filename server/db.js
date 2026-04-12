@@ -1,9 +1,9 @@
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import { dataDir } from "./config.js";
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { dataDir } from './config.js';
 
-const databaseFilePath = path.join(dataDir, "seedflix.db");
+const databaseFilePath = path.join(dataDir, 'seedflix.db');
 let db;
 let selectStmt;
 let upsertStmt;
@@ -16,8 +16,8 @@ function getDb() {
 
   mkdirSync(dataDir, { recursive: true });
   db = new DatabaseSync(databaseFilePath);
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA synchronous = NORMAL");
+  db.exec('PRAGMA journal_mode = WAL');
+  db.exec('PRAGMA synchronous = NORMAL');
   db.exec(`
     CREATE TABLE IF NOT EXISTS kv_store (
       namespace TEXT PRIMARY KEY,
@@ -25,7 +25,7 @@ function getDb() {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
-  selectStmt = db.prepare("SELECT value FROM kv_store WHERE namespace = ?");
+  selectStmt = db.prepare('SELECT value FROM kv_store WHERE namespace = ?');
   listNamespacesStmt = db.prepare(`
     SELECT namespace, updated_at
     FROM kv_store
@@ -56,9 +56,9 @@ export function initializeDatabase() {
 
 export function readJsonStore(namespace, fallback) {
   getDb();
-  const row = selectStmt.get(String(namespace || ""));
+  const row = selectStmt.get(String(namespace || ''));
 
-  if (!row || typeof row.value !== "string") {
+  if (!row || typeof row.value !== 'string') {
     writeJsonStore(namespace, fallback);
     return structuredClone(fallback);
   }
@@ -68,65 +68,65 @@ export function readJsonStore(namespace, fallback) {
 
 export function writeJsonStore(namespace, value) {
   getDb();
-  upsertStmt.run(String(namespace || ""), JSON.stringify(value));
+  upsertStmt.run(String(namespace || ''), JSON.stringify(value));
 }
 
 export function listJsonStores() {
   getDb();
   return listNamespacesStmt.all().map((row) => ({
-    namespace: String(row.namespace || ""),
-    updatedAt: String(row.updated_at || ""),
+    namespace: String(row.namespace || ''),
+    updatedAt: String(row.updated_at || ''),
   }));
 }
 
 export function readRawJsonStore(namespace) {
   getDb();
-  const safeNamespace = String(namespace || "");
+  const safeNamespace = String(namespace || '');
   const row = db
-    .prepare("SELECT namespace, value, updated_at FROM kv_store WHERE namespace = ?")
+    .prepare('SELECT namespace, value, updated_at FROM kv_store WHERE namespace = ?')
     .get(safeNamespace);
 
-  if (!row || typeof row.value !== "string") {
+  if (!row || typeof row.value !== 'string') {
     return null;
   }
 
   return {
     namespace: String(row.namespace || safeNamespace),
     value: row.value,
-    updatedAt: String(row.updated_at || ""),
+    updatedAt: String(row.updated_at || ''),
   };
 }
 
 export function writeRawJsonStore(namespace, rawValue) {
-  JSON.parse(String(rawValue || ""));
+  JSON.parse(String(rawValue || ''));
   getDb();
-  upsertStmt.run(String(namespace || ""), String(rawValue || ""));
+  upsertStmt.run(String(namespace || ''), String(rawValue || ''));
   return readRawJsonStore(namespace);
 }
 
 export function runInTransaction(callback) {
   const database = getDb();
-  database.exec("BEGIN IMMEDIATE");
+  database.exec('BEGIN IMMEDIATE');
   try {
     const txApi = {
       readJson(namespace, fallback) {
-        const row = selectStmt.get(String(namespace || ""));
-        if (!row || typeof row.value !== "string") {
+        const row = selectStmt.get(String(namespace || ''));
+        if (!row || typeof row.value !== 'string') {
           return structuredClone(fallback);
         }
         return parseJson(row.value, structuredClone(fallback));
       },
       writeJson(namespace, value) {
-        upsertStmt.run(String(namespace || ""), JSON.stringify(value));
+        upsertStmt.run(String(namespace || ''), JSON.stringify(value));
       },
     };
 
     const result = callback(txApi);
-    database.exec("COMMIT");
+    database.exec('COMMIT');
     return result;
   } catch (error) {
     try {
-      database.exec("ROLLBACK");
+      database.exec('ROLLBACK');
     } catch {
       // Ignore rollback failure and rethrow original error.
     }
