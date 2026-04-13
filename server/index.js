@@ -10,6 +10,7 @@ import {
   registerTransmissionRoutes,
   startCompletedTorrentsPolling,
 } from './modules/transmission.js';
+import { registerIndexerRoutes, startIndexerWishlistPolling } from './modules/indexer.js';
 import { registerTorznabRoutes } from './modules/torznab.js';
 import { registerTmdbRoutes } from './modules/tmdb.js';
 import { registerWishlistRoutes } from './modules/wishlist.js';
@@ -45,6 +46,7 @@ app.get('/api/health', (_req, res) => {
 
 // Démarre le polling de complétion des torrents (notification background)
 startCompletedTorrentsPolling({ intervalMs: 60000 }); // 1 min par défaut
+startIndexerWishlistPolling();
 
 registerAuthRoutes(app);
 registerWishlistRoutes(app);
@@ -52,6 +54,7 @@ registerTransmissionRoutes(app);
 registerTorznabRoutes(app);
 registerTmdbRoutes(app);
 registerNotificationRoutes(app);
+registerIndexerRoutes(app);
 
 app.use(express.static(clientDistDir));
 

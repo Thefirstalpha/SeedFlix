@@ -143,3 +143,30 @@ export function mutateJsonStore(namespace, fallback, mutator) {
     return safeNextValue;
   });
 }
+
+function readJsonStoreTyped(filePath, fallback) {
+  const parsed = readJsonStore(filePath, fallback);
+  if (Array.isArray(fallback)) {
+    return Array.isArray(parsed) ? parsed : fallback;
+  }
+  if (typeof fallback === 'object' && fallback !== null) {
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
+// Fabrique utilitaire pour générer des fonctions read/write typées
+export function createJsonStoreAccessors(filePath, defaultValue) {
+  return {
+    read: async () => readJsonStoreTyped(filePath, defaultValue),
+    write: async (value) => writeJsonStore(filePath, value),
+    mutate: async (mutator, fallback) =>
+      mutateJsonStore(filePath, fallback !== undefined ? fallback : defaultValue, mutator),
+  };
+}
+
+export const usersStore = createJsonStoreAccessors('auth.users', []);
+export const indexerSeenStore = createJsonStoreAccessors('indexer.rss.seen', {});
+export const indexerRejectedStore = createJsonStoreAccessors('indexer.rss.rejected', {});
+export const indexerResultsStore = createJsonStoreAccessors('indexer.rss.results', {});
+export const notificationsStore = createJsonStoreAccessors('notifications.items', {});
