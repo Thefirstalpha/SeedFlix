@@ -15,6 +15,7 @@ import { getTorrentDownloads } from '../services/torrentService';
 import { getWishlistCount } from '../services/wishlistService';
 import { Button } from './ui/button';
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+import { useSearchState } from '../context/SearchStateContext';
 
 type UnreadNotificationsEvent = CustomEvent<{ count: number }>;
 const NOTIFICATIONS_POLL_INTERVAL_MS = 5000;
@@ -120,6 +121,7 @@ export function Root() {
   const hasHydratedUnreadRef = useRef(false);
   const previousUnreadCountRef = useRef(0);
   const [browserDeviceId] = useState(getOrCreateBrowserDeviceId);
+  const { resetSearchState } = useSearchState();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const wishlistTarget = location.pathname === '/wishlist' ? '/' : '/wishlist';
@@ -348,7 +350,7 @@ export function Root() {
         <header className="border-b border-white/10 backdrop-blur-sm bg-black/20 sticky top-0 z-50">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+              <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity" onClick={() => resetSearchState()}>
                 <img src="/favicon.svg" alt="SeedFlix" className="h-11 w-11 rounded-sm" />
                 <h1 className="text-3xl font-black text-white tracking-tighter">SeedFlix</h1>
               </Link>
