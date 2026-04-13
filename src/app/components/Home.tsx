@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
 import { MovieCard } from './MovieCard';
 import { SeriesCard } from './SeriesCard';
@@ -492,7 +492,7 @@ export function Home() {
   useEffect(() => {
     const attachWheelBlocker = (container: HTMLDivElement | null) => {
       if (!container) {
-        return () => {};
+        return () => { };
       }
 
       const onWheel = (event: WheelEvent) => {
@@ -654,17 +654,21 @@ export function Home() {
   return (
     <div className="space-y-8">
       <div className="max-w-5xl mx-auto space-y-4">
-        <div className="relative overflow-hidden rounded-xl">
+        <div className="relative overflow-hidden">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
           <Input
             type="text"
             placeholder={t('home.searchPlaceholder')}
             value={query}
             onChange={(event) => updateSearchState({ query: event.target.value })}
-            className="pl-10 h-12 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+            className="pl-10 pr-10 h-12 bg-white/10 text-white placeholder:text-white/50 rounded-xl border border-white/20 focus-visible:none"
           />
+          {query && (
+              <X type="button" className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 text-red-500 hover:bg-red-700 rounded-full focus:outline-none focus:ring-2 focus:ring-red-400 transition-colors"
+                onClick={() => updateSearchState({ query: '' })} />
+          )}
           <div
-            className={`search-wave-overlay pointer-events-none absolute inset-0 rounded-xl transition-opacity duration-500 ${isSearchBusy ? 'opacity-100' : 'opacity-0'}`}
+            className={`search-wave-overlay pointer-events-none absolute rounded-xl border inset-0 transition-opacity duration-500 ${isSearchBusy ? 'opacity-100' : 'opacity-0'}`}
             aria-hidden="true"
           />
         </div>
