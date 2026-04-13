@@ -15,7 +15,8 @@
     "lint:backend": "eslint --config eslint.backend.config.js server/",
     "lint:backend:fix": "eslint --config eslint.backend.config.js server/ --fix",
     "lint:frontend": "eslint --config eslint.frontend.config.js src/",
-    "lint:frontend:fix": "eslint --config eslint.frontend.config.js src/ --fix"
+    "lint:frontend:fix": "eslint --config eslint.frontend.config.js src/ --fix",
+    "check": "npm run lint && npm run build && node --check server/index.js"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

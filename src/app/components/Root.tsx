@@ -4,10 +4,6 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/LanguageProvider';
-import {
-  getOrCreateBrowserDeviceId,
-  parseBrowserDevices,
-} from '../services/browserNotificationChannel';
 import * as notificationService from '../services/notificationService';
 import type { Notification } from '../services/notificationService';
 import { getSeriesWishlistCount } from '../services/seriesWishlistService';
@@ -37,63 +33,6 @@ function showNotificationToast(type: Notification['type'], title: string, descri
   }
 }
 
-function canUseBrowserNotificationChannel(
-  notificationsSettings: unknown,
-  browserDeviceId: string,
-): boolean {
-  const settings =
-    notificationsSettings && typeof notificationsSettings === 'object'
-      ? (notificationsSettings as Record<string, unknown>)
-      : {};
-  const enabledChannels = Array.isArray(settings.enabledChannels)
-    ? (settings.enabledChannels as string[])
-    : [];
-
-  if (!enabledChannels.includes('browser')) {
-    return false;
-  }
-
-  const browser = settings.browser;
-  const browserDevices =
-    browser && typeof browser === 'object'
-      ? parseBrowserDevices((browser as Record<string, unknown>).devices)
-      : [];
-
-  return browserDevices.some((device) => device.id === browserDeviceId);
-}
-
-async function showBrowserNotification(title: string, message: string) {
-  if (typeof window === 'undefined' || typeof Notification === 'undefined') {
-    return;
-  }
-
-  if (Notification.permission !== 'granted') {
-    return;
-  }
-
-  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    try {
-      const registration = await navigator.serviceWorker.getRegistration();
-      if (registration?.showNotification) {
-        await registration.showNotification(title, {
-          body: message,
-          icon: '/favicon.svg',
-          badge: '/favicon-96x96.png',
-          tag: 'seedflix-notification',
-        });
-        return;
-      }
-    } catch {
-      // Fallback to Notification API below.
-    }
-  }
-
-  new Notification(title, {
-    body: message,
-    icon: '/favicon.svg',
-  });
-}
-
 function maskEpisodeLabel(value: string) {
   return String(value || '').replace(/(S\d{1,2}E\d{1,2})(?:\s*[-–]\s*[^:\n]+)?/i, '$1');
 }
@@ -120,7 +59,6 @@ export function Root() {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const hasHydratedUnreadRef = useRef(false);
   const previousUnreadCountRef = useRef(0);
-  const [browserDeviceId] = useState(getOrCreateBrowserDeviceId);
   const { resetSearchState } = useSearchState();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
@@ -235,15 +173,6 @@ export function Root() {
                 : safeLatestMessage;
 
             showNotificationToast(latestUnread.type, toastTitle, toastDescription);
-
-            if (
-              canUseBrowserNotificationChannel(
-                settings?.placeholders?.notifications,
-                browserDeviceId,
-              )
-            ) {
-              void showBrowserNotification(latestUnread.title, safeLatestMessage);
-            }
           } else {
             toast.info(
               delta > 1 ? t('root.toasts.manyNew', { count: delta }) : t('root.toasts.oneNew'),
@@ -287,7 +216,6 @@ export function Root() {
     hasPendingSetup,
     location.pathname,
     settings,
-    browserDeviceId,
     spoilerModeEnabled,
   ]);
 

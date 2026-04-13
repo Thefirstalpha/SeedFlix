@@ -51,12 +51,6 @@ import {
   resetUserPassword,
   type User,
 } from '../services/authService';
-import {
-  getDefaultBrowserDeviceName,
-  getOrCreateBrowserDeviceId,
-  parseBrowserDevices,
-  type BrowserNotificationDevice,
-} from '../services/browserNotificationChannel';
 import * as notificationService from '../services/notificationService';
 import { UserList } from './UserList';
 
@@ -170,12 +164,6 @@ export function Settings() {
   const [discordMessage, setDiscordMessage] = useState<string | null>(null);
   const [discordError, setDiscordError] = useState<string | null>(null);
   const [isDiscordSaving, setIsDiscordSaving] = useState(false);
-  const [browserDevices, setBrowserDevices] = useState<BrowserNotificationDevice[]>([]);
-  const [browserDeviceName, setBrowserDeviceName] = useState(getDefaultBrowserDeviceName);
-  const [browserMessage, setBrowserMessage] = useState<string | null>(null);
-  const [browserError, setBrowserError] = useState<string | null>(null);
-  const [isBrowserSaving, setIsBrowserSaving] = useState(false);
-  const [browserDeviceId] = useState(getOrCreateBrowserDeviceId);
   const [languageCode, setLanguageCode] = useState<SupportedLanguage>('fr');
   const [spoilerMode, setSpoilerMode] = useState(false);
   const [preferencesMessage, setPreferencesMessage] = useState<string | null>(null);
@@ -252,7 +240,6 @@ export function Settings() {
       (notifSettings as any).enabledChannels?.includes('discord') &&
       Boolean((notifSettings as any).discord?.webhookUrl),
     );
-    setBrowserDevices(parseBrowserDevices((notifSettings as any).browser?.devices));
     setLanguageCode(
       parseSupportedLanguage((incomingSettings.placeholders?.preferences as any)?.language),
     );
@@ -261,7 +248,6 @@ export function Settings() {
 
   const buildNotificationSettingsPayload = (params: {
     discordWebhookUrl?: string;
-    browserDevices?: BrowserNotificationDevice[];
     includeDiscord?: boolean;
     includeBrowser?: boolean;
   }) => {
@@ -272,8 +258,6 @@ export function Settings() {
 
     const nextDiscordWebhookUrl =
       params.discordWebhookUrl ?? String((current as any).discord?.webhookUrl || '');
-    const nextBrowserDevices =
-      params.browserDevices ?? parseBrowserDevices((current as any).browser?.devices);
 
     const nextChannels = new Set(currentChannels);
 
@@ -286,23 +270,11 @@ export function Settings() {
       nextChannels.delete('discord');
     }
 
-    if (
-      params.includeBrowser === true ||
-      (params.includeBrowser !== false && nextBrowserDevices.length > 0)
-    ) {
-      nextChannels.add('browser');
-    } else {
-      nextChannels.delete('browser');
-    }
-
     return {
       ...(current || {}),
       enabledChannels: Array.from(nextChannels),
       discord: {
         webhookUrl: nextDiscordWebhookUrl,
-      },
-      browser: {
-        devices: nextBrowserDevices,
       },
     };
   };
@@ -646,7 +618,6 @@ export function Settings() {
       // Save configuration
       const notificationsPayload = buildNotificationSettingsPayload({
         discordWebhookUrl,
-        browserDevices,
         includeDiscord: true,
       });
       const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
@@ -664,93 +635,6 @@ export function Settings() {
       );
     } finally {
       setIsDiscordSaving(false);
-    }
-  };
-
-  const handleAddBrowserChannel = async () => {
-    setBrowserError(null);
-    setBrowserMessage(null);
-    setIsBrowserSaving(true);
-
-    try {
-      if (typeof window === 'undefined' || !('Notification' in window)) {
-        setBrowserError(t('settings.messages.browserUnsupported'));
-        setIsBrowserSaving(false);
-        return;
-      }
-
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        setBrowserError(t('settings.messages.browserPermissionDenied'));
-        setIsBrowserSaving(false);
-        return;
-      }
-
-      const nextName = browserDeviceName.trim() || getDefaultBrowserDeviceName();
-      const existingIndex = browserDevices.findIndex((device) => device.id === browserDeviceId);
-      const nextDevices = [...browserDevices];
-
-      if (existingIndex >= 0) {
-        nextDevices[existingIndex] = {
-          ...nextDevices[existingIndex],
-          name: nextName,
-        };
-      } else {
-        nextDevices.push({
-          id: browserDeviceId,
-          name: nextName,
-          createdAt: new Date().toISOString(),
-        });
-      }
-
-      const notificationsPayload = buildNotificationSettingsPayload({
-        browserDevices: nextDevices,
-        includeBrowser: true,
-      });
-      const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
-
-      const savedSettings = await updateSettings(updatedSettings);
-      applyUpdatedSettings(savedSettings);
-      await refresh();
-      setBrowserDevices(nextDevices);
-      setBrowserMessage(t('settings.messages.browserSaved'));
-    } catch (submitError) {
-      setBrowserError(
-        submitError instanceof Error
-          ? submitError.message
-          : t('settings.messages.browserConfigFailed'),
-      );
-    } finally {
-      setIsBrowserSaving(false);
-    }
-  };
-
-  const handleRemoveBrowserDevice = async (deviceId: string) => {
-    setBrowserError(null);
-    setBrowserMessage(null);
-    setIsBrowserSaving(true);
-
-    try {
-      const nextDevices = browserDevices.filter((device) => device.id !== deviceId);
-      const notificationsPayload = buildNotificationSettingsPayload({
-        browserDevices: nextDevices,
-        includeBrowser: nextDevices.length > 0,
-      });
-      const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
-
-      const savedSettings = await updateSettings(updatedSettings);
-      applyUpdatedSettings(savedSettings);
-      await refresh();
-      setBrowserDevices(nextDevices);
-      setBrowserMessage(t('settings.messages.browserRemoved'));
-    } catch (submitError) {
-      setBrowserError(
-        submitError instanceof Error
-          ? submitError.message
-          : t('settings.messages.browserRemoveFailed'),
-      );
-    } finally {
-      setIsBrowserSaving(false);
     }
   };
 
@@ -1516,90 +1400,6 @@ export function Settings() {
                         </Button>
                       </div>
                     </div>
-                  )}
-                </div>
-
-                <div className="space-y-4 p-4 bg-slate-800/50 rounded-md border border-purple-500/20">
-                  <div>
-                    <h4 className="font-medium text-white">
-                      {t('settings.notifications.browser.title')}
-                    </h4>
-                    <p className="text-sm text-purple-200/70">
-                      {t('settings.notifications.browser.description')}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input
-                      value={browserDeviceName}
-                      onChange={(e) => setBrowserDeviceName(e.target.value)}
-                      placeholder={t('settings.notifications.browser.devicePlaceholder')}
-                      disabled={browserDevices.some((device) => device.id === browserDeviceId)}
-                      className="bg-slate-900 border-white/10 text-white disabled:opacity-60 disabled:cursor-not-allowed"
-                    />
-                    <Button
-                      type="button"
-                      onClick={handleAddBrowserChannel}
-                      disabled={
-                        isBrowserSaving ||
-                        browserDevices.some((device) => device.id === browserDeviceId)
-                      }
-                      className={`${browserDevices.some((device) => device.id === browserDeviceId)
-                        ? 'bg-emerald-600 hover:bg-emerald-600 text-white'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
-                        }`}
-                    >
-                      {isBrowserSaving
-                        ? t('common.saving')
-                        : browserDevices.some((device) => device.id === browserDeviceId)
-                          ? t('settings.notifications.discord.enabled')
-                          : t('settings.notifications.browser.add')}
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {browserDevices.length === 0 ? (
-                      <p className="text-sm text-white/60">
-                        {t('settings.notifications.browser.none')}
-                      </p>
-                    ) : (
-                      browserDevices.map((device) => (
-                        <div
-                          key={device.id}
-                          className="flex items-center justify-between gap-3 rounded border border-white/10 bg-slate-900/50 px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm text-white">{device.name}</p>
-                            <p className="text-xs text-white/50">
-                              {device.id === browserDeviceId
-                                ? t('settings.notifications.browser.current')
-                                : t('settings.notifications.browser.registered')}
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => void handleRemoveBrowserDevice(device.id)}
-                            disabled={isBrowserSaving}
-                            className="text-red-300 hover:text-red-200 hover:bg-red-500/15"
-                          >
-                            {t('common.remove')}
-                          </Button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {browserMessage && (
-                    <p className="text-sm text-blue-300 p-2 bg-blue-900/20 rounded">
-                      ✓ {browserMessage}
-                    </p>
-                  )}
-
-                  {browserError && (
-                    <p className="text-sm text-red-300 p-2 bg-red-900/30 rounded">
-                      ✗ {browserError}
-                    </p>
                   )}
                 </div>
 

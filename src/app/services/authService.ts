@@ -7,7 +7,7 @@ export interface AuthUser {
 
 export interface AuthResponse {
   authenticated?: boolean;
-  user?: AuthUser;
+  user?: AuthUser | null;
   settings?: UserSettings;
   mustChangePassword: boolean;
   mustConfigureTmdb: boolean;
@@ -106,6 +106,7 @@ export async function getCurrentAuth(): Promise<AuthResponse> {
     return await parseJson<AuthResponse>(response);
   } catch {
     return {
+      user: null,
       authenticated: false,
       mustChangePassword: false,
       mustConfigureTmdb: false,
@@ -113,6 +114,7 @@ export async function getCurrentAuth(): Promise<AuthResponse> {
       mustConfigureIndexer: false,
       legalAccepted: false,
       needsInitialSetup: false,
+      shouldChangePassword: false,
     };
   }
 }

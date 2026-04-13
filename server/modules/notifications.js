@@ -737,27 +737,6 @@ async function pollIndexerForWishlist() {
 
         const primaryMatch = actionableItems[0].item;
         const primaryIndexerStateKey = actionableItems[0].indexerStateKey;
-        const releasesPreview = actionableItems
-          .slice(0, 6)
-          .map(({ item }) => String(item.title || '').trim())
-          .filter(Boolean);
-
-        const details = {};
-        if (primaryMatch.quality) {
-          details.Qualite = primaryMatch.quality;
-        }
-        if (primaryMatch.language) {
-          details.Langue = primaryMatch.language;
-        }
-        if (primaryMatch.sizeHuman) {
-          details.Taille = primaryMatch.sizeHuman;
-        }
-        if (Number.isFinite(primaryMatch.seeders || NaN)) {
-          details.Seeders = primaryMatch.seeders;
-        }
-        if (actionableItems.length > 1) {
-          details.Resultats = actionableItems.length;
-        }
 
         const translator = getTranslator(undefined, user);
 
@@ -781,19 +760,6 @@ async function pollIndexerForWishlist() {
             mediaId: target.id,
             targetKey: target.key,
             indexerStateKey: primaryIndexerStateKey,
-            indexerItem: {
-              title: primaryMatch.title,
-              downloadUrl: primaryMatch.downloadUrl || primaryMatch.link || '',
-              pubDate: primaryMatch.pubDate || null,
-            },
-            indexerItems: actionableItems.map(({ item, indexerStateKey }) => ({
-              title: item.title,
-              downloadUrl: item.downloadUrl || item.link || '',
-              pubDate: item.pubDate || null,
-              indexerStateKey,
-            })),
-            indexerItemsPreview: releasesPreview,
-            details,
           },
         });
 
