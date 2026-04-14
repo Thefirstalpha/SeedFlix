@@ -711,28 +711,6 @@ function updateIndexerResultBucket({
   return { ok: true };
 }
 
-// Validation d'un résultat indexer (retire du bucket sans rejet)
-export async function validateIndexerResultItem(userId, targetKey, indexerStateKey) {
-  const normalizedTargetKey = String(targetKey || '').trim();
-  const normalizedStateKey = String(indexerStateKey || '').trim();
-  if (!normalizedTargetKey || !normalizedStateKey) {
-    return { ok: false, reason: 'invalid-input' };
-  }
-  const normalizedUserKey = String(userId || '').trim();
-  return runInTransaction(async () => {
-    const allResults = await indexerResultsStore.read();
-    const rejected = await indexerRejectedStore.read();
-    return updateIndexerResultBucket({
-      allResults,
-      rejected,
-      normalizedUserKey,
-      normalizedTargetKey,
-      stateKeysToRemove: [normalizedStateKey],
-      mode: 'validate',
-    });
-  });
-}
-
 async function mutateIndexerResultItem(userId, targetKey, indexerStateKey, mode) {
   const normalizedTargetKey = String(targetKey || '').trim();
   const normalizedStateKey = String(indexerStateKey || '').trim();
@@ -825,10 +803,11 @@ const rejectIndexerResultHandler = withAuth(async (req, res, auth) => {
 
 const validateIndexerResultHandler = withAuth(async (req, res, auth) => {
   try {
-    const result = await validateIndexerResultItem(
+    const result = await mutateIndexerResultItem(
       String(auth.user?.id),
       req.body?.targetKey,
       req.body?.indexerStateKey,
+      'validate',
     );
     if (!result.ok) {
       return res.status(404).json({ error: 'Indexer result not found' });
