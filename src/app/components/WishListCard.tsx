@@ -65,6 +65,7 @@ export function WishListCard({
         id={`wishlist-target-${encodeURIComponent(target.targetKey)}`}
         className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-3"
         onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
+        onKeyDown={(e) => e.preventDefault()}
       >
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <p className="text-white font-medium">{getSpoilerSafeIndexerLabel(target)}</p>
