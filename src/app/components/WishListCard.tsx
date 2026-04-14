@@ -25,32 +25,39 @@ interface WishListCardProps {
   children?: ReactNode; // Pour injecter saisons, épisodes, tracker, etc.
 }
 
-
-
-
-
-
-const renderIndexerTarget = (target: IndexerResultTarget, stopPropagation = false, actionKey: string | null, onRejectIndexerResult: (target: IndexerResultTarget, indexerStateKey: string) => void, onRejectAllIndexerResults: (target: IndexerResultTarget) => void, onAddTorrent: (target: IndexerResultTarget, torrentUrl: string, indexerStateKey: string) => void) => {
-  const { t } = useI18n();
-    if (!target.items.length) {
-      return null;
-    }
+export function WishListCard({
+  poster,
+  title,
+  year,
+  rating,
+  genre,
+  type,
+  targets,
+  actionKey,
+  onRejectIndexerResult,
+  onRejectAllIndexerResults,
+  onAddTorrent,
+  children,
+}: WishListCardProps) {
   const { settings } = useAuth();
+  const { t } = useI18n();
   const spoilerModeEnabled = Boolean(
     (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode,
   );
+  const renderIndexerTarget = (target: IndexerResultTarget, stopPropagation = false, actionKey: string | null, onRejectIndexerResult: (target: IndexerResultTarget, indexerStateKey: string) => void, onRejectAllIndexerResults: (target: IndexerResultTarget) => void, onAddTorrent: (target: IndexerResultTarget, torrentUrl: string, indexerStateKey: string) => void) => {
 
-  
-    
-  
-  const getSpoilerSafeIndexerLabel = (target: IndexerResultTarget) => {
-    if (!spoilerModeEnabled || target.targetType !== 'episode') {
-      return target.label || target.title;
+    if (!target.items.length) {
+      return null;
     }
 
-    const episodeCode = getEpisodeCode(target.targetKey);
-    return episodeCode ? `${target.title} - ${episodeCode}` : target.title;
-  };
+    const getSpoilerSafeIndexerLabel = (target: IndexerResultTarget) => {
+      if (!spoilerModeEnabled || target.targetType !== 'episode') {
+        return target.label || target.title;
+      }
+
+      const episodeCode = getEpisodeCode(target.targetKey);
+      return episodeCode ? `${target.title} - ${episodeCode}` : target.title;
+    };
 
     return (
       <div
@@ -156,23 +163,6 @@ const renderIndexerTarget = (target: IndexerResultTarget, stopPropagation = fals
     );
   };
 
-export function WishListCard({
-  poster,
-  title,
-  year,
-  rating,
-  genre,
-  type,
-  targets,
-  actionKey,
-  onRejectIndexerResult,
-  onRejectAllIndexerResults,
-  onAddTorrent,
-  children,
-}: WishListCardProps) {
-
-
-
   return (
     <Card className="border-white/10 bg-white/5 transition-all">
       <CardContent className="p-4 space-y-4">
@@ -207,7 +197,7 @@ export function WishListCard({
           </div>
         </div>
         {children}
-        
+
         {targets.length > 0 ? (
           <div
             className="space-y-3"
