@@ -1,4 +1,4 @@
-import { Download, Heart, Trash2, Tv, X } from 'lucide-react';
+import { Heart, Trash2, Tv, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Badge } from './ui/badge';
@@ -24,11 +24,30 @@ import { getWishlist, removeMultipleFromWishlist } from '../services/wishlistSer
 import type { Movie } from '../types/movie';
 import type { SeriesWishlistEntry } from '../types/seriesWishlist';
 
+
+
+
+export const getEpisodeCode = (
+    targetKey: string,
+    fallbackSeason?: number | null,
+    fallbackEpisode?: number | null,
+  ) => {
+    const match = String(targetKey || '').match(/^episode:\d+:(\d+):(\d+)$/i);
+    const season = match?.[1] ? Number(match[1]) : Number(fallbackSeason || 0);
+    const episode = match?.[2] ? Number(match[2]) : Number(fallbackEpisode || 0);
+    if (!Number.isFinite(season) || !Number.isFinite(episode) || season <= 0 || episode <= 0) {
+      return '';
+    }
+    return `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
+  };
+
+
 export function WishList() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t } = useI18n();
   const { settings } = useAuth();
+  const [actionKey, setActionKey] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('movies');
 
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -40,7 +59,6 @@ export function WishList() {
   const [isSeriesSelectionMode, setIsSeriesSelectionMode] = useState(false);
   const [indexerTargets, setIndexerTargets] = useState<IndexerResultTarget[]>([]);
   const [indexerError, setIndexerError] = useState<string | null>(null);
-  const [actionKey, setActionKey] = useState<string | null>(null);
 
   useEffect(() => {
     loadWishlist();
@@ -162,63 +180,6 @@ export function WishList() {
     }
   };
 
-  const handleRejectIndexerResult = async (targetKey: string, indexerStateKey: string) => {
-    const key = `${targetKey}:${indexerStateKey}:reject`;
-    setActionKey(key);
-    try {
-      await rejectIndexerResult(targetKey, indexerStateKey);
-      await loadIndexerResults();
-    } finally {
-      setActionKey(null);
-    }
-  };
-
-  const handleRejectAllIndexerResults = async (target: IndexerResultTarget) => {
-    if (!target.items.length) {
-      return;
-    }
-
-    const key = `${target.targetKey}:reject-all`;
-    setActionKey(key);
-    try {
-      await rejectAllIndexerResults(
-        target.targetKey,
-        target.items.map((item) => item.indexerStateKey),
-      );
-      await loadIndexerResults();
-    } finally {
-      setActionKey(null);
-    }
-  };
-
-  const handleAddTorrentFromWishlist = async (
-    target: IndexerResultTarget,
-    torrentUrl: string,
-    indexerStateKey: string,
-  ) => {
-    const key = `${target.targetKey}:${indexerStateKey}:add`;
-    setActionKey(key);
-    try {
-      const mediaType = target.targetType === 'movie' ? 'movie' : 'series';
-      await addTorrentToClient(torrentUrl, mediaType, target.targetKey);
-
-      // Validate indexer result (best effort)
-      try {
-        await validateIndexerResult(target.targetKey, indexerStateKey);
-      } catch {
-        // Silent fail - indexer validation is optional
-      }
-
-      // Reload data (best effort - continue even if one fails)
-      await Promise.allSettled([loadIndexerResults(), loadWishlist(), loadSeriesWishlist()]);
-    } catch (error) {
-      console.error('Error adding torrent from wishlist:', error);
-      // Data stays visible even if error occurs
-    } finally {
-      setActionKey(null);
-    }
-  };
-
   const cancelSeriesSelection = () => {
     setSelectedEntryIds([]);
     setIsSeriesSelectionMode(false);
@@ -325,137 +286,64 @@ export function WishList() {
     (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode,
   );
 
-  const getEpisodeCode = (
-    targetKey: string,
-    fallbackSeason?: number | null,
-    fallbackEpisode?: number | null,
-  ) => {
-    const match = String(targetKey || '').match(/^episode:\d+:(\d+):(\d+)$/i);
-    const season = match?.[1] ? Number(match[1]) : Number(fallbackSeason || 0);
-    const episode = match?.[2] ? Number(match[2]) : Number(fallbackEpisode || 0);
-    if (!Number.isFinite(season) || !Number.isFinite(episode) || season <= 0 || episode <= 0) {
-      return '';
+  const handleRejectIndexerResult = async (target: IndexerResultTarget, indexerStateKey: string) => {
+    const key = `${target.targetKey}:${indexerStateKey}:reject`;
+    setActionKey(key);
+    try {
+      await rejectIndexerResult(target.targetKey, indexerStateKey);
+      await loadIndexerResults();
+    } finally {
+      setActionKey(null);
     }
-    return `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
   };
 
-  const getSpoilerSafeIndexerLabel = (target: IndexerResultTarget) => {
-    if (!spoilerModeEnabled || target.targetType !== 'episode') {
-      return target.label || target.title;
-    }
 
-    const episodeCode = getEpisodeCode(target.targetKey);
-    return episodeCode ? `${target.title} - ${episodeCode}` : target.title;
-  };
-
-  const renderIndexerTarget = (target: IndexerResultTarget, stopPropagation = false) => {
+  const handleRejectAllIndexerResults = async (target: IndexerResultTarget) => {
     if (!target.items.length) {
-      return null;
+      return;
     }
 
-    return (
-      <div
-        key={target.targetKey}
-        id={`wishlist-target-${encodeURIComponent(target.targetKey)}`}
-        className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-3"
-        onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
-      >
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <p className="text-white font-medium">{getSpoilerSafeIndexerLabel(target)}</p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="border-white/20 text-white/70">
-              {target.items.length}
-            </Badge>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={(event) => {
-                if (stopPropagation) {
-                  event.stopPropagation();
-                }
-                handleRejectAllIndexerResults(target);
-              }}
-              disabled={actionKey === `${target.targetKey}:reject-all`}
-              className="border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 hover:text-red-100"
-            >
-              {actionKey === `${target.targetKey}:reject-all`
-                ? t('wishlistPage.indexerResults.actions.rejectingAll')
-                : t('wishlistPage.indexerResults.actions.rejectAll')}
-            </Button>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {target.items.map((item) => {
-            const torrentUrl = item.downloadUrl || item.link;
-            const addKey = `${target.targetKey}:${item.indexerStateKey}:add`;
-            const rejectKey = `${target.targetKey}:${item.indexerStateKey}:reject`;
-
-            return (
-              <div
-                key={item.indexerStateKey}
-                className="rounded border border-white/10 bg-slate-900/60 p-3 space-y-2"
-              >
-                <p className="text-sm text-white font-medium break-all">{item.title}</p>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    onClick={(event) => {
-                      if (stopPropagation) {
-                        event.stopPropagation();
-                      }
-                      handleAddTorrentFromWishlist(target, torrentUrl, item.indexerStateKey);
-                    }}
-                    disabled={actionKey === addKey}
-                    className="bg-cyan-600 hover:bg-cyan-700 text-white"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    {actionKey === addKey
-                      ? t('wishlistPage.indexerResults.actions.adding')
-                      : t('wishlistPage.indexerResults.actions.add')}
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={(event) => {
-                      if (stopPropagation) {
-                        event.stopPropagation();
-                      }
-                      handleRejectIndexerResult(target.targetKey, item.indexerStateKey);
-                    }}
-                    disabled={actionKey === rejectKey}
-                    className="border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 hover:text-red-100"
-                  >
-                    {t('wishlistPage.indexerResults.actions.reject')}
-                  </Button>
-
-                  {item.quality ? (
-                    <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
-                      {item.quality}
-                    </Badge>
-                  ) : null}
-
-                  {item.language ? (
-                    <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
-                      {item.language}
-                    </Badge>
-                  ) : null}
-
-                  {item.sizeHuman ? (
-                    <Badge variant="outline" className="border-white/30 text-white/80">
-                      {item.sizeHuman}
-                    </Badge>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
+    const key = `${target.targetKey}:reject-all`;
+    setActionKey(key);
+    try {
+      await rejectAllIndexerResults(
+        target.targetKey,
+        target.items.map((item) => item.indexerStateKey),
+      );
+      await loadIndexerResults();
+    } finally {
+      setActionKey(null);
+    }
   };
+  const handleAddTorrentFromWishlist = async (
+    target: IndexerResultTarget,
+    torrentUrl: string,
+    indexerStateKey: string,
+  ) => {
+    const key = `${target.targetKey}:${indexerStateKey}:add`;
+    setActionKey(key);
+    try {
+      const mediaType = target.targetType === 'movie' ? 'movie' : 'series';
+      await addTorrentToClient(torrentUrl, mediaType, target.targetKey);
+
+      // Validate indexer result (best effort)
+      try {
+        await validateIndexerResult(target.targetKey, indexerStateKey);
+      } catch {
+        // Silent fail - indexer validation is optional
+      }
+
+      // Reload data (best effort - continue even if one fails)
+      await Promise.allSettled([loadIndexerResults(), loadWishlist(), loadSeriesWishlist()]);
+    } catch (error) {
+      console.error('Error adding torrent from wishlist:', error);
+      // Data stays visible even if error occurs
+    } finally {
+      setActionKey(null);
+    }
+  };
+
+  
 
   return (
     <div className="space-y-8">
@@ -567,7 +455,12 @@ export function WishList() {
                       year={movie.year}
                       rating={movie.rating}
                       genre={movie.genre}
+                      targets={movieIndexerTarget ? [movieIndexerTarget] : []}
                       type="movie"
+                      actionKey={actionKey}
+                      onRejectIndexerResult={handleRejectIndexerResult}
+                      onRejectAllIndexerResults={handleRejectAllIndexerResults}
+                      onAddTorrent={handleAddTorrentFromWishlist}
                     >
                       {isSelectionMode && (
                         <div
@@ -587,7 +480,6 @@ export function WishList() {
                           />
                         </div>
                       )}
-                      {movieIndexerTarget ? renderIndexerTarget(movieIndexerTarget) : null}
                     </WishListCard>
                   </div>
                 );
@@ -705,7 +597,12 @@ export function WishList() {
                       year={group.seriesEntry?.year || 0}
                       rating={group.seriesEntry?.rating || 0}
                       genre={group.seriesEntry?.genre || ''}
+                      targets={groupIndexerTargets}
                       type="series"
+                      actionKey={actionKey}
+                      onRejectIndexerResult={handleRejectIndexerResult}
+                      onRejectAllIndexerResults={handleRejectAllIndexerResults}
+                      onAddTorrent={handleAddTorrentFromWishlist}
                     >
                       {isSeriesSelectionMode && (
                         <div
@@ -841,21 +738,6 @@ export function WishList() {
                             </div>
                           </div>
                         )}
-                        {groupIndexerTargets.length > 0 ? (
-                          <div
-                            className="space-y-3"
-                            onClick={(event) => event.stopPropagation()}
-                            tabIndex={0}
-                            role="presentation"
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.stopPropagation();
-                              }
-                            }}
-                          >
-                            {groupIndexerTargets.map((target) => renderIndexerTarget(target, true))}
-                          </div>
-                        ) : null}
                       </div>
                     </WishListCard>
                   </div>
