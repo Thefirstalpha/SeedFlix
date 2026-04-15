@@ -4,10 +4,6 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/LanguageProvider';
-import {
-  getOrCreateBrowserDeviceId,
-  parseBrowserDevices,
-} from '../services/browserNotificationChannel';
 import * as notificationService from '../services/notificationService';
 import type { Notification } from '../services/notificationService';
 import { getSeriesWishlistCount } from '../services/seriesWishlistService';
@@ -15,6 +11,7 @@ import { getTorrentDownloads } from '../services/torrentService';
 import { getWishlistCount } from '../services/wishlistService';
 import { Button } from './ui/button';
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+import { useSearchState } from '../context/SearchStateContext';
 
 type UnreadNotificationsEvent = CustomEvent<{ count: number }>;
 const NOTIFICATIONS_POLL_INTERVAL_MS = 5000;
@@ -34,63 +31,6 @@ function showNotificationToast(type: Notification['type'], title: string, descri
       toast.info(title, { description });
       break;
   }
-}
-
-function canUseBrowserNotificationChannel(
-  notificationsSettings: unknown,
-  browserDeviceId: string,
-): boolean {
-  const settings =
-    notificationsSettings && typeof notificationsSettings === 'object'
-      ? (notificationsSettings as Record<string, unknown>)
-      : {};
-  const enabledChannels = Array.isArray(settings.enabledChannels)
-    ? (settings.enabledChannels as string[])
-    : [];
-
-  if (!enabledChannels.includes('browser')) {
-    return false;
-  }
-
-  const browser = settings.browser;
-  const browserDevices =
-    browser && typeof browser === 'object'
-      ? parseBrowserDevices((browser as Record<string, unknown>).devices)
-      : [];
-
-  return browserDevices.some((device) => device.id === browserDeviceId);
-}
-
-async function showBrowserNotification(title: string, message: string) {
-  if (typeof window === 'undefined' || typeof Notification === 'undefined') {
-    return;
-  }
-
-  if (Notification.permission !== 'granted') {
-    return;
-  }
-
-  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    try {
-      const registration = await navigator.serviceWorker.getRegistration();
-      if (registration?.showNotification) {
-        await registration.showNotification(title, {
-          body: message,
-          icon: '/favicon.svg',
-          badge: '/favicon-96x96.png',
-          tag: 'seedflix-notification',
-        });
-        return;
-      }
-    } catch {
-      // Fallback to Notification API below.
-    }
-  }
-
-  new Notification(title, {
-    body: message,
-    icon: '/favicon.svg',
-  });
 }
 
 function maskEpisodeLabel(value: string) {
@@ -119,7 +59,7 @@ export function Root() {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const hasHydratedUnreadRef = useRef(false);
   const previousUnreadCountRef = useRef(0);
-  const [browserDeviceId] = useState(getOrCreateBrowserDeviceId);
+  const { resetSearchState } = useSearchState();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const wishlistTarget = location.pathname === '/wishlist' ? '/' : '/wishlist';
@@ -233,15 +173,6 @@ export function Root() {
                 : safeLatestMessage;
 
             showNotificationToast(latestUnread.type, toastTitle, toastDescription);
-
-            if (
-              canUseBrowserNotificationChannel(
-                settings?.placeholders?.notifications,
-                browserDeviceId,
-              )
-            ) {
-              void showBrowserNotification(latestUnread.title, safeLatestMessage);
-            }
           } else {
             toast.info(
               delta > 1 ? t('root.toasts.manyNew', { count: delta }) : t('root.toasts.oneNew'),
@@ -285,7 +216,6 @@ export function Root() {
     hasPendingSetup,
     location.pathname,
     settings,
-    browserDeviceId,
     spoilerModeEnabled,
   ]);
 
@@ -348,7 +278,7 @@ export function Root() {
         <header className="border-b border-white/10 backdrop-blur-sm bg-black/20 sticky top-0 z-50">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+              <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity" onClick={() => resetSearchState()}>
                 <img src="/favicon.svg" alt="SeedFlix" className="h-11 w-11 rounded-sm" />
                 <h1 className="text-3xl font-black text-white tracking-tighter">SeedFlix</h1>
               </Link>

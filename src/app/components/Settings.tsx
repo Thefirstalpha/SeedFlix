@@ -51,13 +51,8 @@ import {
   resetUserPassword,
   type User,
 } from '../services/authService';
-import {
-  getDefaultBrowserDeviceName,
-  getOrCreateBrowserDeviceId,
-  parseBrowserDevices,
-  type BrowserNotificationDevice,
-} from '../services/browserNotificationChannel';
 import * as notificationService from '../services/notificationService';
+import { UserList } from './UserList';
 
 // Fonction utilitaire générique pour la gestion des sauvegardes asynchrones
 async function handleAsyncSave<T = any>({
@@ -169,12 +164,6 @@ export function Settings() {
   const [discordMessage, setDiscordMessage] = useState<string | null>(null);
   const [discordError, setDiscordError] = useState<string | null>(null);
   const [isDiscordSaving, setIsDiscordSaving] = useState(false);
-  const [browserDevices, setBrowserDevices] = useState<BrowserNotificationDevice[]>([]);
-  const [browserDeviceName, setBrowserDeviceName] = useState(getDefaultBrowserDeviceName);
-  const [browserMessage, setBrowserMessage] = useState<string | null>(null);
-  const [browserError, setBrowserError] = useState<string | null>(null);
-  const [isBrowserSaving, setIsBrowserSaving] = useState(false);
-  const [browserDeviceId] = useState(getOrCreateBrowserDeviceId);
   const [languageCode, setLanguageCode] = useState<SupportedLanguage>('fr');
   const [spoilerMode, setSpoilerMode] = useState(false);
   const [preferencesMessage, setPreferencesMessage] = useState<string | null>(null);
@@ -249,9 +238,8 @@ export function Settings() {
     setDiscordWebhookUrl((notifSettings as any).discord?.webhookUrl || '');
     setDiscordTested(
       (notifSettings as any).enabledChannels?.includes('discord') &&
-        Boolean((notifSettings as any).discord?.webhookUrl),
+      Boolean((notifSettings as any).discord?.webhookUrl),
     );
-    setBrowserDevices(parseBrowserDevices((notifSettings as any).browser?.devices));
     setLanguageCode(
       parseSupportedLanguage((incomingSettings.placeholders?.preferences as any)?.language),
     );
@@ -260,7 +248,6 @@ export function Settings() {
 
   const buildNotificationSettingsPayload = (params: {
     discordWebhookUrl?: string;
-    browserDevices?: BrowserNotificationDevice[];
     includeDiscord?: boolean;
     includeBrowser?: boolean;
   }) => {
@@ -271,8 +258,6 @@ export function Settings() {
 
     const nextDiscordWebhookUrl =
       params.discordWebhookUrl ?? String((current as any).discord?.webhookUrl || '');
-    const nextBrowserDevices =
-      params.browserDevices ?? parseBrowserDevices((current as any).browser?.devices);
 
     const nextChannels = new Set(currentChannels);
 
@@ -285,23 +270,11 @@ export function Settings() {
       nextChannels.delete('discord');
     }
 
-    if (
-      params.includeBrowser === true ||
-      (params.includeBrowser !== false && nextBrowserDevices.length > 0)
-    ) {
-      nextChannels.add('browser');
-    } else {
-      nextChannels.delete('browser');
-    }
-
     return {
       ...(current || {}),
       enabledChannels: Array.from(nextChannels),
       discord: {
         webhookUrl: nextDiscordWebhookUrl,
-      },
-      browser: {
-        devices: nextBrowserDevices,
       },
     };
   };
@@ -645,7 +618,6 @@ export function Settings() {
       // Save configuration
       const notificationsPayload = buildNotificationSettingsPayload({
         discordWebhookUrl,
-        browserDevices,
         includeDiscord: true,
       });
       const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
@@ -663,93 +635,6 @@ export function Settings() {
       );
     } finally {
       setIsDiscordSaving(false);
-    }
-  };
-
-  const handleAddBrowserChannel = async () => {
-    setBrowserError(null);
-    setBrowserMessage(null);
-    setIsBrowserSaving(true);
-
-    try {
-      if (typeof window === 'undefined' || !('Notification' in window)) {
-        setBrowserError(t('settings.messages.browserUnsupported'));
-        setIsBrowserSaving(false);
-        return;
-      }
-
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        setBrowserError(t('settings.messages.browserPermissionDenied'));
-        setIsBrowserSaving(false);
-        return;
-      }
-
-      const nextName = browserDeviceName.trim() || getDefaultBrowserDeviceName();
-      const existingIndex = browserDevices.findIndex((device) => device.id === browserDeviceId);
-      const nextDevices = [...browserDevices];
-
-      if (existingIndex >= 0) {
-        nextDevices[existingIndex] = {
-          ...nextDevices[existingIndex],
-          name: nextName,
-        };
-      } else {
-        nextDevices.push({
-          id: browserDeviceId,
-          name: nextName,
-          createdAt: new Date().toISOString(),
-        });
-      }
-
-      const notificationsPayload = buildNotificationSettingsPayload({
-        browserDevices: nextDevices,
-        includeBrowser: true,
-      });
-      const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
-
-      const savedSettings = await updateSettings(updatedSettings);
-      applyUpdatedSettings(savedSettings);
-      await refresh();
-      setBrowserDevices(nextDevices);
-      setBrowserMessage(t('settings.messages.browserSaved'));
-    } catch (submitError) {
-      setBrowserError(
-        submitError instanceof Error
-          ? submitError.message
-          : t('settings.messages.browserConfigFailed'),
-      );
-    } finally {
-      setIsBrowserSaving(false);
-    }
-  };
-
-  const handleRemoveBrowserDevice = async (deviceId: string) => {
-    setBrowserError(null);
-    setBrowserMessage(null);
-    setIsBrowserSaving(true);
-
-    try {
-      const nextDevices = browserDevices.filter((device) => device.id !== deviceId);
-      const notificationsPayload = buildNotificationSettingsPayload({
-        browserDevices: nextDevices,
-        includeBrowser: nextDevices.length > 0,
-      });
-      const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
-
-      const savedSettings = await updateSettings(updatedSettings);
-      applyUpdatedSettings(savedSettings);
-      await refresh();
-      setBrowserDevices(nextDevices);
-      setBrowserMessage(t('settings.messages.browserRemoved'));
-    } catch (submitError) {
-      setBrowserError(
-        submitError instanceof Error
-          ? submitError.message
-          : t('settings.messages.browserRemoveFailed'),
-      );
-    } finally {
-      setIsBrowserSaving(false);
     }
   };
 
@@ -1146,8 +1031,8 @@ export function Settings() {
                 {t('settings.security.lastChange')}:{' '}
                 {settings?.security?.lastPasswordChangeAt
                   ? new Date(settings.security.lastPasswordChangeAt).toLocaleString(
-                      languageCode === 'fr' ? 'fr-FR' : 'en-US',
-                    )
+                    languageCode === 'fr' ? 'fr-FR' : 'en-US',
+                  )
                   : t('settings.security.unknown')}
               </CardDescription>
             </CardHeader>
@@ -1430,9 +1315,8 @@ export function Settings() {
             <CardContent>
               <form onSubmit={handleDiscordSave} className="space-y-6 max-w-lg">
                 <div
-                  className={`space-y-4 p-4 bg-slate-800/50 rounded-md border border-purple-500/20 ${
-                    discordFormOpen ? '' : 'cursor-pointer'
-                  }`}
+                  className={`space-y-4 p-4 bg-slate-800/50 rounded-md border border-purple-500/20 ${discordFormOpen ? '' : 'cursor-pointer'
+                    }`}
                   onClick={() => {
                     if (!discordFormOpen) {
                       setDiscordFormOpen(true);
@@ -1451,11 +1335,10 @@ export function Settings() {
                     <button
                       type="button"
                       onClick={() => setDiscordFormOpen(true)}
-                      className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${
-                        discordTested
-                          ? 'bg-emerald-600 text-white hover:bg-blue-600'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
+                      className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${discordTested
+                        ? 'bg-emerald-600 text-white hover:bg-blue-600'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
                     >
                       {discordTested
                         ? t('settings.notifications.discord.enabled')
@@ -1520,91 +1403,6 @@ export function Settings() {
                   )}
                 </div>
 
-                <div className="space-y-4 p-4 bg-slate-800/50 rounded-md border border-purple-500/20">
-                  <div>
-                    <h4 className="font-medium text-white">
-                      {t('settings.notifications.browser.title')}
-                    </h4>
-                    <p className="text-sm text-purple-200/70">
-                      {t('settings.notifications.browser.description')}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input
-                      value={browserDeviceName}
-                      onChange={(e) => setBrowserDeviceName(e.target.value)}
-                      placeholder={t('settings.notifications.browser.devicePlaceholder')}
-                      disabled={browserDevices.some((device) => device.id === browserDeviceId)}
-                      className="bg-slate-900 border-white/10 text-white disabled:opacity-60 disabled:cursor-not-allowed"
-                    />
-                    <Button
-                      type="button"
-                      onClick={handleAddBrowserChannel}
-                      disabled={
-                        isBrowserSaving ||
-                        browserDevices.some((device) => device.id === browserDeviceId)
-                      }
-                      className={`${
-                        browserDevices.some((device) => device.id === browserDeviceId)
-                          ? 'bg-emerald-600 hover:bg-emerald-600 text-white'
-                          : 'bg-blue-600 hover:bg-blue-700 text-white'
-                      }`}
-                    >
-                      {isBrowserSaving
-                        ? t('common.saving')
-                        : browserDevices.some((device) => device.id === browserDeviceId)
-                          ? t('settings.notifications.discord.enabled')
-                          : t('settings.notifications.browser.add')}
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {browserDevices.length === 0 ? (
-                      <p className="text-sm text-white/60">
-                        {t('settings.notifications.browser.none')}
-                      </p>
-                    ) : (
-                      browserDevices.map((device) => (
-                        <div
-                          key={device.id}
-                          className="flex items-center justify-between gap-3 rounded border border-white/10 bg-slate-900/50 px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm text-white">{device.name}</p>
-                            <p className="text-xs text-white/50">
-                              {device.id === browserDeviceId
-                                ? t('settings.notifications.browser.current')
-                                : t('settings.notifications.browser.registered')}
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => void handleRemoveBrowserDevice(device.id)}
-                            disabled={isBrowserSaving}
-                            className="text-red-300 hover:text-red-200 hover:bg-red-500/15"
-                          >
-                            {t('common.remove')}
-                          </Button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {browserMessage && (
-                    <p className="text-sm text-blue-300 p-2 bg-blue-900/20 rounded">
-                      ✓ {browserMessage}
-                    </p>
-                  )}
-
-                  {browserError && (
-                    <p className="text-sm text-red-300 p-2 bg-red-900/30 rounded">
-                      ✗ {browserError}
-                    </p>
-                  )}
-                </div>
-
                 <div className="space-y-3 p-4 bg-slate-800/50 rounded-md border border-purple-500/20">
                   <div>
                     <h4 className="font-medium text-white">
@@ -1644,416 +1442,372 @@ export function Settings() {
         </TabsContent>
 
         {user?.username === 'admin' && (
-          <TabsContent value="users">
-            <Card className="border-orange-500/30 bg-orange-950/15 text-white">
-              <CardHeader>
-                <CardTitle className="text-orange-200">{t('settings.users.title')}</CardTitle>
-                <CardDescription className="text-orange-100/70">
-                  {t('settings.users.description')}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Create User Button + Dialog */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    {usersMessage && <p className="text-sm text-emerald-300">{usersMessage}</p>}
-                    {usersError && <p className="text-sm text-red-300">{usersError}</p>}
+          <>
+            <TabsContent value="users">
+              <Card className="border-orange-500/30 bg-orange-950/15 text-white">
+                <CardHeader>
+                  <CardTitle className="text-orange-200">{t('settings.users.title')}</CardTitle>
+                  <CardDescription className="text-orange-100/70">
+                    {t('settings.users.description')}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Create User Button + Dialog */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      {usersMessage && <p className="text-sm text-emerald-300">{usersMessage}</p>}
+                      {usersError && <p className="text-sm text-red-300">{usersError}</p>}
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setUsersMessage(null);
+                        setUsersError(null);
+                        setCreatedUserCredentials(null);
+                        setNewUsername('');
+                        setIsCreateUserOpen(true);
+                      }}
+                      className="bg-orange-600 hover:bg-orange-700 text-white"
+                    >
+                      {t('settings.users.createNew')}
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setUsersMessage(null);
-                      setUsersError(null);
-                      setCreatedUserCredentials(null);
-                      setNewUsername('');
-                      setIsCreateUserOpen(true);
-                    }}
-                    className="bg-orange-600 hover:bg-orange-700 text-white"
-                  >
-                    {t('settings.users.createNew')}
-                  </Button>
-                </div>
 
-                <Dialog
-                  open={isCreateUserOpen}
-                  onOpenChange={(open) => {
-                    if (!isCreatingUser) {
-                      setIsCreateUserOpen(open);
+                  <Dialog
+                    open={isCreateUserOpen}
+                    onOpenChange={(open) => {
+                      if (!isCreatingUser) {
+                        setIsCreateUserOpen(open);
+                        if (!open) {
+                          setUsersError(null);
+                        }
+                      }
+                    }}
+                  >
+                    <DialogContent className="border-orange-500/30 bg-slate-950 text-white">
+                      <DialogHeader>
+                        <DialogTitle className="text-orange-200">
+                          {t('settings.users.createNew')}
+                        </DialogTitle>
+                        <DialogDescription className="text-white/70">
+                          {t('settings.users.createDescription')}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={handleCreateUser}>
+                        <div className="space-y-4 py-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="new-username">{t('settings.users.username')}</Label>
+                            <Input
+                              id="new-username"
+                              placeholder="john_doe"
+                              value={newUsername}
+                              onChange={(e) => setNewUsername(e.target.value)}
+                              className="bg-slate-900 border-white/10 text-white"
+                              autoFocus
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-xs text-white/60">
+                              {t('settings.users.passwordGeneratedOnCreate')}
+                            </p>
+                          </div>
+                          {usersError && <p className="text-sm text-red-300">{usersError}</p>}
+                        </div>
+                        <DialogFooter className="mt-4">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setIsCreateUserOpen(false)}
+                            disabled={isCreatingUser}
+                            className="border border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                          >
+                            {t('common.cancel')}
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={isCreatingUser}
+                            className="bg-orange-600 hover:bg-orange-700 text-white"
+                          >
+                            {isCreatingUser ? t('common.saving') : t('settings.users.create')}
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog
+                    open={isCreatedUserModalOpen && createdUserCredentials !== null}
+                    onOpenChange={(open) => {
+                      setIsCreatedUserModalOpen(open);
                       if (!open) {
+                        setIsGeneratedPasswordCopied(false);
+                        setCreatedUserCredentials(null);
+                      }
+                    }}
+                  >
+                    <DialogContent className="border-emerald-500/30 bg-slate-950 text-white">
+                      <DialogHeader>
+                        <DialogTitle className="text-emerald-200">
+                          {t('settings.users.generatedPasswordTitle')}
+                        </DialogTitle>
+                        <DialogDescription className="text-white/70">
+                          {generatedPasswordContext === 'create'
+                            ? t('settings.users.generatedPasswordDescription', {
+                              username: createdUserCredentials?.username || '',
+                            })
+                            : t('settings.users.generatedPasswordDescriptionReset', {
+                              username: createdUserCredentials?.username || '',
+                            })}
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <button
+                        type="button"
+                        onClick={() => void handleCopyGeneratedPassword()}
+                        className={
+                          'group rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 w-full text-left transition-all ' +
+                          (isGeneratedPasswordCopied
+                            ? 'ring-2 ring-emerald-400/60'
+                            : 'hover:bg-emerald-400/10 focus-visible:ring-2 focus-visible:ring-emerald-400/60')
+                        }
+                        title={isGeneratedPasswordCopied ? t('common.copied') : t('common.copy')}
+                      >
+                        <p className="text-xs text-emerald-100/80">
+                          {t('settings.users.newPassword')}
+                        </p>
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                          <p className="font-mono text-lg text-emerald-100 select-all">
+                            {createdUserCredentials?.password}
+                          </p>
+                          <span className="h-8 w-8 flex items-center justify-center text-emerald-100/70">
+                            {isGeneratedPasswordCopied ? (
+                              <Check className="h-4 w-4" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </span>
+                        </div>
+                      </button>
+
+                      <DialogFooter>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setIsCreatedUserModalOpen(false);
+                            setIsGeneratedPasswordCopied(false);
+                            setCreatedUserCredentials(null);
+                          }}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          {t('common.close')}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Reset Password Dialog */}
+                  <Dialog
+                    open={resetPasswordTargetId !== null}
+                    onOpenChange={(open) => {
+                      if (!isResettingPassword && !open) {
+                        setResetPasswordTargetId(null);
                         setUsersError(null);
                       }
-                    }
-                  }}
-                >
-                  <DialogContent className="border-orange-500/30 bg-slate-950 text-white">
-                    <DialogHeader>
-                      <DialogTitle className="text-orange-200">
-                        {t('settings.users.createNew')}
-                      </DialogTitle>
-                      <DialogDescription className="text-white/70">
-                        {t('settings.users.createDescription')}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateUser}>
-                      <div className="space-y-4 py-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="new-username">{t('settings.users.username')}</Label>
-                          <Input
-                            id="new-username"
-                            placeholder="john_doe"
-                            value={newUsername}
-                            onChange={(e) => setNewUsername(e.target.value)}
-                            className="bg-slate-900 border-white/10 text-white"
-                            autoFocus
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-xs text-white/60">
-                            {t('settings.users.passwordGeneratedOnCreate')}
-                          </p>
-                        </div>
+                    }}
+                  >
+                    <DialogContent className="border-blue-500/30 bg-slate-950 text-white">
+                      <DialogHeader>
+                        <DialogTitle className="text-blue-200">
+                          {t('settings.users.resetPasswordTitle')}
+                        </DialogTitle>
+                        <DialogDescription className="text-white/70">
+                          {t('settings.users.resetPasswordDescription', {
+                            username:
+                              users.find((u) => u.id === resetPasswordTargetId)?.username ?? '',
+                          })}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-3 py-2">
+                        <p className="text-sm text-white/70">
+                          {t('settings.users.passwordGeneratedOnReset')}
+                        </p>
                         {usersError && <p className="text-sm text-red-300">{usersError}</p>}
                       </div>
-                      <DialogFooter className="mt-4">
+                      <DialogFooter>
                         <Button
                           type="button"
                           variant="ghost"
-                          onClick={() => setIsCreateUserOpen(false)}
-                          disabled={isCreatingUser}
+                          onClick={() => {
+                            setResetPasswordTargetId(null);
+                            setUsersError(null);
+                          }}
+                          disabled={isResettingPassword}
                           className="border border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
                         >
                           {t('common.cancel')}
                         </Button>
                         <Button
-                          type="submit"
-                          disabled={isCreatingUser}
-                          className="bg-orange-600 hover:bg-orange-700 text-white"
+                          type="button"
+                          onClick={() => void handleResetUserPassword()}
+                          disabled={isResettingPassword}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
-                          {isCreatingUser ? t('common.saving') : t('settings.users.create')}
+                          {isResettingPassword ? t('common.saving') : t('settings.users.resetButton')}
                         </Button>
                       </DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                    </DialogContent>
+                  </Dialog>
 
-                <Dialog
-                  open={isCreatedUserModalOpen && createdUserCredentials !== null}
-                  onOpenChange={(open) => {
-                    setIsCreatedUserModalOpen(open);
-                    if (!open) {
-                      setIsGeneratedPasswordCopied(false);
-                      setCreatedUserCredentials(null);
-                    }
+
+                  {/* Display : if big screen */}
+                  <div className="hidden lg:block gap-6 lg:grid-cols-[280px_minmax(0,1fr)] overflow-x-auto max-w-full">
+                    <UserList
+                      users={users}
+                      isLoading={isLoadingUsers}
+                      isDeletingUser={isDeletingUser}
+                      t={t}
+                      onResetPassword={(userId) => {
+                        setUsersError(null);
+                        setResetPasswordTargetId(userId);
+                      }}
+                      onDeleteUser={(userId, username) => void handleDeleteUser(userId, username)}
+                    />
+                  </div>
+
+                </CardContent>
+              </Card>
+
+              {/* Display : if small screen */}
+              <div className="lg:hidden mt-6">
+                <UserList
+                  users={users}
+                  isLoading={isLoadingUsers}
+                  isDeletingUser={isDeletingUser}
+                  t={t}
+                  onResetPassword={(userId) => {
+                    setUsersError(null);
+                    setResetPasswordTargetId(userId);
                   }}
-                >
-                  <DialogContent className="border-emerald-500/30 bg-slate-950 text-white">
-                    <DialogHeader>
-                      <DialogTitle className="text-emerald-200">
-                        {t('settings.users.generatedPasswordTitle')}
-                      </DialogTitle>
-                      <DialogDescription className="text-white/70">
-                        {generatedPasswordContext === 'create'
-                          ? t('settings.users.generatedPasswordDescription', {
-                              username: createdUserCredentials?.username || '',
-                            })
-                          : t('settings.users.generatedPasswordDescriptionReset', {
-                              username: createdUserCredentials?.username || '',
-                            })}
-                      </DialogDescription>
-                    </DialogHeader>
+                  onDeleteUser={(userId, username) => void handleDeleteUser(userId, username)}
+                />
+              </div>
+            </TabsContent>
 
-                    <button
-                      type="button"
-                      onClick={() => void handleCopyGeneratedPassword()}
-                      className={
-                        'group rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 w-full text-left transition-all ' +
-                        (isGeneratedPasswordCopied
-                          ? 'ring-2 ring-emerald-400/60'
-                          : 'hover:bg-emerald-400/10 focus-visible:ring-2 focus-visible:ring-emerald-400/60')
-                      }
-                      title={isGeneratedPasswordCopied ? t('common.copied') : t('common.copy')}
-                    >
-                      <p className="text-xs text-emerald-100/80">
-                        {t('settings.users.newPassword')}
-                      </p>
-                      <div className="mt-1 flex items-center justify-between gap-2">
-                        <p className="font-mono text-lg text-emerald-100 select-all">
-                          {createdUserCredentials?.password}
-                        </p>
-                        <span className="h-8 w-8 flex items-center justify-center text-emerald-100/70">
-                          {isGeneratedPasswordCopied ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </span>
-                      </div>
-                    </button>
+            <TabsContent value="database">
+              {/* Desktop : Card avec grid */}
+              <Card className="border-teal-500/30 bg-teal-950/15 text-white">
+                <CardHeader>
+                  <CardTitle className="text-teal-200">{t('settings.database.title')}</CardTitle>
+                  <CardDescription className="text-teal-100/70">
+                    {t('settings.database.description')}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                    {t('settings.database.warning')}
+                  </div>
+                  <div className="hidden lg:block overflow-x-auto max-w-full">
+                    <DatabaseNamespaceList
+                      t={t}
+                      isLoading={isLoadingDatabaseNamespaces}
+                      namespaces={databaseNamespaces}
+                      selectedNamespace={selectedDatabaseNamespace}
+                      onReload={handleDatabaseNamespacesReload}
+                      onSelect={setSelectedDatabaseNamespace}
+                    />
 
-                    <DialogFooter>
+                    <DatabaseRawEditorPanel
+                      t={t}
+                      selectedNamespace={selectedDatabaseNamespace}
+                      updatedAt={databaseUpdatedAt}
+                      isLoadingValue={isLoadingDatabaseValue}
+                      isSavingValue={isSavingDatabaseValue}
+                      rawValue={databaseRawValue}
+                      onRawValueChange={setDatabaseRawValue}
+                      onReload={handleDatabaseReload}
+                      onPrettyFormat={handleDatabasePrettyFormat}
+                      onSave={handleDatabaseSave}
+                      message={databaseMessage}
+                      error={databaseError}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+              {/* Mobile/tablette : composants hors Card */}
+              <div className="flex flex-col gap-6 lg:hidden mt-6">
+                <DatabaseNamespaceList
+                  t={t}
+                  isLoading={isLoadingDatabaseNamespaces}
+                  namespaces={databaseNamespaces}
+                  selectedNamespace={selectedDatabaseNamespace}
+                  onReload={handleDatabaseNamespacesReload}
+                  onSelect={setSelectedDatabaseNamespace}
+                />
+                <DatabaseRawEditorPanel
+                  t={t}
+                  selectedNamespace={selectedDatabaseNamespace}
+                  updatedAt={databaseUpdatedAt}
+                  isLoadingValue={isLoadingDatabaseValue}
+                  isSavingValue={isSavingDatabaseValue}
+                  rawValue={databaseRawValue}
+                  onRawValueChange={setDatabaseRawValue}
+                  onReload={handleDatabaseReload}
+                  onPrettyFormat={handleDatabasePrettyFormat}
+                  onSave={handleDatabaseSave}
+                  message={databaseMessage}
+                  error={databaseError}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="factory">
+              <Card className="border-red-500/30 bg-red-950/15 text-white">
+                <CardHeader>
+                  <CardTitle className="text-red-200">{t('settings.factory.title')}</CardTitle>
+                  <CardDescription className="text-red-100/70">
+                    {t('settings.factory.description')}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {resetError && <p className="text-sm text-red-300">{resetError}</p>}
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
                       <Button
                         type="button"
-                        onClick={() => {
-                          setIsCreatedUserModalOpen(false);
-                          setIsGeneratedPasswordCopied(false);
-                          setCreatedUserCredentials(null);
-                        }}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        variant="destructive"
+                        disabled={isResetting}
+                        className="bg-red-600 hover:bg-red-700 text-white"
                       >
-                        {t('common.close')}
+                        {isResetting ? t('settings.factory.resetting') : t('settings.factory.reset')}
                       </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
-                {/* Reset Password Dialog */}
-                <Dialog
-                  open={resetPasswordTargetId !== null}
-                  onOpenChange={(open) => {
-                    if (!isResettingPassword && !open) {
-                      setResetPasswordTargetId(null);
-                      setUsersError(null);
-                    }
-                  }}
-                >
-                  <DialogContent className="border-blue-500/30 bg-slate-950 text-white">
-                    <DialogHeader>
-                      <DialogTitle className="text-blue-200">
-                        {t('settings.users.resetPasswordTitle')}
-                      </DialogTitle>
-                      <DialogDescription className="text-white/70">
-                        {t('settings.users.resetPasswordDescription', {
-                          username:
-                            users.find((u) => u.id === resetPasswordTargetId)?.username ?? '',
-                        })}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-3 py-2">
-                      <p className="text-sm text-white/70">
-                        {t('settings.users.passwordGeneratedOnReset')}
-                      </p>
-                      {usersError && <p className="text-sm text-red-300">{usersError}</p>}
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => {
-                          setResetPasswordTargetId(null);
-                          setUsersError(null);
-                        }}
-                        disabled={isResettingPassword}
-                        className="border border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
-                      >
-                        {t('common.cancel')}
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => void handleResetUserPassword()}
-                        disabled={isResettingPassword}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        {isResettingPassword ? t('common.saving') : t('settings.users.resetButton')}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
-                {/* Users List */}
-                <div className="space-y-4 p-4 bg-slate-800/50 rounded-md border border-orange-500/20">
-                  <h3 className="font-medium text-white">{t('settings.users.managingUsers')}</h3>
-
-                  {isLoadingUsers ? (
-                    <p className="text-sm text-white/60">{t('common.loading')}</p>
-                  ) : users.length === 0 ? (
-                    <p className="text-sm text-white/60">{t('settings.users.noUsers')}</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {users.map((listUser) => (
-                        <div
-                          key={listUser.id}
-                          className="flex items-center justify-between rounded border border-white/10 bg-slate-900/50 px-4 py-3"
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="border-red-500/30 bg-slate-950 text-white">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-red-200">
+                          {t('settings.factory.confirmTitle')}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-white/70">
+                          {t('settings.factory.confirmDescription')}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                          {t('common.cancel')}
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleResetSettings}
+                          className="bg-red-600 text-white hover:bg-red-700"
                         >
-                          <p className="font-medium text-white">{listUser.username}</p>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setUsersError(null);
-                                setResetPasswordTargetId(listUser.id);
-                              }}
-                              disabled={isDeletingUser === listUser.id}
-                              className="text-blue-300 hover:text-blue-200 hover:bg-blue-500/15"
-                            >
-                              {t('settings.users.resetButton')}
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  disabled={isDeletingUser === listUser.id}
-                                  className="text-red-300 hover:text-red-200 hover:bg-red-500/15"
-                                >
-                                  {t('common.delete')}
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent className="border-red-500/30 bg-slate-950 text-white">
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle className="text-red-200">
-                                    {t('settings.users.confirmDeleteTitle')}
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription className="text-white/70">
-                                    {t('settings.users.confirmDeleteDescription', {
-                                      username: listUser.username,
-                                    })}
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
-                                    {t('common.cancel')}
-                                  </AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() =>
-                                      void handleDeleteUser(listUser.id, listUser.username)
-                                    }
-                                    className="bg-red-600 text-white hover:bg-red-700"
-                                  >
-                                    {t('common.delete')}
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-
-        {user?.username === 'admin' && (
-          <TabsContent value="database">
-            {/* Desktop : Card avec grid */}
-            <Card className="border-teal-500/30 bg-teal-950/15 text-white">
-              <CardHeader>
-                <CardTitle className="text-teal-200">{t('settings.database.title')}</CardTitle>
-                <CardDescription className="text-teal-100/70">
-                  {t('settings.database.description')}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                  {t('settings.database.warning')}
-                </div>
-                <div className="hidden lg:grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] overflow-x-auto max-w-full">
-                  <DatabaseNamespaceList
-                    t={t}
-                    isLoading={isLoadingDatabaseNamespaces}
-                    namespaces={databaseNamespaces}
-                    selectedNamespace={selectedDatabaseNamespace}
-                    onReload={handleDatabaseNamespacesReload}
-                    onSelect={setSelectedDatabaseNamespace}
-                  />
-
-                  <DatabaseRawEditorPanel
-                    t={t}
-                    selectedNamespace={selectedDatabaseNamespace}
-                    updatedAt={databaseUpdatedAt}
-                    isLoadingValue={isLoadingDatabaseValue}
-                    isSavingValue={isSavingDatabaseValue}
-                    rawValue={databaseRawValue}
-                    onRawValueChange={setDatabaseRawValue}
-                    onReload={handleDatabaseReload}
-                    onPrettyFormat={handleDatabasePrettyFormat}
-                    onSave={handleDatabaseSave}
-                    message={databaseMessage}
-                    error={databaseError}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            {/* Mobile/tablette : composants hors Card */}
-            <div className="flex flex-col gap-6 lg:hidden mt-6">
-              <DatabaseNamespaceList
-                t={t}
-                isLoading={isLoadingDatabaseNamespaces}
-                namespaces={databaseNamespaces}
-                selectedNamespace={selectedDatabaseNamespace}
-                onReload={handleDatabaseNamespacesReload}
-                onSelect={setSelectedDatabaseNamespace}
-              />
-              <DatabaseRawEditorPanel
-                t={t}
-                selectedNamespace={selectedDatabaseNamespace}
-                updatedAt={databaseUpdatedAt}
-                isLoadingValue={isLoadingDatabaseValue}
-                isSavingValue={isSavingDatabaseValue}
-                rawValue={databaseRawValue}
-                onRawValueChange={setDatabaseRawValue}
-                onReload={handleDatabaseReload}
-                onPrettyFormat={handleDatabasePrettyFormat}
-                onSave={handleDatabaseSave}
-                message={databaseMessage}
-                error={databaseError}
-              />
-            </div>
-          </TabsContent>
-        )}
-
-        {user?.username === 'admin' && (
-          <TabsContent value="factory">
-            <Card className="border-red-500/30 bg-red-950/15 text-white">
-              <CardHeader>
-                <CardTitle className="text-red-200">{t('settings.factory.title')}</CardTitle>
-                <CardDescription className="text-red-100/70">
-                  {t('settings.factory.description')}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {resetError && <p className="text-sm text-red-300">{resetError}</p>}
-
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      disabled={isResetting}
-                      className="bg-red-600 hover:bg-red-700 text-white"
-                    >
-                      {isResetting ? t('settings.factory.resetting') : t('settings.factory.reset')}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="border-red-500/30 bg-slate-950 text-white">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="text-red-200">
-                        {t('settings.factory.confirmTitle')}
-                      </AlertDialogTitle>
-                      <AlertDialogDescription className="text-white/70">
-                        {t('settings.factory.confirmDescription')}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white">
-                        {t('common.cancel')}
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleResetSettings}
-                        className="bg-red-600 text-white hover:bg-red-700"
-                      >
-                        {t('settings.factory.confirmAction')}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                          {t('settings.factory.confirmAction')}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </>
         )}
       </Tabs>
     </div>
