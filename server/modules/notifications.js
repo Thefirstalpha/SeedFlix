@@ -46,7 +46,7 @@ function buildExternalNotificationPayload(user, notification) {
 }
 
 export async function notifyUser(user, notification) {
-  const userId = resolveNotificationUserKey(user);
+  const userId = String(user?.id);
   if (!userId) {
     return;
   }
@@ -241,138 +241,129 @@ export async function sendDiscordNotification(webhookUrl, notification) {
   }
 }
 
+const sendTestNotificationHandler = withAuth(async (req, res, auth) => {
+  try {
+    const t = getTranslator(req, auth.user);
+
+    const notification = {
+      type: 'info',
+      title: t('notifications.testTitle'),
+      message: t('notifications.testMessage'),
+      data: {
+        source: 'manual-test',
+        details: {
+          [t('notifications.testChannelLabel')]: t('notifications.testChannel'),
+          [t('notifications.testTimestamp')]: new Date().toLocaleString(
+            auth.user?.settings?.placeholders?.preferences?.language === 'fr' ? 'fr-FR' : 'en-US',
+          ),
+        },
+      },
+    };
+
+    await notifyUser(auth.user, notification);
+    res.json({ ok: true, message: t('notifications.testSent') });
+  } catch (error) {
+    const t = getTranslator(req);
+    console.error('Error sending test notification:', error);
+    res.status(500).json({ error: error.message || t('notifications.testFailed') });
+  }
+});
+
+const getNotificationsHandler = withAuth(async (req, res, auth) => {
+  try {
+    const userId = String(auth.user?.id);
+    const limit = parseInt(req.query.limit) || 50;
+    const unreadOnly = req.query.unreadOnly === 'true';
+
+    const notifications = await getNotifications(userId, {
+      limit,
+      unreadOnly,
+    });
+    const unreadCount = await getUnreadCount(userId);
+
+    res.json({ notifications, unreadCount });
+  } catch (error) {
+    console.error('Error getting notifications:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+const markAsReadHandler = withAuth(async (req, res, auth) => {
+  try {
+    const userId = String(auth.user?.id);
+    const notificationId = req.params.id;
+
+    const notif = await markAsRead(userId, notificationId);
+
+    if (!notif) {
+      const t = getTranslator(req, auth.user);
+      return res.status(404).json({ error: t('notifications.notFound') });
+    }
+
+    res.json(notif);
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+const markAllAsReadHandler = withAuth(async (req, res, auth) => {
+  try {
+    const userId = String(auth.user?.id);
+    await markAllAsRead(userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error marking all as read:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+const deleteNotificationHandler = withAuth(async (req, res, auth) => {
+  try {
+    const userId = String(auth.user?.id);
+    const notificationId = req.params.id;
+
+    const success = await deleteNotification(userId, notificationId);
+
+    if (!success) {
+      const t = getTranslator(req, auth.user);
+      return res.status(404).json({ error: t('notifications.notFound') });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+const clearNotificationsHandler = withAuth(async (req, res, auth) => {
+  try {
+    const userId = String(auth.user?.id);
+    await clearNotifications(userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error clearing notifications:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Enregistrer les routes
 export function registerNotificationRoutes(app) {
   // Notification de test (interne + Discord si configuré)
-  app.post(
-    '/api/notifications/test',
-    withAuth(async (req, res, auth) => {
-      try {
-        const t = getTranslator(req, auth.user);
-
-        const notification = {
-          type: 'info',
-          title: t('notifications.testTitle'),
-          message: t('notifications.testMessage'),
-          data: {
-            source: 'manual-test',
-            details: {
-              [t('notifications.testChannelLabel')]: t('notifications.testChannel'),
-              [t('notifications.testTimestamp')]: new Date().toLocaleString(
-                auth.user?.settings?.placeholders?.preferences?.language === 'fr'
-                  ? 'fr-FR'
-                  : 'en-US',
-              ),
-            },
-          },
-        };
-
-        await notifyUser(auth.user, notification);
-        res.json({ ok: true, message: t('notifications.testSent') });
-      } catch (error) {
-        const t = getTranslator(req);
-        console.error('Error sending test notification:', error);
-        res.status(500).json({ error: error.message || t('notifications.testFailed') });
-      }
-    }),
-  );
-
+  app.post('/api/notifications/test', sendTestNotificationHandler);
   // Récupérer les notifications
-  app.get(
-    '/api/notifications',
-    withAuth(async (req, res, auth) => {
-      try {
-        const userId = resolveNotificationUserKey(auth.user);
-        const limit = parseInt(req.query.limit) || 50;
-        const unreadOnly = req.query.unreadOnly === 'true';
-
-        const notifications = await getNotifications(userId, {
-          limit,
-          unreadOnly,
-        });
-        const unreadCount = await getUnreadCount(userId);
-
-        res.json({ notifications, unreadCount });
-      } catch (error) {
-        console.error('Error getting notifications:', error);
-        res.status(500).json({ error: error.message });
-      }
-    }),
-  );
+  app.get('/api/notifications', getNotificationsHandler);
 
   // Marquer comme lue
-  app.post(
-    '/api/notifications/:id/read',
-    withAuth(async (req, res, auth) => {
-      try {
-        const userId = resolveNotificationUserKey(auth.user);
-        const notificationId = req.params.id;
-
-        const notif = await markAsRead(userId, notificationId);
-
-        if (!notif) {
-          const t = getTranslator(req, auth.user);
-          return res.status(404).json({ error: t('notifications.notFound') });
-        }
-
-        res.json(notif);
-      } catch (error) {
-        console.error('Error marking notification as read:', error);
-        res.status(500).json({ error: error.message });
-      }
-    }),
-  );
+  app.post('/api/notifications/:id/read', markAsReadHandler);
 
   // Marquer toutes comme lues
-  app.post(
-    '/api/notifications/read-all',
-    withAuth(async (req, res, auth) => {
-      try {
-        const userId = resolveNotificationUserKey(auth.user);
-        await markAllAsRead(userId);
-        res.json({ success: true });
-      } catch (error) {
-        console.error('Error marking all as read:', error);
-        res.status(500).json({ error: error.message });
-      }
-    }),
-  );
+  app.post('/api/notifications/read-all', markAllAsReadHandler);
 
   // Supprimer une notification
-  app.delete(
-    '/api/notifications/:id',
-    withAuth(async (req, res, auth) => {
-      try {
-        const userId = resolveNotificationUserKey(auth.user);
-        const notificationId = req.params.id;
-
-        const success = await deleteNotification(userId, notificationId);
-
-        if (!success) {
-          const t = getTranslator(req, auth.user);
-          return res.status(404).json({ error: t('notifications.notFound') });
-        }
-
-        res.json({ success: true });
-      } catch (error) {
-        console.error('Error deleting notification:', error);
-        res.status(500).json({ error: error.message });
-      }
-    }),
-  );
+  app.delete('/api/notifications/:id', deleteNotificationHandler);
 
   // Vider toutes les notifications
-  app.delete(
-    '/api/notifications',
-    withAuth(async (req, res, auth) => {
-      try {
-        const userId = resolveNotificationUserKey(auth.user);
-        await clearNotifications(userId);
-        res.json({ success: true });
-      } catch (error) {
-        console.error('Error clearing notifications:', error);
-        res.status(500).json({ error: error.message });
-      }
-    }),
-  );
+  app.delete('/api/notifications', clearNotificationsHandler);
 }
