@@ -64,7 +64,8 @@ function buildFallbackSettings(username = 'admin'): UserSettings {
       indexer: {
         url: '',
         token: '',
-        defaultQuality: 'all',
+        qualities: ['all'],
+        languages: ['all'],
       },
     },
   };
@@ -121,7 +122,8 @@ export function InitialSetup() {
 
   const [indexerUrl, setIndexerUrl] = useState('');
   const [indexerToken, setIndexerToken] = useState('');
-  const [indexerDefaultQuality, setIndexerDefaultQuality] = useState('all');
+  const [indexerQualities, setIndexerQualities] = useState<string[]>(['all']);
+  const [indexerLanguages, setIndexerLanguages] = useState<string[]>(['all']);
   const [indexerError, setIndexerError] = useState<string | null>(null);
   const [isIndexerSaving, setIsIndexerSaving] = useState(false);
   const [languageCode, setLanguageCode] = useState<SupportedLanguage>('fr');
@@ -199,7 +201,8 @@ export function InitialSetup() {
     setTorrentSeriesFolder(torrentSettings.seriesFolder || '');
     setIndexerUrl(indexerSettings.url || '');
     setIndexerToken(indexerSettings.token || '');
-    setIndexerDefaultQuality(indexerSettings.defaultQuality || 'all');
+    setIndexerQualities(indexerSettings.qualities || ['all']);
+    setIndexerLanguages(indexerSettings.languages || ['all']);
     setLanguageCode(parseSupportedLanguage(sourceSettings.placeholders?.preferences?.language));
   }, [settings, user?.username]);
 
@@ -485,7 +488,8 @@ export function InitialSetup() {
           indexer: {
             url: indexerUrl.trim(),
             token: indexerToken.trim(),
-            defaultQuality: indexerDefaultQuality,
+            qualities: indexerQualities,
+            languages: indexerLanguages,
           },
         },
       });
@@ -921,22 +925,68 @@ export function InitialSetup() {
               </div>
 
               <div className="space-y-2 md:max-w-xs">
-                <Label htmlFor="setup-indexer-quality">{t('setup.indexer.defaultQuality')}</Label>
-                <select
-                  id="setup-indexer-quality"
-                  value={indexerDefaultQuality}
-                  onChange={(event) => setIndexerDefaultQuality(event.target.value)}
-                  className="h-10 w-full rounded-md border border-white/10 bg-slate-900 px-3 text-white outline-none"
-                >
-                  <option value="all">{t('setup.indexer.allQualities')}</option>
-                  <option value="2160p">{t('setup.indexer.quality.2160p')}</option>
-                  <option value="1080p">{t('setup.indexer.quality.1080p')}</option>
-                  <option value="720p">{t('setup.indexer.quality.720p')}</option>
-                  <option value="480p">{t('setup.indexer.quality.480p')}</option>
-                  <option value="bluray">{t('setup.indexer.quality.bluray')}</option>
-                  <option value="webdl">{t('setup.indexer.quality.webdl')}</option>
-                  <option value="hdtv">{t('setup.indexer.quality.hdtv')}</option>
-                </select>
+                <Label>{t('setup.indexer.defaultQuality')} (cases à cocher)</Label>
+                <div className="flex flex-wrap gap-3">
+                  {[
+                    { value: 'all', label: t('setup.indexer.allQualities') },
+                    { value: '2160p', label: t('setup.indexer.quality.2160p') },
+                    { value: '1080p', label: t('setup.indexer.quality.1080p') },
+                    { value: '720p', label: t('setup.indexer.quality.720p') },
+                    { value: '480p', label: t('setup.indexer.quality.480p') },
+                    { value: 'bluray', label: t('setup.indexer.quality.bluray') },
+                    { value: 'webdl', label: t('setup.indexer.quality.webdl') },
+                    { value: 'hdtv', label: t('setup.indexer.quality.hdtv') },
+                  ].map((option) => (
+                    <label key={option.value} className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        value={option.value}
+                        checked={indexerQualities.includes(option.value)}
+                        onChange={e => {
+                          const checked = e.target.checked;
+                          setIndexerQualities((prev) =>
+                            checked
+                              ? [...prev, option.value]
+                              : prev.filter((v) => v !== option.value)
+                          );
+                        }}
+                        className="accent-cyan-600"
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2 md:max-w-xs">
+                <Label>Langues (cases à cocher)</Label>
+                <div className="flex flex-wrap gap-3">
+                  {[
+                    { value: 'all', label: 'Toutes' },
+                    { value: 'VO', label: 'VO' },
+                    { value: 'VF', label: 'VF' },
+                    { value: 'VOSTFR', label: 'VOSTFR' },
+                    { value: 'MULTI', label: 'MULTI' },
+                  ].map((lang) => (
+                    <label key={lang.value} className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        value={lang.value}
+                        checked={indexerLanguages.includes(lang.value)}
+                        onChange={e => {
+                          const checked = e.target.checked;
+                          setIndexerLanguages((prev) =>
+                            checked
+                              ? [...prev, lang.value]
+                              : prev.filter((v) => v !== lang.value)
+                          );
+                        }}
+                        className="accent-cyan-600"
+                      />
+                      <span>{lang.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               <p className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-200/90">

@@ -89,16 +89,8 @@ async function handleAsyncSave<T = any>({
   }
 }
 
-const QUALITY_OPTIONS = [
-  { value: 'all', labelKey: 'settings.quality.all' },
-  { value: '2160p', labelKey: 'settings.quality.2160p' },
-  { value: '1080p', labelKey: 'settings.quality.1080p' },
-  { value: '720p', labelKey: 'settings.quality.720p' },
-  { value: '480p', labelKey: 'settings.quality.480p' },
-  { value: 'bluray', labelKey: 'settings.quality.bluray' },
-  { value: 'webdl', labelKey: 'settings.quality.webdl' },
-  { value: 'hdtv', labelKey: 'settings.quality.hdtv' },
-];
+const QUALITY_OPTIONS = ['2160p', '1080p', '720p', '480p'];
+const LANGUAGE_OPTIONS = ['VO', 'VFF', 'VF2', 'VFQ', 'VOSTFR', 'MULTI'];
 
 const SETTINGS_TABS = ['general', 'notifications', 'api', 'users', 'database', 'factory'] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
@@ -148,7 +140,8 @@ export function Settings() {
   const [isTorrentSaving, setIsTorrentSaving] = useState(false);
   const [indexerUrl, setIndexerUrl] = useState('');
   const [indexerToken, setIndexerToken] = useState('');
-  const [indexerDefaultQuality, setIndexerDefaultQuality] = useState('all');
+  const [indexerQualities, setIndexerQualities] = useState<string[]>(['all']);
+  const [indexerLanguages, setIndexerLanguages] = useState<string[]>(['all']);
   const [indexerMessage, setIndexerMessage] = useState<string | null>(null);
   const [indexerError, setIndexerError] = useState<string | null>(null);
   const [isIndexerSaving, setIsIndexerSaving] = useState(false);
@@ -232,7 +225,8 @@ export function Settings() {
 
     setIndexerUrl(incomingSettings.placeholders?.indexer?.url || '');
     setIndexerToken(incomingSettings.placeholders?.indexer?.token || '');
-    setIndexerDefaultQuality(incomingSettings.placeholders?.indexer?.defaultQuality || 'all');
+    setIndexerQualities(incomingSettings.placeholders?.indexer?.qualities || ['all']);
+    setIndexerLanguages(incomingSettings.placeholders?.indexer?.languages || ['all']);
 
     const notifSettings = incomingSettings.placeholders?.notifications || {};
     setDiscordWebhookUrl((notifSettings as any).discord?.webhookUrl || '');
@@ -548,7 +542,8 @@ export function Settings() {
           indexer: {
             url: indexerUrl,
             token: indexerToken,
-            defaultQuality: indexerDefaultQuality,
+            qualities: indexerQualities,
+            languages: indexerLanguages,
           },
         });
         const savedSettings = await updateSettings(updatedSettings);
@@ -1270,21 +1265,53 @@ export function Settings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="indexer-default-quality">
-                    {t('settings.api.indexer.defaultQuality')}
-                  </Label>
-                  <select
-                    id="indexer-default-quality"
-                    value={indexerDefaultQuality}
-                    onChange={(e) => setIndexerDefaultQuality(e.target.value)}
-                    className="w-full bg-slate-900 border border-white/10 text-white rounded-md px-3 py-2"
-                  >
+                  <Label>{t('settings.api.indexer.defaultQuality')}</Label>
+                  <div className="flex flex-wrap gap-3">
                     {QUALITY_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {t(option.labelKey)}
-                      </option>
+                      <label key={option} className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          value={option}
+                          checked={indexerQualities.includes(option)}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setIndexerQualities((prev) =>
+                              checked
+                                ? [...prev, option]
+                                : prev.filter((v) => v !== option)
+                            );
+                          }}
+                          className="accent-cyan-600"
+                        />
+                        <span>{option}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t('settings.api.indexer.defaultLanguage')}</Label>
+                  <div className="flex flex-wrap gap-3">
+                    {LANGUAGE_OPTIONS.map((option) => (
+                      <label key={option} className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          value={option}
+                          checked={indexerLanguages.includes(option)}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setIndexerLanguages((prev) =>
+                              checked
+                                ? [...prev, option]
+                                : prev.filter((v) => v !== option)
+                            );
+                          }}
+                          className="accent-cyan-600"
+                        />
+                        <span>{option}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 {indexerMessage && <p className="text-sm text-emerald-300">{indexerMessage}</p>}
