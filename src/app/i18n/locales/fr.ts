@@ -415,6 +415,10 @@ const fr = {
       users: 'Utilisateurs',
       database: 'Base de données',
       factory: 'Réinitialisation',
+      storage: 'Stockage',
+    },
+    storage: {
+      description: 'Configurez votre accès FTP/FTPS pour le stockage distant de vos fichiers.',
     },
     about: {
       versionLabel: "Version de l'image: {{version}}",

@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       const auth = await getCurrentAuth();
-      if (auth.authenticated && auth.user) {
+      if (auth.user) {
         setUser(auth.user);
         setSettings(auth.settings || null);
         setMustChangePassword(auth.mustChangePassword);

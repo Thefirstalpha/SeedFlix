@@ -49,7 +49,16 @@ export interface UserSettings {
       qualities?: string[];
       languages?: string[];
     };
-  };
+    ftp?: {
+      host?: string;
+      port?: string;
+      authRequired?: boolean;
+      username?: string;
+      password?: string;
+      rootPath?: string;
+      limit?: number;
+      };
+    };
 }
 
 export interface IndexerTestResponse {
@@ -253,7 +262,8 @@ export interface DatabaseNamespaceValue extends DatabaseNamespaceEntry {
 }
 
 export interface CreatedUserResponse extends User {
-  generatedPassword: string;
+  username: string;
+  password: string;
 }
 
 export async function listUsers() {
@@ -286,7 +296,7 @@ export async function resetUserPassword(userId: number) {
     method: 'POST',
     credentials: 'include',
   });
-  return parseJson<{ ok: true; generatedPassword: string }>(
+  return parseJson<{ ok: true; password: string }>(
     response,
     'Impossible de réinitialiser le mot de passe',
   );

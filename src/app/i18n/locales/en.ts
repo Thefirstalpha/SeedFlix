@@ -413,6 +413,10 @@ const en = {
       users: 'Users',
       database: 'Database',
       factory: 'Reset',
+      storage: 'Storage',
+    },
+    storage: {
+      description: 'Configure your FTP/FTPS access for remote storage of your files.',
     },
     about: {
       versionLabel: 'Image version: {{version}}',
