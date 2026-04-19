@@ -33,7 +33,8 @@
     "indexer": {
       "url": "",
       "token": "",
-      "defaultQuality": "all"
+      "qualities": ["2160p", "1080p", "720p", "480p"],
+      "languages": ["VO", "VFF", "VF2", "VFQ", "VOSTFR", "MULTI"]
     }
   }
 }

@@ -413,6 +413,10 @@ const en = {
       users: 'Users',
       database: 'Database',
       factory: 'Reset',
+      storage: 'Storage',
+    },
+    storage: {
+      description: 'Configure your FTP/FTPS access for remote storage of your files.',
     },
     about: {
       versionLabel: 'Image version: {{version}}',
@@ -503,6 +507,7 @@ const en = {
         url: 'Indexer URL',
         token: 'API token',
         defaultQuality: 'Default quality',
+        defaultLanguage: 'Default language',
       },
     },
     notifications: {
@@ -601,17 +606,7 @@ const en = {
       confirmDescription:
         'All local data will be reset (user, settings, movies/series wishlists) and your session will expire. This action cannot be undone.',
       confirmAction: 'Yes, reset',
-    },
-    quality: {
-      all: 'All qualities',
-      '2160p': '2160p (4K)',
-      '1080p': '1080p',
-      '720p': '720p',
-      '480p': '480p',
-      bluray: 'BluRay',
-      webdl: 'WEB-DL / WEBRip',
-      hdtv: 'HDTV',
-    },
+    }
   },
 } as const;
 

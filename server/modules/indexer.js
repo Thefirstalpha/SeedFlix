@@ -7,7 +7,7 @@ import {
 } from './indexerStateKey.js';
 import { withAuth } from './auth.js';
 import { getTranslator } from '../i18n.js';
-import { notifyUser, resolveNotificationUserKey } from './notifications.js';
+import { notifyUser } from './notifications.js';
 import {
   indexerRejectedStore,
   indexerResultsStore,
@@ -288,7 +288,7 @@ async function pollIndexerForWishlist() {
     let totalTargets = 0;
 
     for (const user of users) {
-      const userStoreKey = resolveNotificationUserKey(user);
+      const userStoreKey = user.id;
       if (!userStoreKey) {
         continue;
       }
@@ -360,7 +360,7 @@ async function pollIndexerForWishlist() {
 
     for (const user of users) {
       const username = String(user?.username || 'unknown');
-      const userStoreKey = resolveNotificationUserKey(user);
+      const userStoreKey = String(user?.id || '').trim();
       const userTargets = Array.isArray(targetsByUser[userStoreKey])
         ? targetsByUser[userStoreKey]
         : [];
@@ -771,7 +771,7 @@ export async function rejectIndexerResultItems(userId, targetKey, indexerStateKe
 
 const getIndexerResultsHandler = withAuth(async (req, res, auth) => {
   try {
-    const targets = await getIndexerResultsForUser(resolveNotificationUserKey(auth.user));
+    const targets = await getIndexerResultsForUser(String(auth.user?.id));
     res.json({ ok: true, targets });
   } catch (error) {
     console.error('Error getting indexer results:', error);
@@ -824,7 +824,7 @@ const rejectAllIndexerResultHandler = withAuth(async (req, res, auth) => {
   try {
     const t = getTranslator(req, auth.user);
     const result = await rejectIndexerResultItems(
-      resolveNotificationUserKey(auth.user),
+      String(auth.user?.id),
       req.body?.targetKey,
       req.body?.indexerStateKeys,
     );

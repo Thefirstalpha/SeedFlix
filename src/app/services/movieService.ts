@@ -166,7 +166,7 @@ export async function getPopularMoviesPage(
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/movies/popular?${params.toString()}`);
+    const response = await fetch(`${API_BASE_URL}/tmdb/movie/popular?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch popular movies');
@@ -190,7 +190,7 @@ export async function getMovieGenres(uiLanguage = 'fr'): Promise<GenreItem[]> {
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/movies/genres?language=${encodeURIComponent(tmdbLanguage)}`,
+      `${API_BASE_URL}/tmdb/movie/genres?language=${encodeURIComponent(tmdbLanguage)}`,
     );
     if (!response.ok) {
       throw new Error('Failed to fetch movie genres');
@@ -236,7 +236,7 @@ export async function discoverMoviesPage(
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/movies/discover?${params.toString()}`);
+    const response = await fetch(`${API_BASE_URL}/tmdb/movie/discover?${params.toString()}`);
     if (!response.ok) {
       throw new Error('Failed to discover movies');
     }
@@ -274,7 +274,7 @@ export async function searchMoviesPage(
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/movies/search?language=${encodeURIComponent(tmdbLanguage)}&query=${encodeURIComponent(query)}&page=${page}`,
+      `${API_BASE_URL}/tmdb/movie/search?language=${encodeURIComponent(tmdbLanguage)}&query=${encodeURIComponent(query)}&page=${page}`,
     );
 
     if (!response.ok) {
@@ -311,7 +311,7 @@ export async function getMovieById(id: number, uiLanguage = 'fr'): Promise<Movie
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/movies/${id}?language=${encodeURIComponent(tmdbLanguage)}`,
+      `${API_BASE_URL}/tmdb/movie/details/${id}?language=${encodeURIComponent(tmdbLanguage)}`,
     );
 
     if (!response.ok) {
@@ -389,116 +389,5 @@ export async function searchMovieReleases(
 // Données de secours (mock) pour quand l'API n'est pas configurée
 function getMockMovies(): Movie[] {
   return [
-    {
-      id: 1,
-      title: 'Le Dernier Horizon',
-      year: 2025,
-      rating: 8.7,
-      language: 'Anglais',
-      genre: 'Science-Fiction',
-      poster:
-        'https://images.unsplash.com/photo-1578374173713-32f6ae6f3971?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzY2llbmNlJTIwZmljdGlvbiUyMG1vdmllfGVufDF8fHx8MTc3NTQzMzE2OXww&ixlib=rb-4.1.0&q=80&w=1080',
-      director: 'Sarah Chen',
-      actors: ['Tom Hardy', 'Emma Stone', 'Oscar Isaac'],
-      plot: "Dans un futur lointain, l'humanité doit trouver une nouvelle planète habitable avant que la Terre ne devienne inhabitable. Une équipe d'explorateurs courageux se lance dans un voyage interstellaire périlleux pour sauver l'espèce humaine.",
-      duration: '2h 28min',
-    },
-    {
-      id: 2,
-      title: 'Ombres du Passé',
-      year: 2024,
-      rating: 7.9,
-      language: 'Anglais',
-      genre: 'Thriller',
-      poster:
-        'https://images.unsplash.com/photo-1662937600299-7cb9ff0b1061?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0aHJpbGxlciUyMGRhcmslMjBjaW5lbWF8ZW58MXx8fHwxNzc1NDg3NTE0fDA&ixlib=rb-4.1.0&q=80&w=1080',
-      director: 'Michael Rodriguez',
-      actors: ['Jessica Chastain', 'Jake Gyllenhaal', 'Idris Elba'],
-      plot: "Une détective brillante doit résoudre une série de meurtres mystérieux qui semblent connectés à des événements de son propre passé. Plus elle s'approche de la vérité, plus elle réalise que le tueur la connaît intimement.",
-      duration: '2h 15min',
-    },
-    {
-      id: 3,
-      title: "L'Épopée Fantastique",
-      year: 2026,
-      rating: 9.1,
-      language: 'Anglais',
-      genre: 'Aventure',
-      poster:
-        'https://images.unsplash.com/photo-1773518011746-4f1c46ddced1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhZHZlbnR1cmUlMjBtb3ZpZSUyMGVwaWN8ZW58MXx8fHwxNzc1NDg3NTE0fDA&ixlib=rb-4.1.0&q=80&w=1080',
-      director: 'Peter Jackson',
-      actors: ['Chris Hemsworth', 'Zendaya', 'Benedict Cumberbatch'],
-      plot: "Un jeune héros ordinaire découvre qu'il est le dernier d'une lignée de guerriers magiques. Il doit maîtriser ses pouvoirs et rassembler une équipe diverse pour empêcher un ancien mal de détruire tous les royaumes.",
-      duration: '3h 05min',
-    },
-    {
-      id: 4,
-      title: 'Rires et Émotions',
-      year: 2025,
-      rating: 7.5,
-      language: 'Francais',
-      genre: 'Comédie',
-      poster:
-        'https://images.unsplash.com/photo-1606397591059-2bc4e008bf60?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxyb21hbnRpYyUyMGNvbWVkeSUyMG1vdmllfGVufDF8fHx8MTc3NTQ0MjU1OHww&ixlib=rb-4.1.0&q=80&w=1080',
-      director: 'Judd Apatow',
-      actors: ['Ryan Reynolds', 'Sandra Bullock', 'Kevin Hart'],
-      plot: "Deux anciens meilleurs amis se retrouvent après 10 ans et décident de rattraper le temps perdu en accomplissant une liste de défis fous qu'ils avaient créée quand ils étaient adolescents.",
-      duration: '1h 52min',
-    },
-    {
-      id: 5,
-      title: 'Les Murmures de Minuit',
-      year: 2024,
-      rating: 8.3,
-      language: 'Anglais',
-      genre: 'Horreur',
-      poster:
-        'https://images.unsplash.com/photo-1630338679229-99fb150fbf88?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxob3Jyb3IlMjBtb3ZpZSUyMGRhcmt8ZW58MXx8fHwxNzc1NDE3ODkzfDA&ixlib=rb-4.1.0&q=80&w=1080',
-      director: 'Ari Aster',
-      actors: ['Florence Pugh', 'Toni Collette', 'Bill Skarsgård'],
-      plot: "Une famille emménage dans une vieille maison isolée et commence à entendre d'étranges murmures la nuit. Ils découvrent bientôt que la maison cache un terrible secret lié à des rituels anciens.",
-      duration: '2h 18min',
-    },
-    {
-      id: 6,
-      title: 'Le Cœur des Étoiles',
-      year: 2025,
-      rating: 8.0,
-      language: 'Francais',
-      genre: 'Drame',
-      poster:
-        'https://images.unsplash.com/photo-1762356121454-877acbd554bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaW5lbWElMjBkcmFtYSUyMGZpbG18ZW58MXx8fHwxNzc1NDg3NTEzfDA&ixlib=rb-4.1.0&q=80&w=1080',
-      director: 'Greta Gerwig',
-      actors: ['Saoirse Ronan', 'Timothée Chalamet', 'Meryl Streep'],
-      plot: "Une jeune astronome talentueuse doit choisir entre sa carrière prometteuse et sa famille qui traverse une période difficile. Un film émouvant sur les sacrifices et l'amour familial.",
-      duration: '2h 10min',
-    },
-    {
-      id: 7,
-      title: "L'Envol Magique",
-      year: 2026,
-      rating: 8.8,
-      language: 'Anglais',
-      genre: 'Animation',
-      poster:
-        'https://images.unsplash.com/photo-1767557125491-b3483567d843?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhbmltYXRpb24lMjBjYXJ0b29uJTIwY29sb3JmdWx8ZW58MXx8fHwxNzc1NDI0Nzc5fDA&ixlib=rb-4.1.0&q=80&w=1080',
-      director: 'Pete Docter',
-      actors: ['Tom Hanks', 'Scarlett Johansson', 'Chris Pratt'],
-      plot: "Un jeune oiseau qui a peur de voler doit surmonter ses craintes pour sauver sa famille d'une tempête imminente. Une aventure colorée et touchante pour toute la famille.",
-      duration: '1h 35min',
-    },
-    {
-      id: 8,
-      title: 'Code Rouge',
-      year: 2025,
-      rating: 7.7,
-      genre: 'Action',
-      poster:
-        'https://images.unsplash.com/photo-1765510296004-614b6cc204da?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGFjdGlvbnxlbnwxfHx8fDE3NzU0ODc1MTN8MA&ixlib=rb-4.1.0&q=80&w=1080',
-      director: 'Christopher McQuarrie',
-      actors: ['Tom Cruise', 'Charlize Theron', 'Jason Statham'],
-      plot: 'Un agent secret chevronné doit empêcher une organisation terroriste de déclencher une arme nucléaire dans une grande métropole. Une course contre la montre avec des cascades spectaculaires.',
-      duration: '2h 22min',
-    },
   ];
 }

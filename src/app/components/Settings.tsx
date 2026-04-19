@@ -52,7 +52,10 @@ import {
   type User,
 } from '../services/authService';
 import * as notificationService from '../services/notificationService';
-import { UserList } from './UserList';
+import { UserList } from './settings/UserList';
+import { testFtpConnection } from '../services/ftpService';
+import { SettingTMDB } from './settings/SettingTMDB';
+import { SettingUsers } from './settings/SettingUsers';
 
 // Fonction utilitaire générique pour la gestion des sauvegardes asynchrones
 async function handleAsyncSave<T = any>({
@@ -89,18 +92,10 @@ async function handleAsyncSave<T = any>({
   }
 }
 
-const QUALITY_OPTIONS = [
-  { value: 'all', labelKey: 'settings.quality.all' },
-  { value: '2160p', labelKey: 'settings.quality.2160p' },
-  { value: '1080p', labelKey: 'settings.quality.1080p' },
-  { value: '720p', labelKey: 'settings.quality.720p' },
-  { value: '480p', labelKey: 'settings.quality.480p' },
-  { value: 'bluray', labelKey: 'settings.quality.bluray' },
-  { value: 'webdl', labelKey: 'settings.quality.webdl' },
-  { value: 'hdtv', labelKey: 'settings.quality.hdtv' },
-];
+const QUALITY_OPTIONS = ['2160p', '1080p', '720p', '480p'];
+const LANGUAGE_OPTIONS = ['VO', 'VFF', 'VF2', 'VFQ', 'VOSTFR', 'MULTI'];
 
-const SETTINGS_TABS = ['general', 'notifications', 'api', 'users', 'database', 'factory'] as const;
+const SETTINGS_TABS = ['general', 'notifications', 'api', 'ftp', 'users', 'database', 'factory'] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 function parseSupportedLanguage(input: unknown): SupportedLanguage {
@@ -148,16 +143,13 @@ export function Settings() {
   const [isTorrentSaving, setIsTorrentSaving] = useState(false);
   const [indexerUrl, setIndexerUrl] = useState('');
   const [indexerToken, setIndexerToken] = useState('');
-  const [indexerDefaultQuality, setIndexerDefaultQuality] = useState('all');
+  const [indexerQualities, setIndexerQualities] = useState<string[]>(['all']);
+  const [indexerLanguages, setIndexerLanguages] = useState<string[]>(['all']);
   const [indexerMessage, setIndexerMessage] = useState<string | null>(null);
   const [indexerError, setIndexerError] = useState<string | null>(null);
   const [isIndexerSaving, setIsIndexerSaving] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-  const [tmdbApiKey, setTmdbApiKey] = useState('');
-  const [tmdbMessage, setTmdbMessage] = useState<string | null>(null);
-  const [tmdbError, setTmdbError] = useState<string | null>(null);
-  const [isTmdbSaving, setIsTmdbSaving] = useState(false);
   const [discordWebhookUrl, setDiscordWebhookUrl] = useState('');
   const [discordTested, setDiscordTested] = useState(false);
   const [discordFormOpen, setDiscordFormOpen] = useState(false);
@@ -174,25 +166,6 @@ export function Settings() {
   const [isSendingTestNotif, setIsSendingTestNotif] = useState(false);
 
   // User Management State
-  const [users, setUsers] = useState<User[]>([]);
-  const [newUsername, setNewUsername] = useState('');
-  const [usersMessage, setUsersMessage] = useState<string | null>(null);
-  const [usersError, setUsersError] = useState<string | null>(null);
-  const [createdUserCredentials, setCreatedUserCredentials] = useState<{
-    username: string;
-    password: string;
-  } | null>(null);
-  const [generatedPasswordContext, setGeneratedPasswordContext] = useState<'create' | 'reset'>(
-    'create',
-  );
-  const [isCreatedUserModalOpen, setIsCreatedUserModalOpen] = useState(false);
-  const [isGeneratedPasswordCopied, setIsGeneratedPasswordCopied] = useState(false);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-  const [isCreatingUser, setIsCreatingUser] = useState(false);
-  const [isDeletingUser, setIsDeletingUser] = useState<number | null>(null);
-  const [isResettingPassword, setIsResettingPassword] = useState(false);
-  const [resetPasswordTargetId, setResetPasswordTargetId] = useState<number | null>(null);
-  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [databaseNamespaces, setDatabaseNamespaces] = useState<DatabaseNamespaceEntry[]>([]);
   const [selectedDatabaseNamespace, setSelectedDatabaseNamespace] = useState('');
   const [databaseRawValue, setDatabaseRawValue] = useState('');
@@ -202,6 +175,72 @@ export function Settings() {
   const [isLoadingDatabaseNamespaces, setIsLoadingDatabaseNamespaces] = useState(false);
   const [isLoadingDatabaseValue, setIsLoadingDatabaseValue] = useState(false);
   const [isSavingDatabaseValue, setIsSavingDatabaseValue] = useState(false);
+
+  // État pour la configuration FTP
+  const [ftpUrl, setFtpUrl] = useState('');
+  const [ftpPort, setFtpPort] = useState('21');
+  const [ftpSecure, setFtpSecure] = useState(false);
+  const [ftpAuthRequired, setFtpAuthRequired] = useState(false);
+  const [ftpUsername, setFtpUsername] = useState('');
+  const [ftpPassword, setFtpPassword] = useState('');
+  const [ftpRootFolder, setFtpRootFolder] = useState('');
+  const [ftpStorageLimit, setFtpStorageLimit] = useState('');
+  const [ftpMessage, setFtpMessage] = useState<string | null>(null);
+  const [ftpError, setFtpError] = useState<string | null>(null);
+  const [isFtpSaving, setIsFtpSaving] = useState(false);
+  const [isFtpTesting, setIsFtpTesting] = useState(false);
+
+  
+  // Construction du payload FTP pour sauvegarde
+  const buildFtpSettingsPayload = () => ({
+    url: ftpUrl,
+    port: ftpPort,
+    secure: ftpSecure,
+    authRequired: ftpAuthRequired,
+    username: ftpUsername,
+    password: ftpPassword,
+    rootFolder: ftpRootFolder,
+    storageLimit: ftpStorageLimit,
+  });
+
+  // Gestion de la sauvegarde FTP
+  const handleSaveFtpSettings = (event?: React.FormEvent) => {
+    handleAsyncSave({
+      event,
+      setError: setFtpError,
+      setMessage: setFtpMessage,
+      setSaving: setIsFtpSaving,
+      doSave: async () => {
+        const config = buildFtpSettingsPayload();
+        await saveFtpConfig(config);
+        return config;
+      },
+      successMessage: 'Configuration FTP enregistrée.',
+      errorMessage: 'Erreur lors de la sauvegarde FTP.',
+    });
+  };
+
+  // Test de connexion FTP
+  const handleTestFtpConnection = async (event?: React.FormEvent) => {
+    if (event) event.preventDefault();
+    setFtpError(null);
+    setFtpMessage(null);
+    setIsFtpTesting(true);
+    try {
+      const config = buildFtpSettingsPayload();
+      const result = await testFtpConnection(config);
+      if (result.ok) {
+        setFtpMessage('Connexion FTP réussie.');
+      } else {
+        setFtpError(result.error || 'Échec de la connexion FTP.');
+      }
+    } catch (e: any) {
+      setFtpError(e.message || 'Erreur lors du test FTP.');
+    } finally {
+      setIsFtpTesting(false);
+    }
+  };
+
   const isAdmin = user?.username === 'admin';
 
   const tabParam = searchParams.get('tab');
@@ -232,7 +271,8 @@ export function Settings() {
 
     setIndexerUrl(incomingSettings.placeholders?.indexer?.url || '');
     setIndexerToken(incomingSettings.placeholders?.indexer?.token || '');
-    setIndexerDefaultQuality(incomingSettings.placeholders?.indexer?.defaultQuality || 'all');
+    setIndexerQualities(incomingSettings.placeholders?.indexer?.qualities || ['all']);
+    setIndexerLanguages(incomingSettings.placeholders?.indexer?.languages || ['all']);
 
     const notifSettings = incomingSettings.placeholders?.notifications || {};
     setDiscordWebhookUrl((notifSettings as any).discord?.webhookUrl || '');
@@ -290,6 +330,7 @@ export function Settings() {
       preferences: settings?.placeholders?.preferences || {},
       torrent: settings?.placeholders?.torrent || {},
       indexer: settings?.placeholders?.indexer || {},
+      ftp: settings?.placeholders?.ftp || {},
     },
   });
 
@@ -327,10 +368,6 @@ export function Settings() {
         setSettings(response);
         applySettingsToForms(response);
 
-        if (user?.username === 'admin') {
-          const globalSettings = await getGlobalSettings();
-          setTmdbApiKey(globalSettings.tmdbApiKey || '');
-        }
       } catch (loadError) {
         setError(
           loadError instanceof Error ? loadError.message : t('settings.messages.loadFailed'),
@@ -341,27 +378,7 @@ export function Settings() {
     void loadSettings();
   }, [isAuthenticated, setSettings, user?.username, t]);
 
-  useEffect(() => {
-    if (!isAuthenticated || user?.username !== 'admin') {
-      return;
-    }
-
-    const loadUsers = async () => {
-      setIsLoadingUsers(true);
-      try {
-        const loadedUsers = await listUsers();
-        setUsers(loadedUsers);
-      } catch (loadError) {
-        setUsersError(
-          loadError instanceof Error ? loadError.message : t('settings.messages.loadFailed'),
-        );
-      } finally {
-        setIsLoadingUsers(false);
-      }
-    };
-
-    void loadUsers();
-  }, [isAuthenticated, user]);
+  
 
   // Extraction de la logique commune de chargement des namespaces
   const fetchAndSetDatabaseNamespaces = async () => {
@@ -419,21 +436,6 @@ export function Settings() {
     void loadDatabaseEntry();
   }, [isAuthenticated, selectedDatabaseNamespace, t, user?.username]);
 
-  useEffect(() => {
-    if (!createdUserCredentials || isCreatedUserModalOpen) {
-      return;
-    }
-
-    if (isCreateUserOpen || resetPasswordTargetId !== null) {
-      return;
-    }
-
-    const openTimer = window.setTimeout(() => {
-      setIsCreatedUserModalOpen(true);
-    }, 0);
-
-    return () => window.clearTimeout(openTimer);
-  }, [createdUserCredentials, isCreateUserOpen, isCreatedUserModalOpen, resetPasswordTargetId]);
 
   if (!isLoading && !isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
@@ -460,30 +462,6 @@ export function Settings() {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleTmdbSave = async (event: React.FormEvent) => {
-    if (!tmdbApiKey.trim()) {
-      setTmdbError(t('settings.messages.tmdbKeyRequired'));
-      setIsTmdbSaving(false);
-      return;
-    }
-    await handleAsyncSave({
-      event,
-      setError: setTmdbError,
-      setMessage: setTmdbMessage,
-      setSaving: setIsTmdbSaving,
-      doSave: async () => {
-        const savedGlobalSettings = await updateGlobalSettings({
-          tmdbApiKey: tmdbApiKey.trim(),
-        });
-        setTmdbApiKey(savedGlobalSettings.tmdbApiKey || '');
-        await refresh();
-        return savedGlobalSettings;
-      },
-      successMessage: t('settings.messages.tmdbSaved'),
-      errorMessage: t('settings.messages.configFailed'),
-    });
   };
 
   const handleTorrentSave = async (event: React.FormEvent) => {
@@ -548,7 +526,8 @@ export function Settings() {
           indexer: {
             url: indexerUrl,
             token: indexerToken,
-            defaultQuality: indexerDefaultQuality,
+            qualities: indexerQualities,
+            languages: indexerLanguages,
           },
         });
         const savedSettings = await updateSettings(updatedSettings);
@@ -734,106 +713,7 @@ export function Settings() {
     });
   };
 
-  const handleCreateUser = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setUsersMessage(null);
-    setUsersError(null);
-    setCreatedUserCredentials(null);
-    setIsCreatingUser(true);
-
-    try {
-      if (!newUsername.trim()) {
-        setUsersError(t('auth.usernameRequired'));
-        setIsCreatingUser(false);
-        return;
-      }
-
-      const createdUser = await createUser(newUsername.trim());
-      setUsers((currentUsers) => [...currentUsers, createdUser]);
-      setNewUsername('');
-      setIsCreateUserOpen(false);
-      setUsersMessage(
-        t('settings.users.userCreated', {
-          username: createdUser.username,
-        }),
-      );
-      setCreatedUserCredentials({
-        username: createdUser.username,
-        password: createdUser.generatedPassword,
-      });
-      setGeneratedPasswordContext('create');
-      setIsGeneratedPasswordCopied(false);
-    } catch (submitError) {
-      setUsersError(
-        submitError instanceof Error ? submitError.message : t('settings.messages.updateFailed'),
-      );
-    } finally {
-      setIsCreatingUser(false);
-    }
-  };
-
-  const handleDeleteUser = async (userId: number, username: string) => {
-    setUsersMessage(null);
-    setUsersError(null);
-    setCreatedUserCredentials(null);
-    setIsDeletingUser(userId);
-
-    try {
-      await deleteUser(userId);
-      setUsers(users.filter((u) => u.id !== userId));
-      setUsersMessage(t('settings.users.userDeleted', { username }));
-    } catch (submitError) {
-      setUsersError(
-        submitError instanceof Error ? submitError.message : t('settings.messages.updateFailed'),
-      );
-    } finally {
-      setIsDeletingUser(null);
-    }
-  };
-
-  const handleResetUserPassword = async () => {
-    if (!resetPasswordTargetId) return;
-    setUsersError(null);
-    setCreatedUserCredentials(null);
-    setIsResettingPassword(true);
-
-    try {
-      const response = await resetUserPassword(resetPasswordTargetId);
-      const targetUser = users.find((u) => u.id === resetPasswordTargetId);
-      setResetPasswordTargetId(null);
-      setUsersMessage(
-        t('settings.users.passwordReset', {
-          username: targetUser?.username || 'utilisateur',
-        }),
-      );
-      setCreatedUserCredentials({
-        username: targetUser?.username || 'utilisateur',
-        password: response.generatedPassword,
-      });
-      setGeneratedPasswordContext('reset');
-      setIsGeneratedPasswordCopied(false);
-    } catch (submitError) {
-      setUsersError(
-        submitError instanceof Error ? submitError.message : t('settings.messages.updateFailed'),
-      );
-    } finally {
-      setIsResettingPassword(false);
-    }
-  };
-
-  const handleCopyGeneratedPassword = async () => {
-    if (!createdUserCredentials?.password) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(createdUserCredentials.password);
-      setIsGeneratedPasswordCopied(true);
-      setTimeout(() => setIsGeneratedPasswordCopied(false), 1500);
-    } catch {
-      setUsersError(t('settings.messages.updateFailed'));
-    }
-  };
+  
 
   const handleDatabaseReload = async () => {
     if (!selectedDatabaseNamespace) {
@@ -944,6 +824,12 @@ export function Settings() {
               className="flex-none text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white"
             >
               {t('settings.tabs.configuration')}
+            </TabsTrigger>
+            <TabsTrigger
+              value="ftp"
+              className="flex-none text-white data-[state=active]:bg-cyan-600 data-[state=active]:text-white"
+            >
+              {t('settings.tabs.storage')}
             </TabsTrigger>
             {user?.username === 'admin' && (
               <TabsTrigger
@@ -1079,48 +965,7 @@ export function Settings() {
 
         <TabsContent value="api">
           {user?.username === 'admin' ? (
-            <Card className="border-blue-500/30 bg-blue-950/15 text-white">
-              <CardHeader>
-                <CardTitle className="text-blue-200">{t('settings.api.tmdb.title')}</CardTitle>
-                <CardDescription className="text-blue-100/70">
-                  {t('settings.api.tmdb.description')}{' '}
-                  <a
-                    href="https://www.themoviedb.org/settings/api"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-300 hover:text-blue-200"
-                  >
-                    themoviedb.org
-                  </a>
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleTmdbSave} className="space-y-6 max-w-lg">
-                  <div className="space-y-2">
-                    <Label htmlFor="tmdb-api-key">{t('settings.api.tmdb.apiToken')}</Label>
-                    <Input
-                      id="tmdb-api-key"
-                      type="password"
-                      placeholder={t('settings.api.tmdb.placeholder')}
-                      value={tmdbApiKey}
-                      onChange={(event) => setTmdbApiKey(event.target.value)}
-                      className="bg-slate-900 border-white/10 text-white"
-                    />
-                  </div>
-
-                  {tmdbMessage && <p className="text-sm text-emerald-300">{tmdbMessage}</p>}
-                  {tmdbError && <p className="text-sm text-red-300">{tmdbError}</p>}
-
-                  <Button
-                    type="submit"
-                    disabled={isTmdbSaving}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    {isTmdbSaving ? t('common.saving') : t('settings.api.tmdb.save')}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+            <SettingTMDB></SettingTMDB>
           ) : null}
 
           <Card className="border-blue-500/30 bg-blue-950/15 text-white mt-6">
@@ -1270,21 +1115,53 @@ export function Settings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="indexer-default-quality">
-                    {t('settings.api.indexer.defaultQuality')}
-                  </Label>
-                  <select
-                    id="indexer-default-quality"
-                    value={indexerDefaultQuality}
-                    onChange={(e) => setIndexerDefaultQuality(e.target.value)}
-                    className="w-full bg-slate-900 border border-white/10 text-white rounded-md px-3 py-2"
-                  >
+                  <Label>{t('settings.api.indexer.defaultQuality')}</Label>
+                  <div className="flex flex-wrap gap-3">
                     {QUALITY_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {t(option.labelKey)}
-                      </option>
+                      <label key={option} className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          value={option}
+                          checked={indexerQualities.includes(option)}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setIndexerQualities((prev) =>
+                              checked
+                                ? [...prev, option]
+                                : prev.filter((v) => v !== option)
+                            );
+                          }}
+                          className="accent-cyan-600"
+                        />
+                        <span>{option}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t('settings.api.indexer.defaultLanguage')}</Label>
+                  <div className="flex flex-wrap gap-3">
+                    {LANGUAGE_OPTIONS.map((option) => (
+                      <label key={option} className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          value={option}
+                          checked={indexerLanguages.includes(option)}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setIndexerLanguages((prev) =>
+                              checked
+                                ? [...prev, option]
+                                : prev.filter((v) => v !== option)
+                            );
+                          }}
+                          className="accent-cyan-600"
+                        />
+                        <span>{option}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 {indexerMessage && <p className="text-sm text-emerald-300">{indexerMessage}</p>}
@@ -1440,257 +1317,68 @@ export function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+        <TabsContent value="ftp">
+          <Card className="border-cyan-500/30 bg-cyan-950/15 text-white max-w-lg">
+            <CardHeader>
+              <CardTitle className="text-cyan-200"> {t('settings.tabs.storage')}</CardTitle>
+              <CardDescription className="text-cyan-100/70">
+                {t('settings.ftp.description')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveFtpSettings} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="ftp-url">URL FTP</Label>
+                  <Input id="ftp-url" type="text" value={ftpUrl} onChange={e => setFtpUrl(e.target.value)} className="bg-slate-900 border-white/10 text-white" placeholder="ftp://monserveur.com" />
+                </div>
+                <div className="flex gap-4">
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="ftp-port">Port</Label>
+                    <Input id="ftp-port" type="number" value={ftpPort} onChange={e => setFtpPort(e.target.value)} className="bg-slate-900 border-white/10 text-white" placeholder="21" />
+                  </div>
+                  <div className="flex-1 space-y-2 flex items-center gap-2 mt-6">
+                    <input id="ftp-secure" type="checkbox" checked={ftpSecure} onChange={e => setFtpSecure(e.target.checked)} />
+                    <Label htmlFor="ftp-secure">FTPS (SSL/TLS)</Label>
+                  </div>
+                </div>
+                <div className="space-y-2 flex items-center gap-2">
+                  <input id="ftp-auth-required" type="checkbox" checked={ftpAuthRequired} onChange={e => setFtpAuthRequired(e.target.checked)} />
+                  <Label htmlFor="ftp-auth-required">Authentification requise</Label>
+                </div>
+                {ftpAuthRequired && (
+                  <div className="flex gap-4">
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor="ftp-username">Nom d'utilisateur</Label>
+                      <Input id="ftp-username" type="text" value={ftpUsername} onChange={e => setFtpUsername(e.target.value)} className="bg-slate-900 border-white/10 text-white" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor="ftp-password">Mot de passe</Label>
+                      <Input id="ftp-password" type="password" value={ftpPassword} onChange={e => setFtpPassword(e.target.value)} className="bg-slate-900 border-white/10 text-white" />
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="ftp-root-folder">Dossier racine</Label>
+                  <Input id="ftp-root-folder" type="text" value={ftpRootFolder} onChange={e => setFtpRootFolder(e.target.value)} className="bg-slate-900 border-white/10 text-white" placeholder="/" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ftp-storage-limit">Limite de stockage (Go)</Label>
+                  <Input id="ftp-storage-limit" type="number" min="0" value={ftpStorageLimit} onChange={e => setFtpStorageLimit(e.target.value)} className="bg-slate-900 border-white/10 text-white" placeholder="100" />
+                </div>
+                {ftpMessage && <p className="text-sm text-emerald-300">{ftpMessage}</p>}
+                {ftpError && <p className="text-sm text-red-300">{ftpError}</p>}
+                <Button type="submit" disabled={isFtpSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                  {isFtpSaving ? 'Enregistrement...' : 'Enregistrer'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {user?.username === 'admin' && (
           <>
             <TabsContent value="users">
-              <Card className="border-orange-500/30 bg-orange-950/15 text-white">
-                <CardHeader>
-                  <CardTitle className="text-orange-200">{t('settings.users.title')}</CardTitle>
-                  <CardDescription className="text-orange-100/70">
-                    {t('settings.users.description')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Create User Button + Dialog */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      {usersMessage && <p className="text-sm text-emerald-300">{usersMessage}</p>}
-                      {usersError && <p className="text-sm text-red-300">{usersError}</p>}
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        setUsersMessage(null);
-                        setUsersError(null);
-                        setCreatedUserCredentials(null);
-                        setNewUsername('');
-                        setIsCreateUserOpen(true);
-                      }}
-                      className="bg-orange-600 hover:bg-orange-700 text-white"
-                    >
-                      {t('settings.users.createNew')}
-                    </Button>
-                  </div>
-
-                  <Dialog
-                    open={isCreateUserOpen}
-                    onOpenChange={(open) => {
-                      if (!isCreatingUser) {
-                        setIsCreateUserOpen(open);
-                        if (!open) {
-                          setUsersError(null);
-                        }
-                      }
-                    }}
-                  >
-                    <DialogContent className="border-orange-500/30 bg-slate-950 text-white">
-                      <DialogHeader>
-                        <DialogTitle className="text-orange-200">
-                          {t('settings.users.createNew')}
-                        </DialogTitle>
-                        <DialogDescription className="text-white/70">
-                          {t('settings.users.createDescription')}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handleCreateUser}>
-                        <div className="space-y-4 py-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="new-username">{t('settings.users.username')}</Label>
-                            <Input
-                              id="new-username"
-                              placeholder="john_doe"
-                              value={newUsername}
-                              onChange={(e) => setNewUsername(e.target.value)}
-                              className="bg-slate-900 border-white/10 text-white"
-                              autoFocus
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-xs text-white/60">
-                              {t('settings.users.passwordGeneratedOnCreate')}
-                            </p>
-                          </div>
-                          {usersError && <p className="text-sm text-red-300">{usersError}</p>}
-                        </div>
-                        <DialogFooter className="mt-4">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => setIsCreateUserOpen(false)}
-                            disabled={isCreatingUser}
-                            className="border border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
-                          >
-                            {t('common.cancel')}
-                          </Button>
-                          <Button
-                            type="submit"
-                            disabled={isCreatingUser}
-                            className="bg-orange-600 hover:bg-orange-700 text-white"
-                          >
-                            {isCreatingUser ? t('common.saving') : t('settings.users.create')}
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-
-                  <Dialog
-                    open={isCreatedUserModalOpen && createdUserCredentials !== null}
-                    onOpenChange={(open) => {
-                      setIsCreatedUserModalOpen(open);
-                      if (!open) {
-                        setIsGeneratedPasswordCopied(false);
-                        setCreatedUserCredentials(null);
-                      }
-                    }}
-                  >
-                    <DialogContent className="border-emerald-500/30 bg-slate-950 text-white">
-                      <DialogHeader>
-                        <DialogTitle className="text-emerald-200">
-                          {t('settings.users.generatedPasswordTitle')}
-                        </DialogTitle>
-                        <DialogDescription className="text-white/70">
-                          {generatedPasswordContext === 'create'
-                            ? t('settings.users.generatedPasswordDescription', {
-                              username: createdUserCredentials?.username || '',
-                            })
-                            : t('settings.users.generatedPasswordDescriptionReset', {
-                              username: createdUserCredentials?.username || '',
-                            })}
-                        </DialogDescription>
-                      </DialogHeader>
-
-                      <button
-                        type="button"
-                        onClick={() => void handleCopyGeneratedPassword()}
-                        className={
-                          'group rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 w-full text-left transition-all ' +
-                          (isGeneratedPasswordCopied
-                            ? 'ring-2 ring-emerald-400/60'
-                            : 'hover:bg-emerald-400/10 focus-visible:ring-2 focus-visible:ring-emerald-400/60')
-                        }
-                        title={isGeneratedPasswordCopied ? t('common.copied') : t('common.copy')}
-                      >
-                        <p className="text-xs text-emerald-100/80">
-                          {t('settings.users.newPassword')}
-                        </p>
-                        <div className="mt-1 flex items-center justify-between gap-2">
-                          <p className="font-mono text-lg text-emerald-100 select-all">
-                            {createdUserCredentials?.password}
-                          </p>
-                          <span className="h-8 w-8 flex items-center justify-center text-emerald-100/70">
-                            {isGeneratedPasswordCopied ? (
-                              <Check className="h-4 w-4" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </span>
-                        </div>
-                      </button>
-
-                      <DialogFooter>
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            setIsCreatedUserModalOpen(false);
-                            setIsGeneratedPasswordCopied(false);
-                            setCreatedUserCredentials(null);
-                          }}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                        >
-                          {t('common.close')}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-
-                  {/* Reset Password Dialog */}
-                  <Dialog
-                    open={resetPasswordTargetId !== null}
-                    onOpenChange={(open) => {
-                      if (!isResettingPassword && !open) {
-                        setResetPasswordTargetId(null);
-                        setUsersError(null);
-                      }
-                    }}
-                  >
-                    <DialogContent className="border-blue-500/30 bg-slate-950 text-white">
-                      <DialogHeader>
-                        <DialogTitle className="text-blue-200">
-                          {t('settings.users.resetPasswordTitle')}
-                        </DialogTitle>
-                        <DialogDescription className="text-white/70">
-                          {t('settings.users.resetPasswordDescription', {
-                            username:
-                              users.find((u) => u.id === resetPasswordTargetId)?.username ?? '',
-                          })}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-3 py-2">
-                        <p className="text-sm text-white/70">
-                          {t('settings.users.passwordGeneratedOnReset')}
-                        </p>
-                        {usersError && <p className="text-sm text-red-300">{usersError}</p>}
-                      </div>
-                      <DialogFooter>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => {
-                            setResetPasswordTargetId(null);
-                            setUsersError(null);
-                          }}
-                          disabled={isResettingPassword}
-                          className="border border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
-                        >
-                          {t('common.cancel')}
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={() => void handleResetUserPassword()}
-                          disabled={isResettingPassword}
-                          className="bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                          {isResettingPassword ? t('common.saving') : t('settings.users.resetButton')}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-
-
-                  {/* Display : if big screen */}
-                  <div className="hidden lg:block gap-6 lg:grid-cols-[280px_minmax(0,1fr)] overflow-x-auto max-w-full">
-                    <UserList
-                      users={users}
-                      isLoading={isLoadingUsers}
-                      isDeletingUser={isDeletingUser}
-                      t={t}
-                      onResetPassword={(userId) => {
-                        setUsersError(null);
-                        setResetPasswordTargetId(userId);
-                      }}
-                      onDeleteUser={(userId, username) => void handleDeleteUser(userId, username)}
-                    />
-                  </div>
-
-                </CardContent>
-              </Card>
-
-              {/* Display : if small screen */}
-              <div className="lg:hidden mt-6">
-                <UserList
-                  users={users}
-                  isLoading={isLoadingUsers}
-                  isDeletingUser={isDeletingUser}
-                  t={t}
-                  onResetPassword={(userId) => {
-                    setUsersError(null);
-                    setResetPasswordTargetId(userId);
-                  }}
-                  onDeleteUser={(userId, username) => void handleDeleteUser(userId, username)}
-                />
-              </div>
+              <SettingUsers></SettingUsers>
             </TabsContent>
 
             <TabsContent value="database">

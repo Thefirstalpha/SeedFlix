@@ -293,12 +293,6 @@ export function TorrentResultsPanel({
                         </Badge>
                       ) : null}
                     </div>
-
-                    {Array.isArray(item.categories) && item.categories.length > 0 ? (
-                      <p className="text-xs text-white/50 line-clamp-1 break-all">
-                        {labels.categories(item.categories.join(', '))}
-                      </p>
-                    ) : null}
                   </div>
                 );
               })}

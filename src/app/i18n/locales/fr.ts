@@ -415,6 +415,10 @@ const fr = {
       users: 'Utilisateurs',
       database: 'Base de données',
       factory: 'Réinitialisation',
+      storage: 'Stockage',
+    },
+    storage: {
+      description: 'Configurez votre accès FTP/FTPS pour le stockage distant de vos fichiers.',
     },
     about: {
       versionLabel: "Version de l'image: {{version}}",
@@ -509,6 +513,7 @@ const fr = {
         url: "URL de l'indexer",
         token: 'Jeton API',
         defaultQuality: 'Qualité par défaut',
+        defaultLanguage: 'Langue par défaut',
       },
     },
     notifications: {
@@ -610,17 +615,7 @@ const fr = {
       confirmDescription:
         'Toutes les données locales seront remises à zéro (utilisateur, paramètres, wishlist films/séries) puis votre session sera expirée. Cette action est irréversible.',
       confirmAction: 'Oui, réinitialiser',
-    },
-    quality: {
-      all: 'Toutes qualités',
-      '2160p': '2160p (4K)',
-      '1080p': '1080p',
-      '720p': '720p',
-      '480p': '480p',
-      bluray: 'BluRay',
-      webdl: 'WEB-DL / WEBRip',
-      hdtv: 'HDTV',
-    },
+    }
   },
 } as const;
 

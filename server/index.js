@@ -15,6 +15,7 @@ import { registerTorznabRoutes } from './modules/torznab.js';
 import { registerTmdbRoutes } from './modules/tmdb.js';
 import { registerWishlistRoutes } from './modules/wishlist.js';
 import { registerNotificationRoutes } from './modules/notifications.js';
+import { registerFtpRoutes } from './modules/ftp.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,6 +49,7 @@ app.get('/api/health', (_req, res) => {
 startCompletedTorrentsPolling({ intervalMs: 60000 }); // 1 min par défaut
 startIndexerWishlistPolling();
 
+
 registerAuthRoutes(app);
 registerWishlistRoutes(app);
 registerTransmissionRoutes(app);
@@ -55,6 +57,7 @@ registerTorznabRoutes(app);
 registerTmdbRoutes(app);
 registerNotificationRoutes(app);
 registerIndexerRoutes(app);
+registerFtpRoutes(app);
 
 app.use(express.static(clientDistDir));
 
