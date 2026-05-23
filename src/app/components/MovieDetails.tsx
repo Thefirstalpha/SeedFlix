@@ -11,12 +11,12 @@ import { normalizeIndexerLanguage, normalizeQuality } from '../services/indexerN
 import {
   getMovieById,
   searchMovieReleases,
-  type TorznabMovieResult,
 } from '../services/movieService';
 import { buildTorrentResultsLabels } from '../services/torrentResultsLabels';
 import { addTorrentToClient } from '../services/torrentService';
 import { addToWishlist, removeFromWishlist, isInWishlist } from '../services/wishlistService';
 import type { Movie } from '../types/movie';
+import { IndexerMovieResult } from '../../../common/indexer';
 
 const MOVIE_QUALITY_FILTERS = ['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv'];
 
@@ -28,7 +28,7 @@ export function MovieDetails() {
   const [movie, setMovie] = useState<Movie | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [inWishlist, setInWishlist] = useState(false);
-  const [releaseResults, setReleaseResults] = useState<TorznabMovieResult[]>([]);
+  const [releaseResults, setReleaseResults] = useState<IndexerMovieResult[]>([]);
   const [isReleaseLoading, setIsReleaseLoading] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
   const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
@@ -40,13 +40,6 @@ export function MovieDetails() {
   const [sortBy, setSortBy] = useState<'size' | 'date'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const ITEMS_PER_PAGE = 10;
-
-  useEffect(() => {
-    const preferred = String(
-      settings?.placeholders?.indexer?.defaultQuality || 'all',
-    ).toLowerCase();
-    setQualityFilter(MOVIE_QUALITY_FILTERS.includes(preferred) ? preferred : 'all');
-  }, [settings?.placeholders?.indexer?.defaultQuality]);
 
   const filteredReleaseResults = useMemo(() => {
     let results = releaseResults.filter((item) => {
@@ -63,8 +56,8 @@ export function MovieDetails() {
     // Apply sorting
     if (sortBy === 'size') {
       results.sort((a, b) => {
-        const sizeA = a.sizeBytes || 0;
-        const sizeB = b.sizeBytes || 0;
+        const sizeA = a.size || 0;
+        const sizeB = b.size || 0;
         return sortOrder === 'desc' ? sizeB - sizeA : sizeA - sizeB;
       });
     } else if (sortBy === 'date') {
@@ -114,8 +107,7 @@ export function MovieDetails() {
         setReleaseError(null);
         try {
           const indexerResponse = await searchMovieReleases(
-            movieData.originalTitle || movieData.title,
-            12,
+            100,
             movieData.id,
           );
           setReleaseResults(indexerResponse.items);

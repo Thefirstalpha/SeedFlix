@@ -1,4 +1,6 @@
-const fr = {
+import { I18nMessages } from "../LanguageProvider";
+
+const fr : I18nMessages = {
   common: {
     appName: 'SeedFlix',
     save: 'Enregistrer',
@@ -458,7 +460,7 @@ const fr = {
       tmdbSaved: 'Clé API TMDB configurée avec succès.',
       configFailed: 'Configuration impossible',
       savedButTestFailed: 'Configuration enregistrée, mais le test de connexion a échoué',
-      savedButTestFailedWithReason: 'Configuration enregistrée, mais le test a échoué: {{reason}}',
+      configurationFailed: 'La configuration a échoué: {{reason}}',
       discordWebhookRequired: "L'URL du webhook Discord est requise",
       discordConfigured: 'Webhook Discord configuré et testé avec succès!',
       browserUnsupported: 'Ce navigateur ne supporte pas les notifications web.',
@@ -470,7 +472,7 @@ const fr = {
       resetFailed: 'Réinitialisation impossible',
       testNotificationSent: 'Notification de test envoyee',
       testNotificationFailed: "Impossible d'envoyer la notification de test",
-      configurationSavedWithResponse: 'Configuration enregistrée. {{response}}',
+      configurationSaved: 'Configuration enregistrée.',
     },
     security: {
       title: 'Modifier le mot de passe',

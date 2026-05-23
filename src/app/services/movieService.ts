@@ -1,3 +1,4 @@
+import { IndexerMovieResponse } from '../../../common/indexer';
 import { API_BASE_URL, getTmdbImageUrl, getTmdbLanguageParam } from '../config/tmdb';
 import type { Movie, TMDBMovie, TMDBMovieDetails, TMDBSearchResponse } from '../types/movie';
 import { TMDB_GENRES } from '../types/movie';
@@ -14,29 +15,7 @@ export interface GenreItem {
   name: string;
 }
 
-export interface TorznabMovieResult {
-  title: string;
-  link: string;
-  downloadUrl?: string;
-  tmdbId?: string | null;
-  guid?: string;
-  pubDate?: string;
-  size?: number | null;
-  sizeHuman?: string | null;
-  seeders?: number | null;
-  leechers?: number | null;
-  quality?: string | null;
-  language?: string | null;
-  categories?: string[];
-  attributes?: Record<string, string>;
-}
 
-export interface TorznabMovieSearchResponse {
-  ok: boolean;
-  query: string;
-  sourceTitle?: string | null;
-  items: TorznabMovieResult[];
-}
 
 export interface DiscoverFilters {
   genreId?: number;
@@ -359,15 +338,11 @@ export async function getMovieById(id: number, uiLanguage = 'fr'): Promise<Movie
 }
 
 export async function searchMovieReleases(
-  query: string,
   limit = 12,
-  tmdbId?: number | string,
-): Promise<TorznabMovieSearchResponse> {
-  const tmdbPart =
-    tmdbId !== undefined && tmdbId !== null ? `&tmdbId=${encodeURIComponent(String(tmdbId))}` : '';
-
+  tmdbId: number | string,
+): Promise<IndexerMovieResponse> {
   const response = await fetch(
-    `${API_BASE_URL}/indexer/search?query=${encodeURIComponent(query)}&limit=${limit}${tmdbPart}`,
+    `${API_BASE_URL}/indexer/search/movies/${String(tmdbId)}?limit=${limit}`,
     {
       credentials: 'include',
     },
@@ -380,8 +355,6 @@ export async function searchMovieReleases(
 
   return {
     ok: Boolean(data?.ok),
-    query: String(data?.query || query),
-    sourceTitle: data?.sourceTitle ? String(data.sourceTitle) : null,
     items: Array.isArray(data?.items) ? data.items : [],
   };
 }

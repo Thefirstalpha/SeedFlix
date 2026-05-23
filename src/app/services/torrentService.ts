@@ -1,3 +1,4 @@
+import { IndexerMovieResult } from '../../../common/indexer';
 import { API_BASE_URL } from '../config/tmdb';
 
 export interface TorrentAddResponse {
@@ -11,31 +12,6 @@ export interface TorrentAddResponse {
   } | null;
 }
 
-export interface TorrentDownloadItem {
-  id: number;
-  name: string;
-  status: number;
-  statusLabel: string;
-  progress: number;
-  rateDownload: number;
-  eta: number;
-  totalSize: number;
-  downloadDir: string;
-  addedDate: number;
-  isFinished: boolean;
-  leftUntilDone: number;
-  peersConnected: number;
-  error: number;
-  errorString: string;
-  hashString: string;
-  managedBySeedflix?: boolean;
-}
-
-export interface TorrentDownloadsResponse {
-  ok: boolean;
-  torrents: TorrentDownloadItem[];
-  activeCount: number;
-}
 
 async function parseJson<T>(response: Response): Promise<T> {
   const data = await response.json();
@@ -68,11 +44,11 @@ export async function getTorrentDownloads(includeAll = false) {
     params.set('includeAll', 'true');
   }
 
-  const response = await fetch(`${API_BASE_URL}/torrent/downloads?${params.toString()}`, {
+  const response = await fetch(`${API_BASE_URL}/transmission/downloads?${params.toString()}`, {
     credentials: 'include',
   });
 
-  return parseJson<TorrentDownloadsResponse>(response);
+  return parseJson<IndexerMovieResult>(response);
 }
 
 export async function pauseTorrent(id: number) {

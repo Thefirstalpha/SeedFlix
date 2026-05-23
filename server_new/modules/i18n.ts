@@ -17,6 +17,11 @@ interface Translation {
         usernameAlreadyExists: string;
     };
     settings: {
+        transmission: {
+            actionFailed: string;
+            invalidUrl: string;
+            authFailed: string;
+        }
         failedUpdate: string;
     };
 }
@@ -42,6 +47,12 @@ const messagesList: Record<string, Translation> = {
             userNotFound: "Utilisateur non trouvé"
         },
         settings: {
+            transmission: {
+                authFailed: "Échec de l'authentification avec Transmission. Veuillez vérifier vos paramètres.",
+                invalidUrl: "URL Transmission invalide",
+                actionFailed: "Échec de l'action."
+
+            },
             failedUpdate: 'Échec de la mise à jour des paramètres'
         }
     },
@@ -64,6 +75,11 @@ const messagesList: Record<string, Translation> = {
             userNotFound: 'User not found'
         },
         settings: {
+            transmission: {
+                authFailed: 'Failed to authenticate with Transmission. Please check your settings.',
+                invalidUrl: 'Invalid Transmission URL',
+                actionFailed: 'Failed to perform action.'
+            },
             failedUpdate: 'Failed to update settings'
         }
     },

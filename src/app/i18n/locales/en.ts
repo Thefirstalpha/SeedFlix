@@ -1,4 +1,6 @@
-const en = {
+import { I18nMessages } from "../LanguageProvider";
+
+const en: I18nMessages = {
   common: {
     appName: 'SeedFlix',
     save: 'Save',
@@ -453,7 +455,7 @@ const en = {
       tmdbSaved: 'TMDB API key saved successfully.',
       configFailed: 'Configuration failed',
       savedButTestFailed: 'Configuration saved, but connection test failed',
-      savedButTestFailedWithReason: 'Configuration saved, but test failed: {{reason}}',
+      configurationFailed: 'Configuration failed: {{reason}}',
       discordWebhookRequired: 'Discord webhook URL is required',
       discordConfigured: 'Discord webhook configured and tested successfully!',
       browserUnsupported: 'This browser does not support web notifications.',
@@ -465,7 +467,7 @@ const en = {
       resetFailed: 'Reset failed',
       testNotificationSent: 'Test notification sent',
       testNotificationFailed: 'Unable to send test notification',
-      configurationSavedWithResponse: 'Configuration saved. {{response}}',
+      configurationSaved: 'Configuration saved.',
     },
     security: {
       title: 'Change password',

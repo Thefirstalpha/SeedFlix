@@ -9,4 +9,4 @@ export const config = {
 
 
 
-export const logger = pino();
+export const logger = pino()

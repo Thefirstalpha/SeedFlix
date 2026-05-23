@@ -110,8 +110,7 @@ export function SeriesDetails() {
     const loadSeasonEpisodeReleases = async () => {
       try {
         // Recherche ciblée avec le format "Series S01E" pour attraper les épisodes individuels
-        const episodeQuery = `${series.originalTitle || series.title} ${seasonFilter}E`;
-        const indexerResponse = await searchSeriesReleases(episodeQuery, 50);
+        const indexerResponse = await searchSeriesReleases(series.id, 50, seasonFilter);
 
         // Fusionner avec les résultats existants en évitant les doublons
         setReleaseResults((prev) => {
@@ -225,9 +224,8 @@ export function SeriesDetails() {
         setReleaseError(null);
         try {
           const indexerResponse = await searchSeriesReleases(
-            seriesData.originalTitle || seriesData.title,
-            SERIES_RELEASE_SEARCH_LIMIT,
             seriesData.id,
+            SERIES_RELEASE_SEARCH_LIMIT,
           );
           setReleaseResults(indexerResponse.items);
         } catch (indexerLoadError) {

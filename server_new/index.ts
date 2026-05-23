@@ -1,14 +1,18 @@
 // Point d'entrée principal du backend TypeScript
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
+
 import { randomUUID } from "crypto"
 import cookieParser from "cookie-parser"
 import { router as authRouter } from './routes/auth';
 import { router as wishlistRouter } from './routes/wishlist';
 import { router as userRouter } from './routes/user';
 import { router as tmdbRouter } from './routes/tmdb';
+import { router as transmissionRouter } from './routes/transmission';
+import { router as indexerRouter } from './routes/indexer';
 import { User } from './modules/user';
 import { logger } from './config';
 import { initDB } from './modules/db';
+import { ErrorCode } from './modules/errors';
 
 initDB();
 
@@ -43,12 +47,23 @@ app.use('/api', authRouter);
 app.use('/api', userRouter);
 app.use('/api', wishlistRouter);
 app.use('/api', tmdbRouter);
+app.use('/api', transmissionRouter);
+app.use('/api', indexerRouter);
 
 // Exemple de route racine
 app.get('/api/health', (req, res) => {
     res.json({ ok: true });
 });
 
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+    if (err instanceof ErrorCode) {
+        logger.error(`Error: ${err.message}`,);
+        res.status(400).json({ error: err.message });
+    } else {
+        logger.error(err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+})
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

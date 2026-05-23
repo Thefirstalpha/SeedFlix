@@ -175,7 +175,7 @@ export function Root() {
             showNotificationToast(latestUnread.type, toastTitle, toastDescription);
           } else {
             toast.info(
-              delta > 1 ? t('root.toasts.manyNew', { count: delta }) : t('root.toasts.oneNew'),
+              delta > 1 ? message('root.toasts.manyNew', { count: delta }) : message('root.toasts.oneNew'),
               {
                 description: t('root.toasts.updatesAvailable'),
               },
