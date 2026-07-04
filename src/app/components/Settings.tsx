@@ -1,4 +1,3 @@
-import { Check, Copy } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
@@ -17,14 +16,8 @@ import {
 } from './ui/alert-dialog';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog';
+
+
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
@@ -33,31 +26,22 @@ import { useAuth } from '../context/AuthContext';
 import { useI18n, type SupportedLanguage } from '../i18n/LanguageProvider';
 import {
   changePassword,
-  getGlobalSettings,
   getDatabaseNamespace,
   getSettings,
   resetSettings,
-  testIndexerConnection,
-  testTorrentConnection,
-  updateGlobalSettings,
   updateDatabaseNamespace,
   updateSettings,
   listDatabaseNamespaces,
   type DatabaseNamespaceEntry,
   type UserSettings,
-  listUsers,
-  createUser,
-  deleteUser,
-  resetUserPassword,
-  type User,
 } from '../services/authService';
 import * as notificationService from '../services/notificationService';
-import { UserList } from './settings/UserList';
 import { testFtpConnection } from '../services/ftpService';
 import { SettingTMDB } from './settings/SettingTMDB';
 import { SettingUsers } from './settings/SettingUsers';
 import { SettingTransmission } from './settings/SettingTransmission';
 import { SettingIndexer } from './settings/SettingIndexer';
+import { SettingDatabase } from './settings/SettingDatabase';
 
 // Fonction utilitaire générique pour la gestion des sauvegardes asynchrones
 async function handleAsyncSave<T = any>({
@@ -150,16 +134,6 @@ export function Settings() {
   const [testNotifError, setTestNotifError] = useState<string | null>(null);
   const [isSendingTestNotif, setIsSendingTestNotif] = useState(false);
 
-  // User Management State
-  const [databaseNamespaces, setDatabaseNamespaces] = useState<DatabaseNamespaceEntry[]>([]);
-  const [selectedDatabaseNamespace, setSelectedDatabaseNamespace] = useState('');
-  const [databaseRawValue, setDatabaseRawValue] = useState('');
-  const [databaseUpdatedAt, setDatabaseUpdatedAt] = useState('');
-  const [databaseMessage, setDatabaseMessage] = useState<string | null>(null);
-  const [databaseError, setDatabaseError] = useState<string | null>(null);
-  const [isLoadingDatabaseNamespaces, setIsLoadingDatabaseNamespaces] = useState(false);
-  const [isLoadingDatabaseValue, setIsLoadingDatabaseValue] = useState(false);
-  const [isSavingDatabaseValue, setIsSavingDatabaseValue] = useState(false);
 
   // État pour la configuration FTP
   const [ftpUrl, setFtpUrl] = useState('');
@@ -353,61 +327,7 @@ export function Settings() {
 
   
 
-  // Extraction de la logique commune de chargement des namespaces
-  const fetchAndSetDatabaseNamespaces = async () => {
-    setIsLoadingDatabaseNamespaces(true);
-    try {
-      const response = await listDatabaseNamespaces();
-      const namespaces = Array.isArray(response.namespaces) ? response.namespaces : [];
-      setDatabaseNamespaces(namespaces);
-      if (namespaces.length === 0) {
-        setDatabaseRawValue('');
-        setDatabaseUpdatedAt('');
-      }
-      setSelectedDatabaseNamespace((current) => {
-        if (current && namespaces.some((entry) => entry.namespace === current)) {
-          return current;
-        }
-        return namespaces[0]?.namespace || '';
-      });
-    } catch (err) {
-      setDatabaseError(err instanceof Error ? err.message : t('settings.database.loadFailed'));
-    } finally {
-      setIsLoadingDatabaseNamespaces(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!isAuthenticated || user?.username !== 'admin') {
-      return;
-    }
-    void fetchAndSetDatabaseNamespaces();
-  }, [isAuthenticated, t, user?.username]);
-
-  useEffect(() => {
-    if (!isAuthenticated || user?.username !== 'admin' || !selectedDatabaseNamespace) {
-      return;
-    }
-
-    const loadDatabaseEntry = async () => {
-      setIsLoadingDatabaseValue(true);
-      setDatabaseError(null);
-      setDatabaseMessage(null);
-      try {
-        const entry = await getDatabaseNamespace(selectedDatabaseNamespace);
-        setDatabaseRawValue(entry.value || '');
-        setDatabaseUpdatedAt(entry.updatedAt || '');
-      } catch (loadError) {
-        setDatabaseError(
-          loadError instanceof Error ? loadError.message : t('settings.database.entryLoadFailed'),
-        );
-      } finally {
-        setIsLoadingDatabaseValue(false);
-      }
-    };
-
-    void loadDatabaseEntry();
-  }, [isAuthenticated, selectedDatabaseNamespace, t, user?.username]);
+  
 
 
   if (!isLoading && !isAuthenticated) {
@@ -596,78 +516,6 @@ export function Settings() {
     });
   };
 
-  
-
-  const handleDatabaseReload = async () => {
-    if (!selectedDatabaseNamespace) {
-      return;
-    }
-
-    setDatabaseError(null);
-    setDatabaseMessage(null);
-    setIsLoadingDatabaseValue(true);
-    try {
-      const entry = await getDatabaseNamespace(selectedDatabaseNamespace);
-      setDatabaseRawValue(entry.value || '');
-      setDatabaseUpdatedAt(entry.updatedAt || '');
-      setDatabaseMessage(t('settings.database.reloaded'));
-    } catch (reloadError) {
-      setDatabaseError(
-        reloadError instanceof Error ? reloadError.message : t('settings.database.entryLoadFailed'),
-      );
-    } finally {
-      setIsLoadingDatabaseValue(false);
-    }
-  };
-
-  const handleDatabaseNamespacesReload = async () => {
-    setDatabaseError(null);
-    setDatabaseMessage(null);
-    await fetchAndSetDatabaseNamespaces();
-    setDatabaseMessage(t('settings.database.listReloaded'));
-  };
-
-  const handleDatabasePrettyFormat = () => {
-    setDatabaseError(null);
-    try {
-      const prettyValue = JSON.stringify(JSON.parse(databaseRawValue), null, 2);
-      setDatabaseRawValue(prettyValue);
-    } catch {
-      setDatabaseError(t('settings.database.invalidJson'));
-    }
-  };
-
-  const handleDatabaseSave = async () => {
-    if (!selectedDatabaseNamespace) {
-      return;
-    }
-
-    setDatabaseError(null);
-    setDatabaseMessage(null);
-    setIsSavingDatabaseValue(true);
-    try {
-      const updatedEntry = await updateDatabaseNamespace(
-        selectedDatabaseNamespace,
-        databaseRawValue,
-      );
-      setDatabaseRawValue(updatedEntry.value || '');
-      setDatabaseUpdatedAt(updatedEntry.updatedAt || '');
-      setDatabaseNamespaces((current) =>
-        current.map((entry) =>
-          entry.namespace === updatedEntry.namespace
-            ? { namespace: updatedEntry.namespace, updatedAt: updatedEntry.updatedAt }
-            : entry,
-        ),
-      );
-      setDatabaseMessage(t('settings.database.saved'));
-    } catch (saveError) {
-      setDatabaseError(
-        saveError instanceof Error ? saveError.message : t('settings.database.saveFailed'),
-      );
-    } finally {
-      setIsSavingDatabaseValue(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -1057,70 +905,7 @@ export function Settings() {
             </TabsContent>
 
             <TabsContent value="database">
-              {/* Desktop : Card avec grid */}
-              <Card className="border-teal-500/30 bg-teal-950/15 text-white">
-                <CardHeader>
-                  <CardTitle className="text-teal-200">{t('settings.database.title')}</CardTitle>
-                  <CardDescription className="text-teal-100/70">
-                    {t('settings.database.description')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                    {t('settings.database.warning')}
-                  </div>
-                  <div className="hidden lg:block overflow-x-auto max-w-full">
-                    <DatabaseNamespaceList
-                      t={t}
-                      isLoading={isLoadingDatabaseNamespaces}
-                      namespaces={databaseNamespaces}
-                      selectedNamespace={selectedDatabaseNamespace}
-                      onReload={handleDatabaseNamespacesReload}
-                      onSelect={setSelectedDatabaseNamespace}
-                    />
-
-                    <DatabaseRawEditorPanel
-                      t={t}
-                      selectedNamespace={selectedDatabaseNamespace}
-                      updatedAt={databaseUpdatedAt}
-                      isLoadingValue={isLoadingDatabaseValue}
-                      isSavingValue={isSavingDatabaseValue}
-                      rawValue={databaseRawValue}
-                      onRawValueChange={setDatabaseRawValue}
-                      onReload={handleDatabaseReload}
-                      onPrettyFormat={handleDatabasePrettyFormat}
-                      onSave={handleDatabaseSave}
-                      message={databaseMessage}
-                      error={databaseError}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-              {/* Mobile/tablette : composants hors Card */}
-              <div className="flex flex-col gap-6 lg:hidden mt-6">
-                <DatabaseNamespaceList
-                  t={t}
-                  isLoading={isLoadingDatabaseNamespaces}
-                  namespaces={databaseNamespaces}
-                  selectedNamespace={selectedDatabaseNamespace}
-                  onReload={handleDatabaseNamespacesReload}
-                  onSelect={setSelectedDatabaseNamespace}
-                />
-                <DatabaseRawEditorPanel
-                  t={t}
-                  selectedNamespace={selectedDatabaseNamespace}
-                  updatedAt={databaseUpdatedAt}
-                  isLoadingValue={isLoadingDatabaseValue}
-                  isSavingValue={isSavingDatabaseValue}
-                  rawValue={databaseRawValue}
-                  onRawValueChange={setDatabaseRawValue}
-                  onReload={handleDatabaseReload}
-                  onPrettyFormat={handleDatabasePrettyFormat}
-                  onSave={handleDatabaseSave}
-                  message={databaseMessage}
-                  error={databaseError}
-                />
-              </div>
+              <SettingDatabase></SettingDatabase>
             </TabsContent>
 
             <TabsContent value="factory">

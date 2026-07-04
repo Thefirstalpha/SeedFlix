@@ -1,7 +1,8 @@
+import { WishListItem } from '../../../common/wishlist';
 import { API_BASE_URL } from '../config/tmdb';
 import type { SeriesWishlistEntry, SeriesWishlistStatus } from '../types/seriesWishlist';
 
-const BASE = `${API_BASE_URL}/series-wishlist`;
+const BASE = `${API_BASE_URL}/wishlist`;
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { credentials: 'include' });
@@ -20,7 +21,39 @@ async function sendJson(url: string, method: 'POST' | 'DELETE', body?: unknown):
   });
 }
 
-export async function getSeriesWishlist(): Promise<SeriesWishlistEntry[]> {
+export async function addToWishlist(tmdbId: number, season?: number, episode?: number): Promise<void> {
+  await fetch(`${API_BASE_URL}/wishlist`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      type: 'series',
+      tmdbId: tmdbId,
+      season: season,
+      episode: episode,
+    }),
+  });
+}
+
+export async function removeFromWishlist(tmdbId: number, season?: number, episode?: number): Promise<void> {
+  await fetch(`${API_BASE_URL}/wishlist`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      type: 'series',
+      tmdbId: tmdbId,
+      season: season,
+      episode: episode,
+    }),
+  });
+}
+
+export async function getSeriesWishlist(): Promise<WishListItem[]> {
   try {
     const data = await fetchJson<unknown>(BASE);
     return Array.isArray(data) ? data : [];
@@ -29,27 +62,17 @@ export async function getSeriesWishlist(): Promise<SeriesWishlistEntry[]> {
   }
 }
 
-export async function getSeriesWishlistStatus(seriesId: number): Promise<SeriesWishlistStatus> {
+export async function getSeriesWishlistStatus(seriesId: number): Promise<WishListItem | undefined> {
   try {
-    return await fetchJson<SeriesWishlistStatus>(`${BASE}/series/${seriesId}/status`);
+    const data = await fetchJson<any>(`${BASE}/${seriesId}`);
+    if (data && typeof data === 'object' && 'exists' in data && typeof data.exists === 'boolean') {
+      return data.exists && 'content' in data ? (data.content as WishListItem) : undefined;
+    }
   } catch {
-    return { seriesInWishlist: false, seasonsInWishlist: [], episodesInWishlist: [] };
+    return undefined;
   }
 }
 
-export async function addToSeriesWishlist(
-  entry: Omit<SeriesWishlistEntry, 'entryId'>,
-): Promise<void> {
-  await sendJson(BASE, 'POST', entry);
-}
-
-export async function removeFromSeriesWishlist(entryId: string): Promise<void> {
-  await sendJson(`${BASE}/entry/${encodeURIComponent(entryId)}`, 'DELETE');
-}
-
-export async function removeMultipleFromSeriesWishlist(entryIds: string[]): Promise<void> {
-  await sendJson(`${BASE}/bulk`, 'DELETE', { entryIds });
-}
 
 export async function getSeriesWishlistCount(): Promise<number> {
   const wishlist = await getSeriesWishlist();

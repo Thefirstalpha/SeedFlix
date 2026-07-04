@@ -51,7 +51,7 @@ router.get('/indexer/search/series/:id', async (req, res) => {
     const id = Number(req.params.id);
     const limit = Number(req.query.limit) || 100;
     const offset = Number(req.query.offset) || 0;
-    const season = Number(req.query.season) || undefined;
+    const season = req.query.season;
 
     const items = await searchSeriesIndexer(req.user.id, id, limit, offset, season);
     const data : IndexerSeriesResponse = {

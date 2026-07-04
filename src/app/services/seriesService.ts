@@ -353,7 +353,7 @@ export async function getSeriesSeasonEpisodes(
 export async function searchSeriesReleases(
   tmdbId?: number | string,
   limit = 12,
-  season?: number,
+  season?: string | number,
 ): Promise<IndexerSeriesResponse> {
   let additionalFilter = '';
   if (season !== undefined) {

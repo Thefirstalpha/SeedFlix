@@ -12,6 +12,7 @@ import { getWishlistCount } from '../services/wishlistService';
 import { Button } from './ui/button';
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { useSearchState } from '../context/SearchStateContext';
+import { getUserStatusBar } from '../services/authService';
 
 type UnreadNotificationsEvent = CustomEvent<{ count: number }>;
 const NOTIFICATIONS_POLL_INTERVAL_MS = 5000;
@@ -89,23 +90,33 @@ export function Root() {
   const canShowNavigationActions = isAuthenticated && !isSetupPage && !hasPendingSetup;
 
   useEffect(() => {
-    if (!canShowNavigationActions) {
-      setWishlistCount(0);
+    if (!isAuthenticated || isSetupPage || hasPendingSetup) {
+        setDownloadsCount(0);
+        setWishlistCount(0);
+        setUnreadNotificationsCount(0);
       return;
     }
 
-    const loadCount = async () => {
-      const [movieCount, seriesCount] = await Promise.all([
-        getWishlistCount(),
-        getSeriesWishlistCount(),
-      ]);
-      setWishlistCount(movieCount + seriesCount);
+    const loadUserStatusBar = async () => {
+      try {
+        const response = await getUserStatusBar();
+        setDownloadsCount(response.downloads || 0);
+        setWishlistCount(response.wishlist || 0);
+        setUnreadNotificationsCount(response.notifications || 0);
+      } catch {
+        setDownloadsCount(0);
+        setWishlistCount(0);
+        setUnreadNotificationsCount(0);
+      }
     };
 
-    void loadCount();
+    void loadUserStatusBar();
+    const interval = setInterval(() => {
+      void loadUserStatusBar();
+    }, 7000);
 
     const handleImmediateWishlistRefresh = () => {
-      void loadCount();
+      void loadUserStatusBar();
     };
 
     window.addEventListener('seedflix:wishlist-refresh-request', handleImmediateWishlistRefresh);
@@ -115,30 +126,8 @@ export function Root() {
         'seedflix:wishlist-refresh-request',
         handleImmediateWishlistRefresh,
       );
+      clearInterval(interval);
     };
-  }, [canShowNavigationActions, location.pathname]);
-
-  useEffect(() => {
-    if (!isAuthenticated || isSetupPage || hasPendingSetup) {
-      setDownloadsCount(0);
-      return;
-    }
-
-    const loadDownloadsCount = async () => {
-      try {
-        const response = await getTorrentDownloads();
-        setDownloadsCount(response.activeCount || 0);
-      } catch {
-        setDownloadsCount(0);
-      }
-    };
-
-    void loadDownloadsCount();
-    const interval = setInterval(() => {
-      void loadDownloadsCount();
-    }, 7000);
-
-    return () => clearInterval(interval);
   }, [isAuthenticated, isSetupPage, hasPendingSetup, location.pathname]);
 
   useEffect(() => {

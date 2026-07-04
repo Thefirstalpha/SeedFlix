@@ -1,3 +1,4 @@
+import { UserStatusBar } from '../../../common/user';
 import { API_BASE_URL } from '../config/tmdb';
 
 export interface AuthUser {
@@ -333,4 +334,15 @@ export async function updateDatabaseNamespace(namespace: string, value: string) 
     response,
     "Impossible de mettre à jour l'entrée de base de données",
   );
+}
+
+
+
+
+export async function getUserStatusBar() {
+  const response = await fetch(`${API_BASE_URL}/user`, {
+    credentials: 'include',
+  });
+
+  return parseJson<UserStatusBar>(response);
 }

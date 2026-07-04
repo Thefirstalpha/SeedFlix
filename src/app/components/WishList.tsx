@@ -6,7 +6,6 @@ import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { WishListCard } from './WishListCard';
-import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/LanguageProvider';
 import {
   getIndexerResults,
@@ -15,14 +14,9 @@ import {
   validateIndexerResult,
   type IndexerResultTarget,
 } from '../services/indexerResultService';
-import {
-  getSeriesWishlist,
-  removeMultipleFromSeriesWishlist,
-} from '../services/seriesWishlistService';
 import { addTorrentToClient } from '../services/torrentService';
 import { getWishlist, removeMultipleFromWishlist } from '../services/wishlistService';
-import type { Movie } from '../types/movie';
-import type { SeriesWishlistEntry } from '../types/seriesWishlist';
+import { WishListItem } from '../../../common/wishlist';
 
 
 
@@ -46,23 +40,20 @@ export function WishList() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t } = useI18n();
-  const { settings } = useAuth();
   const [actionKey, setActionKey] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('movies');
 
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [wishlist, setWishlist] = useState<WishListItem[]>([]);
+  const [selectedMovieIds, setSelectedMovieIds] = useState<number[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-  const [seriesEntries, setSeriesEntries] = useState<SeriesWishlistEntry[]>([]);
-  const [selectedEntryIds, setSelectedEntryIds] = useState<string[]>([]);
+  const [selectedSeriesIds, setSelectedSeriesIds] = useState<number[]>([]);
   const [isSeriesSelectionMode, setIsSeriesSelectionMode] = useState(false);
   const [indexerTargets, setIndexerTargets] = useState<IndexerResultTarget[]>([]);
   const [indexerError, setIndexerError] = useState<string | null>(null);
 
   useEffect(() => {
     loadWishlist();
-    loadSeriesWishlist();
     loadIndexerResults();
   }, []);
 
@@ -102,16 +93,12 @@ export function WishList() {
   }, [searchParams, activeTab, indexerTargets]);
 
   const loadWishlist = async () => {
-    const wishlist = await getWishlist();
-    setMovies(wishlist);
-    setSelectedIds([]);
+    const data = await getWishlist();
+    setWishlist(data);
+    setSelectedMovieIds([]);
+    setSelectedSeriesIds([]);
   };
 
-  const loadSeriesWishlist = async () => {
-    const entries = await getSeriesWishlist();
-    setSeriesEntries(entries);
-    setSelectedEntryIds([]);
-  };
 
   const loadIndexerResults = async () => {
     try {
@@ -123,25 +110,26 @@ export function WishList() {
     }
   };
 
-  const toggleSelection = (movieId: number) => {
-    if (selectedIds.includes(movieId)) {
-      setSelectedIds(selectedIds.filter((id) => id !== movieId));
-    } else {
-      setSelectedIds([...selectedIds, movieId]);
-    }
+  const movies = wishlist.filter((i) => i.type === 'movie');
+  const seriesItems = wishlist.filter((i) => i.type === 'series');
+
+  const toggleSelection = (tmdbId: number) => {
+    setSelectedMovieIds((prev) =>
+      prev.includes(tmdbId) ? prev.filter((id) => id !== tmdbId) : [...prev, tmdbId],
+    );
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === movies.length) {
-      setSelectedIds([]);
+    if (selectedMovieIds.length === movies.length) {
+      setSelectedMovieIds([]);
     } else {
-      setSelectedIds(movies.map((m) => m.id));
+      setSelectedMovieIds(movies.map((m) => m.tmdb));
     }
   };
 
   const handleRemoveSelected = async () => {
-    if (selectedIds.length > 0) {
-      await removeMultipleFromWishlist(selectedIds);
+    if (selectedMovieIds.length > 0) {
+      await removeMultipleFromWishlist(selectedMovieIds);
       await Promise.all([loadWishlist(), loadIndexerResults()]);
       setIsSelectionMode(false);
       window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
@@ -150,30 +138,30 @@ export function WishList() {
   };
 
   const cancelSelection = () => {
-    setSelectedIds([]);
+    setSelectedMovieIds([]);
     setIsSelectionMode(false);
   };
 
   // ── Series selection helpers ───────────────────────────────────────────────
 
-  const toggleSeriesEntry = (entryId: string) => {
-    setSelectedEntryIds((prev) =>
-      prev.includes(entryId) ? prev.filter((id) => id !== entryId) : [...prev, entryId],
+  const toggleSeriesSelection = (tmdbId: number) => {
+    setSelectedSeriesIds((prev) =>
+      prev.includes(tmdbId) ? prev.filter((id) => id !== tmdbId) : [...prev, tmdbId],
     );
   };
 
   const toggleSelectAllSeries = () => {
-    if (selectedEntryIds.length === seriesEntries.length) {
-      setSelectedEntryIds([]);
+    if (selectedSeriesIds.length === seriesItems.length) {
+      setSelectedSeriesIds([]);
     } else {
-      setSelectedEntryIds(seriesEntries.map((e) => e.entryId));
+      setSelectedSeriesIds(seriesItems.map((s) => s.tmdb));
     }
   };
 
   const handleRemoveSelectedSeries = async () => {
-    if (selectedEntryIds.length > 0) {
-      await removeMultipleFromSeriesWishlist(selectedEntryIds);
-      await Promise.all([loadSeriesWishlist(), loadIndexerResults()]);
+    if (selectedSeriesIds.length > 0) {
+      await removeMultipleFromWishlist(selectedSeriesIds);
+      await Promise.all([loadWishlist(), loadIndexerResults()]);
       setIsSeriesSelectionMode(false);
       window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
       window.dispatchEvent(new CustomEvent('seedflix:notifications-refresh-request'));
@@ -181,53 +169,34 @@ export function WishList() {
   };
 
   const cancelSeriesSelection = () => {
-    setSelectedEntryIds([]);
+    setSelectedSeriesIds([]);
     setIsSeriesSelectionMode(false);
   };
 
-  const groupedSeries = seriesEntries.reduce<
-    Array<{
-      seriesId: number;
-      seriesTitle: string;
-      seriesPoster: string;
-      seriesEntry?: SeriesWishlistEntry;
-      seasons: SeriesWishlistEntry[];
-      episodes: SeriesWishlistEntry[];
-    }>
-  >((groups, entry) => {
-    const existing = groups.find((g) => g.seriesId === entry.seriesId);
-    const group = existing || {
-      seriesId: entry.seriesId,
-      seriesTitle: entry.seriesTitle,
-      seriesPoster: entry.seriesPoster,
-      seasons: [],
-      episodes: [],
+  const groupedSeries = seriesItems.map((item) => {
+    const seasonEntries = Object.entries(item.seasons)
+      .map(([key, s]) => ({ seasonNumber: Number(key), all_episodes: s.all_episodes, episodes: s.episodes }))
+      .sort((a, b) => a.seasonNumber - b.seasonNumber);
+    const seasonsAllEpisodes = seasonEntries.filter((s) => s.all_episodes);
+    const episodeEntries = seasonEntries
+      .flatMap((s) => s.episodes.map((ep) => ({ seasonNumber: s.seasonNumber, episodeNumber: ep })))
+      .sort((a, b) =>
+        a.seasonNumber !== b.seasonNumber
+          ? a.seasonNumber - b.seasonNumber
+          : a.episodeNumber - b.episodeNumber,
+      );
+    return {
+      tmdb: item.tmdb,
+      title: item.title,
+      poster_path: item.poster_path ?? '',
+      genre: item.genre,
+      rating: item.rating,
+      all_seasons: item.all_seasons,
+      releaseDate: item.releaseDate,
+      seasons: seasonsAllEpisodes,
+      episodes: episodeEntries,
     };
-
-    if (!existing) {
-      groups.push(group);
-    }
-
-    if (entry.type === 'series') {
-      group.seriesEntry = entry;
-    } else if (entry.type === 'season') {
-      group.seasons.push(entry);
-    } else {
-      group.episodes.push(entry);
-    }
-
-    return groups;
-  }, []);
-
-  groupedSeries.sort((a, b) => a.seriesTitle.localeCompare(b.seriesTitle, 'fr'));
-  for (const group of groupedSeries) {
-    group.seasons.sort((a, b) => (a.seasonNumber || 0) - (b.seasonNumber || 0));
-    group.episodes.sort((a, b) => {
-      const seasonDelta = (a.seasonNumber || 0) - (b.seasonNumber || 0);
-      if (seasonDelta !== 0) return seasonDelta;
-      return (a.episodeNumber || 0) - (b.episodeNumber || 0);
-    });
-  }
+  }).sort((a, b) => a.title.localeCompare(b.title, 'fr'));
 
   const uniqueSeriesCount = groupedSeries.length;
   const movieCountLabel = t(
@@ -239,52 +208,7 @@ export function WishList() {
     { count: uniqueSeriesCount },
   );
 
-  const getGroupEntryIds = (group: {
-    seriesEntry?: SeriesWishlistEntry;
-    seasons: SeriesWishlistEntry[];
-    episodes: SeriesWishlistEntry[];
-  }) => {
-    const ids: string[] = [];
-    if (group.seriesEntry) {
-      ids.push(group.seriesEntry.entryId);
-    }
-    ids.push(...group.seasons.map((season) => season.entryId));
-    ids.push(...group.episodes.map((episode) => episode.entryId));
-    return ids;
-  };
-
-  const isGroupFullySelected = (group: {
-    seriesEntry?: SeriesWishlistEntry;
-    seasons: SeriesWishlistEntry[];
-    episodes: SeriesWishlistEntry[];
-  }) => {
-    const ids = getGroupEntryIds(group);
-    if (ids.length === 0) return false;
-    return ids.every((id) => selectedEntryIds.includes(id));
-  };
-
-  const toggleSeriesGroup = (group: {
-    seriesEntry?: SeriesWishlistEntry;
-    seasons: SeriesWishlistEntry[];
-    episodes: SeriesWishlistEntry[];
-  }) => {
-    const ids = getGroupEntryIds(group);
-    if (ids.length === 0) return;
-
-    setSelectedEntryIds((prev) => {
-      const allSelected = ids.every((id) => prev.includes(id));
-      if (allSelected) {
-        return prev.filter((id) => !ids.includes(id));
-      }
-      return Array.from(new Set([...prev, ...ids]));
-    });
-  };
-
   const indexerTargetsByKey = new Map(indexerTargets.map((target) => [target.targetKey, target]));
-
-  const spoilerModeEnabled = Boolean(
-    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode,
-  );
 
   const handleRejectIndexerResult = async (target: IndexerResultTarget, indexerStateKey: string) => {
     const key = `${target.targetKey}:${indexerStateKey}:reject`;
@@ -334,7 +258,7 @@ export function WishList() {
       }
 
       // Reload data (best effort - continue even if one fails)
-      await Promise.allSettled([loadIndexerResults(), loadWishlist(), loadSeriesWishlist()]);
+      await Promise.allSettled([loadIndexerResults(), loadWishlist()]);
     } catch (error) {
       console.error('Error adding torrent from wishlist:', error);
       // Data stays visible even if error occurs
@@ -405,17 +329,17 @@ export function WishList() {
                       variant="outline"
                       className="bg-purple-600 hover:bg-purple-700 text-white"
                     >
-                      {selectedIds.length === movies.length
+                      {selectedMovieIds.length === movies.length
                         ? t('wishlistPage.actions.deselectAll')
                         : t('wishlistPage.actions.selectAll')}
                     </Button>
                     <Button
                       onClick={handleRemoveSelected}
-                      disabled={selectedIds.length === 0}
+                      disabled={selectedMovieIds.length === 0}
                       className="bg-red-600 hover:bg-red-700 text-white"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      {t('wishlistPage.actions.removeCount', { count: selectedIds.length })}
+                      {t('wishlistPage.actions.removeCount', { count: selectedMovieIds.length })}
                     </Button>
                   </>
                 )}
@@ -426,10 +350,11 @@ export function WishList() {
           {movies.length > 0 ? (
             <div className="space-y-4">
               {movies.map((movie) => {
-                const movieIndexerTarget = indexerTargetsByKey.get(`movie:${movie.id}`);
+                const movieIndexerTarget = indexerTargetsByKey.get(`movie:${movie.tmdb}`);
+                const movieYear = movie.releaseDate ? new Date(movie.releaseDate).getFullYear() : 0;
                 return (
                   <div
-                    key={movie.id}
+                    key={movie.tmdb}
                     className={
                       isSelectionMode
                         ? undefined
@@ -437,7 +362,7 @@ export function WishList() {
                     }
                     onClick={() => {
                       if (!isSelectionMode) {
-                        navigate(`/movie/${movie.id}`);
+                        navigate(`/movie/${movie.tmdb}`);
                       }
                     }}
                     tabIndex={isSelectionMode ? -1 : 0}
@@ -445,16 +370,16 @@ export function WishList() {
                     onKeyDown={(e) => {
                       if (!isSelectionMode && (e.key === 'Enter' || e.key === ' ')) {
                         e.preventDefault();
-                        navigate(`/movie/${movie.id}`);
+                        navigate(`/movie/${movie.tmdb}`);
                       }
                     }}
                   >
                     <WishListCard
-                      poster={movie.poster}
+                      poster={movie.poster_path ?? ''}
                       title={movie.title}
-                      year={movie.year}
-                      rating={movie.rating}
-                      genre={movie.genre}
+                      year={movieYear}
+                      rating={movie.rating ?? 0}
+                      genre={movie.genre ?? ''}
                       targets={movieIndexerTarget ? [movieIndexerTarget] : []}
                       type="movie"
                       actionKey={actionKey}
@@ -474,8 +399,8 @@ export function WishList() {
                           }}
                         >
                           <Checkbox
-                            checked={selectedIds.includes(movie.id)}
-                            onCheckedChange={() => toggleSelection(movie.id)}
+                            checked={selectedMovieIds.includes(movie.tmdb)}
+                            onCheckedChange={() => toggleSelection(movie.tmdb)}
                             className="border-slate-900"
                           />
                         </div>
@@ -506,7 +431,7 @@ export function WishList() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <h3 className="text-2xl font-bold text-white">{t('wishlistPage.series.title')}</h3>
 
-            {seriesEntries.length > 0 && (
+            {seriesItems.length > 0 && (
               <div className="flex gap-2 flex-wrap">
                 {!isSeriesSelectionMode ? (
                   <Button
@@ -532,17 +457,17 @@ export function WishList() {
                       variant="outline"
                       className="bg-cyan-600 hover:bg-cyan-700 text-white"
                     >
-                      {selectedEntryIds.length === seriesEntries.length
+                      {selectedSeriesIds.length === seriesItems.length
                         ? t('wishlistPage.actions.deselectAll')
                         : t('wishlistPage.actions.selectAll')}
                     </Button>
                     <Button
                       onClick={handleRemoveSelectedSeries}
-                      disabled={selectedEntryIds.length === 0}
+                      disabled={selectedSeriesIds.length === 0}
                       className="bg-red-600 hover:bg-red-700 text-white"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      {t('wishlistPage.actions.removeCount', { count: selectedEntryIds.length })}
+                      {t('wishlistPage.actions.removeCount', { count: selectedSeriesIds.length })}
                     </Button>
                   </>
                 )}
@@ -553,15 +478,16 @@ export function WishList() {
           {groupedSeries.length > 0 ? (
             <div className="space-y-4">
               {groupedSeries.map((group) => {
+                const year = group.releaseDate ? new Date(group.releaseDate).getFullYear() : 0;
                 const seriesIndexerKeys = Array.from(
                   new Set([
-                    `series:${group.seriesId}`,
+                    `series:${group.tmdb}`,
                     ...group.seasons.map(
-                      (season) => `season:${group.seriesId}:${season.seasonNumber}`,
+                      (season) => `season:${group.tmdb}:${season.seasonNumber}`,
                     ),
                     ...group.episodes.map(
                       (episode) =>
-                        `episode:${group.seriesId}:${episode.seasonNumber}:${episode.episodeNumber}`,
+                        `episode:${group.tmdb}:${episode.seasonNumber}:${episode.episodeNumber}`,
                     ),
                   ]),
                 );
@@ -571,7 +497,7 @@ export function WishList() {
 
                 return (
                   <div
-                    key={group.seriesId}
+                    key={group.tmdb}
                     className={
                       isSeriesSelectionMode
                         ? undefined
@@ -579,7 +505,7 @@ export function WishList() {
                     }
                     onClick={() => {
                       if (!isSeriesSelectionMode) {
-                        navigate(`/series/${group.seriesId}`);
+                        navigate(`/series/${group.tmdb}`);
                       }
                     }}
                     tabIndex={isSeriesSelectionMode ? -1 : 0}
@@ -587,16 +513,16 @@ export function WishList() {
                     onKeyDown={(e) => {
                       if (!isSeriesSelectionMode && (e.key === 'Enter' || e.key === ' ')) {
                         e.preventDefault();
-                        navigate(`/series/${group.seriesId}`);
+                        navigate(`/series/${group.tmdb}`);
                       }
                     }}
                   >
                     <WishListCard
-                      poster={group.seriesPoster}
-                      title={group.seriesTitle}
-                      year={group.seriesEntry?.year || 0}
-                      rating={group.seriesEntry?.rating || 0}
-                      genre={group.seriesEntry?.genre || ''}
+                      poster={group.poster_path}
+                      title={group.title}
+                      year={year}
+                      genre={group.genre}
+                      rating={group.rating}
                       targets={groupIndexerTargets}
                       type="series"
                       actionKey={actionKey}
@@ -606,20 +532,20 @@ export function WishList() {
                     >
                       {isSeriesSelectionMode && (
                         <div
-                          className="mt-2"
+                          className="mb-2"
                           onClick={(event) => event.stopPropagation()}
                           tabIndex={0}
                           role="presentation"
                           onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
+                            if (event.key === 'Enter' || event.key === ' ') {
                               event.stopPropagation();
                             }
                           }}
                         >
                           <label className="inline-flex items-center gap-2 text-sm text-white/80">
                             <Checkbox
-                              checked={isGroupFullySelected(group)}
-                              onCheckedChange={() => toggleSeriesGroup(group)}
+                              checked={selectedSeriesIds.includes(group.tmdb)}
+                              onCheckedChange={() => toggleSeriesSelection(group.tmdb)}
                               className="border-white/40"
                             />
                             {t('wishlistPage.series.selectWhole')}
@@ -627,27 +553,8 @@ export function WishList() {
                         </div>
                       )}
                       <div className="space-y-3 pl-1">
-                        {group.seriesEntry && (
-                          <div
-                            className="flex items-center gap-2"
-                            onClick={(event) => event.stopPropagation()}
-                            tabIndex={0}
-                            role="presentation"
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.stopPropagation();
-                              }
-                            }}
-                          >
-                            {isSeriesSelectionMode && (
-                              <Checkbox
-                                checked={selectedEntryIds.includes(group.seriesEntry.entryId)}
-                                onCheckedChange={() =>
-                                  toggleSeriesEntry(group.seriesEntry!.entryId)
-                                }
-                                className="border-white/40"
-                              />
-                            )}
+                        {group.all_seasons && (
+                          <div className="flex items-center gap-2">
                             <Badge className="bg-cyan-600/20 text-cyan-200 border-cyan-500/30">
                               <Tv className="w-3 h-3 mr-1" />
                               {t('wishlistPage.series.fullSeries')}
@@ -661,35 +568,15 @@ export function WishList() {
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {group.seasons.map((season) => (
-                                <div
-                                  key={season.entryId}
-                                  className="flex items-center gap-2"
-                                  onClick={(event) => event.stopPropagation()}
-                                  tabIndex={0}
-                                  role="presentation"
-                                  onKeyDown={(event) => {
-                                    if (event.key === "Enter" || event.key === " ") {
-                                      event.stopPropagation();
-                                    }
-                                  }}
+                                <Badge
+                                  key={season.seasonNumber}
+                                  variant="outline"
+                                  className="border-purple-500/50 text-purple-300"
                                 >
-                                  {isSeriesSelectionMode && (
-                                    <Checkbox
-                                      checked={selectedEntryIds.includes(season.entryId)}
-                                      onCheckedChange={() => toggleSeriesEntry(season.entryId)}
-                                      className="border-white/40"
-                                    />
-                                  )}
-                                  <Badge
-                                    variant="outline"
-                                    className="border-purple-500/50 text-purple-300"
-                                  >
-                                    {season.seasonName ??
-                                      t('wishlistPage.series.seasonNumber', {
-                                        number: season.seasonNumber || 0,
-                                      })}
-                                  </Badge>
-                                </div>
+                                  {t('wishlistPage.series.seasonNumber', {
+                                    number: season.seasonNumber,
+                                  })}
+                                </Badge>
                               ))}
                             </div>
                           </div>
@@ -701,39 +588,17 @@ export function WishList() {
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {group.episodes.map((episode) => (
-                                <div
-                                  key={episode.entryId}
-                                  className="flex items-center gap-2"
-                                  onClick={(event) => event.stopPropagation()}
-                                  tabIndex={0}
-                                  role="presentation"
-                                  onKeyDown={(event) => {
-                                    if (event.key === "Enter" || event.key === " ") {
-                                      event.stopPropagation();
-                                    }
-                                  }}
+                                <Badge
+                                  key={`${episode.seasonNumber}-${episode.episodeNumber}`}
+                                  variant="outline"
+                                  className="border-white/20 text-white/70"
                                 >
-                                  {isSeriesSelectionMode && (
-                                    <Checkbox
-                                      checked={selectedEntryIds.includes(episode.entryId)}
-                                      onCheckedChange={() => toggleSeriesEntry(episode.entryId)}
-                                      className="border-white/40"
-                                    />
+                                  {getEpisodeCode(
+                                    '',
+                                    episode.seasonNumber,
+                                    episode.episodeNumber,
                                   )}
-                                  <Badge
-                                    variant="outline"
-                                    className="border-white/20 text-white/70"
-                                  >
-                                    {getEpisodeCode(
-                                      '',
-                                      episode.seasonNumber,
-                                      episode.episodeNumber,
-                                    )}
-                                    {!spoilerModeEnabled && episode.episodeName
-                                      ? ` - ${episode.episodeName}`
-                                      : ''}
-                                  </Badge>
-                                </div>
+                                </Badge>
                               ))}
                             </div>
                           </div>

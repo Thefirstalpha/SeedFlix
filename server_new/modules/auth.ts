@@ -62,7 +62,7 @@ export function resetAuth(userId: number) {
     return generatedPassword;
 }
 
-export function getAuths() : { id: number, username: string }[] {
+export function getUsers() : { id: number, username: string }[] {
     const result = db.prepare('SELECT user_id, username FROM auth_users').all();
     return result.map((row: any) => ({ id: row.user_id, username: row.username }));
 }

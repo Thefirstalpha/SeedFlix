@@ -9,12 +9,15 @@ import { router as userRouter } from './routes/user';
 import { router as tmdbRouter } from './routes/tmdb';
 import { router as transmissionRouter } from './routes/transmission';
 import { router as indexerRouter } from './routes/indexer';
+import { router as dbRouter } from './routes/db';
 import { User } from './modules/user';
-import { logger } from './config';
 import { initDB } from './modules/db';
 import { ErrorCode } from './modules/errors';
 
+import { Logger } from './logger';
+
 initDB();
+Logger.init();
 
 declare module "express-serve-static-core" {
     interface Request {
@@ -27,21 +30,7 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser("204e03f6-18b8-4c8c-945a-d32a1a5b9f20"));
 
-app.use((req, res, next) => {
-    req.correlationId = randomUUID();
-    const start = Date.now();
-    res.on("finish", () => {
-        const duration = Date.now() - start;
-        logger.info({
-            method: req.method,
-            url: req.originalUrl,
-            status: res.statusCode,
-            duration,
-            correlationId: req.correlationId,
-        }, "express_request")
-    })
-    next();
-});
+app.use(Logger.express());
 
 app.use('/api', authRouter);
 app.use('/api', userRouter);
@@ -49,6 +38,7 @@ app.use('/api', wishlistRouter);
 app.use('/api', tmdbRouter);
 app.use('/api', transmissionRouter);
 app.use('/api', indexerRouter);
+app.use('/api', dbRouter);
 
 // Exemple de route racine
 app.get('/api/health', (req, res) => {
@@ -57,10 +47,10 @@ app.get('/api/health', (req, res) => {
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof ErrorCode) {
-        logger.error(`Error: ${err.message}`,);
+        console.error(`Error: ${err.message}`,);
         res.status(400).json({ error: err.message });
     } else {
-        logger.error(err);
+        console.error(err);
         res.status(500).json({ error: 'Internal server error' });
     }
 })

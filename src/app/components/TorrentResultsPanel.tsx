@@ -46,21 +46,21 @@ export type TorrentResultsLabels = {
   sortBySizeAria: string;
 };
 
+export interface FilterOption {
+  quality?: string;
+  language?: string;
+  season?: string;
+  sortBy: 'size' | 'date';
+  sortOrder: 'asc' | 'desc';
+}
+
 interface TorrentResultsPanelProps {
   title: string;
   description?: string;
-  qualityFilter: string;
-  onQualityFilterChange: (value: string) => void;
-  languageFilter: string;
-  onLanguageFilterChange: (value: string) => void;
-  seasonFilter?: string;
-  onSeasonFilterChange?: (value: string) => void;
+  filter: FilterOption;
+  onFilterChange: (filter: FilterOption) => void;
   availableReleaseSeasons?: string[];
   availableReleaseLanguages: string[];
-  sortBy: 'size' | 'date';
-  onSortByChange: (value: 'size' | 'date') => void;
-  sortOrder: 'asc' | 'desc';
-  onSortOrderToggle: () => void;
   isReleaseLoading: boolean;
   releaseError: string | null;
   torrentStatus: string | null;
@@ -81,18 +81,11 @@ const QUALITY_OPTIONS = ['2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'h
 export function TorrentResultsPanel({
   title,
   description,
-  qualityFilter,
-  onQualityFilterChange,
-  languageFilter,
-  onLanguageFilterChange,
-  seasonFilter,
-  onSeasonFilterChange,
+  type,
+  filter,
+  onFilterChange,
   availableReleaseSeasons,
   availableReleaseLanguages,
-  sortBy,
-  onSortByChange,
-  sortOrder,
-  onSortOrderToggle,
   isReleaseLoading,
   releaseError,
   torrentStatus,
@@ -116,14 +109,14 @@ export function TorrentResultsPanel({
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          {onSeasonFilterChange && availableReleaseSeasons ? (
+          {availableReleaseSeasons ? (
             <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
               <label className="text-sm text-white/70 whitespace-nowrap font-medium">
                 {labels.season}
               </label>
               <select
-                value={seasonFilter || 'all'}
-                onChange={(event) => onSeasonFilterChange(event.target.value)}
+                value={filter.season || 'all'}
+                onChange={(event) => onFilterChange({ ...filter, season: event.target.value })}
                 className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
               >
                 <option value="all">{labels.all}</option>
@@ -141,8 +134,8 @@ export function TorrentResultsPanel({
               {labels.quality}
             </label>
             <select
-              value={qualityFilter}
-              onChange={(event) => onQualityFilterChange(event.target.value)}
+              value={filter.quality || 'all'}
+              onChange={(event) => onFilterChange({ ...filter, quality: event.target.value })}
               className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
             >
               <option value="all">{labels.all}</option>
@@ -163,8 +156,8 @@ export function TorrentResultsPanel({
               {labels.language}
             </label>
             <select
-              value={languageFilter}
-              onChange={(event) => onLanguageFilterChange(event.target.value)}
+              value={filter.language || 'all'}
+              onChange={(event) => onFilterChange({ ...filter, language: event.target.value })}
               className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
             >
               <option value="all">{labels.all}</option>
@@ -180,10 +173,10 @@ export function TorrentResultsPanel({
             <span className="text-sm text-white/70 font-medium">{labels.sort}</span>
             <ToggleGroup
               type="single"
-              value={sortBy}
+              value={filter.sortBy}
               onValueChange={(value) => {
                 if (value) {
-                  onSortByChange(value as 'size' | 'date');
+                  onFilterChange({ ...filter, sortBy: value as 'size' | 'date' });
                 }
               }}
               className="border border-white/20 rounded-md bg-slate-900/30"
@@ -205,10 +198,10 @@ export function TorrentResultsPanel({
             </ToggleGroup>
             <Button
               size="sm"
-              onClick={onSortOrderToggle}
+              onClick={() => onFilterChange({ ...filter, sortOrder: filter.sortOrder === 'desc' ? 'asc' : 'desc' })}
               className="h-9 px-3 border border-white/20 text-white/80 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all"
             >
-              {sortOrder === 'desc' ? '↓' : '↑'}
+              {filter.sortOrder === 'desc' ? '↓' : '↑'}
             </Button>
           </div>
         </div>

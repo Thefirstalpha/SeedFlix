@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { config, logger } from "../config";
+import { config } from "../config";
 import { createAuth } from "./auth";
 import { createUser, getUser } from "./user";
 
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS auth_users (
   const adminUser = getUser(1);
   if (!adminUser) {
     const { password } = createUser('admin', 'admin');
-    logger.info(`Admin user created with password: ${password}`);
+    console.info(`Admin user created with password: ${password}`);
   }
 
 };
@@ -76,3 +76,7 @@ export function runInTransaction(callback: (db: { writeStore: typeof writeStore 
   }
 }
 
+export function listNamespaces(): { namespace: string, updated_at: string }[] {
+  const rows = db.prepare('SELECT DISTINCT namespace, updated_at FROM kv_store').all();
+  return rows.map((row: any) => ({ namespace: row.namespace, updated_at: row.updated_at }));
+}

@@ -1,10 +1,12 @@
 import { IndexerMovieResponse, IndexerMovieResult, IndexerSeriesResult } from "../../common/indexer";
 import { IndexerSettings } from "../../common/settings";
-import { runInTransaction } from "./db";
+import { getUsers } from "./auth";
+import { readStore, runInTransaction } from "./db";
 import { ErrorCode } from "./errors";
-import { buildDetailsRequest, proxyTmdb, TmdbType } from "./tmdb";
+import { buildDetailsRequest, buildSearchRequest, proxyTmdb, TmdbType } from "./tmdb";
 import { checkTorznabConnection, searchTorznab } from "./torznab";
 import { getUser } from "./user";
+import { getWishlist } from "./wishlist";
 
 // Enum of quality options
 const QUALITY_MAP: Record<string, string> = {
@@ -217,7 +219,7 @@ export async function searchMovieIndexer(userId: number, movieId: number, limit 
 }
 
 
-export async function searchSeriesIndexer(userId: number, seriesId: number, limit = 100, offset = 0, season?: number): Promise<IndexerSeriesResult[]> {
+export async function searchSeriesIndexer(userId: number, seriesId: number, limit = 100, offset = 0, season?: string | number): Promise<IndexerSeriesResult[]> {
     const settings = getIndexerSettings(userId);
     if (!settings) {
         throw new ErrorCode('Indexer settings not found');
@@ -230,8 +232,109 @@ export async function searchSeriesIndexer(userId: number, seriesId: number, limi
     }
     let name = series.original_name || series.name;
     if (season !== undefined)
-        name = name.concat(` S${String(season).padStart(2, '0')}`);
-
+        name = name.concat(` ${String(season).padStart(2, '0')}`);
+    console.log(name)
     const response = await searchTorznab(settings, name, seriesId, limit, offset);
     return await parseSeriesIndexerResponse(response);
 }
+
+export async function getLastSeries(userId: number): Promise<IndexerSeriesResult[]> {
+    const settings = getIndexerSettings(userId);
+    if (!settings) {
+        throw new ErrorCode('Indexer settings not found');
+    }
+
+    const response = await searchTorznab(settings);
+    return await parseSeriesIndexerResponse(response);
+}
+
+export async function getLastMovies(userId: number): Promise<IndexerMovieResult[]> {
+    const settings = getIndexerSettings(userId);
+    if (!settings) {
+        throw new ErrorCode('Indexer settings not found');
+    }
+
+    const response = await searchTorznab(settings);
+    return await parseMovieIndexerResponse(response);
+}
+
+export async function getMoviesIndexerResult(userId: number): Promise<IndexerMovieResult[]> {
+    const moviesResult = readStore('indexer-movie-result', userId) || [];
+    return moviesResult as IndexerMovieResult[];
+}
+export async function getSeriesIndexerResult(userId: number): Promise<IndexerSeriesResult[]> {
+    const seriesResult = readStore('indexer-series-result', userId) || [];
+    return seriesResult as IndexerSeriesResult[];
+}
+
+
+// Automated job to search wishlist items in the indexer and update their status
+export async function processWishlistIndexer() {
+    const users = getUsers();
+    for (const user of users) {
+        try {
+            console.log(`Processing wishlist indexer for user ${user.username}`);
+            const wishlist = await getWishlist(user.id);
+            const lastMovies = await getLastMovies(user.id);
+            const lastSeries = await getLastSeries(user.id);
+            const moviesFounds: IndexerMovieResult[] = [];
+            const seriesFounds: IndexerSeriesResult[] = [];
+            for (const item of wishlist) {
+                if (item.type === 'movie') {
+                    const founds = lastMovies.filter(m => m.tmdbId === String(item.tmdb));
+                    if (founds.length > 0) {
+                        moviesFounds.push(...founds);
+                    }
+                } else if (item.type === 'series') {
+                    const founds = lastSeries.filter(s => s.tmdbId === String(item.tmdb));
+                    if (founds.length > 0) {
+                        seriesFounds.push(...founds);
+                    }
+                }
+            }
+
+            if (moviesFounds.length > 0 || seriesFounds.length > 0) {
+                console.log(`User ${user.username} has ${moviesFounds.length} movies and ${seriesFounds.length} series found in indexer`);
+
+                await runInTransaction(async ({ writeStore }) => {
+                    // Read blacklist of movies and series already notified or blacklisted by the user to avoid duplicates
+                    const blacklist = readStore('indexer-blacklist', user.id) || [];
+
+                    // Read current indexer results to avoid notifying about the same release multiple times if it stays in the last results for a while
+                    const moviesResult = await getMoviesIndexerResult(user.id);
+                    const seriesResult = await getSeriesIndexerResult(user.id);
+
+                    // Create keys for found movies and series to compare with blacklist and current results
+                    const moviesKey = moviesResult.map(m => `movie:${m.tmdbId}:${m.guid}`);
+                    const seriesKey = seriesResult.map(s => `series:${s.tmdbId}:${s.guid}`);
+
+                    // Filter found movies and series to only keep those not in blacklist and not already in current results
+                    const remainingMovies: IndexerMovieResult[] = moviesFounds.filter(m => !blacklist.includes(`movie:${m.tmdbId}:${m.guid}`) && !moviesKey.includes(`movie:${m.tmdbId}:${m.guid}`));
+                    const remainingSeries: IndexerSeriesResult[] = seriesFounds.filter(s => !blacklist.includes(`series:${s.tmdbId}:${s.guid}`) && !seriesKey.includes(`series:${s.tmdbId}:${s.guid}`));
+
+                    // For series, also filter by season and episode, if the item in the wishlist is for a specific season or episode
+                    const finalSeries = [];
+                    for (const item of wishlist.filter(i => i.type === 'series')) {
+                        const itemFounds = remainingSeries.filter(s => s.tmdbId === String(item.tmdb) &&
+                            (item.all_seasons === true ||
+                                (item.seasons !== undefined && item.seasons !== undefined && item.seasons[s.seasonNumber || 1] !== undefined &&
+                                    (item.seasons[s.seasonNumber || 1].all_episodes === true || (s.episodeNumber !== undefined && item.seasons[s.seasonNumber || 1].episodes.includes(s.episodeNumber || 1))))));
+                        finalSeries.push(...itemFounds);
+                    }
+
+                    if (remainingMovies.length > 0) {
+                        writeStore('indexer-movie-result', user.id, [...moviesResult, ...remainingMovies]);
+                    }
+                    if (finalSeries.length > 0) {
+                        writeStore('indexer-series-result', user.id, [...seriesResult, ...finalSeries]);
+                    }
+                });
+            }
+        } catch (error) {
+            console.log(`Error processing wishlist indexer for user ${user.username}: ${error.message}`);
+
+        }
+    }
+}
+
+setInterval(processWishlistIndexer, 30 * 1000);

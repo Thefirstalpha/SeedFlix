@@ -132,7 +132,7 @@ function buildTransmissionRpcUrl(settings: TransmissionSettings): URL {
 }
 
 
-export async function getDownloadsTransmission(userId: number, filter): Promise<TorrentDownloadItem[]> {
+export async function getDownloadsTransmission(userId: number, filter: Record<string, any>): Promise<TorrentDownloadItem[]> {
 
     const includeAll =
         String(filter?.includeAll || '')
@@ -160,6 +160,7 @@ export async function getDownloadsTransmission(userId: number, filter): Promise<
                 'error',
                 'errorString',
                 'peersConnected',
+                'uploadRatio',
             ],
         },
     });
@@ -192,6 +193,7 @@ export async function getDownloadsTransmission(userId: number, filter): Promise<
                 error: Number(torrent.error || 0),
                 errorString: torrent.errorString || '',
                 managedBySeedflix,
+                uploadRatio: Number(torrent.uploadRatio || 0),
             };
             return data;
         })

@@ -191,7 +191,6 @@ export function WishListCard({
                     : 'bg-purple-600/20 text-purple-300 border-purple-500/30'
                 }
               >
-                {type === 'series' ? <Tv className="w-3 h-3 mr-1" /> : null}
                 {genre}
               </Badge>
             </div>

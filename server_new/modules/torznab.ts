@@ -32,6 +32,7 @@ async function runTorznabQuery(settings: IndexerSettings, params: Record<string,
     }
     const response = await fetchWithTimeout(url);
     if (!response.ok) {
+        console.log(`Torznab request failed: ${response.status} ${response.statusText}`);
         throw new ErrorCode(`Torznab request failed: ${response.status} ${response.statusText}`);
     }
     const text = await response.text();
@@ -53,14 +54,15 @@ export async function checkTorznabConnection(settings: IndexerSettings) {
 }
 
 
-export async function searchTorznab(settings: IndexerSettings, query: string, tmdbId?: number, limit = 10, offset = 0) {
+export async function searchTorznab(settings: IndexerSettings, query?: string, tmdbId?: number, limit = 100, offset = 0) {
     let params : Record<string, string> = {
         t: 'search',
-        q: query,
         limit: String(limit),
         offset: String(Math.max(0, Number(offset) || 0)),
     };
     if (tmdbId)
         params['tmdbid'] = String(tmdbId);
+    if (query)
+        params['q'] = query;
     return await runTorznabQuery(settings, params);
 }
