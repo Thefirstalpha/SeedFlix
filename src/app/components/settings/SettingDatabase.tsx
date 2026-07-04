@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { useI18n } from '../../i18n/LanguageProvider';
 import { DatabaseNamespaceEntry, getDatabaseNamespace, listDatabaseNamespaces, listUsers, updateDatabaseNamespace, User } from '../../services/authService';
@@ -7,8 +7,74 @@ import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 
+type TranslateFn = ReturnType<typeof useI18n>['t'];
+type TranslateKey = Parameters<TranslateFn>[0];
+
+interface DatabaseSelectableListItem {
+    key: string;
+    title: string;
+    subtitle?: string;
+    isSelected: boolean;
+    onSelect: () => void;
+}
+
+interface DatabaseSelectableListProps {
+    t: TranslateFn;
+    title: string;
+    isLoading: boolean;
+    items: DatabaseSelectableListItem[];
+    emptyMessageKey?: TranslateKey;
+    onReload: () => void;
+}
+
+const DatabaseSelectableList: React.FC<DatabaseSelectableListProps> = ({
+    t,
+    title,
+    isLoading,
+    items,
+    emptyMessageKey = 'settings.database.empty',
+    onReload,
+}) => (
+    <div className="w-full space-y-3 rounded-lg border border-white/10 bg-slate-900/40 p-4">
+        <div className="flex items-center justify-between gap-2">
+            <h3 className="font-medium text-white">{title}</h3>
+            <Button
+                type="button"
+                variant="outline"
+                onClick={onReload}
+                className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+            >
+                {t('settings.database.refreshList')}
+            </Button>
+        </div>
+
+        {isLoading ? (
+            <p className="text-sm text-white/60">{t('common.loading')}</p>
+        ) : items.length === 0 ? (
+            <p className="text-sm text-white/60">{t(emptyMessageKey)}</p>
+        ) : (
+            <div className="space-y-2">
+                {items.map((item) => (
+                    <button
+                        key={item.key}
+                        type="button"
+                        onClick={item.onSelect}
+                        className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${item.isSelected
+                            ? 'border-teal-400/40 bg-teal-500/15 text-teal-100'
+                            : 'border-white/10 bg-slate-950/50 text-white/80 hover:bg-white/5'
+                            }`}
+                    >
+                        <p className="font-mono text-sm">{item.title}</p>
+                        {item.subtitle ? <p className="mt-1 text-xs text-white/50">{item.subtitle}</p> : null}
+                    </button>
+                ))}
+            </div>
+        )}
+    </div>
+);
+
 interface DatabaseNamespaceListProps {
-    t: (key: string, options?: any) => string;
+    t: TranslateFn;
     isLoading: boolean;
     namespaces: Array<{ namespace: string; updatedAt?: string }>;
     selectedNamespace: string | null;
@@ -24,48 +90,23 @@ export const DatabaseNamespaceList: React.FC<DatabaseNamespaceListProps> = ({
     onReload,
     onSelect,
 }) => (
-    <div className="w-full space-y-3 rounded-lg border border-white/10 bg-slate-900/40 p-4">
-        <div className="flex items-center justify-between gap-2">
-            <h3 className="font-medium text-white">{t('settings.database.namespaces')}</h3>
-            <Button
-                type="button"
-                variant="outline"
-                onClick={() => onReload()}
-                className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
-            >
-                {t('settings.database.refreshList')}
-            </Button>
-        </div>
-
-        {isLoading ? (
-            <p className="text-sm text-white/60">{t('common.loading')}</p>
-        ) : namespaces.length === 0 ? (
-            <p className="text-sm text-white/60">{t('settings.database.empty')}</p>
-        ) : (
-            <div className="space-y-2">
-                {namespaces.map((entry) => (
-                    <button
-                        key={entry.namespace}
-                        type="button"
-                        onClick={() => onSelect(entry.namespace)}
-                        className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${selectedNamespace === entry.namespace
-                            ? 'border-teal-400/40 bg-teal-500/15 text-teal-100'
-                            : 'border-white/10 bg-slate-950/50 text-white/80 hover:bg-white/5'
-                            }`}
-                    >
-                        <p className="font-mono text-sm">{entry.namespace}</p>
-                        <p className="mt-1 text-xs text-white/50">
-                            {t('settings.database.updatedAt', { value: entry.updatedAt || '-' })}
-                        </p>
-                    </button>
-                ))}
-            </div>
-        )}
-    </div>
+    <DatabaseSelectableList
+        t={t}
+        title={t('settings.database.namespaces')}
+        isLoading={isLoading}
+        items={namespaces.map((entry) => ({
+            key: entry.namespace,
+            title: entry.namespace,
+            subtitle: t('settings.database.updatedAt', { value: entry.updatedAt || '-' }),
+            isSelected: selectedNamespace === entry.namespace,
+            onSelect: () => onSelect(entry.namespace),
+        }))}
+        onReload={onReload}
+    />
 );
 
 export interface DatabaseRawEditorPanelProps {
-    t: (key: string, options?: any) => string;
+    t: TranslateFn;
     selectedNamespace: string | null;
     isLoadingValue: boolean;
     isSavingValue: boolean;
@@ -79,7 +120,7 @@ export interface DatabaseRawEditorPanelProps {
 }
 
 interface DatabaseUsersListProps {
-    t: (key: string, options?: any) => string;
+    t: TranslateFn;
     isLoading: boolean;
     users: User[];
     selectedUser: User | null;
@@ -95,41 +136,18 @@ export const DatabaseUserList: React.FC<DatabaseUsersListProps> = ({
     onReload,
     onSelect,
 }) => (
-    <div className="w-full space-y-3 rounded-lg border border-white/10 bg-slate-900/40 p-4">
-        <div className="flex items-center justify-between gap-2">
-            <h3 className="font-medium text-white">{t('settings.database.namespaces')}</h3>
-            <Button
-                type="button"
-                variant="outline"
-                onClick={() => onReload()}
-                className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
-            >
-                {t('settings.database.refreshList')}
-            </Button>
-        </div>
-
-        {isLoading ? (
-            <p className="text-sm text-white/60">{t('common.loading')}</p>
-        ) : users.length === 0 ? (
-            <p className="text-sm text-white/60">{t('settings.database.empty')}</p>
-        ) : (
-            <div className="space-y-2">
-                {users.map((entry) => (
-                    <button
-                        key={entry.id}
-                        type="button"
-                        onClick={() => onSelect(entry)}
-                        className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${selectedUser?.id === entry.id
-                            ? 'border-teal-400/40 bg-teal-500/15 text-teal-100'
-                            : 'border-white/10 bg-slate-950/50 text-white/80 hover:bg-white/5'
-                            }`}
-                    >
-                        <p className="font-mono text-sm">{entry.username}</p>
-                    </button>
-                ))}
-            </div>
-        )}
-    </div>
+    <DatabaseSelectableList
+        t={t}
+        title={t('settings.users.managingUsers')}
+        isLoading={isLoading}
+        items={users.map((entry) => ({
+            key: String(entry.id),
+            title: entry.username,
+            isSelected: selectedUser?.id === entry.id,
+            onSelect: () => onSelect(entry),
+        }))}
+        onReload={onReload}
+    />
 );
 
 
@@ -206,6 +224,8 @@ export const DatabaseRawEditorPanel: React.FC<DatabaseRawEditorPanelProps> = ({
 export function SettingDatabase() {
     const { t } = useI18n();
     const { isAuthenticated, user } = useAuth();
+    const isAdmin = isAuthenticated && user?.username === 'admin';
+
     const [users, setUsers] = useState<User[]>([]);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [databaseNamespaces, setDatabaseNamespaces] = useState<DatabaseNamespaceEntry[]>([]);
@@ -218,9 +238,12 @@ export function SettingDatabase() {
     const [isLoadingDatabaseValue, setIsLoadingDatabaseValue] = useState(false);
     const [isSavingDatabaseValue, setIsSavingDatabaseValue] = useState(false);
 
+    const clearDatabaseFeedback = useCallback(() => {
+        setDatabaseError(null);
+        setDatabaseMessage(null);
+    }, []);
 
-    // Extraction de la logique commune de chargement des namespaces
-    const fetchAndSetDatabaseNamespaces = async () => {
+    const fetchAndSetDatabaseNamespaces = useCallback(async () => {
         setIsLoadingDatabaseNamespaces(true);
         try {
             const response = await listDatabaseNamespaces();
@@ -240,54 +263,35 @@ export function SettingDatabase() {
         } finally {
             setIsLoadingDatabaseNamespaces(false);
         }
-    };
+    }, [t]);
 
-    // Extraction de la logique commune de chargement des namespaces
-    const fetchAndSetDatabaseUsers = async () => {
+    const fetchAndSetDatabaseUsers = useCallback(async () => {
         setIsLoadingDatabaseUsers(true);
         try {
-            const users = await listUsers(true);
-            setUsers(users);
+            const fetchedUsers = await listUsers(true);
+            setUsers(fetchedUsers);
             setSelectedUser((current) => {
-                if (current && users.some((user) => user.username === current.username)) {
+                if (current && fetchedUsers.some((entry) => entry.id === current.id)) {
                     return current;
                 }
-                return users[0] || null;
+                return fetchedUsers[0] || null;
             });
         } catch (err) {
             setDatabaseError(err instanceof Error ? err.message : t('settings.database.loadFailed'));
         } finally {
             setIsLoadingDatabaseUsers(false);
         }
-    };
+    }, [t]);
 
-    useEffect(() => {
-        if (!isAuthenticated || user?.username !== 'admin') {
-            return;
-        }
-        void fetchAndSetDatabaseNamespaces();
-        void fetchAndSetDatabaseUsers();
-    }, [isAuthenticated, t, user?.username]);
-
-    useEffect(() => {
-        if (!isAuthenticated || user?.username !== 'admin' || !selectedDatabaseNamespace) {
-            return;
-        }
-
-        handleDatabaseReload();
-    }, [isAuthenticated, selectedDatabaseNamespace, t, user?.username]);
-
-
-    const handleDatabaseReload = async () => {
+    const handleDatabaseReload = useCallback(async () => {
         if (!selectedDatabaseNamespace || !selectedUser) {
             return;
         }
 
-        setDatabaseError(null);
-        setDatabaseMessage(null);
+        clearDatabaseFeedback();
         setIsLoadingDatabaseValue(true);
         try {
-            const entry = await getDatabaseNamespace(selectedUser.id, selectedDatabaseNamespace, );
+            const entry = await getDatabaseNamespace(selectedUser.id, selectedDatabaseNamespace);
             setDatabaseRawValue(JSON.stringify(entry || '', null, 2));
             setDatabaseMessage(t('settings.database.reloaded'));
         } catch (reloadError) {
@@ -297,22 +301,21 @@ export function SettingDatabase() {
         } finally {
             setIsLoadingDatabaseValue(false);
         }
-    };
+    }, [clearDatabaseFeedback, selectedDatabaseNamespace, selectedUser, t]);
 
-    const handleDatabaseNamespacesReload = async () => {
-        setDatabaseError(null);
-        setDatabaseMessage(null);
+    const handleDatabaseNamespacesReload = useCallback(async () => {
+        clearDatabaseFeedback();
         await fetchAndSetDatabaseNamespaces();
         setDatabaseMessage(t('settings.database.listReloaded'));
-    };
-    const handleDatabaseUsersReload = async () => {
-        setDatabaseError(null);
-        setDatabaseMessage(null);
+    }, [clearDatabaseFeedback, fetchAndSetDatabaseNamespaces, t]);
+
+    const handleDatabaseUsersReload = useCallback(async () => {
+        clearDatabaseFeedback();
         await fetchAndSetDatabaseUsers();
         setDatabaseMessage(t('settings.database.listReloaded'));
-    };
+    }, [clearDatabaseFeedback, fetchAndSetDatabaseUsers, t]);
 
-    const handleDatabasePrettyFormat = () => {
+    const handleDatabasePrettyFormat = useCallback(() => {
         setDatabaseError(null);
         try {
             const prettyValue = JSON.stringify(JSON.parse(databaseRawValue), null, 2);
@@ -320,23 +323,21 @@ export function SettingDatabase() {
         } catch {
             setDatabaseError(t('settings.database.invalidJson'));
         }
-    };
+    }, [databaseRawValue, t]);
 
-    const handleDatabaseSave = async () => {
+    const handleDatabaseSave = useCallback(async () => {
         if (!selectedDatabaseNamespace || !selectedUser) {
             return;
         }
 
-        setDatabaseError(null);
-        setDatabaseMessage(null);
+        clearDatabaseFeedback();
         setIsSavingDatabaseValue(true);
         try {
-            const updatedEntry = await updateDatabaseNamespace(
+            await updateDatabaseNamespace(
                 selectedUser.id,
                 selectedDatabaseNamespace,
                 databaseRawValue,
             );
-            
             setDatabaseMessage(t('settings.database.saved'));
         } catch (saveError) {
             setDatabaseError(
@@ -345,87 +346,70 @@ export function SettingDatabase() {
         } finally {
             setIsSavingDatabaseValue(false);
         }
-    };
+    }, [clearDatabaseFeedback, databaseRawValue, selectedDatabaseNamespace, selectedUser, t]);
+
+    useEffect(() => {
+        if (!isAdmin) {
+            return;
+        }
+
+        void fetchAndSetDatabaseNamespaces();
+        void fetchAndSetDatabaseUsers();
+    }, [fetchAndSetDatabaseNamespaces, fetchAndSetDatabaseUsers, isAdmin]);
+
+    useEffect(() => {
+        if (!isAdmin || !selectedDatabaseNamespace || !selectedUser) {
+            return;
+        }
+
+        void handleDatabaseReload();
+    }, [handleDatabaseReload, isAdmin, selectedDatabaseNamespace, selectedUser]);
 
     return (
-        <>
-            <Card className="border-teal-500/30 bg-teal-950/15 text-white">
-                <CardHeader>
-                    <CardTitle className="text-teal-200">{t('settings.database.title')}</CardTitle>
-                    <CardDescription className="text-teal-100/70">
-                        {t('settings.database.description')}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                        {t('settings.database.warning')}
-                    </div>
-                    <div className="hidden lg:block overflow-x-auto max-w-full">
-                        <DatabaseNamespaceList
-                            t={t}
-                            isLoading={isLoadingDatabaseNamespaces}
-                            namespaces={databaseNamespaces}
-                            selectedNamespace={selectedDatabaseNamespace}
-                            onReload={handleDatabaseNamespacesReload}
-                            onSelect={setSelectedDatabaseNamespace}
-                        />
-                        <DatabaseUserList
-                            t={t}
-                            isLoading={isLoadingDatabaseUsers}
-                            users={users}
-                            selectedUser={selectedUser}
-                            onReload={handleDatabaseUsersReload}
-                            onSelect={setSelectedUser}
-                        />
+        <Card className="border-teal-500/30 bg-teal-950/15 text-white">
+            <CardHeader>
+                <CardTitle className="text-teal-200">{t('settings.database.title')}</CardTitle>
+                <CardDescription className="text-teal-100/70">
+                    {t('settings.database.description')}
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                    {t('settings.database.warning')}
+                </div>
 
-                        <DatabaseRawEditorPanel
-                            t={t}
-                            selectedNamespace={selectedDatabaseNamespace}
-                            isLoadingValue={isLoadingDatabaseValue}
-                            isSavingValue={isSavingDatabaseValue}
-                            rawValue={databaseRawValue}
-                            onRawValueChange={setDatabaseRawValue}
-                            onReload={handleDatabaseReload}
-                            onPrettyFormat={handleDatabasePrettyFormat}
-                            onSave={handleDatabaseSave}
-                            message={databaseMessage}
-                            error={databaseError}
-                        />
-                    </div>
-                </CardContent>
-            </Card>
-            {/* Mobile/tablette : composants hors Card */}
-            <div className="flex flex-col gap-6 lg:hidden mt-6">
-                <DatabaseNamespaceList
-                    t={t}
-                    isLoading={isLoadingDatabaseNamespaces}
-                    namespaces={databaseNamespaces}
-                    selectedNamespace={selectedDatabaseNamespace}
-                    onReload={handleDatabaseNamespacesReload}
-                    onSelect={setSelectedDatabaseNamespace}
-                />
-                <DatabaseUserList
-                    t={t}
-                    isLoading={isLoadingDatabaseUsers}
-                    users={users}
-                    selectedUser={selectedUser}
-                    onReload={handleDatabaseUsersReload}
-                    onSelect={setSelectedUser}
-                />
-                <DatabaseRawEditorPanel
-                    t={t}
-                    selectedNamespace={selectedDatabaseNamespace}
-                    isLoadingValue={isLoadingDatabaseValue}
-                    isSavingValue={isSavingDatabaseValue}
-                    rawValue={databaseRawValue}
-                    onRawValueChange={setDatabaseRawValue}
-                    onReload={handleDatabaseReload}
-                    onPrettyFormat={handleDatabasePrettyFormat}
-                    onSave={handleDatabaseSave}
-                    message={databaseMessage}
-                    error={databaseError}
-                />
-            </div>
-        </>
-    )
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,280px)_minmax(0,280px)_minmax(0,1fr)]">
+                    <DatabaseNamespaceList
+                        t={t}
+                        isLoading={isLoadingDatabaseNamespaces}
+                        namespaces={databaseNamespaces}
+                        selectedNamespace={selectedDatabaseNamespace}
+                        onReload={handleDatabaseNamespacesReload}
+                        onSelect={setSelectedDatabaseNamespace}
+                    />
+                    <DatabaseUserList
+                        t={t}
+                        isLoading={isLoadingDatabaseUsers}
+                        users={users}
+                        selectedUser={selectedUser}
+                        onReload={handleDatabaseUsersReload}
+                        onSelect={setSelectedUser}
+                    />
+                    <DatabaseRawEditorPanel
+                        t={t}
+                        selectedNamespace={selectedDatabaseNamespace}
+                        isLoadingValue={isLoadingDatabaseValue}
+                        isSavingValue={isSavingDatabaseValue}
+                        rawValue={databaseRawValue}
+                        onRawValueChange={setDatabaseRawValue}
+                        onReload={handleDatabaseReload}
+                        onPrettyFormat={handleDatabasePrettyFormat}
+                        onSave={handleDatabaseSave}
+                        message={databaseMessage}
+                        error={databaseError}
+                    />
+                </div>
+            </CardContent>
+        </Card>
+    );
 }
