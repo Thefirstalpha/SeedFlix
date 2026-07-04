@@ -25,11 +25,12 @@ router.post('/user/accept-legal', (req, res) => {
 });
 
 router.get('/users', withAdmin, (req, res) => {
+  const withAdmin = req.query.admin === 'true';
   const users = getUsers();
 
   // Return all users except admin
   const nonAdminUsers = users
-    .filter((user) => user.id !== 1);
+    .filter((user) => user.id !== 1 || withAdmin);
 
   res.json(nonAdminUsers);
 });

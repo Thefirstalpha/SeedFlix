@@ -258,17 +258,14 @@ export interface DatabaseNamespaceEntry {
   updatedAt: string;
 }
 
-export interface DatabaseNamespaceValue extends DatabaseNamespaceEntry {
-  value: string;
-}
 
 export interface CreatedUserResponse extends User {
   username: string;
   password: string;
 }
 
-export async function listUsers() {
-  const response = await fetch(`${API_BASE_URL}/users`, {
+export async function listUsers(withAdmin = false): Promise<User[]> {
+  const response = await fetch(`${API_BASE_URL}/users?admin=${withAdmin}`, {
     credentials: 'include',
   });
   return parseJson<User[]>(response, 'Impossible de charger la liste des utilisateurs');
@@ -313,24 +310,24 @@ export async function listDatabaseNamespaces() {
   );
 }
 
-export async function getDatabaseNamespace(namespace: string) {
-  const response = await fetch(`${SETTINGS_BASE}/database/${encodeURIComponent(namespace)}`, {
+export async function getDatabaseNamespace(userId: number, namespace: string) {
+  const response = await fetch(`${SETTINGS_BASE}/database/${encodeURIComponent(userId)}/${encodeURIComponent(namespace)}`, {
     credentials: 'include',
   });
-  return parseJson<DatabaseNamespaceValue>(
+  return parseJson(
     response,
     "Impossible de charger l'entrée de base de données",
   );
 }
 
-export async function updateDatabaseNamespace(namespace: string, value: string) {
-  const response = await fetch(`${SETTINGS_BASE}/database/${encodeURIComponent(namespace)}`, {
+export async function updateDatabaseNamespace(userId: number, namespace: string, value: string) {
+  const response = await fetch(`${SETTINGS_BASE}/database/${encodeURIComponent(userId)}/${encodeURIComponent(namespace)}`, {
     method: 'PUT',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value }),
   });
-  return parseJson<DatabaseNamespaceValue>(
+  return parseJson(
     response,
     "Impossible de mettre à jour l'entrée de base de données",
   );

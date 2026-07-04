@@ -48,7 +48,7 @@ export const readStore = (namespace: string, userId: number): Record<string, any
   return row ? JSON.parse(String(row.value)) : null;
 }
 
-const writeStore = (namespace: string, userId: number, value: Record<string, any>) => {
+export const writeStore = (namespace: string, userId: number, value: Record<string, any>) => {
   db.prepare(`
     INSERT INTO kv_store(namespace, user_id, value, updated_at)
     VALUES(?, ?, ?, datetime('now'))

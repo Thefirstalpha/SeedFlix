@@ -1,45 +1,49 @@
 import { Router } from 'express';
 import { authentication, withAdmin } from '../modules/auth';
-import { listNamespaces, readStore } from '../modules/db';
+import { listNamespaces, readStore, writeStore } from '../modules/db';
+import { messages } from '../modules/i18n';
 
 
 const router = Router();
 router.use(authentication);
+router.use(withAdmin);
 
 
 
-router.get('/settings/database', withAdmin, async (req, res) => {
+router.get('/settings/database', async (req, res) => {
     res.json({ namespaces: listNamespaces() });
 });
 
-router.get(
-    '/api/settings/database/:userid/:namespace', withAdmin, async (req, res) => {
-        const namespace = String(req.params.namespace || '').trim();
-        const userId = String(req.params.userid || '').trim();
-        if (!namespace) {
-            res.status(400).json({ error: t('auth.failedLoadSettings') });
-            return;
-        }
-
-        const entry = readStore(namespace);
-        if (!entry) {
-            res.status(404).json({ error: t('auth.failedLoadSettings') });
-            return;
-        }
-
-        res.json(entry);
-    });
-
-router.put('/api/settings/database/:namespace', withAdmin, async (req, res) => {
+router.get('/settings/database/:userid/:namespace', async (req, res) => {
     const namespace = String(req.params.namespace || '').trim();
-    const rawValue = String(req.body?.value || '');
-
-    if (!namespace || !rawValue.trim()) {
-        res.status(400).json({ error: t('auth.failedUpdateSettings') });
+    const userId = Number(req.params.userid);
+    if (!namespace || isNaN(userId)) {
+        res.status(400).json({ error: messages.settings.failedLoadSettings });
         return;
     }
 
-    const updatedEntry = writeRawJsonStore(namespace, rawValue);
+    const entry = readStore(namespace, userId);
+    if (!entry) {
+        res.status(404).json({ error: messages.settings.failedLoadSettings });
+        return;
+    }
+
+    res.json(entry);
+});
+
+router.put('/settings/database/:userid/:namespace', async (req, res) => {
+    const namespace = String(req.params.namespace || '').trim();
+    const userId = Number(req.params.userid);
+    const rawValue = String(req.body?.value || '');
+
+    if (!namespace || !rawValue.trim()) {
+        res.status(400).json({ error: messages.settings.failedUpdateSettings });
+        return;
+    }
+
+    const value = JSON.parse(rawValue);
+
+    const updatedEntry = writeStore(namespace, userId, value);
     res.json(updatedEntry);
 });
 

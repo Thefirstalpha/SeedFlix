@@ -17,6 +17,8 @@ interface Translation {
         usernameAlreadyExists: string;
     };
     settings: {
+        failedUpdateSettings: any;
+        failedLoadSettings: any;
         transmission: {
             actionFailed: string;
             invalidUrl: string;
@@ -53,7 +55,8 @@ const messagesList: Record<string, Translation> = {
                 actionFailed: "Échec de l'action."
 
             },
-            failedUpdate: 'Échec de la mise à jour des paramètres'
+            failedUpdate: 'Échec de la mise à jour des paramètres',
+            failedLoadSettings: "Impossible de charger les paramètres"
         }
     },
     en: {
@@ -80,7 +83,8 @@ const messagesList: Record<string, Translation> = {
                 invalidUrl: 'Invalid Transmission URL',
                 actionFailed: 'Failed to perform action.'
             },
-            failedUpdate: 'Failed to update settings'
+            failedUpdate: 'Failed to update settings',
+            failedLoadSettings: 'Failed to load settings'
         }
     },
 };
