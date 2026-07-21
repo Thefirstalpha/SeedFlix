@@ -70,18 +70,19 @@ export function extractLanguage(title: string): string | null {
 
 export function extractSeasonNumber(title: string): number | null {
     const normalized = String(title || '').toLowerCase();
-    const seasonMatch = normalized.match(/\.s(\d{1,2})\./);
+    const seasonMatch = normalized.match(/(?:^|[^a-z0-9])s(\d{1,3})(?=e\d{1,4}|[^a-z0-9]|$)/);
     if (seasonMatch && seasonMatch[1]) {
-        return Number(seasonMatch[1].padStart(2, '0'));
+        return Number(seasonMatch[1]);
     }
     return null;
 }
 
 export function extractEpisodeNumber(title: string): number | null {
     const normalized = String(title || '').toLowerCase();
-    const episodeMatch = normalized.match(/\.e(\d{1,2})\./);
+    const compactMatch = normalized.match(/(?:^|[^a-z0-9])s\d{1,3}e(\d{1,4})(?=[^a-z0-9]|$)/);
+    const episodeMatch = compactMatch || normalized.match(/(?:^|[^a-z0-9])e(\d{1,4})(?=[^a-z0-9]|$)/);
     if (episodeMatch && episodeMatch[1]) {
-        return Number(episodeMatch[1].padStart(2, '0'));
+        return Number(episodeMatch[1]);
     }
     return null;
 }
@@ -286,7 +287,10 @@ export async function processWishlistIndexer() {
                         moviesFounds.push(...founds);
                     }
                 } else if (item.type === 'series') {
-                    const founds = lastSeries.filter(s => s.tmdbId === String(item.tmdb));
+                    const founds = lastSeries.filter(s => s.tmdbId === String(item.tmdb) &&
+                            (item.all_seasons === true ||
+                                (item.seasons !== undefined && item.seasons !== undefined && item.seasons[s.seasonNumber || 1] !== undefined &&
+                                    (item.seasons[s.seasonNumber || 1].all_episodes === true || (s.episodeNumber !== undefined && item.seasons[s.seasonNumber || 1].episodes.includes(s.episodeNumber || 1))))));
                     if (founds.length > 0) {
                         seriesFounds.push(...founds);
                     }
@@ -312,21 +316,11 @@ export async function processWishlistIndexer() {
                     const remainingMovies: IndexerMovieResult[] = moviesFounds.filter(m => !blacklist.includes(`movie:${m.tmdbId}:${m.guid}`) && !moviesKey.includes(`movie:${m.tmdbId}:${m.guid}`));
                     const remainingSeries: IndexerSeriesResult[] = seriesFounds.filter(s => !blacklist.includes(`series:${s.tmdbId}:${s.guid}`) && !seriesKey.includes(`series:${s.tmdbId}:${s.guid}`));
 
-                    // For series, also filter by season and episode, if the item in the wishlist is for a specific season or episode
-                    const finalSeries = [];
-                    for (const item of wishlist.filter(i => i.type === 'series')) {
-                        const itemFounds = remainingSeries.filter(s => s.tmdbId === String(item.tmdb) &&
-                            (item.all_seasons === true ||
-                                (item.seasons !== undefined && item.seasons !== undefined && item.seasons[s.seasonNumber || 1] !== undefined &&
-                                    (item.seasons[s.seasonNumber || 1].all_episodes === true || (s.episodeNumber !== undefined && item.seasons[s.seasonNumber || 1].episodes.includes(s.episodeNumber || 1))))));
-                        finalSeries.push(...itemFounds);
-                    }
-
                     if (remainingMovies.length > 0) {
                         writeStore('indexer-movie-result', user.id, [...moviesResult, ...remainingMovies]);
                     }
-                    if (finalSeries.length > 0) {
-                        writeStore('indexer-series-result', user.id, [...seriesResult, ...finalSeries]);
+                    if (remainingSeries.length > 0) {
+                        writeStore('indexer-series-result', user.id, [...seriesResult, ...remainingSeries]);
                     }
                 });
             }
@@ -337,4 +331,5 @@ export async function processWishlistIndexer() {
     }
 }
 
-setInterval(processWishlistIndexer, 30 * 1000);
+setInterval(processWishlistIndexer, 60 * 1000);
+setTimeout(processWishlistIndexer, 1000);

@@ -8,15 +8,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { WishListCard } from './WishListCard';
 import { useI18n } from '../i18n/LanguageProvider';
 import {
-  getIndexerResults,
+  getIndexerMovieResults,
+  getIndexerSeriesResults,
   rejectAllIndexerResults,
   rejectIndexerResult,
   validateIndexerResult,
-  type IndexerResultTarget,
 } from '../services/indexerResultService';
 import { addTorrentToClient } from '../services/torrentService';
 import { getWishlist, removeMultipleFromWishlist } from '../services/wishlistService';
 import { WishListItem } from '../../../common/wishlist';
+import { IndexerMovieResult, IndexerSeriesResult } from '../../../common/indexer';
 
 
 
@@ -49,7 +50,8 @@ export function WishList() {
 
   const [selectedSeriesIds, setSelectedSeriesIds] = useState<number[]>([]);
   const [isSeriesSelectionMode, setIsSeriesSelectionMode] = useState(false);
-  const [indexerTargets, setIndexerTargets] = useState<IndexerResultTarget[]>([]);
+  const [indexerMovieResults, setIndexerMovieResults] = useState<IndexerMovieResult[]>([]);
+  const [indexerSeriesResults, setIndexerSeriesResults] = useState<IndexerSeriesResult[]>([]);
   const [indexerError, setIndexerError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -90,7 +92,7 @@ export function WishList() {
     }, 150);
 
     return () => window.clearTimeout(timeoutId);
-  }, [searchParams, activeTab, indexerTargets]);
+  }, [searchParams, activeTab, indexerMovieResults]);
 
   const loadWishlist = async () => {
     const data = await getWishlist();
@@ -102,8 +104,10 @@ export function WishList() {
 
   const loadIndexerResults = async () => {
     try {
-      const results = await getIndexerResults();
-      setIndexerTargets(results);
+      const moviesResults = await getIndexerMovieResults();
+      setIndexerMovieResults(moviesResults);
+      const seriesResults = await getIndexerSeriesResults();
+      setIndexerSeriesResults(seriesResults);
       setIndexerError(null);
     } catch (error) {
       setIndexerError(error instanceof Error ? error.message : 'Failed to load indexer results');
@@ -240,19 +244,17 @@ export function WishList() {
     }
   };
   const handleAddTorrentFromWishlist = async (
-    target: IndexerResultTarget,
+    type: 'movie' | 'series',
+    guid: string,
     torrentUrl: string,
     indexerStateKey: string,
   ) => {
-    const key = `${target.targetKey}:${indexerStateKey}:add`;
-    setActionKey(key);
     try {
-      const mediaType = target.targetType === 'movie' ? 'movie' : 'series';
-      await addTorrentToClient(torrentUrl, mediaType, target.targetKey);
+      await addTorrentToClient(torrentUrl, type);
 
       // Validate indexer result (best effort)
       try {
-        await validateIndexerResult(target.targetKey, indexerStateKey);
+        await validateIndexerResult(guid, indexerStateKey);
       } catch {
         // Silent fail - indexer validation is optional
       }

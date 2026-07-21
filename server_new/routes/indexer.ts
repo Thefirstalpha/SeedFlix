@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authentication } from "../modules/auth";
 import { IndexerSettings } from "../../common/settings";
-import { configureIndexer, getIndexerSettings, searchMovieIndexer, searchSeriesIndexer } from "../modules/indexer";
+import { configureIndexer, getIndexerSettings, getMoviesIndexerResult, getSeriesIndexerResult, searchMovieIndexer, searchSeriesIndexer } from "../modules/indexer";
 import { IndexerMovieResponse, IndexerSeriesResponse } from "../../common/indexer";
 
 const router = Router();
@@ -59,6 +59,22 @@ router.get('/indexer/search/series/:id', async (req, res) => {
         items: items,
     }
     res.status(200).json(data);
+});
+
+
+router.get('/indexer/results/movies', async (req, res) => {
+    const items = await getMoviesIndexerResult(req.user.id);
+    res.status(200).json({
+        ok: true,
+        items: items,
+    });
+});
+router.get('/indexer/results/series', async (req, res) => {
+    const items = await getSeriesIndexerResult(req.user.id);
+    res.status(200).json({
+        ok: true,
+        items: items,
+    });
 });
 
 export { router };

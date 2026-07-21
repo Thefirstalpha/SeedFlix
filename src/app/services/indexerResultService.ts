@@ -1,30 +1,5 @@
+import { IndexerMovieResult, IndexerSeriesResult } from '../../../common/indexer';
 import { API_BASE_URL } from '../config/tmdb';
-
-export interface IndexerResultItem {
-  indexerStateKey: string;
-  title: string;
-  link: string;
-  downloadUrl?: string;
-  guid?: string;
-  pubDate?: string | null;
-  size?: number | null;
-  sizeHuman?: string | null;
-  seeders?: number | null;
-  leechers?: number | null;
-  quality?: string | null;
-  language?: string | null;
-  categories?: string[];
-}
-
-export interface IndexerResultTarget {
-  targetKey: string;
-  targetType: 'movie' | 'series' | 'season' | 'episode' | string;
-  mediaId: number | null;
-  title: string;
-  label: string;
-  updatedAt: string;
-  items: IndexerResultItem[];
-}
 
 async function parseJson<T>(response: Response): Promise<T> {
   const text = await response.text();
@@ -53,8 +28,8 @@ async function postIndexerAction(
   }
 }
 
-export async function getIndexerResults(): Promise<IndexerResultTarget[]> {
-  const response = await fetch(`${API_BASE_URL}/indexer-results`, {
+export async function getIndexerMovieResults(): Promise<IndexerMovieResult[]> {
+  const response = await fetch(`${API_BASE_URL}/indexer/results/movies`, {
     credentials: 'include',
   });
 
@@ -62,8 +37,21 @@ export async function getIndexerResults(): Promise<IndexerResultTarget[]> {
     throw new Error(`Failed to fetch indexer results: ${response.status}`);
   }
 
-  const data = await parseJson<{ ok: boolean; targets: IndexerResultTarget[] }>(response);
-  return Array.isArray(data?.targets) ? data.targets : [];
+  const data = await parseJson<{ ok: boolean; items: IndexerMovieResult[] }>(response);
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function getIndexerSeriesResults(): Promise<IndexerSeriesResult[]> {
+  const response = await fetch(`${API_BASE_URL}/indexer/results/series`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch indexer results: ${response.status}`);
+  }
+
+  const data = await parseJson<{ ok: boolean; items: IndexerSeriesResult[] }>(response);
+  return Array.isArray(data?.items) ? data.items : [];
 }
 
 export async function rejectIndexerResult(
@@ -93,12 +81,13 @@ export async function rejectAllIndexerResults(
 }
 
 export async function validateIndexerResult(
-  targetKey: string,
-  indexerStateKey: string,
+  type: 'movie' | 'series',
+  guid: string,
+  key: string,
 ): Promise<void> {
   await postIndexerAction(
-    '/indexer-results/validate',
-    { targetKey, indexerStateKey },
+    '/indexer/results/validate',
+    { type, guid, key },
     'Failed to validate indexer result',
   );
 }
