@@ -10,7 +10,7 @@ import { Switch } from "../ui/switch";
 
 
 
-export function SettingTransmission({ setup, onComplete }: { setup: boolean; onComplete: (() => void) | undefined }) {
+export function SettingTransmission({ setup, onComplete }: { setup: boolean; onComplete?: (() => void) | undefined }) {
     const { t } = useI18n();
     const [torrentUrl, setTorrentUrl] = useState('');
     const [torrentPort, setTorrentPort] = useState<number | null>(null);

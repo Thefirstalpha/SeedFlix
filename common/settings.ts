@@ -14,3 +14,15 @@ export interface IndexerSettings {
     qualities: string[];
     languages: string[];
 }
+
+
+export interface FtpSettings {
+    host: string;
+    port: number;
+    secure: boolean;
+    authRequired: boolean | false;
+    username: string | undefined;
+    password: string | undefined;
+    rootFolder: string;
+    storageLimit: number | null;
+}

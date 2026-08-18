@@ -11,6 +11,7 @@ import { router as transmissionRouter } from './routes/transmission';
 import { router as indexerRouter } from './routes/indexer';
 import { router as dbRouter } from './routes/db';
 import { router as settingsRouter } from './routes/settings';
+import { router as ftpRouter } from './routes/ftp';
 import { initDB } from './modules/db';
 import { ErrorCode } from './modules/errors';
 
@@ -41,6 +42,7 @@ app.use('/api', transmissionRouter);
 app.use('/api', indexerRouter);
 app.use('/api', dbRouter);
 app.use('/api', settingsRouter);
+app.use('/api', ftpRouter);
 
 // Exemple de route racine
 app.get('/api/health', (req, res) => {

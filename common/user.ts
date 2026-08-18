@@ -1,4 +1,4 @@
-import { IndexerSettings, TransmissionSettings } from "./settings";
+import { FtpSettings, IndexerSettings, TransmissionSettings } from "./settings";
 
 export interface UserStatusBar {
     downloads: number;
@@ -17,6 +17,7 @@ export interface User {
     settings: {
         indexer: IndexerSettings | null;
         transmission: TransmissionSettings | null;
+        ftp: FtpSettings | null;
         language?: string | null;
         spoilerMode?: boolean | null;
     };

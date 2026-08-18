@@ -1,80 +1,64 @@
 import { useEffect, useState } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
-import { testFtpConnection } from '../../services/ftpService';
-
+import { getFtpConfig, saveFtpConfig } from '../../services/ftpService';
 
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { useI18n, type SupportedLanguage } from '../../i18n/LanguageProvider';
+import { useI18n } from '../../i18n/LanguageProvider';
 
 
 export function SettingFtp() {
     const { t } = useI18n();
 
-
     // État pour la configuration FTP
-    const [ftpUrl, setFtpUrl] = useState('');
+    const [ftpHost, setFtpHost] = useState('');
     const [ftpPort, setFtpPort] = useState('21');
     const [ftpSecure, setFtpSecure] = useState(false);
     const [ftpAuthRequired, setFtpAuthRequired] = useState(false);
     const [ftpUsername, setFtpUsername] = useState('');
     const [ftpPassword, setFtpPassword] = useState('');
-    const [ftpRootFolder, setFtpRootFolder] = useState('');
+    const [ftpRootFolder, setFtpRootFolder] = useState('/');
     const [ftpStorageLimit, setFtpStorageLimit] = useState('');
     const [ftpMessage, setFtpMessage] = useState<string | null>(null);
     const [ftpError, setFtpError] = useState<string | null>(null);
-    const [isFtpSaving, setIsFtpSaving] = useState(false);
-    const [isFtpTesting, setIsFtpTesting] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
+    useEffect(() => {
+        getFtpConfig().then((config) => {
+            if (!config) return;
+            setFtpHost(config.host || '');
+            setFtpPort(String(config.port || 21));
+            setFtpSecure(config.secure ?? false);
+            setFtpAuthRequired(config.authRequired ?? false);
+            setFtpUsername(config.username || '');
+            setFtpRootFolder(config.rootFolder || '/');
+            setFtpStorageLimit(config.storageLimit !== null ? String(config.storageLimit) : '');
+        }).catch(() => {});
+    }, []);
 
-    // Construction du payload FTP pour sauvegarde
-    const buildFtpSettingsPayload = () => ({
-        url: ftpUrl,
-        port: ftpPort,
-        secure: ftpSecure,
-        authRequired: ftpAuthRequired,
-        username: ftpUsername,
-        password: ftpPassword,
-        rootFolder: ftpRootFolder,
-        storageLimit: ftpStorageLimit,
-    });
-
-    // Gestion de la sauvegarde FTP
-    const handleSaveFtpSettings = (event?: React.FormEvent) => {
-        handleAsyncSave({
-            event,
-            setError: setFtpError,
-            setMessage: setFtpMessage,
-            setSaving: setIsFtpSaving,
-            doSave: async () => {
-                const config = buildFtpSettingsPayload();
-                await saveFtpConfig(config);
-                return config;
-            },
-            successMessage: 'Configuration FTP enregistrée.',
-            errorMessage: 'Erreur lors de la sauvegarde FTP.',
-        });
-    };
-
-    // Test de connexion FTP
-    const handleTestFtpConnection = async (event?: React.FormEvent) => {
-        if (event) event.preventDefault();
+    // Tester la connexion ET enregistrer (la validation est faite côté backend)
+    const handleSave = async (event: React.FormEvent) => {
+        event.preventDefault();
         setFtpError(null);
         setFtpMessage(null);
-        setIsFtpTesting(true);
+        setIsSaving(true);
         try {
-            const config = buildFtpSettingsPayload();
-            const result = await testFtpConnection(config);
-            if (result.ok) {
-                setFtpMessage('Connexion FTP réussie.');
-            } else {
-                setFtpError(result.error || 'Échec de la connexion FTP.');
-            }
+            await saveFtpConfig({
+                host: ftpHost,
+                port: Number(ftpPort) || 21,
+                secure: ftpSecure,
+                authRequired: ftpAuthRequired,
+                username: ftpUsername || undefined,
+                password: ftpPassword || undefined,
+                rootFolder: ftpRootFolder || '/',
+                storageLimit: ftpStorageLimit ? Number(ftpStorageLimit) : null,
+            });
+            setFtpMessage('Connexion réussie — configuration enregistrée.');
         } catch (e: any) {
-            setFtpError(e.message || 'Erreur lors du test FTP.');
+            setFtpError(e.message || 'Erreur lors de l\'enregistrement.');
         } finally {
-            setIsFtpTesting(false);
+            setIsSaving(false);
         }
     };
 
@@ -87,10 +71,10 @@ export function SettingFtp() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <form onSubmit={handleSaveFtpSettings} className="space-y-4">
+                <form onSubmit={handleSave} className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="ftp-url">URL FTP</Label>
-                        <Input id="ftp-url" type="text" value={ftpUrl} onChange={e => setFtpUrl(e.target.value)} className="bg-slate-900 border-white/10 text-white" placeholder="ftp://monserveur.com" />
+                        <Label htmlFor="ftp-host">Hôte FTP</Label>
+                        <Input id="ftp-host" type="text" value={ftpHost} onChange={e => setFtpHost(e.target.value)} className="bg-slate-900 border-white/10 text-white" placeholder="monserveur.com" />
                     </div>
                     <div className="flex gap-4">
                         <div className="flex-1 space-y-2">
@@ -128,8 +112,8 @@ export function SettingFtp() {
                     </div>
                     {ftpMessage && <p className="text-sm text-emerald-300">{ftpMessage}</p>}
                     {ftpError && <p className="text-sm text-red-300">{ftpError}</p>}
-                    <Button type="submit" disabled={isFtpSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
-                        {isFtpSaving ? 'Enregistrement...' : 'Enregistrer'}
+                    <Button type="submit" disabled={isSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                        {isSaving ? 'Test en cours...' : 'Tester et enregistrer'}
                     </Button>
                 </form>
             </CardContent>

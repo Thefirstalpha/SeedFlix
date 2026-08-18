@@ -54,3 +54,29 @@ export async function configureIndexer(settings: IndexerSettings) {
         throw new Error(errorData.error || 'Failed to configure Indexer settings');
     }
 }
+
+export async function updateLanguage(language: string) {
+    const response = await fetch(`/api/settings/language`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({language: language}),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update language setting');
+    }
+}
+
+export async function updateSpoilerMode(spoiler: boolean) {
+    const response = await fetch(`/api/settings/spoiler`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({spoiler: spoiler}),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update spoiler setting');
+    }
+}

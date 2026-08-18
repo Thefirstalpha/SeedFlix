@@ -11,7 +11,7 @@ import { configureIndexer } from "../../services/settingService";
 const QUALITY_OPTIONS = ['2160p', '1080p', '720p', '480p'];
 const LANGUAGE_OPTIONS = ['VO', 'VFF', 'VF2', 'VFQ', 'VOSTFR', 'MULTI'];
 
-export function SettingIndexer({ setup, onComplete }: { setup: boolean; onComplete: (() => void) | undefined }) {
+export function SettingIndexer({ setup, onComplete }: { setup: boolean; onComplete?: (() => void) | undefined }) {
     const { t } = useI18n();
     const [indexerUrl, setIndexerUrl] = useState('');
     const [indexerToken, setIndexerToken] = useState('');

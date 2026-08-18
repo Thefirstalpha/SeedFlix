@@ -28,7 +28,7 @@ import { Label } from './ui/label';
 import { Progress } from './ui/progress';
 import { Switch } from './ui/switch';
 import { useI18n, type SupportedLanguage } from '../i18n/LanguageProvider';
-import { configureTmdb, isTmdbConfigure } from '../services/settingService';
+import { configureTmdb, isTmdbConfigure, updateLanguage } from '../services/settingService';
 import { SettingTransmission } from './settings/SettingTransmission';
 import { SettingIndexer } from './settings/SettingIndexer';
 import { SettingPassword } from './settings/SettingPassword';
@@ -276,14 +276,7 @@ export function InitialSetup() {
     setIsLanguageSaving(true);
 
     try {
-      const updatedSettings = buildUpdatedSettings({
-        placeholders: {
-          preferences: {
-            ...(currentSettings.placeholders?.preferences || {}),
-            language: nextLanguage,
-          },
-        },
-      });
+      await updateLanguage(nextLanguage);
       setLanguage(nextLanguage);
       await refresh();
       setLanguageMessage(t('settings.language.success'));
@@ -306,43 +299,6 @@ export function InitialSetup() {
       setLegalError(err instanceof Error ? err.message : t('common.loading'));
     } finally {
       setIsLegalSaving(false);
-    }
-  };
-
-  const handlePasswordSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setPasswordError(null);
-
-    if (!newPassword) {
-      setPasswordError(t('setup.password.errors.required'));
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setPasswordError(t('setup.password.errors.mismatch'));
-      return;
-    }
-
-    if (user?.username !== 'admin' && !currentPassword) {
-      setPasswordError(t('setup.password.errors.required'));
-      return;
-    }
-
-    setIsPasswordSaving(true);
-    try {
-      await changePassword(newPassword);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      await goToNextVisibleStep();
-    } catch (submitError) {
-      setPasswordError(
-        submitError instanceof Error
-          ? submitError.message
-          : t('setup.password.errors.updateFailed'),
-      );
-    } finally {
-      setIsPasswordSaving(false);
     }
   };
 

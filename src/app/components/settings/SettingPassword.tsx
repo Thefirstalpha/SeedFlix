@@ -11,7 +11,7 @@ import {
     changePassword,
 } from '../../services/authService';
 
-export function SettingPassword({ setup, onComplete }: { setup: boolean; onComplete: (() => void) | undefined }) {
+export function SettingPassword({ setup, onComplete }: { setup: boolean; onComplete?: (() => void) | undefined }) {
 
     const { isAuthenticated, isLoading, user, refresh } =
         useAuth();

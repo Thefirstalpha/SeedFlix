@@ -33,6 +33,7 @@ import { SettingDatabase } from './settings/SettingDatabase';
 import { SettingPassword } from './settings/SettingPassword';
 import { SettingNotification } from './settings/SettingNotification';
 import { SettingFtp } from './settings/SettingFtp';
+import { updateLanguage, updateSpoilerMode } from '../services/settingService';
 
 // Fonction utilitaire générique pour la gestion des sauvegardes asynchrones
 async function handleAsyncSave<T = any>({
@@ -99,11 +100,11 @@ export function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { isAuthenticated, isLoading, user, refresh } =
     useAuth();
-  const { t, availableLanguages } = useI18n();
+  const { t, availableLanguages, setLanguage } = useI18n();
   const [resetError, setResetError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-  const [languageCode, setLanguageCode] = useState<SupportedLanguage>('fr');
-  const [spoilerMode, setSpoilerMode] = useState(false);
+  const [languageCode, setLanguageCode] = useState<SupportedLanguage>(user?.settings?.language as SupportedLanguage || 'en');
+  const [spoilerMode, setSpoilerMode] = useState(user?.settings?.spoilerMode as boolean || false);
   const [preferencesMessage, setPreferencesMessage] = useState<string | null>(null);
   const [preferencesError, setPreferencesError] = useState<string | null>(null);
   const [isPreferencesSaving, setIsPreferencesSaving] = useState(false);
@@ -127,7 +128,7 @@ export function Settings() {
     setSearchParams(nextParams, { replace: true });
   }, [isAdmin, tabParam, searchParams, setSearchParams]);
 
-  
+
 
 
   if (!isLoading && !isAuthenticated) {
@@ -156,6 +157,46 @@ export function Settings() {
     }
   };
 
+
+  const saveLanguage = async (nextLanguage: SupportedLanguage) => {
+    setPreferencesMessage(null);
+    setPreferencesError(null);
+    setIsPreferencesSaving(true);
+
+    try {
+      await updateLanguage(nextLanguage);
+      setLanguage(nextLanguage);
+      setLanguageCode(nextLanguage);
+      await refresh();
+      setPreferencesMessage(t('settings.language.success'));
+    } catch (submitError) {
+      setPreferencesError(
+        submitError instanceof Error ? submitError.message : t('settings.language.failed'),
+      );
+    } finally {
+      setIsPreferencesSaving(false);
+    }
+  };
+
+
+  const handleSpoilerChange = async (nextSpoilerSetting: boolean) => {
+    setPreferencesMessage(null);
+    setPreferencesError(null);
+    setIsPreferencesSaving(true);
+
+    try {
+      await updateSpoilerMode(nextSpoilerSetting);
+      setSpoilerMode(nextSpoilerSetting);
+      await refresh();
+      setPreferencesMessage(t('settings.spoilers.saved'));
+    } catch (submitError) {
+      setPreferencesError(
+        submitError instanceof Error ? submitError.message : t('settings.spoilers.failed'),
+      );
+    } finally {
+      setIsPreferencesSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -245,7 +286,7 @@ export function Settings() {
                     id="settings-language"
                     value={languageCode}
                     onChange={(event) =>
-                      void handleLanguageChange(parseSupportedLanguage(event.target.value))
+                      void saveLanguage(parseSupportedLanguage(event.target.value))
                     }
                     disabled={isPreferencesSaving}
                     className="w-full bg-slate-900 border border-white/10 text-white rounded-md px-3 py-2"
@@ -281,7 +322,7 @@ export function Settings() {
             </CardContent>
           </Card>
 
-          <SettingPassword></SettingPassword>
+          <SettingPassword setup={false}></SettingPassword>
         </TabsContent>
 
         <TabsContent value="api">
@@ -289,9 +330,9 @@ export function Settings() {
             <SettingTMDB></SettingTMDB>
           ) : null}
 
-          <SettingTransmission></SettingTransmission>
+          <SettingTransmission setup={false}></SettingTransmission>
 
-          <SettingIndexer></SettingIndexer>
+          <SettingIndexer setup={false}></SettingIndexer>
         </TabsContent>
 
         <TabsContent value="notifications">

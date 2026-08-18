@@ -35,6 +35,16 @@ export const getUser = (id: number): User | null => {
                 moviesFolder: String(user.settings.transmission?.moviesFolder || ''),
                 seriesFolder: String(user.settings.transmission?.seriesFolder || ''),
             },
+            ftp: user.settings?.ftp === null ? null : {
+                host: String(user.settings.ftp?.host || ''),
+                port: Number(user.settings.ftp?.port || 0),
+                secure: Boolean(user.settings.ftp?.secure ?? false),
+                authRequired: Boolean(user.settings.ftp?.authRequired),
+                username: user.settings.ftp?.username !== undefined ? String(user.settings.ftp?.username || '') : undefined,
+                password: user.settings.ftp?.password !== undefined ? String(user.settings.ftp?.password || '') : undefined,
+                rootFolder: String(user.settings.ftp?.rootFolder || ''),
+                storageLimit: user.settings.ftp?.storageLimit === null ? null : Number(user.settings.ftp?.storageLimit || 0),
+            },
             language: user.settings?.language === null ? null : String(user.settings.language || null),
             spoilerMode: Boolean(user.settings.spoilerMode || false)
         }
@@ -55,7 +65,9 @@ export const createUser = (username: string, forcePassword: string | null = null
             settings: {
                 indexer: null,
                 transmission: null,
-                language: null
+                ftp: null,
+                language: null,
+                spoilerMode: false
             },
         };
         writeStore('user', user.id, user);

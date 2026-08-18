@@ -81,7 +81,7 @@ export async function addToWishlist(userId: number, tmdbId: number, type: 'movie
                         existingItem.seasons = {}
                     }
                     if (episodeNumber !== undefined) {
-                        if (!existingItem.seasons[seasonNumber]) {
+                        if (existingItem.seasons[seasonNumber] === undefined) {
                             existingItem.seasons[seasonNumber] = {
                                 season_number: seasonNumber,
                                 all_episodes: false,
@@ -93,7 +93,7 @@ export async function addToWishlist(userId: number, tmdbId: number, type: 'movie
                             }
                         }
                     } else {
-                        if (!existingItem.seasons[seasonNumber]) {
+                        if (existingItem.seasons[seasonNumber] !== undefined) {
                             existingItem.seasons[seasonNumber] = {
                                 season_number: seasonNumber,
                                 all_episodes: true,

@@ -1,4 +1,4 @@
-import { Download, Heart, LogOut, Settings, User, Bell, Menu } from 'lucide-react';
+import { Download, HardDrive, Heart, LogOut, Settings, User, Bell, Menu } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -286,6 +286,16 @@ export function Root() {
                   )}
                 </Link>
 
+                {user?.settings?.ftp?.host && (
+                  <Link
+                    to="/files"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+                  >
+                    <HardDrive className="w-5 h-5 text-emerald-400" />
+                    <span className="text-white font-medium">Mes fichiers</span>
+                  </Link>
+                )}
+
                 <Link
                   to={wishlistTarget}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
@@ -392,6 +402,18 @@ export function Root() {
                               )}
                             </Link>
                           </SheetClose>
+
+                          {user?.settings?.ftp?.host && (
+                            <SheetClose asChild>
+                              <Link
+                                to="/files"
+                                className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                              >
+                                <HardDrive className="w-4 h-4 text-emerald-400" />
+                                Mes fichiers
+                              </Link>
+                            </SheetClose>
+                          )}
 
                           <SheetClose asChild>
                             <Link

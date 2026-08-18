@@ -30,10 +30,12 @@ type I18nKey = Leaves<I18nMessages>;
 type DictionaryValue = string | Record<string, any>;
 type Dictionary = Record<string, DictionaryValue>;
 
+export type Translator = (key: I18nKey, vars?: Record<string, string | number>) => string;
+
 type I18nContextValue = {
   language: SupportedLanguage;
   setLanguage: (nextLanguage: SupportedLanguage) => void;
-  t: (key: I18nKey, vars?: Record<string, string | number>) => string;
+  t: Translator;
   availableLanguages: Array<{ code: SupportedLanguage; label: string }>;
 };
 
@@ -76,15 +78,15 @@ function parseSupportedLanguage(input: unknown): SupportedLanguage {
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const { settings } = useAuth();
+  const { user } = useAuth();
   const [language, setLanguage] = useState<SupportedLanguage>('fr');
 
   useEffect(() => {
     const settingsLanguage = parseSupportedLanguage(
-      (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.language,
+      (user?.settings?.language as string | undefined),
     );
     setLanguage(settingsLanguage);
-  }, [settings]);
+  }, [user]);
 
   const value = useMemo<I18nContextValue>(
     () => ({

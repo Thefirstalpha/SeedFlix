@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router';
 import { Downloads } from './components/Downloads';
+import { FtpExplorer } from './components/FtpExplorer';
 import { Home } from './components/Home';
 import { InitialSetup } from './components/InitialSetup';
 import { Login } from './components/Login';
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
           { path: 'series/:id', Component: SeriesDetails },
           { path: 'wishlist', Component: WishList },
           { path: 'downloads', Component: Downloads },
+          { path: 'files', Component: FtpExplorer },
           { path: 'notifications', Component: Notifications },
           { path: 'setup', Component: InitialSetup },
           { path: 'settings', Component: Settings },
