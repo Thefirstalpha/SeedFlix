@@ -33,6 +33,18 @@ CREATE TABLE IF NOT EXISTS auth_users (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 )
 `);
+  db.exec(`
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT NOT NULL,
+    read INTEGER NOT NULL DEFAULT 0,
+    data TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+)
+`);
   const adminUser = getUser(1);
   if (!adminUser) {
     const { password } = createUser('admin', 'admin');

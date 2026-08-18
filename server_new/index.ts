@@ -12,7 +12,9 @@ import { router as indexerRouter } from './routes/indexer';
 import { router as dbRouter } from './routes/db';
 import { router as settingsRouter } from './routes/settings';
 import { router as ftpRouter } from './routes/ftp';
+import { router as notificationRouter } from './routes/notification';
 import { initDB } from './modules/db';
+import { startDownloadWatcher } from './modules/downloadWatcher';
 import { ErrorCode } from './modules/errors';
 
 import { Logger } from './logger';
@@ -20,6 +22,7 @@ import { User } from '../common/user';
 
 initDB();
 Logger.init();
+startDownloadWatcher();
 
 declare module "express-serve-static-core" {
     interface Request {
@@ -43,6 +46,7 @@ app.use('/api', indexerRouter);
 app.use('/api', dbRouter);
 app.use('/api', settingsRouter);
 app.use('/api', ftpRouter);
+app.use('/api', notificationRouter);
 
 // Exemple de route racine
 app.get('/api/health', (req, res) => {

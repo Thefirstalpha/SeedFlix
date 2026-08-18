@@ -1,5 +1,8 @@
 import {
   ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
   File,
   FileText,
   Film,
@@ -23,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
+import { useAuth } from '../context/AuthContext';
 import {
   deleteBatch,
   getDownloadUrl,
@@ -239,7 +243,10 @@ function lruSet(cache: Map<string, FtpFileInfo[]>, key: string, value: FtpFileIn
 }
 
 export function FtpExplorer() {
-  const [path, setPath] = useState('/');
+  const { user } = useAuth();
+  const rootFolder = user?.settings?.ftp?.rootFolder || '/';
+
+  const [path, setPath] = useState(rootFolder);
   const [items, setItems] = useState<FtpFileInfo[]>([]);
   const [loading, setLoading] = useState(false);   // premier chargement d'un chemin non caché
   const [refreshing, setRefreshing] = useState(false); // rafraîchissement silencieux en arrière-plan
@@ -253,6 +260,7 @@ export function FtpExplorer() {
   // Storage
   const [storageUsed, setStorageUsed] = useState<number | null>(null);
   const [storageLimit, setStorageLimit] = useState<number | null>(null);
+  const [storageLoading, setStorageLoading] = useState(false);
 
   // Sélection multiple
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -275,6 +283,19 @@ export function FtpExplorer() {
 
   // Modal déplacement
   const [showMoveDialog, setShowMoveDialog] = useState(false);
+
+  // Tri colonnes
+  const [sortCol, setSortCol] = useState<'name' | 'size'>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const handleSortClick = (col: 'name' | 'size') => {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  };
 
   // ── Préchargement silencieux ─────────────────────────────────────────────
 
@@ -352,18 +373,29 @@ export function FtpExplorer() {
     void load(path);
   }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const refreshStorage = useCallback(async () => {
+    setStorageLoading(true);
+    try {
+      const { used, limit } = await getStorageUsage();
+      setStorageUsed(used);
+      setStorageLimit(limit);
+    } catch {}
+    finally { setStorageLoading(false); }
+  }, []);
+
   useEffect(() => {
-    getStorageUsage()
-      .then(({ used, limit }) => { setStorageUsed(used); setStorageLimit(limit); })
-      .catch(() => {});
-  }, [path]);
+    void refreshStorage();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const navigate = (newPath: string) => setPath(newPath);
 
   const goUp = () => {
     const parts = path.replace(/\/$/, '').split('/').filter(Boolean);
     parts.pop();
-    setPath(parts.length === 0 ? '/' : `/${parts.join('/')}`);
+    const parent = parts.length === 0 ? '/' : `/${parts.join('/')}`;
+    // Ne pas remonter au-dessus de rootFolder
+    if (parent.length < rootFolder.replace(/\/$/, '').length) return;
+    setPath(parent);
   };
 
   // ── Sélection ────────────────────────────────────────────────────────────
@@ -520,6 +552,21 @@ export function FtpExplorer() {
   const hasSelection = selected.size > 0;
   const allSelected = items.length > 0 && selected.size === items.length;
 
+  const sortedItems = [...items].sort((a, b) => {
+    // Dossiers toujours en premier
+    if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+    const mul = sortDir === 'asc' ? 1 : -1;
+    if (sortCol === 'size') return mul * ((a.size ?? 0) - (b.size ?? 0));
+    return mul * a.name.localeCompare(b.name);
+  });
+
+  const SortIcon = ({ col }: { col: 'name' | 'size' }) => {
+    if (sortCol !== col) return <ChevronsUpDown className="w-3 h-3 ml-0.5 opacity-40" />;
+    return sortDir === 'asc'
+      ? <ChevronUp className="w-3 h-3 ml-0.5" />
+      : <ChevronDown className="w-3 h-3 ml-0.5" />;
+  };
+
   return (
     <div className="space-y-4">
       {/* Modal déplacement */}
@@ -574,11 +621,24 @@ export function FtpExplorer() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Mes fichiers</h1>
-          {storageUsed !== null && (
-            <p className="text-sm text-white/50 mt-0.5">
-              {formatSize(storageUsed)} utilisés{storageLimit ? ` / ${formatSize(storageLimit)}` : ''}
-            </p>
-          )}
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {storageLoading ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin text-white/30" />
+                <span className="text-sm text-white/30">Calcul du stockage…</span>
+              </>
+            ) : storageUsed !== null ? (
+              <>
+                <span className="text-sm text-white/50">
+                  {formatSize(storageUsed)} utilisés{storageLimit ? ` / ${formatSize(storageLimit)}` : ''}
+                </span>
+                <button type="button" onClick={refreshStorage}
+                  className="text-white/20 hover:text-white/60 transition-colors" title="Actualiser le stockage">
+                  <RefreshCw className="w-3 h-3" />
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -602,32 +662,67 @@ export function FtpExplorer() {
       </div>
 
       {/* Barre de stockage */}
-      {storagePercent !== null && (
+      {storageLoading ? (
+        <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+          <div className="h-full w-1/3 rounded-full bg-white/20 animate-pulse" />
+        </div>
+      ) : storagePercent !== null ? (
         <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all ${storagePercent > 90 ? 'bg-red-500' : storagePercent > 70 ? 'bg-amber-500' : 'bg-cyan-500'}`}
+            className={`h-full rounded-full transition-all duration-700 ${storagePercent > 90 ? 'bg-red-500' : storagePercent > 70 ? 'bg-amber-500' : 'bg-cyan-500'}`}
             style={{ width: `${storagePercent}%` }}
           />
         </div>
-      )}
+      ) : null}
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-1 flex-wrap">
-        {path !== '/' && (
-          <button type="button" onClick={goUp}
-            className="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors" title="Dossier parent">
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-        )}
-        {breadcrumbs.map((crumb, i) => (
-          <span key={crumb.path} className="flex items-center gap-1">
-            {i > 0 && <span className="text-white/30 text-sm">/</span>}
-            <button type="button" onClick={() => navigate(crumb.path)} disabled={i === breadcrumbs.length - 1}
-              className={`text-sm px-1 rounded transition-colors ${i === breadcrumbs.length - 1 ? 'text-white font-medium cursor-default' : 'text-cyan-400 hover:text-cyan-200 hover:bg-white/5'}`}>
-              {crumb.label === '/' ? <HardDrive className="w-3.5 h-3.5" /> : crumb.label}
+        {/* Flèche retour — toujours visible, grisée à la racine */}
+        {(() => {
+          const atRoot = path === rootFolder.replace(/\/$/, '') || path === rootFolder;
+          return (
+            <button type="button" onClick={goUp} disabled={atRoot}
+              title={atRoot ? 'Racine' : 'Dossier parent'}
+              className={`p-1 rounded transition-colors ${
+                atRoot
+                  ? 'text-white/20 cursor-default'
+                  : 'hover:bg-white/10 text-white/60 hover:text-white'
+              }`}>
+              <ArrowLeft className="w-4 h-4" />
             </button>
-          </span>
-        ))}
+          );
+        })()}
+        {breadcrumbs
+          .filter(crumb => crumb.label !== '/' || crumb.path === rootFolder.replace(/\/$/, '') || crumb.path === rootFolder)
+          .map((crumb, i, arr) => {
+            const isRoot = crumb.path === rootFolder.replace(/\/$/, '') || crumb.path === rootFolder;
+            const isAboveRoot = !isRoot && !crumb.path.startsWith(rootFolder.endsWith('/') ? rootFolder : rootFolder + '/');
+            const isCurrent = i === arr.length - 1;
+            return (
+              <span key={crumb.path} className="flex items-center gap-1">
+                {i > 0 && <span className="text-white/30 text-sm">/</span>}
+                <button
+                  type="button"
+                  onClick={() => !isAboveRoot && !isCurrent && navigate(crumb.path)}
+                  disabled={isCurrent || isAboveRoot}
+                  className={`text-sm px-1 rounded transition-colors ${
+                    isCurrent
+                      ? 'text-white font-medium cursor-default'
+                      : isAboveRoot
+                      ? 'text-white/20 cursor-default'
+                      : 'text-cyan-400 hover:text-cyan-200 hover:bg-white/5'
+                  }`}
+                >
+                  {isRoot ? (
+                    <span className="flex items-center gap-1">
+                      <HardDrive className="w-3.5 h-3.5" />
+                      {crumb.label !== '/' && <span>{crumb.label}</span>}
+                    </span>
+                  ) : crumb.label}
+                </button>
+              </span>
+            );
+          })}
       </div>
 
       {/* Erreur */}
@@ -683,8 +778,14 @@ export function FtpExplorer() {
           <button type="button" onClick={toggleSelectAll} className="flex items-center text-white/30 hover:text-white/60 transition-colors">
             {allSelected ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
           </button>
-          <span>Nom</span>
-          <span className="text-right w-24">Taille</span>
+          <button type="button" onClick={() => handleSortClick('name')}
+            className={`flex items-center transition-colors hover:text-white/70 ${sortCol === 'name' ? 'text-white/60' : ''}`}>
+            Nom<SortIcon col="name" />
+          </button>
+          <button type="button" onClick={() => handleSortClick('size')}
+            className={`flex items-center justify-end w-24 transition-colors hover:text-white/70 ${sortCol === 'size' ? 'text-white/60' : ''}`}>
+            Taille<SortIcon col="size" />
+          </button>
           <span className="w-20" />
         </div>
 
@@ -696,7 +797,7 @@ export function FtpExplorer() {
           <div className="py-12 text-center text-white/40 text-sm">Dossier vide</div>
         ) : (
           <div className="divide-y divide-white/5">
-            {items.map(item => {
+            {sortedItems.map(item => {
               const isRenaming = renamingItem === item.name;
               const busy = actionInProgress === item.name;
               const isSelected = selected.has(item.name);

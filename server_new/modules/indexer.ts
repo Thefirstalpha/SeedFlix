@@ -3,6 +3,7 @@ import { IndexerSettings } from "../../common/settings";
 import { getUsers } from "./auth";
 import { readStore, runInTransaction } from "./db";
 import { ErrorCode } from "./errors";
+import { addNotification } from "./notification";
 import { buildDetailsRequest, buildSearchRequest, proxyTmdb, TmdbType } from "./tmdb";
 import { checkTorznabConnection, searchTorznab } from "./torznab";
 import { getUser } from "./user";
@@ -128,9 +129,9 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
     for (const block of itemBlocks) {
         const title = block?.title;
         const link = block?.link;
-        const guidMatch = block?.guid;
+        const guidMatch = block.guid;
         const pubDateMatch = block?.pubDate;
-        const attributes = block['torznab:attr'].reduce((acc, item) => {
+        const attributes = block['torznab:attr'].reduce((acc: Record<string, any>, item: { name: string; value: any }) => {
             acc[item.name] = item.value;
             return acc;
         }, {});
@@ -138,7 +139,7 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
         results.push({
             title: typeof title === 'string' ? title : '',
             link: typeof link === 'string' ? link : '',
-            guid: typeof guidMatch === 'string' ? guidMatch : undefined,
+            guid: guidMatch,
             pubDate: typeof pubDateMatch === 'string' ? pubDateMatch : undefined,
             tmdbId: attributes.tmdbid || undefined,
             size: attributes.size ? Number(attributes.size) : undefined,
@@ -167,9 +168,9 @@ async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesRe
     for (const block of itemBlocks) {
         const title = block?.title;
         const link = block?.link;
-        const guidMatch = block?.guid;
+        const guidMatch = block.guid;
         const pubDateMatch = block?.pubDate;
-        const attributes = block['torznab:attr'].reduce((acc, item) => {
+        const attributes = block['torznab:attr'].reduce((acc: Record<string, any>, item: { name: string; value: any }) => {
             acc[item.name] = item.value;
             return acc;
         }, {});
@@ -177,7 +178,7 @@ async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesRe
         results.push({
             title: typeof title === 'string' ? title : '',
             link: typeof link === 'string' ? link : '',
-            guid: typeof guidMatch === 'string' ? guidMatch : undefined,
+            guid: guidMatch,
             pubDate: typeof pubDateMatch === 'string' ? pubDateMatch : undefined,
             tmdbId: attributes.tmdbid || undefined,
             size: attributes.size ? Number(attributes.size) : undefined,
@@ -320,9 +321,9 @@ export async function processWishlistIndexer() {
                     }
                 } else if (item.type === 'series') {
                     const founds = lastSeries.filter(s => s.tmdbId === String(item.tmdb) &&
-                            (item.all_seasons === true ||
-                                (item.seasons !== undefined && item.seasons !== undefined && item.seasons[s.seasonNumber || 1] !== undefined &&
-                                    (item.seasons[s.seasonNumber || 1].all_episodes === true || (s.episodeNumber !== undefined && item.seasons[s.seasonNumber || 1].episodes.includes(s.episodeNumber || 1))))));
+                        (item.all_seasons === true ||
+                            (item.seasons !== undefined && item.seasons !== undefined && item.seasons[s.seasonNumber || 1] !== undefined &&
+                                (item.seasons[s.seasonNumber || 1].all_episodes === true || (s.episodeNumber !== undefined && item.seasons[s.seasonNumber || 1].episodes.includes(s.episodeNumber || 1))))));
                     if (founds.length > 0) {
                         seriesFounds.push(...founds);
                     }
@@ -353,6 +354,42 @@ export async function processWishlistIndexer() {
                     }
                     if (remainingSeries.length > 0) {
                         writeStore('indexer-series-result', user.id, [...seriesResult, ...remainingSeries]);
+                    }
+
+                    // Notifications pour les nouveaux résultats
+                    const uniqueMovieTitles = [...new Set(remainingMovies.map(m => m.title || `Film #${m.tmdbId}`))];
+                    const uniqueSeriesTitles = [...new Set(remainingSeries.map(s => s.title || `Série #${s.tmdbId}`))];
+
+                    if (uniqueMovieTitles.length === 1) {
+                        addNotification(user.id, {
+                            title: 'Film disponible',
+                            message: uniqueMovieTitles[0],
+                            type: 'search',
+                            data: { tmdbId: remainingMovies[0].tmdbId, type: 'movie' },
+                        });
+                    } else if (uniqueMovieTitles.length > 1) {
+                        addNotification(user.id, {
+                            title: `${uniqueMovieTitles.length} nouveaux films disponibles`,
+                            message: uniqueMovieTitles.slice(0, 3).join(', ') + (uniqueMovieTitles.length > 3 ? `… (+${uniqueMovieTitles.length - 3})` : ''),
+                            type: 'search',
+                            data: { count: uniqueMovieTitles.length, type: 'movie' },
+                        });
+                    }
+
+                    if (uniqueSeriesTitles.length === 1) {
+                        addNotification(user.id, {
+                            title: 'Épisode disponible',
+                            message: uniqueSeriesTitles[0],
+                            type: 'search',
+                            data: { tmdbId: remainingSeries[0].tmdbId, type: 'series' },
+                        });
+                    } else if (uniqueSeriesTitles.length > 1) {
+                        addNotification(user.id, {
+                            title: `${uniqueSeriesTitles.length} nouveaux épisodes disponibles`,
+                            message: uniqueSeriesTitles.slice(0, 3).join(', ') + (uniqueSeriesTitles.length > 3 ? `… (+${uniqueSeriesTitles.length - 3})` : ''),
+                            type: 'search',
+                            data: { count: uniqueSeriesTitles.length, type: 'series' },
+                        });
                     }
                 });
             }

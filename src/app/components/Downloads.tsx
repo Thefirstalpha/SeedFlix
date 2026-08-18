@@ -7,6 +7,9 @@ import {
   Pause,
   Play,
   SlidersHorizontal,
+  ChevronDown,
+  ChevronUp,
+  Link,
   Trash2,
   Unlink,
 } from 'lucide-react';
@@ -128,204 +131,139 @@ function DownloadCard({
           : 'bg-white/5'
       }`}
     >
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-4">
-          <CardTitle className="text-base font-semibold line-clamp-2 break-all flex-1">
-            {item.name}
-          </CardTitle>
-          {completed && <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />}
+      <CardContent className="px-3 py-2.5 space-y-2 [&:last-child]:pb-2.5">
+        {/* Ligne 1 : nom + icône */}
+        <div className="flex items-center gap-2">
+          {completed
+            ? <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            : isPaused
+            ? <Circle className="w-4 h-4 text-white/30 flex-shrink-0" />
+            : <Loader2 className="w-4 h-4 text-cyan-400 flex-shrink-0 animate-spin" />}
+          <span className="text-sm font-medium truncate flex-1">{item.name}</span>
+          {item.error > 0 && item.errorString && (
+            <span className="text-xs text-red-400 truncate max-w-[160px]" title={item.errorString}>
+              ⚠ {item.errorString}
+            </span>
+          )}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {!completed && <Progress value={item.progress} className="bg-white/10" />}
-        <div className="flex flex-wrap gap-2">
+
+        {/* Barre de progression */}
+        {!completed && <Progress value={item.progress} className="h-1 bg-white/10" />}
+
+        {/* Badges métriques */}
+        <div className="flex flex-wrap gap-1.5">
           {!completed && (
-            <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
+            <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-xs py-0 h-5">
               {item.progress.toFixed(1)}%
             </Badge>
           )}
           {completed && (
-            <Badge className="border-emerald-500/50 bg-emerald-600/40 text-emerald-200">
+            <Badge className="border-emerald-500/50 bg-emerald-600/40 text-emerald-200 text-xs py-0 h-5">
               ✓ {t('downloads.finished')}
             </Badge>
           )}
-          <Badge
-            variant="outline"
-            className={
-              completed ? 'border-emerald-500/40 text-emerald-300' : 'border-white/30 text-white/80'
-            }
-          >
+          <Badge variant="outline"
+            className={`text-xs py-0 h-5 ${completed ? 'border-emerald-500/40 text-emerald-300' : 'border-white/30 text-white/70'}`}>
             {item.statusLabel}
           </Badge>
           {!completed && !isPaused && (
             <>
-              <Badge variant="outline" className="border-lime-500/40 text-lime-300">
-                {t('downloads.rate')}: {formatRate(item.rateDownload)}
+              <Badge variant="outline" className="border-lime-500/40 text-lime-300 text-xs py-0 h-5">
+                {formatRate(item.rateDownload)}
               </Badge>
-              <Badge variant="outline" className="border-amber-500/40 text-amber-300">
-                {t('downloads.eta')}:{' '}
+              <Badge variant="outline" className="border-amber-500/40 text-amber-300 text-xs py-0 h-5">
                 {formatEta(item.eta, t('downloads.unknown'), t('downloads.finished'))}
               </Badge>
             </>
           )}
-          <Badge variant="outline" className="border-purple-500/40 text-purple-300">
-            {t('downloads.peers')}: {item.peersConnected}
-          </Badge>
-          <Badge variant="outline" className="border-sky-500/40 text-sky-300">
-            {t('downloads.totalSize')}: {formatSize(item.totalSize)}
+          <Badge variant="outline" className="border-sky-500/40 text-sky-300 text-xs py-0 h-5">
+            {formatSize(item.totalSize)}
           </Badge>
           {!completed && (
-            <Badge variant="outline" className="border-orange-500/40 text-orange-300">
-              {t('downloads.remaining')}: {formatSize(item.leftUntilDone)}
+            <Badge variant="outline" className="border-orange-500/40 text-orange-300 text-xs py-0 h-5">
+              {formatSize(item.leftUntilDone)} restants
             </Badge>
           )}
-          <Badge variant="outline" className="border-fuchsia-500/40 text-fuchsia-300">
-            {t('downloads.ratio')}: {item.uploadRatio.toFixed(2)}
+          <Badge variant="outline" className="border-purple-500/40 text-purple-300 text-xs py-0 h-5">
+            {t('downloads.peers')}: {item.peersConnected}
           </Badge>
-          <Badge variant="outline" className="border-teal-500/40 text-teal-300">
-            {t('downloads.added')}: {formatAddedDate(item.addedDate, t('downloads.unknown'))}
+          <Badge variant="outline" className="border-fuchsia-500/40 text-fuchsia-300 text-xs py-0 h-5">
+            ratio {item.uploadRatio.toFixed(2)}
           </Badge>
-          <Badge
-            variant="outline"
-            className={
-              item.managedBySeedflix === false
-                ? 'border-slate-400/40 text-slate-300'
-                : 'border-cyan-500/40 text-cyan-300'
-            }
-          >
+          <Badge variant="outline" className="border-teal-500/40 text-teal-300 text-xs py-0 h-5">
+            {formatAddedDate(item.addedDate, t('downloads.unknown'))}
+          </Badge>
+          <Badge variant="outline"
+            className={`text-xs py-0 h-5 ${item.managedBySeedflix === false ? 'border-slate-400/40 text-slate-300' : 'border-cyan-500/40 text-cyan-300'}`}>
             {item.managedBySeedflix === false
               ? t('downloads.unmanagedBadge')
-              : t('downloads.managedBadge')}
+              : <><Link className="w-3 h-3" />SeedFlix</>}
           </Badge>
         </div>
-        {item.error > 0 && item.errorString ? (
-          <p className="text-sm text-red-300">
-            {t('downloads.errorPrefix')}: {item.errorString}
-          </p>
-        ) : null}
-        <div className="flex flex-wrap gap-2 pt-2">
+
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 pt-0.5">
           {!completed && isActive && (
-            <Button
-              size="sm"
-              onClick={() => handlePause(item.id)}
+            <Button size="sm" onClick={() => handlePause(item.id)}
               disabled={actionInProgress === `pause-${item.id}`}
-              className={`border transition-all ${
-                actionInProgress === `pause-${item.id}`
-                  ? 'bg-amber-600/20 text-amber-200/50 border-amber-500/20 cursor-wait'
-                  : 'bg-amber-600/40 hover:bg-amber-600/60 text-amber-200 border-amber-500/30'
-              }`}
-            >
-              {actionInProgress === `pause-${item.id}` ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                  {t('downloads.pause')}
-                </>
-              ) : (
-                <>
-                  <Pause className="w-4 h-4 mr-1" />
-                  {t('downloads.pause')}
-                </>
-              )}
+              className="h-7 px-2 text-xs border bg-amber-600/40 hover:bg-amber-600/60 text-amber-200 border-amber-500/30">
+              {actionInProgress === `pause-${item.id}`
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <><Pause className="w-3 h-3 mr-1" />{t('downloads.pause')}</>}
             </Button>
           )}
           {!completed && isPaused && (
-            <Button
-              size="sm"
-              onClick={() => handleResume(item.id)}
+            <Button size="sm" onClick={() => handleResume(item.id)}
               disabled={actionInProgress === `resume-${item.id}`}
-              className={`border transition-all ${
-                actionInProgress === `resume-${item.id}`
-                  ? 'bg-cyan-600/20 text-cyan-200/50 border-cyan-500/20 cursor-wait'
-                  : 'bg-cyan-600/40 hover:bg-cyan-600/60 text-cyan-200 border-cyan-500/30'
-              }`}
-            >
-              {actionInProgress === `resume-${item.id}` ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                  {t('downloads.resume')}
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4 mr-1" />
-                  {t('downloads.resume')}
-                </>
-              )}
+              className="h-7 px-2 text-xs border bg-cyan-600/40 hover:bg-cyan-600/60 text-cyan-200 border-cyan-500/30">
+              {actionInProgress === `resume-${item.id}`
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <><Play className="w-3 h-3 mr-1" />{t('downloads.resume')}</>}
             </Button>
           )}
           {item.managedBySeedflix && (
-            <Button
-              size="sm"
-              onClick={() => handleUnmanage(item.hashString || '')}
+            <Button size="sm" onClick={() => handleUnmanage(item.hashString || '')}
               disabled={actionInProgress === `unmanage-${item.hashString}`}
-              className={`border transition-all ${
-                actionInProgress === `unmanage-${item.hashString}`
-                  ? 'bg-slate-600/20 text-slate-200/50 border-slate-500/20 cursor-wait'
-                  : 'bg-slate-600/30 hover:bg-slate-600/50 text-slate-300 border-slate-500/20'
-              }`}
-            >
-              {actionInProgress === `unmanage-${item.hashString}` ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                  {t('downloads.dontTrack')}
-                </>
-              ) : (
-                <>
-                  <Unlink className="w-4 h-4 mr-1" />
-                  {t('downloads.dontTrack')}
-                </>
-              )}
+              className="h-7 px-2 text-xs border bg-slate-600/30 hover:bg-slate-600/50 text-slate-300 border-slate-500/20">
+              {actionInProgress === `unmanage-${item.hashString}`
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <><Unlink className="w-3 h-3 mr-1" />{t('downloads.dontTrack')}</>}
             </Button>
           )}
-          <Button
-            size="sm"
-            onClick={() => handleDelete(item.id)}
+          <Button size="sm" onClick={() => handleDelete(item.id)}
             disabled={actionInProgress === `delete-${item.id}`}
-            className={`border transition-all ${
+            className={`h-7 px-2 text-xs border transition-all ${
               actionInProgress === `delete-${item.id}`
-                ? completed
-                  ? 'bg-red-600/20 text-red-200/50 border-red-500/20 cursor-wait'
-                  : 'bg-red-600/10 text-red-300/50 border-red-500/10 cursor-wait'
+                ? 'bg-red-600/10 text-red-300/50 border-red-500/10 cursor-wait'
                 : completed
-                  ? 'bg-red-600/40 hover:bg-red-600/60 text-red-200 border-red-500/30'
-                  : 'bg-red-600/20 hover:bg-red-600/40 text-red-300 border-red-500/20'
-            }`}
-          >
-            {actionInProgress === `delete-${item.id}` ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                {t('downloads.remove')}
-              </>
-            ) : (
-              <>
-                <Trash2 className="w-4 h-4 mr-1" />
-                {t('downloads.remove')}
-              </>
-            )}
+                ? 'bg-red-600/40 hover:bg-red-600/60 text-red-200 border-red-500/30'
+                : 'bg-red-600/20 hover:bg-red-600/40 text-red-300 border-red-500/20'
+            }`}>
+            {actionInProgress === `delete-${item.id}`
+              ? <Loader2 className="w-3 h-3 animate-spin" />
+              : <><Trash2 className="w-3 h-3 mr-1" />{t('downloads.remove')}</>}
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
+          <Button size="sm" variant="outline"
             onClick={() => setShowRawDetails((prev) => !prev)}
-            className="border-white/20 bg-white/5 text-white/80 hover:bg-white/10"
-          >
-            {showRawDetails ? t('downloads.hideRawDetails') : t('downloads.showRawDetails')}
+            className="h-7 px-2 text-xs border-white/20 bg-white/5 text-white/60 hover:bg-white/10">
+            {showRawDetails
+              ? <><ChevronUp className="w-3 h-3 mr-1" />Détails</>
+              : <><ChevronDown className="w-3 h-3 mr-1" />Détails</>}
           </Button>
         </div>
-        {showRawDetails ? (
+
+        {showRawDetails && (
           <div className="rounded-md border border-white/15 bg-black/30 p-3">
-            <p className="text-xs uppercase tracking-wide text-white/60 mb-2">
-              {t('downloads.rawDetails')}
-            </p>
+            <p className="text-xs uppercase tracking-wide text-white/60 mb-2">{t('downloads.rawDetails')}</p>
             <pre className="text-xs text-white/80 whitespace-pre-wrap break-all">
               {JSON.stringify(item, null, 2)}
             </pre>
           </div>
-        ) : null}
+        )}
       </CardContent>
     </Card>
   );
 }
-
 function filterDownloads(
   downloads: TorrentDownloadItem[],
   showAllTorrents: boolean,
