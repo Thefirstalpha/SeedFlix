@@ -10,11 +10,12 @@ import { router as tmdbRouter } from './routes/tmdb';
 import { router as transmissionRouter } from './routes/transmission';
 import { router as indexerRouter } from './routes/indexer';
 import { router as dbRouter } from './routes/db';
-import { User } from './modules/user';
+import { router as settingsRouter } from './routes/settings';
 import { initDB } from './modules/db';
 import { ErrorCode } from './modules/errors';
 
 import { Logger } from './logger';
+import { User } from '../common/user';
 
 initDB();
 Logger.init();
@@ -39,6 +40,7 @@ app.use('/api', tmdbRouter);
 app.use('/api', transmissionRouter);
 app.use('/api', indexerRouter);
 app.use('/api', dbRouter);
+app.use('/api', settingsRouter);
 
 // Exemple de route racine
 app.get('/api/health', (req, res) => {

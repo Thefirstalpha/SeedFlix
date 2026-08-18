@@ -23,7 +23,7 @@ const MOVIE_QUALITY_FILTERS = ['all', '2160p', '1080p', '720p', '480p', 'bluray'
 export function MovieDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { settings } = useAuth();
+  const { user } = useAuth();
   const { t, language } = useI18n();
   const [movie, setMovie] = useState<Movie | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,12 +31,7 @@ export function MovieDetails() {
   const [releaseResults, setReleaseResults] = useState<IndexerMovieResult[]>([]);
   const [isReleaseLoading, setIsReleaseLoading] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
-  const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
-  const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
-  const [torrentError, setTorrentError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterOption>({ quality: 'all', language: 'all', season: 'all', sortBy: 'date', sortOrder: 'desc' });
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
 
   const filteredReleaseResults = useMemo(() => {
     let results = releaseResults.filter((item) => {
@@ -67,17 +62,6 @@ export function MovieDetails() {
 
     return results;
   }, [releaseResults, filter]);
-
-  const totalPages = Math.ceil(filteredReleaseResults.length / ITEMS_PER_PAGE);
-  const paginatedResults = filteredReleaseResults.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE,
-  );
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter]);
 
   const availableReleaseLanguages = Array.from(
     new Set(releaseResults.map((item) => normalizeIndexerLanguage(item.language)).filter(Boolean)),
@@ -151,27 +135,6 @@ export function MovieDetails() {
       setReleaseResults([]);
     } finally {
       setIsReleaseLoading(false);
-    }
-  };
-
-  const handleAddTorrent = async (torrentUrl: string) => {
-    setTorrentStatus(null);
-    setTorrentError(null);
-    setAddingTorrentLink(torrentUrl);
-
-    try {
-      const response = await addTorrentToClient(torrentUrl);
-      setTorrentStatus(
-        response.duplicate
-          ? t('movieDetails.messages.duplicateTorrent')
-          : t('movieDetails.messages.torrentAdded'),
-      );
-    } catch (error) {
-      setTorrentError(
-        error instanceof Error ? error.message : t('movieDetails.errors.addTorrentFailed'),
-      );
-    } finally {
-      setAddingTorrentLink(null);
     }
   };
 
@@ -358,19 +321,12 @@ export function MovieDetails() {
           <TorrentResultsPanel
             title={t('movieDetails.indexer.title')}
             filter={filter}
+            type="movie"
             onFilterChange={setFilter}
             availableReleaseLanguages={availableReleaseLanguages}
             isReleaseLoading={isReleaseLoading}
             releaseError={releaseError}
-            torrentStatus={torrentStatus}
-            torrentError={torrentError}
             filteredResults={filteredReleaseResults}
-            paginatedResults={paginatedResults}
-            addingTorrentLink={addingTorrentLink}
-            onAddTorrent={handleAddTorrent}
-            currentPage={currentPage}
-            onCurrentPageChange={setCurrentPage}
-            totalPages={totalPages}
             locale={language === 'fr' ? 'fr-FR' : 'en-US'}
             labels={torrentPanelLabels}
           />

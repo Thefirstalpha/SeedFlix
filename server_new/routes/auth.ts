@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { messages } from '../modules/i18n';
 import { randomBytes } from 'crypto';
-import { db} from '../modules/db';
+import { db, runInTransaction } from '../modules/db';
 import { config } from '../config';
-import { authentication, hashPassword } from '../modules/auth';
+import { authentication, hashPassword, resetPassword } from '../modules/auth';
 import { getUser } from '../modules/user';
+import { User } from '../../common/user';
 
 const router = Router();
 
@@ -42,6 +43,31 @@ router.post('/auth/login', (req, res) => {
   res.json({ ok: true, user: user });
 });
 
+
+
+router.post('/auth/reset-password', authentication, (req, res) => {
+  const password = String(req.body?.password || '');
+  resetPassword(req.user.id, password);
+  runInTransaction(({ writeStore }) => {
+    let user = getUser(req.user.id);
+    if (!user)
+      throw new Error('User not found');
+    user.flags.mustUpdatePassword = false;
+    writeStore('user', user.id, user);
+  });
+  res.json({ ok: true });
+});
+
+router.post('/auth/accept-legal', authentication, (req, res) => {
+  runInTransaction(({ writeStore }) => {
+    let user = getUser(req.user.id);
+    if (!user)
+      throw new Error('User not found');
+    user.flags.legalAccepted = true;
+    writeStore('user', user.id, user);
+  });
+  res.json({ ok: true });
+});
 
 router.post('/auth/logout', authentication, (req, res) => {
   const sessionToken = req.cookies['session'];

@@ -3,6 +3,7 @@ import { TorrentDownloadItem } from "../../common/torrent";
 import { runInTransaction } from "./db";
 import { ErrorCode } from "./errors";
 import { messages } from "./i18n";
+import { getIndexerSettings } from "./indexer";
 import { getUser } from "./user";
 
 const transmissionRpcPath = '/transmission/rpc';
@@ -211,6 +212,79 @@ export async function performTransmissionAction(action: string, userId: number, 
         method: action,
         arguments: {
             ids: [torrentId],
+        },
+    });
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok || data?.result !== 'success')
+        throw new ErrorCode(messages.settings.transmission.actionFailed);
+
+
+};
+
+function isMagnetLink(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .startsWith('magnet:?');
+}
+
+async function fetchTorrentMetainfo(torrentUrl) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), transmissionTimeoutMs);
+
+  try {
+    console.log(`Fetching torrent metainfo from URL: ${torrentUrl}`);
+    const response = await fetch(torrentUrl, {
+      headers: {
+        Accept: 'application/x-bittorrent,application/octet-stream,*/*;q=0.1',
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Impossible de télécharger le fichier torrent (${response.status})`);
+    }
+
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    if (contentType.includes('text/html')) {
+      throw new Error("Le lien fourni n'est pas un fichier torrent valide");
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.length) {
+      throw new Error('Le fichier torrent est vide');
+    }
+
+    return buffer.toString('base64');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function startDownload(userId: number, guid: string, mediaType: string) {
+    const settings = getTransmissionSettings(userId);
+    if (!settings)
+        throw new ErrorCode(messages.settings.transmission.authFailed);
+    const downloadDir = mediaType === 'movie' ? settings.moviesFolder : settings.seriesFolder;
+    
+    const indexerSettings = getIndexerSettings(userId);
+    if (!indexerSettings)
+        throw new ErrorCode(messages.settings.failedLoadSettings);
+    const url = new URL(indexerSettings.url);
+    if(indexerSettings.token)
+        url.searchParams.set('apikey', indexerSettings.token);
+    url.searchParams.set('t', 'get');
+    url.searchParams.set('id', guid);
+
+    const response = await executeTransmissionRpc(settings, {
+        method: 'torrent-add',
+        arguments: {
+            paused: false,
+            'download-dir': downloadDir,
+            ...(isMagnetLink(url.toString())
+              ? { filename: url.toString() }
+              : { metainfo: await fetchTorrentMetainfo(url.toString()) }),
         },
     });
 

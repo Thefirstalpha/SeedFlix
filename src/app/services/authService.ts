@@ -1,65 +1,11 @@
 import { UserStatusBar } from '../../../common/user';
+import { User } from '../../../common/user';
 import { API_BASE_URL } from '../config/tmdb';
 
-export interface AuthUser {
-  id: number;
-  username: string;
-}
 
 export interface AuthResponse {
   authenticated?: boolean;
-  user?: AuthUser | null;
-  settings?: UserSettings;
-  mustChangePassword: boolean;
-  mustConfigureTmdb: boolean;
-  mustConfigureTorrent: boolean;
-  mustConfigureIndexer: boolean;
-  shouldChangePassword: boolean;
-  legalAccepted: boolean;
-  needsInitialSetup: boolean;
-}
-
-export interface UserSettings {
-  appInfo?: {
-    imageTag?: string;
-  };
-  profile: {
-    username: string;
-  };
-  security: {
-    lastPasswordChangeAt?: string;
-  };
-  apiKeys?: {
-    tmdb?: string;
-  };
-  placeholders: {
-    notifications?: Record<string, unknown>;
-    preferences?: Record<string, unknown>;
-    torrent?: {
-      url?: string;
-      port?: string;
-      authRequired?: boolean;
-      username?: string;
-      password?: string;
-      moviesFolder?: string;
-      seriesFolder?: string;
-    };
-    indexer?: {
-      url?: string;
-      token?: string;
-      qualities?: string[];
-      languages?: string[];
-    };
-    ftp?: {
-      host?: string;
-      port?: string;
-      authRequired?: boolean;
-      username?: string;
-      password?: string;
-      rootPath?: string;
-      limit?: number;
-      };
-    };
+  user?: User | null;
 }
 
 export interface IndexerTestResponse {
@@ -82,7 +28,7 @@ export interface TmdbApiKeyTestResponse {
 const AUTH_BASE = `${API_BASE_URL}/auth`;
 const SETTINGS_BASE = `${API_BASE_URL}/settings`;
 
-async function parseJson<T>(response: Response, fallbackError = 'Request failed'): Promise<T> {
+export async function parseJson<T>(response: Response, fallbackError = 'Request failed'): Promise<T> {
   const text = await response.text();
   let data: unknown = null;
 
@@ -119,13 +65,6 @@ export async function getCurrentAuth(): Promise<AuthResponse> {
     return {
       user: null,
       authenticated: false,
-      mustChangePassword: false,
-      mustConfigureTmdb: false,
-      mustConfigureTorrent: false,
-      mustConfigureIndexer: false,
-      legalAccepted: false,
-      needsInitialSetup: false,
-      shouldChangePassword: false,
     };
   }
 }
@@ -156,31 +95,14 @@ export async function acceptLegal() {
   return parseJson<{ ok: true }>(response);
 }
 
-export async function changePassword(currentPassword: string, newPassword: string) {
-  const response = await fetch(`${AUTH_BASE}/change-password`, {
+export async function changePassword(newPassword: string) {
+  const response = await fetch(`${AUTH_BASE}/reset-password`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ currentPassword, newPassword }),
+    body: JSON.stringify({ password: newPassword }),
   });
   return parseJson<{ ok: true }>(response);
-}
-
-export async function getSettings() {
-  const response = await fetch(SETTINGS_BASE, {
-    credentials: 'include',
-  });
-  return parseJson<UserSettings>(response);
-}
-
-export async function updateSettings(settings: UserSettings) {
-  const response = await fetch(SETTINGS_BASE, {
-    method: 'PUT',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(settings),
-  });
-  return parseJson<UserSettings>(response);
 }
 
 export async function getGlobalSettings() {
@@ -247,11 +169,6 @@ export async function testTmdbApiKey(apiKey: string) {
 // ─────────────────────────────────────────────────────────────────────────────
 // User Management
 // ─────────────────────────────────────────────────────────────────────────────
-
-export interface User {
-  id: number;
-  username: string;
-}
 
 export interface DatabaseNamespaceEntry {
   namespace: string;

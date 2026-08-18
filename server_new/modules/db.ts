@@ -1,7 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { config } from "../config";
-import { createAuth } from "./auth";
 import { createUser, getUser } from "./user";
 
 mkdirSync(config.dataDir, { recursive: true });
@@ -47,6 +46,10 @@ export const readStore = (namespace: string, userId: number): Record<string, any
   const row = db.prepare('SELECT value FROM kv_store WHERE namespace = ? AND user_id = ?').get(namespace, userId);
   return row ? JSON.parse(String(row.value)) : null;
 }
+export const readStores = (namespace: string): Record<string, any>[] => {
+  const rows = db.prepare('SELECT value FROM kv_store WHERE namespace = ?').all(namespace);
+  return rows.map((row: any) => JSON.parse(String(row.value)));
+}
 
 export const writeStore = (namespace: string, userId: number, value: Record<string, any>) => {
   db.prepare(`
@@ -79,4 +82,12 @@ export function runInTransaction(callback: (db: { writeStore: typeof writeStore 
 export function listNamespaces(): { namespace: string, updated_at: string }[] {
   const rows = db.prepare('SELECT DISTINCT namespace, updated_at FROM kv_store').all();
   return rows.map((row: any) => ({ namespace: row.namespace, updated_at: row.updated_at }));
+}
+
+export function resetDatabase() {
+  db.exec('DELETE FROM kv_store');
+  db.exec('DELETE FROM auth_sessions');
+  db.exec('DELETE FROM auth_users');
+  const { password } = createUser('admin', 'admin');
+  console.info(`Admin user created with password: ${password}`);
 }

@@ -25,6 +25,7 @@ import { addTorrentToClient } from '../services/torrentService';
 import type { SeriesDetails as SeriesDetailsModel, SeriesEpisode } from '../types/series';
 import type { SeriesWishlistStatus } from '../types/seriesWishlist';
 import { WishListItem } from '../../../common/wishlist';
+import { IndexerSeriesResult } from '../../../common/indexer';
 
 
 const SERIES_QUALITY_FILTERS = ['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv'];
@@ -52,7 +53,7 @@ function detectSeasonFromRelease(item: TorznabSeriesResult): string {
 export function SeriesDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { settings } = useAuth();
+  const { user } = useAuth();
   const { t, language } = useI18n();
   const [series, setSeries] = useState<SeriesDetailsModel | null>(null);
   const [episodes, setEpisodes] = useState<SeriesEpisode[]>([]);
@@ -63,9 +64,6 @@ export function SeriesDetails() {
   const [releaseResults, setReleaseResults] = useState<TorznabSeriesResult[]>([]);
   const [isReleaseLoading, setIsReleaseLoading] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
-  const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
-  const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
-  const [torrentError, setTorrentError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterOption>({
     quality: 'all',
     season: 'all',
@@ -73,22 +71,18 @@ export function SeriesDetails() {
     sortBy: 'date' as 'size' | 'date',
     sortOrder: 'desc' as 'asc' | 'desc',
   });
-  const [currentPage, setCurrentPage] = useState(1);
   const [revealedEpisodeIds, setRevealedEpisodeIds] = useState<number[]>([]);
-  const ITEMS_PER_PAGE = 10;
-  const spoilerModeEnabled = Boolean(
-    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode,
-  );
+  const spoilerModeEnabled = user?.settings?.spoilerMode || false;
 
   useEffect(() => {
     const preferred = String(
-      settings?.placeholders?.indexer?.defaultQuality || 'all',
+      user?.settings?.indexer?.qualities || 'all',
     ).toLowerCase();
     setFilter((prev) => ({
       ...prev,
       quality: SERIES_QUALITY_FILTERS.includes(preferred) ? preferred : 'all',
     }));
-  }, [settings?.placeholders?.indexer?.defaultQuality]);
+  }, [user?.settings?.indexer?.qualities]);
 
   useEffect(() => {
     loadSeriesDetails();
@@ -184,15 +178,6 @@ export function SeriesDetails() {
     return filtered;
   }, [releaseResults, filter]);
 
-  const totalPages = Math.ceil(filteredReleaseResults.length / ITEMS_PER_PAGE);
-  const paginatedResults = filteredReleaseResults.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE,
-  );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter]);
 
   useEffect(() => {
     setRevealedEpisodeIds([]);
@@ -251,27 +236,6 @@ export function SeriesDetails() {
   const refreshStatus = async () => {
     if (!series) return;
     setWishlistStatus(await getSeriesWishlistStatus(series.id));
-  };
-
-  const handleAddTorrent = async (torrentUrl: string) => {
-    setTorrentStatus(null);
-    setTorrentError(null);
-    setAddingTorrentLink(torrentUrl);
-
-    try {
-      const response = await addTorrentToClient(torrentUrl, 'series');
-      setTorrentStatus(
-        response.duplicate
-          ? t('seriesDetails.messages.duplicateTorrent')
-          : t('seriesDetails.messages.torrentAdded'),
-      );
-    } catch (error) {
-      setTorrentError(
-        error instanceof Error ? error.message : t('seriesDetails.errors.addTorrentFailed'),
-      );
-    } finally {
-      setAddingTorrentLink(null);
-    }
   };
 
   // ── Wishlist helpers ────────────────────────────────────────────────────────
@@ -713,21 +677,14 @@ const isSeasonCoveredBySeries = wishlistStatus && wishlistStatus.all_seasons;
           <TorrentResultsPanel
             title={t('seriesDetails.indexer.title')}
             description={t('seriesDetails.indexer.description')}
+            type="series"
             filter={filter}
             onFilterChange={setFilter}
             availableReleaseSeasons={availableReleaseSeasons}
             availableReleaseLanguages={availableReleaseLanguages}
             isReleaseLoading={isReleaseLoading}
             releaseError={releaseError}
-            torrentStatus={torrentStatus}
-            torrentError={torrentError}
             filteredResults={filteredReleaseResults}
-            paginatedResults={paginatedResults}
-            addingTorrentLink={addingTorrentLink}
-            onAddTorrent={handleAddTorrent}
-            currentPage={currentPage}
-            onCurrentPageChange={setCurrentPage}
-            totalPages={totalPages}
             locale={language === 'fr' ? 'fr-FR' : 'en-US'}
             labels={torrentPanelLabels}
           />

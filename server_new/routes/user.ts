@@ -15,7 +15,7 @@ router.post('/user/accept-legal', (req, res) => {
       let user = getUser(req.user.id);
       if (!user)
         throw new Error('User not found');
-      user.flags.acceptLegal = true;
+      user.flags.legalAccepted = true;
       writeStore('user', user.id, user);
     });
     res.json({ ok: true });

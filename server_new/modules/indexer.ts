@@ -268,6 +268,38 @@ export async function getSeriesIndexerResult(userId: number): Promise<IndexerSer
     return seriesResult as IndexerSeriesResult[];
 }
 
+export async function rejectIndexerResultByGuid(userId: number, guid: string): Promise<void> {
+    const moviesResult: IndexerMovieResult[] = (readStore('indexer-movie-result', userId) || []) as IndexerMovieResult[];
+    const seriesResult: IndexerSeriesResult[] = (readStore('indexer-series-result', userId) || []) as IndexerSeriesResult[];
+
+    const rejectedMovie = moviesResult.find((m) => m.guid === guid);
+    const rejectedSeries = seriesResult.find((s) => s.guid === guid);
+
+    const filteredMovies = moviesResult.filter((m) => m.guid !== guid);
+    const filteredSeries = seriesResult.filter((s) => s.guid !== guid);
+
+    const blacklist: string[] = (readStore('indexer-blacklist', userId) || []) as string[];
+    if (rejectedMovie) {
+        blacklist.push(`movie:${rejectedMovie.tmdbId}:${guid}`);
+    } else if (rejectedSeries) {
+        blacklist.push(`series:${rejectedSeries.tmdbId}:${guid}`);
+    } else {
+        blacklist.push(`unknown:${guid}`);
+    }
+
+    runInTransaction(({ writeStore }) => {
+        writeStore('indexer-movie-result', userId, filteredMovies);
+        writeStore('indexer-series-result', userId, filteredSeries);
+        writeStore('indexer-blacklist', userId, blacklist);
+    });
+}
+
+export async function rejectAllIndexerResultsByGuids(userId: number, guids: string[]): Promise<void> {
+    for (const guid of guids) {
+        await rejectIndexerResultByGuid(userId, guid);
+    }
+}
+
 
 // Automated job to search wishlist items in the indexer and update their status
 export async function processWishlistIndexer() {

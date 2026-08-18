@@ -11,7 +11,7 @@ import { configureIndexer } from "../../services/settingService";
 const QUALITY_OPTIONS = ['2160p', '1080p', '720p', '480p'];
 const LANGUAGE_OPTIONS = ['VO', 'VFF', 'VF2', 'VFQ', 'VOSTFR', 'MULTI'];
 
-export function SettingIndexer() {
+export function SettingIndexer({ setup, onComplete }: { setup: boolean; onComplete: (() => void) | undefined }) {
     const { t } = useI18n();
     const [indexerUrl, setIndexerUrl] = useState('');
     const [indexerToken, setIndexerToken] = useState('');
@@ -38,6 +38,7 @@ export function SettingIndexer() {
         try {
             await configureIndexer(indexerSettings);
             setIndexerMessage(t('settings.messages.configurationSaved'));
+            onComplete?.();
         } catch (submitError) {
             setIndexerError(
                 submitError instanceof Error
@@ -76,7 +77,8 @@ export function SettingIndexer() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <form onSubmit={handleIndexerSave} className="space-y-4 max-w-lg">
+                <form onSubmit={handleIndexerSave} className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                         <Label htmlFor="indexer-url">{t('settings.api.indexer.url')}</Label>
                         <Input
@@ -98,6 +100,7 @@ export function SettingIndexer() {
                             onChange={(e) => setIndexerToken(e.target.value)}
                             className="bg-slate-900 border-white/10 text-white"
                         />
+                    </div>
                     </div>
 
                     <div className="space-y-2">
@@ -153,15 +156,28 @@ export function SettingIndexer() {
                     {indexerMessage && <p className="text-sm text-emerald-300">{indexerMessage}</p>}
                     {indexerError && <p className="text-sm text-red-300">{indexerError}</p>}
 
-                    <Button
-                        type="submit"
-                        disabled={isIndexerSaving}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                        {isIndexerSaving
-                            ? t('settings.api.common.savingAndTesting')
-                            : t('settings.api.common.saveAndTest')}
-                    </Button>
+                    {setup ? (
+                        <div className="flex items-center justify-end gap-3">
+                            <Button
+                                type="submit"
+                                disabled={isIndexerSaving}
+                                className="bg-cyan-600 text-white hover:bg-cyan-700"
+                            >
+                                {isIndexerSaving ? t('setup.indexer.testing') : t('setup.indexer.testAndFinish')}
+                            </Button>
+                        </div>
+                    )
+                        : (
+                            <Button
+                                type="submit"
+                                disabled={isIndexerSaving}
+                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                                {isIndexerSaving
+                                    ? t('settings.api.common.savingAndTesting')
+                                    : t('settings.api.common.saveAndTest')}
+                            </Button>
+                        )}
                 </form>
             </CardContent>
         </Card>

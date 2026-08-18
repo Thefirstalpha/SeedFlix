@@ -1,5 +1,21 @@
 import { IndexerSettings, TransmissionSettings } from "../../../common/settings";
 
+
+export async function isTmdbConfigure(): Promise<boolean> {
+    const response = await fetch(`/api/tmdb/configure`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+    });
+    if (response.ok) {
+        const data = await response.json();
+        if (data.ok) {
+            return true;
+        }
+    }
+    return false;
+}
+
 export async function configureTmdb(tmdbApiKey: string) {
     const response = await fetch(`/api/tmdb/configure`, {
         method: 'POST',

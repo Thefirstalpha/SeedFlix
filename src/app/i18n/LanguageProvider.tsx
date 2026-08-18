@@ -180,8 +180,7 @@ export interface I18nMessages {
     progress: string;
     stepLabel: string;
     password: {
-      cardTitle: string;
-      cardDescription: string;
+      description: string;
       cardTitleUser: string;
       cardDescriptionUser: string;
       currentPassword: string;
@@ -280,6 +279,15 @@ export interface I18nMessages {
     rate: string;
     eta: string;
     peers: string;
+    totalSize: string;
+    remaining: string;
+    ratio: string;
+    added: string;
+    managedBadge: string;
+    unmanagedBadge: string;
+    showRawDetails: string;
+    hideRawDetails: string;
+    rawDetails: string;
     errorPrefix: string;
     pause: string;
     resume: string;

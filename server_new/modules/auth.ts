@@ -58,8 +58,13 @@ export function createAuth(username: string, password: string | null = null) {
 export function resetAuth(userId: number) {
     const generatedPassword = generateSimpleUserPassword();
     const { salt, hash } = hashPassword(generatedPassword);
-    db.prepare('UPDATE auth_users SET salt = ?, hash = ?, updated_at = datetime("now") WHERE user_id = ?').run(salt, hash, userId);
+    db.prepare('UPDATE auth_users SET salt = ?, hash = ?, updated_at = datetime(\'now\') WHERE user_id = ?').run(salt, hash, userId);
     return generatedPassword;
+}
+
+export function resetPassword(userId: number, password: string) {
+    const { salt, hash } = hashPassword(password);
+    db.prepare('UPDATE auth_users SET salt = ?, hash = ?, updated_at = datetime(\'now\') WHERE user_id = ?').run(salt, hash, userId);
 }
 
 export function getUsers() : { id: number, username: string }[] {

@@ -13,21 +13,12 @@ export function Login() {
   const location = useLocation();
   const { t } = useI18n();
   const {
+    user,
     isAuthenticated,
     isLoading,
-    login,
-    needsInitialSetup,
-    mustChangePassword,
-    mustConfigureTmdb,
-    mustConfigureTorrent,
-    mustConfigureIndexer,
+    login
   } = useAuth();
-  const hasPendingSetup =
-    needsInitialSetup ||
-    mustChangePassword ||
-    mustConfigureTmdb ||
-    mustConfigureTorrent ||
-    mustConfigureIndexer;
+  const hasPendingSetup = user?.flags?.mustSetup;
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -54,11 +45,7 @@ export function Login() {
     try {
       const response = await login(username, password);
       const mustOpenSetup =
-        response.needsInitialSetup ||
-        response.mustChangePassword ||
-        response.mustConfigureTmdb ||
-        response.mustConfigureTorrent ||
-        response.mustConfigureIndexer ||
+        response.user?.flags?.mustSetup ||
         (username === 'admin' && password === 'admin');
 
       if (mustOpenSetup) {

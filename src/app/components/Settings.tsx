@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
-import { DatabaseNamespaceList } from './DatabaseNamespaceList';
-import { DatabaseRawEditorPanel } from './DatabaseRawEditorPanel';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,30 +16,23 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
 
-import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { useAuth } from '../context/AuthContext';
 import { useI18n, type SupportedLanguage } from '../i18n/LanguageProvider';
 import {
-  changePassword,
-  getDatabaseNamespace,
-  getSettings,
-  resetSettings,
-  updateDatabaseNamespace,
-  updateSettings,
-  listDatabaseNamespaces,
-  type DatabaseNamespaceEntry,
-  type UserSettings,
+  resetSettings
 } from '../services/authService';
 import * as notificationService from '../services/notificationService';
-import { testFtpConnection } from '../services/ftpService';
 import { SettingTMDB } from './settings/SettingTMDB';
 import { SettingUsers } from './settings/SettingUsers';
 import { SettingTransmission } from './settings/SettingTransmission';
 import { SettingIndexer } from './settings/SettingIndexer';
 import { SettingDatabase } from './settings/SettingDatabase';
+import { SettingPassword } from './settings/SettingPassword';
+import { SettingNotification } from './settings/SettingNotification';
+import { SettingFtp } from './settings/SettingFtp';
 
 // Fonction utilitaire générique pour la gestion des sauvegardes asynchrones
 async function handleAsyncSave<T = any>({
@@ -106,99 +97,17 @@ export function Settings() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isAuthenticated, isLoading, user, setSettings, refresh, shouldChangePassword } =
+  const { isAuthenticated, isLoading, user, refresh } =
     useAuth();
-  const { t, availableLanguages, setLanguage } = useI18n();
-  const [settings, setLocalSettings] = useState<UserSettings | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  
- 
+  const { t, availableLanguages } = useI18n();
   const [resetError, setResetError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-  const [discordWebhookUrl, setDiscordWebhookUrl] = useState('');
-  const [discordTested, setDiscordTested] = useState(false);
-  const [discordFormOpen, setDiscordFormOpen] = useState(false);
-  const [discordMessage, setDiscordMessage] = useState<string | null>(null);
-  const [discordError, setDiscordError] = useState<string | null>(null);
-  const [isDiscordSaving, setIsDiscordSaving] = useState(false);
   const [languageCode, setLanguageCode] = useState<SupportedLanguage>('fr');
   const [spoilerMode, setSpoilerMode] = useState(false);
   const [preferencesMessage, setPreferencesMessage] = useState<string | null>(null);
   const [preferencesError, setPreferencesError] = useState<string | null>(null);
   const [isPreferencesSaving, setIsPreferencesSaving] = useState(false);
-  const [testNotifMessage, setTestNotifMessage] = useState<string | null>(null);
-  const [testNotifError, setTestNotifError] = useState<string | null>(null);
-  const [isSendingTestNotif, setIsSendingTestNotif] = useState(false);
 
-
-  // État pour la configuration FTP
-  const [ftpUrl, setFtpUrl] = useState('');
-  const [ftpPort, setFtpPort] = useState('21');
-  const [ftpSecure, setFtpSecure] = useState(false);
-  const [ftpAuthRequired, setFtpAuthRequired] = useState(false);
-  const [ftpUsername, setFtpUsername] = useState('');
-  const [ftpPassword, setFtpPassword] = useState('');
-  const [ftpRootFolder, setFtpRootFolder] = useState('');
-  const [ftpStorageLimit, setFtpStorageLimit] = useState('');
-  const [ftpMessage, setFtpMessage] = useState<string | null>(null);
-  const [ftpError, setFtpError] = useState<string | null>(null);
-  const [isFtpSaving, setIsFtpSaving] = useState(false);
-  const [isFtpTesting, setIsFtpTesting] = useState(false);
-
-  
-  // Construction du payload FTP pour sauvegarde
-  const buildFtpSettingsPayload = () => ({
-    url: ftpUrl,
-    port: ftpPort,
-    secure: ftpSecure,
-    authRequired: ftpAuthRequired,
-    username: ftpUsername,
-    password: ftpPassword,
-    rootFolder: ftpRootFolder,
-    storageLimit: ftpStorageLimit,
-  });
-
-  // Gestion de la sauvegarde FTP
-  const handleSaveFtpSettings = (event?: React.FormEvent) => {
-    handleAsyncSave({
-      event,
-      setError: setFtpError,
-      setMessage: setFtpMessage,
-      setSaving: setIsFtpSaving,
-      doSave: async () => {
-        const config = buildFtpSettingsPayload();
-        await saveFtpConfig(config);
-        return config;
-      },
-      successMessage: 'Configuration FTP enregistrée.',
-      errorMessage: 'Erreur lors de la sauvegarde FTP.',
-    });
-  };
-
-  // Test de connexion FTP
-  const handleTestFtpConnection = async (event?: React.FormEvent) => {
-    if (event) event.preventDefault();
-    setFtpError(null);
-    setFtpMessage(null);
-    setIsFtpTesting(true);
-    try {
-      const config = buildFtpSettingsPayload();
-      const result = await testFtpConnection(config);
-      if (result.ok) {
-        setFtpMessage('Connexion FTP réussie.');
-      } else {
-        setFtpError(result.error || 'Échec de la connexion FTP.');
-      }
-    } catch (e: any) {
-      setFtpError(e.message || 'Erreur lors du test FTP.');
-    } finally {
-      setIsFtpTesting(false);
-    }
-  };
 
   const isAdmin = user?.username === 'admin';
 
@@ -218,209 +127,12 @@ export function Settings() {
     setSearchParams(nextParams, { replace: true });
   }, [isAdmin, tabParam, searchParams, setSearchParams]);
 
-  const applySettingsToForms = (incomingSettings: UserSettings) => {
-
-
-    const notifSettings = incomingSettings.placeholders?.notifications || {};
-    setDiscordWebhookUrl((notifSettings as any).discord?.webhookUrl || '');
-    setDiscordTested(
-      (notifSettings as any).enabledChannels?.includes('discord') &&
-      Boolean((notifSettings as any).discord?.webhookUrl),
-    );
-    setLanguageCode(
-      parseSupportedLanguage((incomingSettings.placeholders?.preferences as any)?.language),
-    );
-    setSpoilerMode(Boolean((incomingSettings.placeholders?.preferences as any)?.spoilerMode));
-  };
-
-  const buildNotificationSettingsPayload = (params: {
-    discordWebhookUrl?: string;
-    includeDiscord?: boolean;
-    includeBrowser?: boolean;
-  }) => {
-    const current = (settings?.placeholders?.notifications as Record<string, unknown>) || {};
-    const currentChannels = Array.isArray(current.enabledChannels)
-      ? (current.enabledChannels as string[])
-      : [];
-
-    const nextDiscordWebhookUrl =
-      params.discordWebhookUrl ?? String((current as any).discord?.webhookUrl || '');
-
-    const nextChannels = new Set(currentChannels);
-
-    if (
-      params.includeDiscord === true ||
-      (params.includeDiscord !== false && Boolean(nextDiscordWebhookUrl.trim()))
-    ) {
-      nextChannels.add('discord');
-    } else {
-      nextChannels.delete('discord');
-    }
-
-    return {
-      ...(current || {}),
-      enabledChannels: Array.from(nextChannels),
-      discord: {
-        webhookUrl: nextDiscordWebhookUrl,
-      },
-    };
-  };
-
-  const buildSettingsWithNotifications = (
-    notificationsPayload: Record<string, unknown>,
-  ): UserSettings => ({
-    profile: settings?.profile || { username: user?.username || 'admin' },
-    security: settings?.security || { lastPasswordChangeAt: new Date().toISOString() },
-    apiKeys: settings?.apiKeys || { tmdb: '' },
-    placeholders: {
-      notifications: notificationsPayload,
-      preferences: settings?.placeholders?.preferences || {},
-      torrent: settings?.placeholders?.torrent || {},
-      indexer: settings?.placeholders?.indexer || {},
-      ftp: settings?.placeholders?.ftp || {},
-    },
-  });
-
-  const buildUpdatedSettings = (
-    overrides: Partial<UserSettings['placeholders']>,
-  ): UserSettings => ({
-    profile: settings?.profile || { username: user?.username || 'admin' },
-    security: settings?.security || {
-      lastPasswordChangeAt: new Date().toISOString(),
-    },
-    apiKeys: settings?.apiKeys || { tmdb: '' },
-    placeholders: {
-      notifications: settings?.placeholders?.notifications || {},
-      preferences: settings?.placeholders?.preferences || {},
-      torrent: settings?.placeholders?.torrent,
-      indexer: settings?.placeholders?.indexer,
-      ...overrides,
-    },
-  });
-
-  const applyUpdatedSettings = (nextSettings: UserSettings) => {
-    setLocalSettings(nextSettings);
-    setSettings(nextSettings);
-  };
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
-
-    const loadSettings = async () => {
-      try {
-        const response = await getSettings();
-        setLocalSettings(response);
-        setSettings(response);
-        applySettingsToForms(response);
-
-      } catch (loadError) {
-        setError(
-          loadError instanceof Error ? loadError.message : t('settings.messages.loadFailed'),
-        );
-      }
-    };
-
-    void loadSettings();
-  }, [isAuthenticated, setSettings, user?.username, t]);
-
-  
-
   
 
 
   if (!isLoading && !isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
-
-  const handlePasswordUpdate = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setError(null);
-    setMessage(null);
-    setIsSaving(true);
-    try {
-      await changePassword(currentPassword, newPassword);
-      const refreshedSettings = await getSettings();
-      setLocalSettings(refreshedSettings);
-      setSettings(refreshedSettings);
-      await refresh();
-      setCurrentPassword('');
-      setNewPassword('');
-      setMessage(t('settings.messages.passwordUpdated'));
-    } catch (submitError) {
-      setError(
-        submitError instanceof Error ? submitError.message : t('settings.messages.updateFailed'),
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  
-
-  
-  const handleDiscordSave = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setDiscordError(null);
-    setDiscordMessage(null);
-    setIsDiscordSaving(true);
-
-    try {
-      // Validation
-      if (!discordWebhookUrl.trim()) {
-        setDiscordError(t('settings.messages.discordWebhookRequired'));
-        setIsDiscordSaving(false);
-        return;
-      }
-
-      // Test webhook
-      const testResponse = await fetch(discordWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          embeds: [
-            {
-              title: t('settings.notifications.discord.testTitle'),
-              description: t('settings.notifications.discord.testDescription'),
-              color: 0x10b981,
-              timestamp: new Date().toISOString(),
-              footer: { text: t('settings.notifications.discord.testFooter') },
-            },
-          ],
-        }),
-      });
-
-      if (!testResponse.ok) {
-        setDiscordError(
-          `Test échoué (${testResponse.status}). Vérifiez que l'URL est correcte et active.`,
-        );
-        setIsDiscordSaving(false);
-        return;
-      }
-
-      // Save configuration
-      const notificationsPayload = buildNotificationSettingsPayload({
-        discordWebhookUrl,
-        includeDiscord: true,
-      });
-      const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
-
-      const savedSettings = await updateSettings(updatedSettings);
-      applyUpdatedSettings(savedSettings);
-      await refresh();
-      setDiscordTested(true);
-      setDiscordMessage(t('settings.messages.discordConfigured'));
-      // Fermer le formulaire
-      setDiscordFormOpen(false);
-    } catch (submitError) {
-      setDiscordError(
-        submitError instanceof Error ? submitError.message : t('settings.messages.configFailed'),
-      );
-    } finally {
-      setIsDiscordSaving(false);
-    }
-  };
 
   const handleResetSettings = async () => {
     if (user?.username !== 'admin') {
@@ -429,8 +141,6 @@ export function Settings() {
     }
 
     setResetError(null);
-    setIndexerMessage(null);
-    setIndexerError(null);
     setIsResetting(true);
 
     try {
@@ -446,83 +156,13 @@ export function Settings() {
     }
   };
 
-  const handleSendTestNotification = async () => {
-    setTestNotifError(null);
-    setTestNotifMessage(null);
-    setIsSendingTestNotif(true);
-
-    try {
-      const response = await notificationService.sendTestNotification();
-      setTestNotifMessage(response.message || t('settings.messages.testNotificationSent'));
-      window.dispatchEvent(new CustomEvent('seedflix:notifications-refresh-request'));
-    } catch (submitError) {
-      setTestNotifError(
-        submitError instanceof Error
-          ? submitError.message
-          : t('settings.messages.testNotificationFailed'),
-      );
-    } finally {
-      setIsSendingTestNotif(false);
-    }
-  };
-
-  const savePreferences = async (
-    nextPreferences: Record<string, unknown>,
-    nextLanguage?: SupportedLanguage,
-  ) => {
-    setPreferencesMessage(null);
-    setPreferencesError(null);
-    setIsPreferencesSaving(true);
-
-    try {
-      const updatedSettings = buildUpdatedSettings({
-        preferences: nextPreferences,
-      });
-
-      const savedSettings = await updateSettings(updatedSettings);
-      applyUpdatedSettings(savedSettings);
-      await refresh();
-      if (nextLanguage) {
-        setLanguage(nextLanguage);
-      }
-      setPreferencesMessage(t('settings.preferences.saved'));
-    } catch (submitError) {
-      setPreferencesError(
-        submitError instanceof Error ? submitError.message : t('settings.preferences.failed'),
-      );
-    } finally {
-      setIsPreferencesSaving(false);
-    }
-  };
-
-  const handleLanguageChange = async (nextLanguage: SupportedLanguage) => {
-    setLanguageCode(nextLanguage);
-    await savePreferences(
-      {
-        ...(settings?.placeholders?.preferences || {}),
-        language: nextLanguage,
-        spoilerMode,
-      },
-      nextLanguage,
-    );
-  };
-
-  const handleSpoilerChange = async (nextSpoilerMode: boolean) => {
-    setSpoilerMode(nextSpoilerMode);
-    await savePreferences({
-      ...(settings?.placeholders?.preferences || {}),
-      language: languageCode,
-      spoilerMode: nextSpoilerMode,
-    });
-  };
-
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-white">{t('settings.title')}</h2>
         <p className="mt-2 text-sm text-white/60">
-          {t('settings.about.versionLabel', { version: settings?.appInfo?.imageTag || 'dev' })}
+          {t('settings.about.versionLabel', { version: 'dev' })}
         </p>
       </div>
       <Tabs
@@ -641,57 +281,7 @@ export function Settings() {
             </CardContent>
           </Card>
 
-          <Card className="border-emerald-500/30 bg-emerald-950/15 text-white">
-            <CardHeader>
-              <CardTitle className="text-emerald-200">{t('settings.security.title')}</CardTitle>
-              <CardDescription className="text-emerald-100/70">
-                {t('settings.security.lastChange')}:{' '}
-                {settings?.security?.lastPasswordChangeAt
-                  ? new Date(settings.security.lastPasswordChangeAt).toLocaleString(
-                    languageCode === 'fr' ? 'fr-FR' : 'en-US',
-                  )
-                  : t('settings.security.unknown')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {shouldChangePassword ? (
-                <div className="mb-4 rounded-lg border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                  {t('settings.security.changePasswordSuggestion')}
-                </div>
-              ) : null}
-              <form onSubmit={handlePasswordUpdate} className="space-y-4 max-w-lg">
-                <div className="space-y-2">
-                  <Label htmlFor="current-password">{t('settings.security.currentPassword')}</Label>
-                  <Input
-                    id="current-password"
-                    type="password"
-                    value={currentPassword}
-                    onChange={(event) => setCurrentPassword(event.target.value)}
-                    className="bg-slate-900 border-white/10 text-white"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-password">{t('settings.security.newPassword')}</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    value={newPassword}
-                    onChange={(event) => setNewPassword(event.target.value)}
-                    className="bg-slate-900 border-white/10 text-white"
-                  />
-                </div>
-                {message && <p className="text-sm text-emerald-300">{message}</p>}
-                {error && <p className="text-sm text-red-300">{error}</p>}
-                <Button
-                  type="submit"
-                  disabled={isSaving}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  {isSaving ? t('common.saving') : t('settings.security.update')}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+          <SettingPassword></SettingPassword>
         </TabsContent>
 
         <TabsContent value="api">
@@ -705,197 +295,10 @@ export function Settings() {
         </TabsContent>
 
         <TabsContent value="notifications">
-          <Card className="border-purple-500/30 bg-purple-950/15 text-white">
-            <CardHeader>
-              <CardTitle className="text-purple-200">{t('settings.notifications.title')}</CardTitle>
-              <CardDescription className="text-purple-100/70">
-                {t('settings.notifications.description')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleDiscordSave} className="space-y-6 max-w-lg">
-                <div
-                  className={`space-y-4 p-4 bg-slate-800/50 rounded-md border border-purple-500/20 ${discordFormOpen ? '' : 'cursor-pointer'
-                    }`}
-                  onClick={() => {
-                    if (!discordFormOpen) {
-                      setDiscordFormOpen(true);
-                    }
-                  }}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h4 className="font-medium text-white">
-                        {t('settings.notifications.discord.title')}
-                      </h4>
-                      <p className="text-sm text-purple-200/70">
-                        {t('settings.notifications.discord.description')}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setDiscordFormOpen(true)}
-                      className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${discordTested
-                        ? 'bg-emerald-600 text-white hover:bg-blue-600'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                    >
-                      {discordTested
-                        ? t('settings.notifications.discord.enabled')
-                        : t('settings.notifications.discord.configure')}
-                    </button>
-                  </div>
-
-                  {discordFormOpen && (
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="discord-webhook">
-                          {t('settings.notifications.discord.webhookLabel')}
-                        </Label>
-                        <Input
-                          id="discord-webhook"
-                          type="password"
-                          placeholder="https://discord.com/api/webhooks/..."
-                          value={discordWebhookUrl}
-                          onChange={(e) => setDiscordWebhookUrl(e.target.value)}
-                          className="bg-slate-900 border-white/10 text-white"
-                        />
-                        <p className="text-xs text-slate-400">
-                          {t('settings.notifications.discord.webhookHelp')}
-                        </p>
-                      </div>
-
-                      {discordMessage && (
-                        <p className="text-sm text-purple-300 p-2 bg-purple-900/30 rounded">
-                          ✓ {discordMessage}
-                        </p>
-                      )}
-                      {discordError && (
-                        <p className="text-sm text-red-300 p-2 bg-red-900/30 rounded">
-                          ✗ {discordError}
-                        </p>
-                      )}
-
-                      <div className="flex gap-2">
-                        <Button
-                          type="submit"
-                          disabled={isDiscordSaving || !discordWebhookUrl.trim()}
-                          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-                        >
-                          {isDiscordSaving
-                            ? t('settings.notifications.discord.testing')
-                            : t('settings.notifications.discord.testAndSave')}
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            setDiscordFormOpen(false);
-                            setDiscordError(null);
-                          }}
-                          disabled={isDiscordSaving}
-                          variant="ghost"
-                          className="border border-white/10 bg-transparent text-white hover:bg-white/10 hover:text-white"
-                        >
-                          {t('common.cancel')}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-3 p-4 bg-slate-800/50 rounded-md border border-purple-500/20">
-                  <div>
-                    <h4 className="font-medium text-white">
-                      {t('settings.notifications.test.title')}
-                    </h4>
-                    <p className="text-sm text-purple-200/70">
-                      {t('settings.notifications.test.description')}
-                    </p>
-                  </div>
-
-                  <Button
-                    type="button"
-                    onClick={handleSendTestNotification}
-                    disabled={isSendingTestNotif}
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
-                  >
-                    {isSendingTestNotif
-                      ? t('settings.notifications.test.sending')
-                      : t('settings.notifications.test.trigger')}
-                  </Button>
-
-                  {testNotifMessage && (
-                    <p className="text-sm text-emerald-300 p-2 bg-emerald-900/20 rounded">
-                      ✓ {testNotifMessage}
-                    </p>
-                  )}
-
-                  {testNotifError && (
-                    <p className="text-sm text-red-300 p-2 bg-red-900/30 rounded">
-                      ✗ {testNotifError}
-                    </p>
-                  )}
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+          <SettingNotification></SettingNotification>
         </TabsContent>
         <TabsContent value="ftp">
-          <Card className="border-cyan-500/30 bg-cyan-950/15 text-white max-w-lg">
-            <CardHeader>
-              <CardTitle className="text-cyan-200"> {t('settings.tabs.storage')}</CardTitle>
-              <CardDescription className="text-cyan-100/70">
-                {t('settings.storage.description')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSaveFtpSettings} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="ftp-url">URL FTP</Label>
-                  <Input id="ftp-url" type="text" value={ftpUrl} onChange={e => setFtpUrl(e.target.value)} className="bg-slate-900 border-white/10 text-white" placeholder="ftp://monserveur.com" />
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="ftp-port">Port</Label>
-                    <Input id="ftp-port" type="number" value={ftpPort} onChange={e => setFtpPort(e.target.value)} className="bg-slate-900 border-white/10 text-white" placeholder="21" />
-                  </div>
-                  <div className="flex-1 space-y-2 flex items-center gap-2 mt-6">
-                    <input id="ftp-secure" type="checkbox" checked={ftpSecure} onChange={e => setFtpSecure(e.target.checked)} />
-                    <Label htmlFor="ftp-secure">FTPS (SSL/TLS)</Label>
-                  </div>
-                </div>
-                <div className="space-y-2 flex items-center gap-2">
-                  <input id="ftp-auth-required" type="checkbox" checked={ftpAuthRequired} onChange={e => setFtpAuthRequired(e.target.checked)} />
-                  <Label htmlFor="ftp-auth-required">Authentification requise</Label>
-                </div>
-                {ftpAuthRequired && (
-                  <div className="flex gap-4">
-                    <div className="flex-1 space-y-2">
-                      <Label htmlFor="ftp-username">Nom d'utilisateur</Label>
-                      <Input id="ftp-username" type="text" value={ftpUsername} onChange={e => setFtpUsername(e.target.value)} className="bg-slate-900 border-white/10 text-white" />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <Label htmlFor="ftp-password">Mot de passe</Label>
-                      <Input id="ftp-password" type="password" value={ftpPassword} onChange={e => setFtpPassword(e.target.value)} className="bg-slate-900 border-white/10 text-white" />
-                    </div>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="ftp-root-folder">Dossier racine</Label>
-                  <Input id="ftp-root-folder" type="text" value={ftpRootFolder} onChange={e => setFtpRootFolder(e.target.value)} className="bg-slate-900 border-white/10 text-white" placeholder="/" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ftp-storage-limit">Limite de stockage (Go)</Label>
-                  <Input id="ftp-storage-limit" type="number" min="0" value={ftpStorageLimit} onChange={e => setFtpStorageLimit(e.target.value)} className="bg-slate-900 border-white/10 text-white" placeholder="100" />
-                </div>
-                {ftpMessage && <p className="text-sm text-emerald-300">{ftpMessage}</p>}
-                {ftpError && <p className="text-sm text-red-300">{ftpError}</p>}
-                <Button type="submit" disabled={isFtpSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
-                  {isFtpSaving ? 'Enregistrement...' : 'Enregistrer'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+          <SettingFtp></SettingFtp>
         </TabsContent>
 
         {user?.username === 'admin' && (

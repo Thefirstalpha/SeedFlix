@@ -54,40 +54,29 @@ export async function getIndexerSeriesResults(): Promise<IndexerSeriesResult[]> 
   return Array.isArray(data?.items) ? data.items : [];
 }
 
-export async function rejectIndexerResult(
-  targetKey: string,
-  indexerStateKey: string,
-): Promise<void> {
+export async function rejectIndexerResult(guid: string): Promise<void> {
+  if (!guid) return;
   await postIndexerAction(
-    '/indexer-results/reject',
-    { targetKey, indexerStateKey },
+    '/indexer/results/reject',
+    { guid },
     'Failed to reject indexer result',
   );
 }
 
-export async function rejectAllIndexerResults(
-  targetKey: string,
-  indexerStateKeys: string[],
-): Promise<void> {
-  if (!Array.isArray(indexerStateKeys) || indexerStateKeys.length === 0) {
+export async function rejectAllIndexerResults(guids: string[]): Promise<void> {
+  if (!Array.isArray(guids) || guids.length === 0) {
     return;
   }
 
   await postIndexerAction(
-    '/indexer-results/reject-all',
-    { targetKey, indexerStateKeys },
+    '/indexer/results/reject-all',
+    { guids },
     'Failed to reject all indexer results',
   );
 }
 
 export async function validateIndexerResult(
-  type: 'movie' | 'series',
   guid: string,
-  key: string,
 ): Promise<void> {
-  await postIndexerAction(
-    '/indexer/results/validate',
-    { type, guid, key },
-    'Failed to validate indexer result',
-  );
+  await rejectIndexerResult(guid);
 }

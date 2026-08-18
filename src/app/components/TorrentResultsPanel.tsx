@@ -3,6 +3,10 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
+import { addTorrentToClient } from '../services/torrentService';
+import { IndexerMovieResult, IndexerSeriesResult } from '../../../common/indexer';
+import { useEffect, useState } from 'react';
+import { useI18n } from '../i18n/LanguageProvider';
 
 export interface TorrentReleaseItem {
   title: string;
@@ -57,21 +61,14 @@ export interface FilterOption {
 interface TorrentResultsPanelProps {
   title: string;
   description?: string;
+  type: 'movie' | 'series';
   filter: FilterOption;
   onFilterChange: (filter: FilterOption) => void;
   availableReleaseSeasons?: string[];
   availableReleaseLanguages: string[];
   isReleaseLoading: boolean;
   releaseError: string | null;
-  torrentStatus: string | null;
-  torrentError: string | null;
-  filteredResults: TorrentReleaseItem[];
-  paginatedResults: TorrentReleaseItem[];
-  addingTorrentLink: string | null;
-  onAddTorrent: (torrentUrl: string) => void;
-  currentPage: number;
-  onCurrentPageChange: (page: number) => void;
-  totalPages: number;
+  filteredResults: IndexerMovieResult[] | IndexerSeriesResult[];
   locale: string;
   labels: TorrentResultsLabels;
 }
@@ -88,18 +85,53 @@ export function TorrentResultsPanel({
   availableReleaseLanguages,
   isReleaseLoading,
   releaseError,
-  torrentStatus,
-  torrentError,
   filteredResults,
-  paginatedResults,
-  addingTorrentLink,
-  onAddTorrent,
-  currentPage,
-  onCurrentPageChange,
-  totalPages,
   locale,
   labels,
 }: TorrentResultsPanelProps) {
+
+  const { t, language } = useI18n();
+  const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
+  const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
+  const [torrentError, setTorrentError] = useState<string | null>(null);
+
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+
+  const handleAddTorrent = async (target: IndexerSeriesResult | IndexerMovieResult) => {
+    setTorrentStatus(null);
+    setTorrentError(null);
+
+    try {
+      const response = await addTorrentToClient(target.guid, type);
+      setTorrentStatus(
+        response.duplicate
+          ? t('seriesDetails.messages.duplicateTorrent')
+          : t('seriesDetails.messages.torrentAdded'),
+      );
+    } catch (error) {
+      setTorrentError(
+        error instanceof Error ? error.message : t('seriesDetails.errors.addTorrentFailed'),
+      );
+    } finally {
+      setAddingTorrentLink(null);
+    }
+  };
+
+
+  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE);
+  const paginatedResults = filteredResults.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]);
+
+
   return (
     <Card className="bg-white/5 border-white/10">
       <CardContent className="p-6 space-y-4">
@@ -232,7 +264,7 @@ export function TorrentResultsPanel({
                     <div className="flex flex-wrap gap-2 items-center">
                       <Button
                         size="sm"
-                        onClick={() => onAddTorrent(torrentLink)}
+                        onClick={async () => await handleAddTorrent(item)}
                         disabled={addingTorrentLink === torrentLink}
                         className="bg-cyan-600 hover:bg-cyan-700 text-white w-full sm:w-auto"
                       >
@@ -295,7 +327,7 @@ export function TorrentResultsPanel({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onCurrentPageChange(Math.max(currentPage - 1, 1))}
+                onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
                 disabled={currentPage === 1}
               >
                 {labels.previous}
@@ -307,7 +339,7 @@ export function TorrentResultsPanel({
 
               <select
                 value={currentPage}
-                onChange={(event) => onCurrentPageChange(Number(event.target.value))}
+                onChange={(event) => setCurrentPage(Number(event.target.value))}
                 className="bg-slate-900 border border-white/20 text-white rounded-md px-2 py-1 text-sm"
               >
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -320,7 +352,7 @@ export function TorrentResultsPanel({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onCurrentPageChange(Math.min(currentPage + 1, totalPages))}
+                onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages))}
                 disabled={currentPage === totalPages}
               >
                 {labels.next}

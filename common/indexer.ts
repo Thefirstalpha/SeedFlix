@@ -15,7 +15,7 @@ export interface IndexerMovieResult {
   link: string;
   downloadUrl?: string;
   tmdbId?: string | null;
-  guid?: string;
+  guid: string;
   pubDate?: string;
   size?: number | null;
   sizeHuman?: string | null;
@@ -32,7 +32,7 @@ export interface IndexerSeriesResult {
   link: string;
   downloadUrl?: string;
   tmdbId?: string | null;
-  guid?: string;
+  guid: string;
   pubDate?: string;
   size?: number | null;
   sizeHuman?: string | null;

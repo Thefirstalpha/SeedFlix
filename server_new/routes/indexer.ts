@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authentication } from "../modules/auth";
 import { IndexerSettings } from "../../common/settings";
-import { configureIndexer, getIndexerSettings, getMoviesIndexerResult, getSeriesIndexerResult, searchMovieIndexer, searchSeriesIndexer } from "../modules/indexer";
+import { configureIndexer, getIndexerSettings, getMoviesIndexerResult, getSeriesIndexerResult, searchMovieIndexer, searchSeriesIndexer, rejectIndexerResultByGuid, rejectAllIndexerResultsByGuids } from "../modules/indexer";
 import { IndexerMovieResponse, IndexerSeriesResponse } from "../../common/indexer";
 
 const router = Router();
@@ -75,6 +75,28 @@ router.get('/indexer/results/series', async (req, res) => {
         ok: true,
         items: items,
     });
+});
+
+router.post('/indexer/results/reject', async (req, res) => {
+    const guid = String(req.body?.guid || '').trim();
+    if (!guid) {
+        res.status(400).json({ error: 'guid is required' });
+        return;
+    }
+    await rejectIndexerResultByGuid(req.user.id, guid);
+    res.status(200).json({ ok: true });
+});
+
+router.post('/indexer/results/reject-all', async (req, res) => {
+    const guids: string[] = Array.isArray(req.body?.guids)
+        ? req.body.guids.map(String).filter(Boolean)
+        : [];
+    if (!guids.length) {
+        res.status(400).json({ error: 'guids array is required' });
+        return;
+    }
+    await rejectAllIndexerResultsByGuids(req.user.id, guids);
+    res.status(200).json({ ok: true });
 });
 
 export { router };

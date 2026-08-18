@@ -12,7 +12,6 @@ import {
   getIndexerSeriesResults,
   rejectAllIndexerResults,
   rejectIndexerResult,
-  validateIndexerResult,
 } from '../services/indexerResultService';
 import { addTorrentToClient } from '../services/torrentService';
 import { getWishlist, removeMultipleFromWishlist } from '../services/wishlistService';
@@ -212,58 +211,60 @@ export function WishList() {
     { count: uniqueSeriesCount },
   );
 
-  const indexerTargetsByKey = new Map(indexerTargets.map((target) => [target.targetKey, target]));
+  const movieResultsByTmdbId = new Map<string, IndexerMovieResult[]>();
+  for (const result of indexerMovieResults) {
+    const key = String(result.tmdbId ?? '');
+    if (!movieResultsByTmdbId.has(key)) movieResultsByTmdbId.set(key, []);
+    movieResultsByTmdbId.get(key)!.push(result);
+  }
 
-  const handleRejectIndexerResult = async (target: IndexerResultTarget, indexerStateKey: string) => {
-    const key = `${target.targetKey}:${indexerStateKey}:reject`;
+  const seriesResultsByTmdbId = new Map<string, IndexerSeriesResult[]>();
+  for (const result of indexerSeriesResults) {
+    const key = String(result.tmdbId ?? '');
+    if (!seriesResultsByTmdbId.has(key)) seriesResultsByTmdbId.set(key, []);
+    seriesResultsByTmdbId.get(key)!.push(result);
+  }
+
+  const handleRejectIndexerResult = async (target: IndexerMovieResult | IndexerSeriesResult) => {
+    const key = `${target.guid}:reject`;
     setActionKey(key);
     try {
-      await rejectIndexerResult(target.targetKey, indexerStateKey);
+      await rejectIndexerResult(target.guid ?? '');
       await loadIndexerResults();
     } finally {
       setActionKey(null);
     }
   };
 
-
-  const handleRejectAllIndexerResults = async (target: IndexerResultTarget) => {
-    if (!target.items.length) {
-      return;
-    }
-
-    const key = `${target.targetKey}:reject-all`;
-    setActionKey(key);
+  const handleRejectAllIndexerResults = async (targets: (IndexerMovieResult | IndexerSeriesResult)[]) => {
+    if (!targets.length) return;
+    const groupKey = targets[0]?.tmdbId ?? '';
+    setActionKey(`${groupKey}:reject-all`);
     try {
-      await rejectAllIndexerResults(
-        target.targetKey,
-        target.items.map((item) => item.indexerStateKey),
-      );
+      await rejectAllIndexerResults(targets.map((t) => t.guid ?? '').filter(Boolean));
       await loadIndexerResults();
     } finally {
       setActionKey(null);
     }
   };
-  const handleAddTorrentFromWishlist = async (
+
+  const handleAddTorrent = async (
+    target: IndexerMovieResult | IndexerSeriesResult,
     type: 'movie' | 'series',
-    guid: string,
-    torrentUrl: string,
-    indexerStateKey: string,
   ) => {
+    const key = `${target.guid}:add`;
+    setActionKey(key);
     try {
-      await addTorrentToClient(torrentUrl, type);
-
-      // Validate indexer result (best effort)
+      await addTorrentToClient(target.guid, type);
+      // Blacklister après ajout (best effort)
       try {
-        await validateIndexerResult(guid, indexerStateKey);
+        await rejectIndexerResult(target.guid ?? '');
       } catch {
-        // Silent fail - indexer validation is optional
+        // silent
       }
-
-      // Reload data (best effort - continue even if one fails)
       await Promise.allSettled([loadIndexerResults(), loadWishlist()]);
     } catch (error) {
       console.error('Error adding torrent from wishlist:', error);
-      // Data stays visible even if error occurs
     } finally {
       setActionKey(null);
     }
@@ -352,7 +353,7 @@ export function WishList() {
           {movies.length > 0 ? (
             <div className="space-y-4">
               {movies.map((movie) => {
-                const movieIndexerTarget = indexerTargetsByKey.get(`movie:${movie.tmdb}`);
+                const movieTargets = movieResultsByTmdbId.get(`${movie.tmdb}`) ?? [];
                 const movieYear = movie.releaseDate ? new Date(movie.releaseDate).getFullYear() : 0;
                 return (
                   <div
@@ -382,12 +383,12 @@ export function WishList() {
                       year={movieYear}
                       rating={movie.rating ?? 0}
                       genre={movie.genre ?? ''}
-                      targets={movieIndexerTarget ? [movieIndexerTarget] : []}
+                      targets={movieTargets}
                       type="movie"
                       actionKey={actionKey}
                       onRejectIndexerResult={handleRejectIndexerResult}
                       onRejectAllIndexerResults={handleRejectAllIndexerResults}
-                      onAddTorrent={handleAddTorrentFromWishlist}
+                      onAddTorrent={(t) => handleAddTorrent(t, 'movie')}
                     >
                       {isSelectionMode && (
                         <div
@@ -481,21 +482,7 @@ export function WishList() {
             <div className="space-y-4">
               {groupedSeries.map((group) => {
                 const year = group.releaseDate ? new Date(group.releaseDate).getFullYear() : 0;
-                const seriesIndexerKeys = Array.from(
-                  new Set([
-                    `series:${group.tmdb}`,
-                    ...group.seasons.map(
-                      (season) => `season:${group.tmdb}:${season.seasonNumber}`,
-                    ),
-                    ...group.episodes.map(
-                      (episode) =>
-                        `episode:${group.tmdb}:${episode.seasonNumber}:${episode.episodeNumber}`,
-                    ),
-                  ]),
-                );
-                const groupIndexerTargets = seriesIndexerKeys
-                  .map((key) => indexerTargetsByKey.get(key))
-                  .filter((target): target is IndexerResultTarget => Boolean(target));
+                const groupTargets = seriesResultsByTmdbId.get(`${group.tmdb}`) ?? [];
 
                 return (
                   <div
@@ -525,12 +512,12 @@ export function WishList() {
                       year={year}
                       genre={group.genre}
                       rating={group.rating}
-                      targets={groupIndexerTargets}
+                      targets={groupTargets}
                       type="series"
                       actionKey={actionKey}
                       onRejectIndexerResult={handleRejectIndexerResult}
                       onRejectAllIndexerResults={handleRejectAllIndexerResults}
-                      onAddTorrent={handleAddTorrentFromWishlist}
+                      onAddTorrent={(t) => handleAddTorrent(t, 'series')}
                     >
                       {isSeriesSelectionMode && (
                         <div

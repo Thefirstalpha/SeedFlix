@@ -66,8 +66,7 @@ const fr : I18nMessages = {
     progress: 'Étape {{current}} sur {{total}}',
     stepLabel: 'Étape {{index}}',
     password: {
-      cardTitle: 'Changez le mot de passe par défaut',
-      cardDescription: 'Cette étape sécurise immédiatement le compte administrateur',
+      description: 'Changez le mot de passe par défaut',
       cardTitleUser: 'Définissez votre mot de passe',
       cardDescriptionUser:
         "Votre compte a été créé par l'administrateur. Choisissez un nouveau mot de passe personnel.",
@@ -183,6 +182,15 @@ const fr : I18nMessages = {
     rate: 'Débit',
     eta: 'ETA',
     peers: 'Peers',
+    totalSize: 'Taille',
+    remaining: 'Restant',
+    ratio: 'Ratio',
+    added: 'Ajouté',
+    managedBadge: 'Suivi SeedFlix',
+    unmanagedBadge: 'Externe',
+    showRawDetails: 'Afficher les détails bruts',
+    hideRawDetails: 'Masquer les détails bruts',
+    rawDetails: 'Détails bruts du torrent',
     errorPrefix: 'Erreur',
     pause: 'Pause',
     resume: 'Reprendre',
@@ -511,7 +519,7 @@ const fr : I18nMessages = {
       indexer: {
         title: 'Indexer',
         description:
-          'Configurez votre indexer pour consulter des résultats issus de sources autorisées.',
+          "Fournissez l'URL Torznab et le jeton API pour consulter et évaluer les résultats provenant de vos indexeurs autorisés.",
         url: "URL de l'indexer",
         token: 'Jeton API',
         defaultQuality: 'Qualité par défaut',

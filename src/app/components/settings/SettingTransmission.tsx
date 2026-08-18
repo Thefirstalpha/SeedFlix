@@ -6,10 +6,11 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { TransmissionSettings } from "../../../../common/settings";
 import { configureTransmission } from "../../services/settingService";
+import { Switch } from "../ui/switch";
 
 
 
-export function SettingTransmission() {
+export function SettingTransmission({ setup, onComplete }: { setup: boolean; onComplete: (() => void) | undefined }) {
     const { t } = useI18n();
     const [torrentUrl, setTorrentUrl] = useState('');
     const [torrentPort, setTorrentPort] = useState<number | null>(null);
@@ -41,6 +42,7 @@ export function SettingTransmission() {
         try {
             await configureTransmission(transmissionSettings);
             setTorrentMessage(t('settings.messages.configurationSaved'));
+            onComplete?.();
         } catch (submitError) {
             setTorrentError(
                 submitError instanceof Error
@@ -60,7 +62,7 @@ export function SettingTransmission() {
             headers: { 'Content-Type': 'application/json' },
         }).then(async (response) => {
             if (response.ok) {
-                const data : TransmissionSettings = await response.json();
+                const data: TransmissionSettings = await response.json();
                 if (data != null) {
                     setTorrentUrl(data.host || '');
                     setTorrentPort(data.port);
@@ -91,108 +93,112 @@ export function SettingTransmission() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <form onSubmit={handleTorrentSave} className="space-y-4 max-w-lg">
-                    <div className="grid grid-cols-2 gap-4">
+
+                <form onSubmit={handleTorrentSave} className="space-y-5">
+                    <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="torrent-url">{t('settings.api.torrent.url')}</Label>
+                            <Label htmlFor="setup-torrent-url">{t('setup.torrent.url')}</Label>
                             <Input
-                                id="torrent-url"
-                                placeholder="http://localhost"
+                                id="setup-torrent-url"
                                 value={torrentUrl}
-                                onChange={(e) => setTorrentUrl(e.target.value)}
-                                className="bg-slate-900 border-white/10 text-white"
+                                onChange={(event) => setTorrentUrl(event.target.value)}
+                                placeholder={t('setup.torrent.urlPlaceholder')}
+                                className="border-white/10 bg-slate-900 text-white"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="torrent-port">{t('settings.api.torrent.port')}</Label>
+                            <Label htmlFor="setup-torrent-port">{t('setup.torrent.port')}</Label>
                             <Input
-                                id="torrent-port"
-                                type="number"
-                                placeholder="6800"
+                                id="setup-torrent-port"
                                 value={torrentPort !== null ? torrentPort : ''}
                                 onChange={(e) => setTorrentPort(Number(e.target.value))}
-                                className="bg-slate-900 border-white/10 text-white"
+                                placeholder={t('setup.torrent.portPlaceholder')}
+                                className="border-white/10 bg-slate-900 text-white"
                             />
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <input
-                            id="torrent-auth"
-                            type="checkbox"
-                            checked={torrentAuthRequired}
-                            onChange={(e) => setTorrentAuthRequired(e.target.checked)}
-                            className="w-4 h-4 cursor-pointer"
-                        />
-                        <Label htmlFor="torrent-auth" className="cursor-pointer">
-                            {t('settings.api.torrent.authRequired')}
-                        </Label>
+                    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/10 px-4 py-3">
+                        <div>
+                            <p className="font-medium text-white">{t('setup.torrent.authRequired')}</p>
+                            <p className="text-sm text-white/55">{t('setup.torrent.authDescription')}</p>
+                        </div>
+                        <Switch checked={torrentAuthRequired} onCheckedChange={setTorrentAuthRequired} />
                     </div>
 
-                    {torrentAuthRequired && (
-                        <div className="grid grid-cols-2 gap-4">
+                    {torrentAuthRequired ? (
+                        <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
-                                <Label htmlFor="torrent-username">{t('settings.api.torrent.username')}</Label>
+                                <Label htmlFor="setup-torrent-username">{t('setup.torrent.username')}</Label>
                                 <Input
-                                    id="torrent-username"
-                                    placeholder="admin"
+                                    id="setup-torrent-username"
                                     value={torrentUsername}
-                                    onChange={(e) => setTorrentUsername(e.target.value)}
-                                    className="bg-slate-900 border-white/10 text-white"
+                                    onChange={(event) => setTorrentUsername(event.target.value)}
+                                    className="border-white/10 bg-slate-900 text-white"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="torrent-password">{t('settings.api.torrent.password')}</Label>
+                                <Label htmlFor="setup-torrent-password">{t('setup.torrent.password')}</Label>
                                 <Input
-                                    id="torrent-password"
+                                    id="setup-torrent-password"
                                     type="password"
-                                    placeholder="••••••"
                                     value={torrentPassword}
-                                    onChange={(e) => setTorrentPassword(e.target.value)}
-                                    className="bg-slate-900 border-white/10 text-white"
+                                    onChange={(event) => setTorrentPassword(event.target.value)}
+                                    className="border-white/10 bg-slate-900 text-white"
                                 />
                             </div>
                         </div>
-                    )}
+                    ) : null}
 
-                    <div className="space-y-2">
-                        <Label htmlFor="torrent-movies-folder">
-                            {t('settings.api.torrent.moviesFolder')}
-                        </Label>
-                        <Input
-                            id="torrent-movies-folder"
-                            placeholder="/downloads/movies"
-                            value={torrentMoviesFolder}
-                            onChange={(e) => setTorrentMoviesFolder(e.target.value)}
-                            className="bg-slate-900 border-white/10 text-white"
-                        />
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="setup-movies-folder">{t('setup.torrent.moviesFolder')}</Label>
+                            <Input
+                                id="setup-movies-folder"
+                                value={torrentMoviesFolder}
+                                onChange={(event) => setTorrentMoviesFolder(event.target.value)}
+                                placeholder={t('setup.torrent.moviesFolderPlaceholder')}
+                                className="border-white/10 bg-slate-900 text-white"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="setup-series-folder">{t('setup.torrent.seriesFolder')}</Label>
+                            <Input
+                                id="setup-series-folder"
+                                value={torrentSeriesFolder}
+                                onChange={(event) => setTorrentSeriesFolder(event.target.value)}
+                                placeholder={t('setup.torrent.seriesFolderPlaceholder')}
+                                className="border-white/10 bg-slate-900 text-white"
+                            />
+                        </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="torrent-series-folder">
-                            {t('settings.api.torrent.seriesFolder')}
-                        </Label>
-                        <Input
-                            id="torrent-series-folder"
-                            placeholder="/downloads/series"
-                            value={torrentSeriesFolder}
-                            onChange={(e) => setTorrentSeriesFolder(e.target.value)}
-                            className="bg-slate-900 border-white/10 text-white"
-                        />
-                    </div>
+                    {torrentError ? <p className="text-sm text-red-300">{torrentError}</p> : null}
+                    {setup ? (
+                        <div className="flex items-center justify-end gap-3">
+                            <Button
+                                type="submit"
+                                disabled={isTorrentSaving}
+                                className="bg-cyan-600 text-white hover:bg-cyan-700"
+                            >
+                                {isTorrentSaving
+                                    ? t('setup.torrent.testing')
+                                    : t('setup.torrent.testAndContinue')}
+                            </Button>
+                        </div>
+                    ) :
+                        (
 
-                    {torrentMessage && <p className="text-sm text-emerald-300">{torrentMessage}</p>}
-                    {torrentError && <p className="text-sm text-red-300">{torrentError}</p>}
-
-                    <Button
-                        type="submit"
-                        disabled={isTorrentSaving}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                        {isTorrentSaving
-                            ? t('settings.api.common.savingAndTesting')
-                            : t('settings.api.common.saveAndTest')}
-                    </Button>
+                            <Button
+                                type="submit"
+                                disabled={isTorrentSaving}
+                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                                {isTorrentSaving
+                                    ? t('settings.api.common.savingAndTesting')
+                                    : t('settings.api.common.saveAndTest')}
+                            </Button>
+                        )}
                 </form>
             </CardContent>
         </Card>

@@ -1,9 +1,7 @@
 import { Router } from "express";
 import { authentication } from "../modules/auth";
-import { configureTransmission, getDownloadsTransmission, getTransmissionSettings, performTransmissionAction } from "../modules/transmission";
-import { ErrorCode } from "../modules/errors";
+import { configureTransmission, getDownloadsTransmission, getTransmissionSettings, performTransmissionAction, startDownload } from "../modules/transmission";
 import { TransmissionSettings } from "../../common/settings";
-import { logger } from "../config";
 import { TorrentDownloadsResponse } from "../../common/torrent";
 
 const router = Router();
@@ -59,5 +57,19 @@ router.post('/transmission/pause/:id', async (req, res) => {
     await performTransmissionAction('torrent-stop', req.user.id, id);
     res.status(200).json({ status: "ok" });
 });
+
+router.post('/transmission/delete/:id', async (req, res) => {
+    const id = Number(req.params.id);
+    await performTransmissionAction('torrent-remove', req.user.id, id);
+    res.status(200).json({ status: "ok" });
+});
+// Route for starting a download with url
+router.post('/transmission/add', async (req, res) => {
+    const mediaType = String(req.body?.mediaType || '').trim();
+    const guid = String(req.body?.guid || '').trim();
+    await startDownload(req.user.id, guid, mediaType);
+    res.status(200).json({ status: "ok" });
+});
+
 
 export { router };
