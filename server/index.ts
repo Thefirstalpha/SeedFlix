@@ -33,7 +33,7 @@ declare module "express-serve-static-core" {
 
 const app = express();
 app.use(express.json());
-app.use(cookieParser("204e03f6-18b8-4c8c-945a-d32a1a5b9f20"));
+app.use(cookieParser(process.env.COOKIE_SECRET || "development-secret"));
 
 app.use(Logger.express());
 
