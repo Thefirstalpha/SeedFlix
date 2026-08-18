@@ -11,13 +11,18 @@ export const getUser = (id: number): User | null => {
     if (!user)
         return null;
 
+    const mustUpdatePassword = Boolean(user?.flags?.mustUpdatePassword);
+    const legalAccepted = Boolean(user?.flags?.legalAccepted);
+    const hasIndexer = user.settings?.indexer !== null;
+    const hasTransmission = user.settings?.transmission !== null;
+
     return {
         id: Number(user.id),
         username: String(user.username),
         flags: {
-            mustSetup: Boolean(user.settings?.indexer === null && user.settings?.transmission === null),
-            mustUpdatePassword: Boolean(user?.flags?.mustUpdatePassword),
-            legalAccepted: Boolean(user?.flags?.legalAccepted)
+            mustSetup: Boolean(!legalAccepted || mustUpdatePassword || !hasIndexer || !hasTransmission),
+            mustUpdatePassword,
+            legalAccepted
         },
         settings: {
             indexer: user.settings?.indexer === null ? null : {

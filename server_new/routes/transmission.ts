@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authentication } from "../modules/auth";
-import { configureTransmission, getDownloadsTransmission, getTransmissionSettings, performTransmissionAction, startDownload } from "../modules/transmission";
+import { configureTransmission, getDownloadsTransmission, getTransmissionSettings, performTransmissionAction, startDownload, unmanageTorrentForUser } from "../modules/transmission.ts";
 import { TransmissionSettings } from "../../common/settings";
 import { TorrentDownloadsResponse } from "../../common/torrent";
 
@@ -63,6 +63,23 @@ router.post('/transmission/delete/:id', async (req, res) => {
     await performTransmissionAction('torrent-remove', req.user.id, id);
     res.status(200).json({ status: "ok" });
 });
+
+router.post('/transmission/unmanage', async (req, res) => {
+    const hash = String(req.body?.hash || '').trim();
+    if (!hash) {
+        res.status(400).json({ error: 'hash is required' });
+        return;
+    }
+
+    const removed = unmanageTorrentForUser(req.user.id, hash);
+    if (!removed) {
+        res.status(404).json({ error: 'Managed torrent not found' });
+        return;
+    }
+
+    res.status(200).json({ ok: true, message: 'Torrent unmanaged successfully' });
+});
+
 // Route for starting a download with url
 router.post('/transmission/add', async (req, res) => {
     const mediaType = String(req.body?.mediaType || '').trim();

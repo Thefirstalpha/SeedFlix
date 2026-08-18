@@ -6,16 +6,9 @@
  */
 import { db } from './db';
 import { addNotification } from './notification';
-import { getDownloadsTransmission, getTransmissionSettings } from './transmission';
-import { Logger } from '../logger';
+import { getDownloadsTransmission, getManagedTorrents, getTransmissionSettings, markManagedTorrentCompleted, ManagedTorrentEntry } from './transmission.ts';
 
 const POLL_INTERVAL_MS = 30_000;
-
-// userId → Set de hashStrings déjà notifiés (ou déjà terminés au démarrage)
-const notifiedHashes = new Map<number, Set<string>>();
-
-// Premier tour par userId : sert uniquement à peupler le Set sans notifier
-const initializedUsers = new Set<number>();
 
 function getAllUserIds(): number[] {
     const rows = db
@@ -28,47 +21,46 @@ async function pollUser(userId: number): Promise<void> {
     const settings = getTransmissionSettings(userId);
     if (!settings?.host) return;
 
+    const managedEntries = getManagedTorrents(userId);
+    if (!managedEntries.length) {
+        return;
+    }
+
+    const managedByHash = new Map<string, ManagedTorrentEntry>(
+        managedEntries.map((entry: ManagedTorrentEntry) => [entry.hash, entry]),
+    );
+
     let torrents;
     try {
-        torrents = await getDownloadsTransmission(userId, {});
+        torrents = await getDownloadsTransmission(userId, { includeAll: true });
     } catch {
         return; // Transmission inaccessible → on skip silencieusement
     }
 
-    if (!notifiedHashes.has(userId)) {
-        notifiedHashes.set(userId, new Set());
-    }
-    const done = notifiedHashes.get(userId)!;
-
-    const isFirstRun = !initializedUsers.has(userId);
-
     for (const torrent of torrents) {
-        const hash = torrent.hashString;
+        const hash = String(torrent.hashString || '').trim().toLowerCase();
         if (!hash) continue;
+
+        const managed = managedByHash.get(hash);
+        if (!managed || managed.completedNotifiedAt) continue;
 
         const isComplete = torrent.leftUntilDone === 0 || torrent.isFinished;
 
-        if (isComplete && !done.has(hash)) {
-            done.add(hash);
-            if (!isFirstRun) {
-                // Envoyer la notification
-                addNotification(userId, {
-                    title: 'Téléchargement terminé',
-                    message: torrent.name,
-                    type: 'success',
-                    data: {
-                        torrentId: torrent.id,
-                        hashString: hash,
-                        totalSize: torrent.totalSize,
-                    },
-                });
-                console.log(`[DownloadWatcher] Notification envoyée pour "${torrent.name}" (user ${userId})`);
-            }
+        if (isComplete) {
+            addNotification(userId, {
+                title: 'Téléchargement terminé',
+                message: torrent.name,
+                type: 'success',
+                data: {
+                    torrentId: torrent.id,
+                    hashString: hash,
+                    totalSize: torrent.totalSize,
+                    torrentLink: managed.link,
+                },
+            });
+            markManagedTorrentCompleted(userId, hash);
+            console.log(`[DownloadWatcher] Notification envoyée pour "${torrent.name}" (user ${userId})`);
         }
-    }
-
-    if (isFirstRun) {
-        initializedUsers.add(userId);
     }
 }
 

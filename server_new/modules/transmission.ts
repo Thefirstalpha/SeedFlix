@@ -1,6 +1,6 @@
 import { TransmissionSettings } from "../../common/settings";
 import { TorrentDownloadItem } from "../../common/torrent";
-import { runInTransaction } from "./db";
+import { readStore, runInTransaction } from "./db";
 import { ErrorCode } from "./errors";
 import { messages } from "./i18n";
 import { getIndexerSettings } from "./indexer";
@@ -8,6 +8,15 @@ import { getUser } from "./user";
 
 const transmissionRpcPath = '/transmission/rpc';
 const transmissionTimeoutMs = 8000;
+const transmissionManagedTorrentsStore = 'transmission.app-torrents';
+
+export interface ManagedTorrentEntry {
+    hash: string;
+    link: string;
+    name: string;
+    addedAt: string;
+    completedNotifiedAt: string | null;
+}
 
 const transmissionStatusLabels: Record<number, string> = {
     0: 'Stopped',
@@ -19,7 +28,122 @@ const transmissionStatusLabels: Record<number, string> = {
     6: 'Seeding',
 };
 
+function normalizeTorrentHash(value: unknown): string {
+    return String(value || '').trim().toLowerCase();
+}
 
+function toManagedTorrentEntry(input: Record<string, unknown>): ManagedTorrentEntry | null {
+    const hash = normalizeTorrentHash(input.hash);
+    const link = String(input.link || '').trim();
+    if (!hash || !link) {
+        return null;
+    }
+
+    const name = String(input.name || '').trim();
+    const addedAt = String(input.addedAt || new Date().toISOString());
+    const completedNotifiedAtRaw = input.completedNotifiedAt;
+    const completedNotifiedAt = completedNotifiedAtRaw ? String(completedNotifiedAtRaw) : null;
+
+    return {
+        hash,
+        link,
+        name,
+        addedAt,
+        completedNotifiedAt,
+    };
+}
+
+export function getManagedTorrents(userId: number): ManagedTorrentEntry[] {
+    const raw = readStore(transmissionManagedTorrentsStore, userId);
+    if (!Array.isArray(raw)) {
+        return [];
+    }
+
+    const entries: ManagedTorrentEntry[] = [];
+    for (const item of raw) {
+        if (!item || typeof item !== 'object') {
+            continue;
+        }
+
+        const normalized = toManagedTorrentEntry(item as Record<string, unknown>);
+        if (normalized) {
+            entries.push(normalized);
+        }
+    }
+
+    return entries;
+}
+
+function writeManagedTorrents(userId: number, entries: ManagedTorrentEntry[]) {
+    runInTransaction(({ writeStore }) => {
+        writeStore(transmissionManagedTorrentsStore, userId, entries as unknown as Record<string, any>);
+    });
+}
+
+function registerManagedTorrent(userId: number, hash: string, link: string, name: string) {
+    const normalizedHash = normalizeTorrentHash(hash);
+    const normalizedLink = String(link || '').trim();
+    if (!normalizedHash || !normalizedLink) {
+        return;
+    }
+
+    const now = new Date().toISOString();
+    const existing = getManagedTorrents(userId);
+    const current = existing.find((entry) => entry.hash === normalizedHash);
+    const nextEntry: ManagedTorrentEntry = {
+        hash: normalizedHash,
+        link: normalizedLink,
+        name: String(name || current?.name || '').trim(),
+        addedAt: current?.addedAt || now,
+        completedNotifiedAt: current?.completedNotifiedAt || null,
+    };
+
+    const next = [...existing.filter((entry) => entry.hash !== normalizedHash), nextEntry];
+    writeManagedTorrents(userId, next);
+}
+
+export function unmanageTorrentForUser(userId: number, hash: string): boolean {
+    const normalizedHash = normalizeTorrentHash(hash);
+    if (!normalizedHash) {
+        return false;
+    }
+
+    const existing = getManagedTorrents(userId);
+    const next = existing.filter((entry) => entry.hash !== normalizedHash);
+    if (next.length === existing.length) {
+        return false;
+    }
+
+    writeManagedTorrents(userId, next);
+    return true;
+}
+
+export function markManagedTorrentCompleted(userId: number, hash: string): boolean {
+    const normalizedHash = normalizeTorrentHash(hash);
+    if (!normalizedHash) {
+        return false;
+    }
+
+    const existing = getManagedTorrents(userId);
+    let updated = false;
+    const now = new Date().toISOString();
+    const next = existing.map((entry) => {
+        if (entry.hash !== normalizedHash || entry.completedNotifiedAt) {
+            return entry;
+        }
+        updated = true;
+        return {
+            ...entry,
+            completedNotifiedAt: now,
+        };
+    });
+
+    if (updated) {
+        writeManagedTorrents(userId, next);
+    }
+
+    return updated;
+}
 
 async function postTransmissionRpc(url: URL, headers: Record<string, string>, sessionId: string | undefined, body: any) {
     const controller = new AbortController();
@@ -77,7 +201,6 @@ export async function configureTransmission(userId: number, settings: Transmissi
     });
 }
 
-
 function createAuthHeaders(settings: TransmissionSettings): Record<string, string> {
     if (!settings.authRequired)
         return {};
@@ -132,7 +255,6 @@ function buildTransmissionRpcUrl(settings: TransmissionSettings): URL {
     return url;
 }
 
-
 export async function getDownloadsTransmission(userId: number, filter: Record<string, any>): Promise<TorrentDownloadItem[]> {
 
     const includeAll =
@@ -167,14 +289,12 @@ export async function getDownloadsTransmission(userId: number, filter: Record<st
     });
     const data = await response.json();
     const rawTorrents = Array.isArray(data?.arguments?.torrents) ? data.arguments.torrents : [];
+    const managedHashes = new Set(getManagedTorrents(userId).map((entry) => entry.hash));
 
     const torrents: TorrentDownloadItem[] = rawTorrents
         .map((torrent: Record<string, any>): TorrentDownloadItem => {
-            //const hash = String(torrent?.hashString || '')
-            //  .trim()
-            //  .toLowerCase();
-            //const managedBySeedflix = Boolean(hash && allowedHashes.has(hash));
-            const managedBySeedflix = true;
+            const hash = normalizeTorrentHash(torrent?.hashString);
+            const managedBySeedflix = Boolean(hash && managedHashes.has(hash));
 
             const data: TorrentDownloadItem = {
                 id: torrent.id,
@@ -202,7 +322,6 @@ export async function getDownloadsTransmission(userId: number, filter: Record<st
     return torrents;
 };
 
-
 export async function performTransmissionAction(action: string, userId: number, torrentId: number) {
     const settings = getTransmissionSettings(userId);
     if (!settings)
@@ -222,14 +341,14 @@ export async function performTransmissionAction(action: string, userId: number, 
 
 };
 
-function isMagnetLink(value) {
+function isMagnetLink(value: string) {
   return String(value || '')
     .trim()
     .toLowerCase()
     .startsWith('magnet:?');
 }
 
-async function fetchTorrentMetainfo(torrentUrl) {
+async function fetchTorrentMetainfo(torrentUrl: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), transmissionTimeoutMs);
 
@@ -267,7 +386,7 @@ export async function startDownload(userId: number, guid: string, mediaType: str
     if (!settings)
         throw new ErrorCode(messages.settings.transmission.authFailed);
     const downloadDir = mediaType === 'movie' ? settings.moviesFolder : settings.seriesFolder;
-    
+
     const indexerSettings = getIndexerSettings(userId);
     if (!indexerSettings)
         throw new ErrorCode(messages.settings.failedLoadSettings);
@@ -292,5 +411,9 @@ export async function startDownload(userId: number, guid: string, mediaType: str
     if (!response.ok || data?.result !== 'success')
         throw new ErrorCode(messages.settings.transmission.actionFailed);
 
-
+    const added = data?.arguments?.['torrent-added'] || data?.arguments?.['torrent-duplicate'] || null;
+    const addedHash = normalizeTorrentHash(added?.hashString);
+    if (addedHash) {
+        registerManagedTorrent(userId, addedHash, url.toString(), String(added?.name || ''));
+    }
 };

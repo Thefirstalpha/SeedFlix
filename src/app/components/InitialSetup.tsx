@@ -12,13 +12,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router';
 
 import { useAuth } from '../context/AuthContext';
 import {
-  acceptLegal,
-  changePassword,
-  getGlobalSettings,
-  testIndexerConnection,
-  testTmdbApiKey,
-  testTorrentConnection,
-  updateGlobalSettings,
+  acceptLegal
 } from '../services/authService';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';

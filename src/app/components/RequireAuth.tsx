@@ -4,20 +4,11 @@ import { useAuth } from '../context/AuthContext';
 export function RequireAuth() {
   const location = useLocation();
   const {
+    user,
     isAuthenticated,
     isLoading,
-    needsInitialSetup,
-    mustChangePassword,
-    mustConfigureTmdb,
-    mustConfigureTorrent,
-    mustConfigureIndexer,
   } = useAuth();
-  const hasPendingSetup =
-    needsInitialSetup ||
-    mustChangePassword ||
-    mustConfigureTmdb ||
-    mustConfigureTorrent ||
-    mustConfigureIndexer;
+  const hasPendingSetup = Boolean(user?.flags?.mustSetup);
 
   if (isLoading) {
     return (

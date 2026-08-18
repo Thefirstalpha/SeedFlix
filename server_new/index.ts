@@ -43,7 +43,7 @@ app.use('/api', wishlistRouter);
 app.use('/api', tmdbRouter);
 app.use('/api', transmissionRouter);
 app.use('/api', indexerRouter);
-app.use('/api', dbRouter);
+app.use('/api/settings/database', dbRouter);
 app.use('/api', settingsRouter);
 app.use('/api', ftpRouter);
 app.use('/api', notificationRouter);

@@ -40,14 +40,6 @@ export async function saveFtpConfig(config: Partial<FtpConfig> & { password?: st
     return data;
 }
 
-// ─── Test connexion ───────────────────────────────────────────────────────────
-
-export async function testFtpConnection(): Promise<{ ok: boolean; error?: string }> {
-    const res = await fetch('/api/ftp/test', { method: 'POST' });
-    if (!res.ok) throw new Error('Erreur test connexion FTP');
-    return await res.json();
-}
-
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
 export async function listDirectory(path: string): Promise<FtpFileInfo[]> {

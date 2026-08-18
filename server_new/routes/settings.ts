@@ -9,7 +9,8 @@ router.use(authentication);
 
 router.post('/settings/reset', withAdmin, async (req, res) => {
     resetDatabase();
-    res.status(200).json({ message: "Database reset successfully" });
+    res.clearCookie('session');
+    res.status(200).json({ ok: true, loggedOut: true, message: "Database reset successfully" });
 });
 
 router.post('/settings/language', async (req, res) => {

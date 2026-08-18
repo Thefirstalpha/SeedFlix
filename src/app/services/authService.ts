@@ -130,42 +130,6 @@ export async function resetSettings() {
   return parseJson<{ ok: true; loggedOut: true }>(response);
 }
 
-export async function testIndexerConnection(url: string, token: string) {
-  const response = await fetch(`${API_BASE_URL}/indexer/test`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, token }),
-  });
-  return parseJson<IndexerTestResponse>(response);
-}
-
-export async function testTorrentConnection(payload: {
-  url: string;
-  port: string;
-  authRequired: boolean;
-  username: string;
-  password: string;
-}) {
-  const response = await fetch(`${API_BASE_URL}/torrent/test`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  return parseJson<TorrentTestResponse>(response);
-}
-
-export async function testTmdbApiKey(apiKey: string) {
-  const response = await fetch(`${API_BASE_URL}/tmdb/test-key`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ apiKey }),
-  });
-  return parseJson<TmdbApiKeyTestResponse>(response, 'Clé API invalide');
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // User Management
 // ─────────────────────────────────────────────────────────────────────────────

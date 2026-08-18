@@ -10,11 +10,11 @@ router.use(withAdmin);
 
 
 
-router.get('/settings/database', async (req, res) => {
+router.get('/', async (req, res) => {
     res.json({ namespaces: listNamespaces() });
 });
 
-router.get('/settings/database/:userid/:namespace', async (req, res) => {
+router.get('/:userid/:namespace', async (req, res) => {
     const namespace = String(req.params.namespace || '').trim();
     const userId = Number(req.params.userid);
     if (!namespace || isNaN(userId)) {
@@ -31,7 +31,7 @@ router.get('/settings/database/:userid/:namespace', async (req, res) => {
     res.json(entry);
 });
 
-router.put('/settings/database/:userid/:namespace', async (req, res) => {
+router.put('/:userid/:namespace', async (req, res) => {
     const namespace = String(req.params.namespace || '').trim();
     const userId = Number(req.params.userid);
     const rawValue = String(req.body?.value || '');

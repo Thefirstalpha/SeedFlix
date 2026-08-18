@@ -9,6 +9,15 @@ import { User } from '../../common/user';
 
 const router = Router();
 
+function isStrongPassword(password: string): boolean {
+  if (password.length < 8) return false;
+  if (!/[a-z]/.test(password)) return false;
+  if (!/[A-Z]/.test(password)) return false;
+  if (!/[0-9]/.test(password)) return false;
+  if (!/[^A-Za-z0-9]/.test(password)) return false;
+  return true;
+}
+
 
 router.get('/auth/me', authentication, (req, res) => {
   res.json({ user: req.user });
@@ -47,6 +56,13 @@ router.post('/auth/login', (req, res) => {
 
 router.post('/auth/reset-password', authentication, (req, res) => {
   const password = String(req.body?.password || '');
+  if (!isStrongPassword(password)) {
+    res.status(400).json({
+      error:
+        'Le mot de passe doit contenir au moins 8 caracteres, avec majuscule, minuscule, chiffre et caractere special.',
+    });
+    return;
+  }
   resetPassword(req.user.id, password);
   runInTransaction(({ writeStore }) => {
     let user = getUser(req.user.id);
