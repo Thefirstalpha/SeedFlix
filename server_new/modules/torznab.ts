@@ -66,3 +66,12 @@ export async function searchTorznab(settings: IndexerSettings, query?: string, t
         params['q'] = query;
     return await runTorznabQuery(settings, params);
 }
+
+export async function rssTorznab(settings: IndexerSettings, type: 'movie' | 'tvsearch', limit = 100, offset = 0) {
+    let params : Record<string, string> = {
+        t: type,
+        limit: String(limit),
+        offset: String(Math.max(0, Number(offset) || 0)),
+    };
+    return await runTorznabQuery(settings, params);
+}

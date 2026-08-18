@@ -1,70 +1,24 @@
-import { useEffect, useState } from 'react';
-
-import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '../ui/alert-dialog';
+import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 
 
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Switch } from '../ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { useAuth } from '../../context/AuthContext';
 import { useI18n, type SupportedLanguage } from '../../i18n/LanguageProvider';
-import {
-    changePassword,
-    getDatabaseNamespace,
-    resetSettings,
-    updateDatabaseNamespace,
-    listDatabaseNamespaces,
-    type DatabaseNamespaceEntry,
-} from '../../services/authService';
 import { sendTestNotification } from '../../services/notificationService';
 
 export function SettingNotification() {
     const { t } = useI18n();
-    const [resetError, setResetError] = useState<string | null>(null);
-    const [isResetting, setIsResetting] = useState(false);
     const [discordWebhookUrl, setDiscordWebhookUrl] = useState('');
     const [discordTested, setDiscordTested] = useState(false);
     const [discordFormOpen, setDiscordFormOpen] = useState(false);
     const [discordMessage, setDiscordMessage] = useState<string | null>(null);
     const [discordError, setDiscordError] = useState<string | null>(null);
     const [isDiscordSaving, setIsDiscordSaving] = useState(false);
-    const [languageCode, setLanguageCode] = useState<SupportedLanguage>('fr');
-    const [spoilerMode, setSpoilerMode] = useState(false);
-    const [preferencesMessage, setPreferencesMessage] = useState<string | null>(null);
-    const [preferencesError, setPreferencesError] = useState<string | null>(null);
-    const [isPreferencesSaving, setIsPreferencesSaving] = useState(false);
     const [testNotifMessage, setTestNotifMessage] = useState<string | null>(null);
     const [testNotifError, setTestNotifError] = useState<string | null>(null);
     const [isSendingTestNotif, setIsSendingTestNotif] = useState(false);
-
-    const applySettingsToForms = (incomingSettings: UserSettings) => {
-
-
-        const notifSettings = incomingSettings.placeholders?.notifications || {};
-        setDiscordWebhookUrl((notifSettings as any).discord?.webhookUrl || '');
-        setDiscordTested(
-            (notifSettings as any).enabledChannels?.includes('discord') &&
-            Boolean((notifSettings as any).discord?.webhookUrl),
-        );
-        setLanguageCode(
-            parseSupportedLanguage((incomingSettings.placeholders?.preferences as any)?.language),
-        );
-        setSpoilerMode(Boolean((incomingSettings.placeholders?.preferences as any)?.spoilerMode));
-    };
 
 
 

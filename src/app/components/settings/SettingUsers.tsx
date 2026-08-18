@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { UserList } from "./UserList";
-import { CreatedUserResponse, createUser, deleteUser, listUsers, resetUserPassword, User } from "../../services/authService";
+import { CreatedUserResponse, createUser, deleteUser, listUsers, resetUserPassword } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
 import { Check, Copy } from "lucide-react";
 

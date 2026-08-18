@@ -1,9 +1,17 @@
 import { FtpSettings, IndexerSettings, TransmissionSettings } from "./settings";
 
+export interface StatusBarNotification {
+    title: string;
+    message: string;
+    type: string;
+    id: string;
+}
+
 export interface UserStatusBar {
     downloads: number;
     notifications: number;
     wishlist: number;
+    latestNotification?: StatusBarNotification | null;
 }
 
 export interface User {

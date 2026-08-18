@@ -4,6 +4,9 @@ import { runInTransaction } from '../modules/db';
 import { createUser, deleteUser, getUser } from '../modules/user';
 import { messages } from '../modules/i18n';
 import { ErrorCode } from '../modules/errors';
+import { getNotifications } from '../modules/notification';
+import { getDownloadsTransmission } from '../modules/transmission';
+import { getWishlist } from '../modules/wishlist';
 import { UserStatusBar } from '../../common/user';
 
 const router = Router();
@@ -67,15 +70,35 @@ router.post('/users/:id/reset-password', withAdmin, (req, res) => {
   res.json({ ok: true, password: newPassword });
 });
 
-router.get('/user', (req, res) => {
-  let downoads = 0;
-  let whishlist = 0;
-  let notifications = 0;
-  const data : UserStatusBar = {
-    downloads: downoads,
-    wishlist: whishlist,
-    notifications: notifications
-  }
+router.get('/user', async (req, res) => {
+  const userId = req.user.id;
+
+  // Téléchargements actifs
+  let downloads = 0;
+  try {
+    const torrents = await getDownloadsTransmission(userId, {});
+    downloads = torrents.filter(t => t.leftUntilDone > 0 && !t.isFinished).length;
+  } catch { /* Transmission non configuré ou inaccessible */ }
+
+  // Wishlist
+  let wishlist = 0;
+  try {
+    const items = await getWishlist(userId);
+    wishlist = items.length;
+  } catch { /* ignore */ }
+
+  // Notifications non lues + dernière notification
+  const { notifications: notifList, unreadCount } = getNotifications(userId, { limit: 1, unreadOnly: true });
+  const latest = notifList[0] ?? null;
+
+  const data: UserStatusBar = {
+    downloads,
+    wishlist,
+    notifications: unreadCount,
+    latestNotification: latest
+      ? { id: latest.id, title: latest.title, message: latest.message, type: latest.type }
+      : null,
+  };
   res.json(data);
 });
 

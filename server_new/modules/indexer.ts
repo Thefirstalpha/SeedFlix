@@ -5,7 +5,7 @@ import { readStore, runInTransaction } from "./db";
 import { ErrorCode } from "./errors";
 import { addNotification } from "./notification";
 import { buildDetailsRequest, buildSearchRequest, proxyTmdb, TmdbType } from "./tmdb";
-import { checkTorznabConnection, searchTorznab } from "./torznab";
+import { checkTorznabConnection, rssTorznab, searchTorznab } from "./torznab";
 import { getUser } from "./user";
 import { getWishlist } from "./wishlist";
 
@@ -246,7 +246,7 @@ export async function getLastSeries(userId: number): Promise<IndexerSeriesResult
         throw new ErrorCode('Indexer settings not found');
     }
 
-    const response = await searchTorznab(settings);
+    const response = await rssTorznab(settings, 'tvsearch');
     return await parseSeriesIndexerResponse(response);
 }
 
@@ -256,7 +256,7 @@ export async function getLastMovies(userId: number): Promise<IndexerMovieResult[
         throw new ErrorCode('Indexer settings not found');
     }
 
-    const response = await searchTorznab(settings);
+    const response = await rssTorznab(settings, 'movie');
     return await parseMovieIndexerResponse(response);
 }
 

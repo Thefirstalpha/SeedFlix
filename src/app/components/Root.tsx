@@ -4,18 +4,12 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/LanguageProvider';
-import * as notificationService from '../services/notificationService';
-import type { Notification } from '../services/notificationService';
-import { getSeriesWishlistCount } from '../services/seriesWishlistService';
-import { getTorrentDownloads } from '../services/torrentService';
-import { getWishlistCount } from '../services/wishlistService';
 import { Button } from './ui/button';
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { useSearchState } from '../context/SearchStateContext';
 import { getUserStatusBar } from '../services/authService';
 
 type UnreadNotificationsEvent = CustomEvent<{ count: number }>;
-const NOTIFICATIONS_POLL_INTERVAL_MS = 5000;
 
 function showNotificationToast(type: Notification['type'], title: string, description: string) {
   switch (type) {
@@ -91,18 +85,39 @@ export function Root() {
 
   useEffect(() => {
     if (!isAuthenticated || isSetupPage || hasPendingSetup) {
-        setDownloadsCount(0);
-        setWishlistCount(0);
-        setUnreadNotificationsCount(0);
+      setDownloadsCount(0);
+      setWishlistCount(0);
+      setUnreadNotificationsCount(0);
       return;
     }
 
     const loadUserStatusBar = async () => {
       try {
         const response = await getUserStatusBar();
+        const nextUnread = response.notifications || 0;
+        const previousUnread = previousUnreadCountRef.current;
+
         setDownloadsCount(response.downloads || 0);
         setWishlistCount(response.wishlist || 0);
-        setUnreadNotificationsCount(response.notifications || 0);
+        setUnreadNotificationsCount(nextUnread);
+
+        // Toast si nouvelles notifications
+        if (hasHydratedUnreadRef.current && nextUnread > previousUnread && location.pathname !== '/notifications') {
+          const delta = nextUnread - previousUnread;
+          const latest = response.latestNotification;
+          if (latest) {
+            const toastTitle = delta > 1 ? `${delta} nouvelles notifications` : latest.title;
+            const safeMsg = getSafeNotificationMessage(latest.message, spoilerModeEnabled, undefined);
+            const toastDesc = delta > 1 ? `${safeMsg} (et ${delta - 1} autre${delta - 1 > 1 ? 's' : ''})` : safeMsg;
+            showNotificationToast(latest.type as any, toastTitle, toastDesc);
+          } else {
+            toast.info(delta > 1 ? `${delta} nouvelles notifications` : '1 nouvelle notification');
+          }
+        }
+
+        hasHydratedUnreadRef.current = true;
+        previousUnreadCountRef.current = nextUnread;
+        window.dispatchEvent(new CustomEvent('seedflix:notifications-updated', { detail: { count: nextUnread } }));
       } catch {
         setDownloadsCount(0);
         setWishlistCount(0);
@@ -115,98 +130,16 @@ export function Root() {
       void loadUserStatusBar();
     }, 7000);
 
-    const handleImmediateWishlistRefresh = () => {
-      void loadUserStatusBar();
-    };
+    window.addEventListener('seedflix:wishlist-refresh-request', loadUserStatusBar);
+    window.addEventListener('seedflix:notifications-refresh-request', loadUserStatusBar);
 
-    window.addEventListener('seedflix:wishlist-refresh-request', handleImmediateWishlistRefresh);
 
     return () => {
-      window.removeEventListener(
-        'seedflix:wishlist-refresh-request',
-        handleImmediateWishlistRefresh,
-      );
+      window.removeEventListener('seedflix:wishlist-refresh-request', loadUserStatusBar);
+      window.removeEventListener('seedflix:notifications-refresh-request', loadUserStatusBar);
       clearInterval(interval);
     };
   }, [isAuthenticated, isSetupPage, hasPendingSetup, location.pathname]);
-
-  useEffect(() => {
-    if (!isAuthenticated || isSetupPage || hasPendingSetup) {
-      setUnreadNotificationsCount(0);
-      return;
-    }
-
-    const loadUnreadCount = async () => {
-      try {
-        const data = await notificationService.getNotifications(1, true);
-        const latestUnread = Array.isArray(data.notifications) ? data.notifications[0] : undefined;
-        const nextUnreadCount = Number(data.unreadCount || 0);
-        const previousUnreadCount = previousUnreadCountRef.current;
-
-        if (
-          hasHydratedUnreadRef.current &&
-          nextUnreadCount > previousUnreadCount &&
-          location.pathname !== '/notifications'
-        ) {
-          const delta = nextUnreadCount - previousUnreadCount;
-          if (latestUnread) {
-            const toastTitle = delta > 1 ? `${delta} nouvelles notifications` : latestUnread.title;
-            const safeLatestMessage = getSafeNotificationMessage(
-              latestUnread.message,
-              spoilerModeEnabled,
-              latestUnread.data?.mediaType,
-            );
-            const toastDescription =
-              delta > 1
-                ? `${safeLatestMessage} (et ${delta - 1} autre${delta - 1 > 1 ? 's' : ''})`
-                : safeLatestMessage;
-
-            showNotificationToast(latestUnread.type, toastTitle, toastDescription);
-          } else {
-            toast.info(
-              delta > 1 ? message('root.toasts.manyNew', { count: delta }) : message('root.toasts.oneNew'),
-              {
-                description: t('root.toasts.updatesAvailable'),
-              },
-            );
-          }
-        }
-
-        hasHydratedUnreadRef.current = true;
-        previousUnreadCountRef.current = nextUnreadCount;
-        setUnreadNotificationsCount(nextUnreadCount);
-        window.dispatchEvent(
-          new CustomEvent('seedflix:notifications-updated', {
-            detail: { count: nextUnreadCount },
-          }),
-        );
-      } catch {
-        setUnreadNotificationsCount(0);
-      }
-    };
-
-    void loadUnreadCount();
-    const interval = setInterval(() => {
-      void loadUnreadCount();
-    }, NOTIFICATIONS_POLL_INTERVAL_MS);
-
-    const handleImmediateRefresh = () => {
-      void loadUnreadCount();
-    };
-    window.addEventListener('seedflix:notifications-refresh-request', handleImmediateRefresh);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('seedflix:notifications-refresh-request', handleImmediateRefresh);
-    };
-  }, [
-    isAuthenticated,
-    isSetupPage,
-    hasPendingSetup,
-    location.pathname,
-    settings,
-    spoilerModeEnabled,
-  ]);
 
   useEffect(() => {
     const handleUnreadUpdate = (event: Event) => {
