@@ -230,11 +230,25 @@ function MoveDialog({
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
+const CACHE_MAX = 40;
+
+function lruSet(cache: Map<string, FtpFileInfo[]>, key: string, value: FtpFileInfo[]) {
+  if (cache.has(key)) cache.delete(key); // rafraîchir la position
+  if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value!);
+  cache.set(key, value);
+}
+
 export function FtpExplorer() {
   const [path, setPath] = useState('/');
   const [items, setItems] = useState<FtpFileInfo[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);   // premier chargement d'un chemin non caché
+  const [refreshing, setRefreshing] = useState(false); // rafraîchissement silencieux en arrière-plan
   const [error, setError] = useState<string | null>(null);
+
+  // Cache LRU : path → contenu trié
+  const dirCache = useRef<Map<string, FtpFileInfo[]>>(new Map());
+  // Prefetch en cours : évite les doublons
+  const prefetchInFlight = useRef<Set<string>>(new Set());
 
   // Storage
   const [storageUsed, setStorageUsed] = useState<number | null>(null);
@@ -256,33 +270,87 @@ export function FtpExplorer() {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
-  // Suppression unitaire
-  const [confirmDelete, setConfirmDelete] = useState<FtpFileInfo | null>(null);
+  // Confirmation de suppression (unitaire ou groupée)
+  const [pendingDelete, setPendingDelete] = useState<FtpFileInfo[] | null>(null);
 
   // Modal déplacement
   const [showMoveDialog, setShowMoveDialog] = useState(false);
 
-  // ── Chargement ───────────────────────────────────────────────────────────
+  // ── Préchargement silencieux ─────────────────────────────────────────────
 
-  const load = useCallback(async (targetPath: string) => {
-    setLoading(true);
-    setItems([]);
-    setSelected(new Set());
+  const prefetchPath = useCallback((targetPath: string) => {
+    if (prefetchInFlight.current.has(targetPath) || dirCache.current.has(targetPath)) return;
+    prefetchInFlight.current.add(targetPath);
+    listDirectory(targetPath)
+      .then(result => { lruSet(dirCache.current, targetPath, sortItems(result)); })
+      .catch(() => {})
+      .finally(() => { prefetchInFlight.current.delete(targetPath); });
+  }, []);
+
+  const prefetchNeighbours = useCallback((targetPath: string, loadedItems: FtpFileInfo[]) => {
+    // Précharger le dossier parent
+    const parts = targetPath.replace(/\/$/, '').split('/').filter(Boolean);
+    if (parts.length > 0) {
+      const parent = parts.length === 1 ? '/' : `/${parts.slice(0, -1).join('/')}`;
+      prefetchPath(parent);
+    }
+    // Précharger tous les sous-dossiers (idle callback si disponible, sinon setTimeout)
+    const subdirs = loadedItems.filter(i => i.isDirectory);
+    const schedule = typeof window.requestIdleCallback === 'function'
+      ? (fn: () => void) => window.requestIdleCallback(fn, { timeout: 3000 })
+      : (fn: () => void) => setTimeout(fn, 300);
+    schedule(() => {
+      for (const dir of subdirs) {
+        prefetchPath(joinPath(targetPath, dir.name));
+      }
+    });
+  }, [prefetchPath]);
+
+  // ── Chargement principal ─────────────────────────────────────────────────
+
+  const load = useCallback(async (targetPath: string, { silent = false, invalidate = false } = {}) => {
+    if (invalidate) dirCache.current.delete(targetPath);
+
+    const cached = dirCache.current.get(targetPath);
+
+    if (cached && !silent) {
+      // Affichage instantané depuis le cache
+      setItems(cached);
+      setLoading(false);
+      setRefreshing(true); // indicateur discret de rafraîchissement
+    } else if (!cached) {
+      setLoading(true);
+      setItems([]);
+    }
+
     setError(null);
     setRenamingItem(null);
     setCreatingFolder(false);
-    setConfirmDelete(null);
+    setPendingDelete(null);
+
     try {
       const result = await listDirectory(targetPath);
-      setItems(sortItems(result));
+      const sorted = sortItems(result);
+      lruSet(dirCache.current, targetPath, sorted);
+      setItems(sorted);
+      prefetchNeighbours(targetPath, sorted);
     } catch (e: any) {
-      setError(e.message || 'Erreur lors du chargement.');
+      if (!cached) setError(e.message || 'Erreur lors du chargement.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, []);
+  }, [prefetchNeighbours]);
 
-  useEffect(() => { void load(path); }, [path, load]);
+  // Invalider le cache du chemin courant après une mutation
+  const invalidateCurrent = useCallback(() => {
+    dirCache.current.delete(path);
+  }, [path]);
+
+  useEffect(() => {
+    setSelected(new Set());
+    void load(path);
+  }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     getStorageUsage()
@@ -317,33 +385,35 @@ export function FtpExplorer() {
   const handleDeleteBatch = async (toDelete: FtpFileInfo[]) => {
     const payload = toDelete.map(i => ({ path: joinPath(path, i.name), isDirectory: i.isDirectory }));
     setSelected(new Set());
-    setConfirmDelete(null);
-    // Optimiste : retirer immédiatement
+    setPendingDelete(null);
     const names = new Set(toDelete.map(i => i.name));
-    setItems(prev => prev.filter(i => !names.has(i.name)));
+    // Optimiste
+    const applyDelete = (list: FtpFileInfo[]) => list.filter(i => !names.has(i.name));
+    setItems(prev => applyDelete(prev));
+    invalidateCurrent();
     try {
       const result = await deleteBatch(payload);
       if (result.failed.length > 0) {
-        // Rollback partiel — ré-insérer les éléments qui ont échoué
         const failedNames = new Set(result.failed.map(f => f.path.split('/').pop()));
         const toRestore = toDelete.filter(i => failedNames.has(i.name));
         setItems(prev => sortItems([...prev, ...toRestore]));
         setError(`${result.failed.length} élément(s) n'ont pas pu être supprimés.`);
+      } else {
+        // Mettre à jour le cache avec la version courante
+        dirCache.current.set(path, applyDelete(dirCache.current.get(path) ?? []));
       }
     } catch (e: any) {
-      // Rollback total
       setItems(prev => sortItems([...prev, ...toDelete]));
       setError(e.message);
     }
   };
 
   const handleDeleteSelected = () => {
-    const toDelete = items.filter(i => selected.has(i.name));
-    void handleDeleteBatch(toDelete);
+    setPendingDelete(items.filter(i => selected.has(i.name)));
   };
 
   const handleDeleteSingle = (item: FtpFileInfo) => {
-    void handleDeleteBatch([item]);
+    setPendingDelete([item]);
   };
 
   // ── Renommer ────────────────────────────────────────────────────────────
@@ -360,9 +430,12 @@ export function FtpExplorer() {
     const newFull = joinPath(path, trimmed);
     setRenamingItem(null);
     setActionInProgress(oldName);
-    setItems(prev => sortItems(prev.map(i => i.name === oldName ? { ...i, name: trimmed } : i)));
+    invalidateCurrent();
+    const applyRename = (list: FtpFileInfo[]) => sortItems(list.map(i => i.name === oldName ? { ...i, name: trimmed } : i));
+    setItems(prev => applyRename(prev));
     try {
       await renameItem(oldFull, newFull);
+      dirCache.current.set(path, applyRename(dirCache.current.get(path) ?? []));
     } catch (e: any) {
       setItems(prev => sortItems(prev.map(i => i.name === trimmed ? { ...i, name: oldName } : i)));
       setError(e.message);
@@ -377,9 +450,11 @@ export function FtpExplorer() {
     const toMove = items.filter(i => selected.has(i.name));
     const sourcePaths = toMove.map(i => joinPath(path, i.name));
     setSelected(new Set());
-    // Optimiste : retirer du dossier courant
     const names = new Set(toMove.map(i => i.name));
     setItems(prev => prev.filter(i => !names.has(i.name)));
+    invalidateCurrent();
+    // Invalider aussi la destination (son contenu va changer)
+    dirCache.current.delete(destDir);
     try {
       const result = await moveItems(sourcePaths, destDir);
       if (result.failed.length > 0) {
@@ -403,10 +478,12 @@ export function FtpExplorer() {
     setActionInProgress('mkdir');
     setCreatingFolder(false);
     setNewFolderName('');
+    invalidateCurrent();
     const newEntry: FtpFileInfo = { name, type: 2, size: 0, rawModifiedAt: '', isDirectory: true, isFile: false, isSymbolicLink: false };
     setItems(prev => sortItems([...prev, newEntry]));
     try {
       await makeDirectory(fullPath);
+      dirCache.current.set(path, sortItems([...(dirCache.current.get(path) ?? []), newEntry]));
     } catch (e: any) {
       setItems(prev => prev.filter(i => i.name !== name));
       setError(e.message);
@@ -455,6 +532,44 @@ export function FtpExplorer() {
         />
       )}
 
+      {/* Modal confirmation suppression */}
+      {pendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl border border-red-500/30 bg-slate-900 shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-white/10">
+              <p className="text-base font-semibold text-white">
+                Supprimer {pendingDelete.length} élément{pendingDelete.length > 1 ? 's' : ''} ?
+              </p>
+              <p className="text-xs text-white/40 mt-1">Cette action est irréversible.</p>
+            </div>
+            <ul className="max-h-40 overflow-y-auto divide-y divide-white/5 px-5 py-2">
+              {pendingDelete.slice(0, 8).map(item => (
+                <li key={item.name} className="flex items-center gap-2 py-1.5 text-sm text-white/70">
+                  {getFileIcon(item.name, item.isDirectory)}
+                  <span className="truncate">{item.name}</span>
+                </li>
+              ))}
+              {pendingDelete.length > 8 && (
+                <li className="py-1.5 text-xs text-white/30 italic">
+                  …et {pendingDelete.length - 8} autre{pendingDelete.length - 8 > 1 ? 's' : ''}
+                </li>
+              )}
+            </ul>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/10 bg-white/5">
+              <Button size="sm" variant="ghost" onClick={() => setPendingDelete(null)}
+                className="text-white/50 hover:text-white h-8">
+                Annuler
+              </Button>
+              <Button size="sm" onClick={() => void handleDeleteBatch(pendingDelete)}
+                className="bg-red-600 hover:bg-red-700 text-white h-8">
+                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                Supprimer{pendingDelete.length > 1 ? ` (${pendingDelete.length})` : ''}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* En-tête */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -480,8 +595,8 @@ export function FtpExplorer() {
             Nouveau dossier
           </Button>
           <Button size="sm" variant="ghost" className="text-white/60 hover:text-white hover:bg-white/10"
-            onClick={() => load(path)} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            onClick={() => load(path, { invalidate: true })} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 ${loading || refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
       </div>
@@ -533,9 +648,9 @@ export function FtpExplorer() {
             className="text-cyan-300 hover:text-cyan-100 hover:bg-white/10 h-7">
             <MoveRight className="w-3.5 h-3.5 mr-1" />Déplacer
           </Button>
-          <Button size="sm" variant="ghost" onClick={handleDeleteSelected}
+          <Button size="sm" variant="ghost" onClick={() => handleDeleteSelected()}
             className="text-red-400 hover:text-red-200 hover:bg-red-500/10 h-7">
-            <Trash2 className="w-3.5 h-3.5 mr-1" />Supprimer
+            <Trash2 className="w-3.5 h-3.5 mr-1" />Supprimer ({selected.size})
           </Button>
           <button type="button" onClick={() => setSelected(new Set())} className="text-white/30 hover:text-white p-1">
             <X className="w-4 h-4" />
@@ -583,7 +698,6 @@ export function FtpExplorer() {
           <div className="divide-y divide-white/5">
             {items.map(item => {
               const isRenaming = renamingItem === item.name;
-              const isDeleting = confirmDelete?.name === item.name;
               const busy = actionInProgress === item.name;
               const isSelected = selected.has(item.name);
               const fullPath = joinPath(path, item.name);
@@ -592,7 +706,7 @@ export function FtpExplorer() {
                 <div
                   key={item.name}
                   className={`grid grid-cols-[auto_1fr_auto_auto] gap-2 items-center px-4 py-2.5 group transition-colors
-                    ${isSelected ? 'bg-cyan-950/30' : isDeleting ? 'bg-red-500/10' : 'hover:bg-white/5'}`}
+                    ${isSelected ? 'bg-cyan-950/30' : 'hover:bg-white/5'}`}
                 >
                   {/* Checkbox */}
                   <button type="button" onClick={() => toggleSelect(item.name)}
@@ -628,36 +742,25 @@ export function FtpExplorer() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 w-20 justify-end">
-                    {isDeleting ? (
-                      <>
-                        <button type="button" onClick={() => handleDeleteSingle(item)} disabled={busy}
-                          className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded transition-colors">
-                          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Oui'}
-                        </button>
-                        <button type="button" onClick={() => setConfirmDelete(null)}
-                          className="text-xs text-white/50 hover:text-white px-1">Non</button>
-                      </>
-                    ) : (
-                      <>
-                        {!item.isDirectory && (
-                          <a href={getDownloadUrl(fullPath)} download={item.name}
-                            className="p-1 rounded text-white/0 group-hover:text-white/50 hover:!text-cyan-300 hover:bg-white/10 transition-colors"
-                            title="Télécharger">
-                            <Download className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                        <button type="button" onClick={() => startRename(item)} disabled={busy}
-                          className="p-1 rounded text-white/0 group-hover:text-white/50 hover:!text-amber-300 hover:bg-white/10 transition-colors"
-                          title="Renommer">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button type="button" onClick={() => setConfirmDelete(item)} disabled={busy}
-                          className="p-1 rounded text-white/0 group-hover:text-white/50 hover:!text-red-400 hover:bg-white/10 transition-colors"
-                          title="Supprimer">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </>
-                    )}
+                    <>
+                      {!item.isDirectory && (
+                        <a href={getDownloadUrl(fullPath)} download={item.name}
+                          className="p-1 rounded text-white/0 group-hover:text-white/50 hover:!text-cyan-300 hover:bg-white/10 transition-colors"
+                          title="Télécharger">
+                          <Download className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                      <button type="button" onClick={() => startRename(item)} disabled={busy}
+                        className="p-1 rounded text-white/0 group-hover:text-white/50 hover:!text-amber-300 hover:bg-white/10 transition-colors"
+                        title="Renommer">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button type="button" onClick={() => handleDeleteSingle(item)} disabled={busy}
+                        className="p-1 rounded text-white/0 group-hover:text-white/50 hover:!text-red-400 hover:bg-white/10 transition-colors"
+                        title="Supprimer">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
                   </div>
                 </div>
               );
