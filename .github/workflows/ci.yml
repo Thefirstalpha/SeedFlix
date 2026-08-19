@@ -41,14 +41,9 @@ jobs:
 
       - name: Backend syntax checks
         run: |
-          node --check server/index.js
-          node --check server/config.js
-          node --check server/modules/auth.js
-          node --check server/modules/notifications.js
-          node --check server/modules/tmdb.js
-          node --check server/modules/torznab.js
-          node --check server/modules/transmission.js
-          node --check server/modules/wishlist.js
+          set -euo pipefail
+          npx tsc --noEmit --skipLibCheck --incremental false server/**/*.ts
+          npx tsc --noEmit --skipLibCheck --incremental false common/**/*.ts
 
       - name: Service smoke test (server startup + API reachability)
         shell: bash
