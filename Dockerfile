@@ -1,9 +1,12 @@
 # syntax=docker/dockerfile:1
 
+ARG NPM_VERSION=11.6.2
+
 FROM node:24-alpine AS deps
+ARG NPM_VERSION
 WORKDIR /app
 COPY package*.json ./
-RUN npm install -g npm@latest --ignore-scripts && npm ci --ignore-scripts
+RUN npm install -g npm@${NPM_VERSION} --ignore-scripts && npm ci --ignore-scripts
 
 FROM deps AS build
 COPY index.html ./
@@ -16,6 +19,7 @@ RUN npm run build
 
 FROM node:24-alpine AS runtime
 ARG IMAGE_TAG=dev
+ARG NPM_VERSION
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
@@ -27,7 +31,7 @@ LABEL org.opencontainers.image.version="${IMAGE_TAG}"
 COPY package*.json ./
 # Keep npm CLI in runtime at a patched level because Trivy scans npm's bundled deps in the final image.
 # Remove npm/npx afterward: the app runs with node only in production.
-RUN npm install -g npm@latest --ignore-scripts \
+RUN npm install -g npm@${NPM_VERSION} --ignore-scripts \
 	&& npm ci --omit=dev --ignore-scripts \
 	&& npm cache clean --force \
 	&& rm -rf /usr/local/lib/node_modules/npm \
