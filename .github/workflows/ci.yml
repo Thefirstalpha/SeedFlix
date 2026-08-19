@@ -42,15 +42,15 @@ jobs:
       - name: Backend syntax checks
         run: |
           set -euo pipefail
-          npx tsc --noEmit --skipLibCheck --incremental false server/*.ts
-          npx tsc --noEmit --skipLibCheck --incremental false server/**/*.ts
-          npx tsc --noEmit --skipLibCheck --incremental false common/*.ts
+          ./node_modules/.bin/tsc --noEmit --skipLibCheck --incremental false server/*.ts
+          ./node_modules/.bin/tsc --noEmit --skipLibCheck --incremental false server/**/*.ts
+          ./node_modules/.bin/tsc --noEmit --skipLibCheck --incremental false common/*.ts
 
       - name: Service smoke test (server startup + API reachability)
         shell: bash
         run: |
           set -euo pipefail
-          npx tsx server/index.ts > /tmp/server.log 2>&1 &
+          ./node_modules/.bin/tsx server/index.ts > /tmp/server.log 2>&1 &
           SERVER_PID=$!
 
           cleanup() {

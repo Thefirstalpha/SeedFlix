@@ -527,7 +527,7 @@ export function SeriesDetails() {
                   {/* Episodes list */}
                   {isLoadingEpisodes ? (
                     <div className="space-y-3">
-                      {[...Array(3)].map((_, i) => (
+                      {[...new Array(3)].map((_, i) => (
                         <div key={i} className="h-20 bg-white/5 rounded-lg animate-pulse" />
                       ))}
                     </div>

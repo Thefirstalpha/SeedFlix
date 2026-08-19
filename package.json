@@ -6,8 +6,8 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "dev:server": "npx tsx watch server/index.ts",
-    "dev:server:debug": "npx tsx watch server/index.ts --debug",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:server:debug": "tsx watch server/index.ts --debug",
     "dev:all": "concurrently \"npm:dev:server\" \"npm:dev\"",
     "dev:all:debug": "concurrently \"npm:dev:server:debug\" \"npm:dev\"",
     "lint": "npm run lint:frontend && npm run lint:backend",
