@@ -50,7 +50,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node server/index.js > /tmp/server.log 2>&1 &
+          tsx server/index.ts > /tmp/server.log 2>&1 &
           SERVER_PID=$!
 
           cleanup() {
