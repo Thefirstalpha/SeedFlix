@@ -1,7 +1,7 @@
 // Point d'entrée principal du backend TypeScript
 /// <reference path="./types/express.d.ts" />
 
-import express, { NextFunction, Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 
 import cookieParser from 'cookie-parser';
 import { router as authRouter } from './routes/auth';
@@ -19,13 +19,34 @@ import { startDownloadWatcher } from './modules/downloadWatcher';
 import { ErrorCode } from './modules/errors';
 
 import { Logger } from './logger';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const express = require('express') as typeof import('express');
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const clientDistDir = path.resolve(__dirname, '../dist');
 
 initDB();
 Logger.init();
 startDownloadWatcher();
 
-const app: express.Express = express();
+const app: import('express').Express = express();
 app.disable('x-powered-by');
+
+app.use(express.static(clientDistDir));
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    next();
+    return;
+  }
+
+  res.sendFile(path.join(clientDistDir, 'index.html'));
+});
+
 app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET || 'development-secret'));
 
@@ -57,6 +78,10 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Serveur backend TS démarré sur le port ${PORT}`);
+});
+server.on('error', (error) => {
+  console.error('Server startup failed:', error);
+  process.exitCode = 1;
 });
