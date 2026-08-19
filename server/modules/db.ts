@@ -1,12 +1,27 @@
-import { mkdirSync } from 'node:fs';
+import { accessSync, constants, mkdirSync } from 'node:fs';
+import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { config } from '../config';
 import { createUser, getUser } from './user';
 
-mkdirSync(config.dataDir, { recursive: true });
 export let db: DatabaseSync;
 
+function ensureDatabaseDirectory(): void {
+  const dbDirectory = path.dirname(config.databasePath);
+  try {
+    mkdirSync(dbDirectory, { recursive: true });
+    accessSync(dbDirectory, constants.W_OK);
+  } catch (error) {
+    throw new Error(
+      `Database directory is not writable: ${dbDirectory}. ` +
+        `Set SEEDFLIX_DATA_DIR to a writable path.`,
+      { cause: error as Error },
+    );
+  }
+}
+
 export const initDB = () => {
+  ensureDatabaseDirectory();
   db = new DatabaseSync(config.databasePath);
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
