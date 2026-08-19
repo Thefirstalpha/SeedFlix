@@ -1,4 +1,6 @@
 // Point d'entrée principal du backend TypeScript
+/// <reference path="./types/express.d.ts" />
+
 import express, { NextFunction, Request, Response } from 'express';
 
 import cookieParser from 'cookie-parser';
