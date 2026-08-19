@@ -44,4 +44,4 @@ COPY --chown=root:root --chmod=555 --from=build /app/dist ./dist
 USER node
 
 EXPOSE 4000
-CMD ["tsx", "server/index.ts"]
+CMD ["./node_modules/.bin/tsx", "server/index.ts"]
