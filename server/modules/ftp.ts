@@ -13,7 +13,7 @@ export async function configureFtp(userId: number, settings: FtpSettings) {
             throw new Error('User not found');
         }
         user.settings.ftp = settings;
-        await writeStore('user', userId, user);
+        writeStore('user', userId, user);
     });
 }
 
@@ -133,7 +133,7 @@ export async function moveBatch(
     const dest = destinationDir.endsWith('/') ? destinationDir : `${destinationDir}/`;
     await withClient(userId, async (client) => {
         for (const src of sourcePaths) {
-            const basename = src.split('/').filter(Boolean).pop() ?? src;
+            const basename = src.split('/').findLast(Boolean) ?? src;
             const target = `${dest}${basename}`;
             try {
                 await client.rename(src, target);
