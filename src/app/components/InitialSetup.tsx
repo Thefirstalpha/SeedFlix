@@ -7,7 +7,7 @@ import {
   Server,
   ShieldCheck,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { SubmitEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 
 import { useAuth } from '../context/AuthContext';
@@ -20,7 +20,6 @@ import { Checkbox } from './ui/checkbox';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Progress } from './ui/progress';
-import { Switch } from './ui/switch';
 import { useI18n, type SupportedLanguage } from '../i18n/LanguageProvider';
 import { configureTmdb, isTmdbConfigure, updateLanguage } from '../services/settingService';
 import { SettingTransmission } from './settings/SettingTransmission';
@@ -115,22 +114,7 @@ export function InitialSetup() {
   }, [totalSteps, visibleSteps]);
 
   useEffect(() => {
-    const sourceSettings = user?.settings || buildFallbackSettings(user?.username || 'admin');
-    const torrentSettings = sourceSettings.placeholders?.torrent || {};
-    const indexerSettings = sourceSettings.placeholders?.indexer || {};
-
-    setTorrentUrl(torrentSettings.url || '');
-    setTorrentPort(torrentSettings.port || '');
-    setTorrentAuthRequired(Boolean(torrentSettings.authRequired));
-    setTorrentUsername(torrentSettings.username || '');
-    setTorrentPassword(torrentSettings.password || '');
-    setTorrentMoviesFolder(torrentSettings.moviesFolder || '');
-    setTorrentSeriesFolder(torrentSettings.seriesFolder || '');
-    setIndexerUrl(indexerSettings.url || '');
-    setIndexerToken(indexerSettings.token || '');
-    setIndexerQualities(indexerSettings.qualities || ['all']);
-    setIndexerLanguages(indexerSettings.languages || ['all']);
-    setLanguageCode(parseSupportedLanguage(sourceSettings.placeholders?.preferences?.language));
+    setLanguageCode(parseSupportedLanguage(user?.settings?.language));
   }, [user?.username, user?.settings]);
 
   useEffect(() => {
@@ -197,7 +181,6 @@ export function InitialSetup() {
   const currentStep = visibleSteps[activeStep];
   const currentStepNumber = activeStep + 1;
   const progressValue = totalSteps > 0 ? (currentStepNumber / totalSteps) * 100 : 0;
-  const currentSettings = user?.settings
 
 
   const goToNextVisibleStep = async () => {
@@ -242,7 +225,7 @@ export function InitialSetup() {
     }
   };
 
-  const handleTmdbSubmit = async (event: React.FormEvent) => {
+  const handleTmdbSubmit = async (event: SubmitEvent) => {
     event.preventDefault();
     setTmdbError(null);
     setTmdbMessage(null);

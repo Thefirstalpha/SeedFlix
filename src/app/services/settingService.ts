@@ -80,3 +80,15 @@ export async function updateSpoilerMode(spoiler: boolean) {
         throw new Error(errorData.error || 'Failed to update spoiler setting');
     }
 }
+export async function configureDiscord(settings: { webhookUrl: string }) {
+    const response = await fetch(`/api/settings/discord`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to configure Discord settings');
+    }
+}

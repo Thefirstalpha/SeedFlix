@@ -29,4 +29,9 @@ export interface User {
         language?: string | null;
         spoilerMode?: boolean | null;
     };
+    notifications: {
+        discord: {
+            webhookUrl: string | null;
+        } | null;
+    };
 }

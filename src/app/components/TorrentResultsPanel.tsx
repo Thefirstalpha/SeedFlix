@@ -90,7 +90,7 @@ export function TorrentResultsPanel({
   labels,
 }: TorrentResultsPanelProps) {
 
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
   const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
   const [torrentError, setTorrentError] = useState<string | null>(null);

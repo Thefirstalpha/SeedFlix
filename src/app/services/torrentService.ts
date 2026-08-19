@@ -1,4 +1,3 @@
-import { IndexerMovieResult } from '../../../common/indexer';
 import { TorrentDownloadsResponse } from '../../../common/torrent';
 import { API_BASE_URL } from '../config/tmdb';
 

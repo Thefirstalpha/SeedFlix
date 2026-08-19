@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { authentication } from '../modules/auth';
 import { addToWishlist, deleteWishlist, getWishlist } from '../modules/wishlist';
-import { exists } from 'node:fs';
 
 const router = Router();
 
@@ -16,7 +15,6 @@ router.post('/wishlist', async (req, res) => {
   const { tmdbId, type, season, episode } = req.body;
   await addToWishlist(req.user.id, tmdbId, type, season, episode);
   res.status(201).json({ ok: true });
-
 });
 
 router.delete('/wishlist', async (req, res) => {
@@ -34,8 +32,8 @@ router.delete('/wishlists', async (req, res) => {
 
 router.get('/wishlist/:id', async (req, res) => {
   const wishlist = await getWishlist(req.user.id);
-  const item = wishlist.find(i => i.tmdb === parseInt(req.params.id));
-  res.json({exists: !!item, content: item});
+  const item = wishlist.find((i) => i.tmdb === parseInt(req.params.id));
+  res.json({ exists: !!item, content: item });
 });
 
 router.delete('/wishlist/:id', async (req, res) => {

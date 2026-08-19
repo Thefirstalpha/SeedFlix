@@ -24,7 +24,9 @@ export default [
 			globals: {
 				React: "readonly",
 				HTMLDivElement: "readonly",
+				HTMLInputElement: "readonly",
 				HTMLImageElement: "readonly",
+				File: "readonly",
 				URLSearchParams: "readonly",
 				Node: "readonly",
 				Notification: "readonly",
@@ -38,6 +40,7 @@ export default [
 				clearTimeout: "readonly",
 				clearInterval: "readonly",
 				fetch: "readonly",
+				XMLHttpRequest: "readonly",
 				navigator: "readonly",
 				CustomEvent: "readonly",
 				Event: "readonly",

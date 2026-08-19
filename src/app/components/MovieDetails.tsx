@@ -5,7 +5,6 @@ import { FilterOption, TorrentResultsPanel } from './TorrentResultsPanel';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
-import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/LanguageProvider';
 import { normalizeIndexerLanguage, normalizeQuality } from '../services/indexerNormalization';
 import {
@@ -13,17 +12,13 @@ import {
   searchMovieReleases,
 } from '../services/movieService';
 import { buildTorrentResultsLabels } from '../services/torrentResultsLabels';
-import { addTorrentToClient } from '../services/torrentService';
 import { addToWishlist, removeFromWishlist, isInWishlist } from '../services/wishlistService';
 import type { Movie } from '../types/movie';
 import { IndexerMovieResult } from '../../../common/indexer';
 
-const MOVIE_QUALITY_FILTERS = ['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv'];
-
 export function MovieDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { t, language } = useI18n();
   const [movie, setMovie] = useState<Movie | null>(null);
   const [isLoading, setIsLoading] = useState(true);

@@ -1,21 +1,20 @@
-import { useEffect, useState } from 'react';
+import { SubmitEvent, useState } from 'react';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 
 
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { useAuth } from '../../context/AuthContext';
-import { useI18n, type SupportedLanguage } from '../../i18n/LanguageProvider';
+import { useI18n } from '../../i18n/LanguageProvider';
 import {
     changePassword,
 } from '../../services/authService';
 
 export function SettingPassword({ setup, onComplete }: { setup: boolean; onComplete?: (() => void) | undefined }) {
 
-    const { isAuthenticated, isLoading, user, refresh } =
-        useAuth();
-    const { t, availableLanguages, setLanguage } = useI18n();
+    const { user, refresh } = useAuth();
+    const { t } = useI18n();
     const [isSaving, setIsSaving] = useState(false);
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -24,7 +23,7 @@ export function SettingPassword({ setup, onComplete }: { setup: boolean; onCompl
 
 
 
-    const handlePasswordUpdate = async (event: React.FormEvent) => {
+    const handlePasswordUpdate = async (event: SubmitEvent) => {
         event.preventDefault();
         setError(null);
         setMessage(null);

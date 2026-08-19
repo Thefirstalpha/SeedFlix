@@ -1,40 +1,61 @@
-import { Router } from "express";
-import { authentication, withAdmin } from "../modules/auth";
-import { resetDatabase, runInTransaction } from "../modules/db";
-import { getUser } from "../modules/user";
+import { Router } from 'express';
+import { authentication, withAdmin } from '../modules/auth';
+import { resetDatabase, runInTransaction } from '../modules/db';
+import { getUser } from '../modules/user';
+import { sendDiscordNotification } from '../modules/notification';
 
 const router = Router();
 router.use(authentication);
 
-
 router.post('/settings/reset', withAdmin, async (req, res) => {
-    resetDatabase();
-    res.clearCookie('session');
-    res.status(200).json({ ok: true, loggedOut: true, message: "Database reset successfully" });
+  resetDatabase();
+  res.clearCookie('session');
+  res.status(200).json({ ok: true, loggedOut: true, message: 'Database reset successfully' });
 });
 
 router.post('/settings/language', async (req, res) => {
-    const { language } = req.body;
-    runInTransaction(({ writeStore }) => {
-        let user = getUser(req.user.id);
-        if (!user)
-            throw new Error('User not found');
-        user.settings.language = language;
-        writeStore('user', user.id, user);
-    });
-    res.status(200).json({ message: `Language updated to ${language}` });
+  const { language } = req.body;
+  runInTransaction(({ writeStore }) => {
+    let user = getUser(req.user.id);
+    if (!user) throw new Error('User not found');
+    user.settings.language = language;
+    writeStore('user', user.id, user);
+  });
+  res.status(200).json({ message: `Language updated to ${language}` });
 });
 
 router.post('/settings/spoiler', async (req, res) => {
-    const { spoiler } = req.body;
-    runInTransaction(({ writeStore }) => {
-        let user = getUser(req.user.id);
-        if (!user)
-            throw new Error('User not found');
-        user.settings.spoilerMode = spoiler;
-        writeStore('user', user.id, user);
+  const { spoiler } = req.body;
+  runInTransaction(({ writeStore }) => {
+    let user = getUser(req.user.id);
+    if (!user) throw new Error('User not found');
+    user.settings.spoilerMode = spoiler;
+    writeStore('user', user.id, user);
+  });
+  res.status(200).json({ message: `Spoiler mode updated to ${spoiler}` });
+});
+
+router.post('/settings/discord', async (req, res) => {
+  const { webhookUrl } = req.body;
+  try {
+    sendDiscordNotification(webhookUrl, {
+      title: 'Test Notification',
+      message: 'This is a test notification from SeedFlix.',
+      type: 'info',
     });
-    res.status(200).json({ message: `Spoiler mode updated to ${spoiler}` });
+    runInTransaction(({ writeStore }) => {
+      let user = getUser(req.user.id);
+      if (!user) throw new Error('User not found');
+      user.notifications['discord'] = { webhookUrl };
+      writeStore('user', user.id, user);
+    });
+    res.status(200).json({ message: `Discord webhook URL updated to ${webhookUrl}` });
+  } catch (error) {
+    console.error('Failed to send test Discord notification:', error);
+    return res
+      .status(400)
+      .json({ error: 'Failed to send test Discord notification. Please check the webhook URL.' });
+  }
 });
 
 export { router };

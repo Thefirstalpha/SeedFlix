@@ -3,7 +3,6 @@ import { authentication, getUsers, resetAuth, withAdmin } from '../modules/auth'
 import { runInTransaction } from '../modules/db';
 import { createUser, deleteUser, getUser } from '../modules/user';
 import { messages } from '../modules/i18n';
-import { ErrorCode } from '../modules/errors';
 import { getNotifications } from '../modules/notification';
 import { getDownloadsTransmission } from '../modules/transmission';
 import { getWishlist } from '../modules/wishlist';
@@ -16,13 +15,12 @@ router.post('/user/accept-legal', (req, res) => {
   try {
     runInTransaction(({ writeStore }) => {
       let user = getUser(req.user.id);
-      if (!user)
-        throw new Error('User not found');
+      if (!user) throw new Error('User not found');
       user.flags.legalAccepted = true;
       writeStore('user', user.id, user);
     });
     res.json({ ok: true });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: messages.settings.failedUpdate });
   }
 });
@@ -32,8 +30,7 @@ router.get('/users', withAdmin, (req, res) => {
   const users = getUsers();
 
   // Return all users except admin
-  const nonAdminUsers = users
-    .filter((user) => user.id !== 1 || withAdmin);
+  const nonAdminUsers = users.filter((user) => user.id !== 1 || withAdmin);
 
   res.json(nonAdminUsers);
 });
@@ -77,18 +74,25 @@ router.get('/user', async (req, res) => {
   let downloads = 0;
   try {
     const torrents = await getDownloadsTransmission(userId, {});
-    downloads = torrents.filter(t => t.leftUntilDone > 0 && !t.isFinished).length;
-  } catch { /* Transmission non configuré ou inaccessible */ }
+    downloads = torrents.filter((t) => t.leftUntilDone > 0 && !t.isFinished).length;
+  } catch {
+    /* Transmission non configuré ou inaccessible */
+  }
 
   // Wishlist
   let wishlist = 0;
   try {
     const items = await getWishlist(userId);
     wishlist = items.length;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   // Notifications non lues + dernière notification
-  const { notifications: notifList, unreadCount } = getNotifications(userId, { limit: 1, unreadOnly: true });
+  const { notifications: notifList, unreadCount } = getNotifications(userId, {
+    limit: 1,
+    unreadOnly: true,
+  });
   const latest = notifList[0] ?? null;
 
   const data: UserStatusBar = {

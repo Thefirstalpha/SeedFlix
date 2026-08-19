@@ -31,6 +31,7 @@ export function SettingTMDB() {
             await configureTmdb(tmdbApiKey.trim());
             setTmdbMessage(t('settings.messages.tmdbSaved'));
         } catch (error) {
+            console.error('Erreur lors de la configuration de TMDB :', error);
             setTmdbError(t('settings.messages.configFailed'));
         } finally {
             setIsTmdbSaving(false);

@@ -1,6 +1,5 @@
 import { WishListItem } from '../../../common/wishlist';
 import { API_BASE_URL } from '../config/tmdb';
-import type { SeriesWishlistEntry, SeriesWishlistStatus } from '../types/seriesWishlist';
 
 const BASE = `${API_BASE_URL}/wishlist`;
 
@@ -10,15 +9,6 @@ async function fetchJson<T>(url: string): Promise<T> {
     throw new Error('Request failed');
   }
   return response.json() as Promise<T>;
-}
-
-async function sendJson(url: string, method: 'POST' | 'DELETE', body?: unknown): Promise<void> {
-  await fetch(url, {
-    method,
-    credentials: 'include',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
 }
 
 export async function addToWishlist(tmdbId: number, season?: number, episode?: number): Promise<void> {

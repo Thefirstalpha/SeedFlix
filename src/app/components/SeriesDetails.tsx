@@ -13,7 +13,6 @@ import {
   getSeriesById,
   getSeriesSeasonEpisodes,
   searchSeriesReleases,
-  type TorznabSeriesResult,
 } from '../services/seriesService';
 import {
   addToWishlist,
@@ -21,34 +20,13 @@ import {
   removeFromWishlist,
 } from '../services/seriesWishlistService';
 import { buildTorrentResultsLabels } from '../services/torrentResultsLabels';
-import { addTorrentToClient } from '../services/torrentService';
 import type { SeriesDetails as SeriesDetailsModel, SeriesEpisode } from '../types/series';
-import type { SeriesWishlistStatus } from '../types/seriesWishlist';
 import { WishListItem } from '../../../common/wishlist';
 import { IndexerSeriesResult } from '../../../common/indexer';
 
 
-const SERIES_QUALITY_FILTERS = ['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv'];
+const SERIES_QUALITY_FILTERS = new Set(['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv']);
 const SERIES_RELEASE_SEARCH_LIMIT = 100;
-
-function detectSeasonFromRelease(item: TorznabSeriesResult): string {
-  const title = String(item.title || '');
-  const attrs = item.attributes || {};
-
-  const attrSeason = String(attrs.season || attrs.seasonnum || attrs.seasonnumber || '').trim();
-  if (/^\d+$/.test(attrSeason)) {
-    return `S${attrSeason.padStart(2, '0')}`;
-  }
-
-  // Matcher S##E## (épisodes individuels) ou S## seul
-  const seasonMatch =
-    title.match(/S(\d{1,2})(?:E\d{1,2})?/i) || title.match(/\bSeason[ ._-]?(\d{1,2})\b/i);
-  if (seasonMatch?.[1]) {
-    return `S${String(seasonMatch[1]).padStart(2, '0')}`;
-  }
-
-  return 'unknown';
-}
 
 export function SeriesDetails() {
   const { id } = useParams();
@@ -61,7 +39,7 @@ export function SeriesDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
   const [wishlistStatus, setWishlistStatus] = useState<WishListItem | undefined>(undefined);
-  const [releaseResults, setReleaseResults] = useState<TorznabSeriesResult[]>([]);
+  const [releaseResults, setReleaseResults] = useState<IndexerSeriesResult[]>([]);
   const [isReleaseLoading, setIsReleaseLoading] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterOption>({
@@ -80,7 +58,7 @@ export function SeriesDetails() {
     ).toLowerCase();
     setFilter((prev) => ({
       ...prev,
-      quality: SERIES_QUALITY_FILTERS.includes(preferred) ? preferred : 'all',
+      quality: SERIES_QUALITY_FILTERS.has(preferred) ? preferred : 'all',
     }));
   }, [user?.settings?.indexer?.qualities]);
 
@@ -239,19 +217,19 @@ export function SeriesDetails() {
   };
 
   // ── Wishlist helpers ────────────────────────────────────────────────────────
-  const isSeasonCoveredBySeries = wishlistStatus && wishlistStatus.all_seasons;
+  const isSeasonCoveredBySeries = wishlistStatus?.all_seasons;
 
   const isSeasonInWishlist = (seasonNumber: number) =>
-    wishlistStatus && (wishlistStatus.all_seasons || (wishlistStatus.seasons && wishlistStatus.seasons[seasonNumber] && wishlistStatus.seasons[seasonNumber].all_episodes));
+    wishlistStatus && (wishlistStatus.all_seasons || (wishlistStatus.seasons?.[seasonNumber]?.all_episodes));
 
   const isEpisodeDirectlyInWishlist = (seasonNumber: number, episodeNumber: number) =>
-    wishlistStatus && wishlistStatus.seasons && wishlistStatus.seasons[seasonNumber] && wishlistStatus.seasons[seasonNumber].episodes && wishlistStatus.seasons[seasonNumber].episodes.includes(episodeNumber);
+    wishlistStatus?.seasons?.[seasonNumber]?.episodes?.includes(episodeNumber);
 
   // ── Wishlist actions ────────────────────────────────────────────────────────
 
   const handleSeriesWishlist = async () => {
     if (!series) return;
-    if (wishlistStatus && wishlistStatus.all_seasons) {
+    if (wishlistStatus?.all_seasons) {
       await removeFromWishlist(series.id);
     } else {
       await addToWishlist(series.id);
@@ -359,15 +337,15 @@ export function SeriesDetails() {
           <Button
             onClick={handleSeriesWishlist}
             className={
-              wishlistStatus && wishlistStatus.all_seasons
+              wishlistStatus?.all_seasons
                 ? 'bg-cyan-600 hover:bg-cyan-700 text-white'
                 : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
             }
           >
             <Heart
-              className={`w-5 h-5 mr-2 ${wishlistStatus && wishlistStatus.all_seasons ? 'fill-current' : ''}`}
+              className={`w-5 h-5 mr-2 ${wishlistStatus?.all_seasons ? 'fill-current' : ''}`}
             />
-            {wishlistStatus && wishlistStatus.all_seasons
+            {wishlistStatus?.all_seasons
               ? t('seriesDetails.removeSeries')
               : t('seriesDetails.addSeries')}
           </Button>
@@ -445,7 +423,7 @@ export function SeriesDetails() {
                 <span>{series.rating}/10</span>
               </div>
               <Badge className="bg-cyan-600 text-white">{series.genre}</Badge>
-              {series.voteCount && (
+              {!!(series.voteCount) && (
                 <span className="text-white/60">
                   {t('seriesDetails.votes', { count: series.voteCount.toLocaleString() })}
                 </span>
@@ -521,7 +499,7 @@ export function SeriesDetails() {
                     {selectedSeason !== null && (
                       <Button
                         size="sm"
-                        disabled={wishlistStatus && wishlistStatus.all_seasons}
+                        disabled={wishlistStatus?.all_seasons}
                         onClick={handleSeasonWishlist}
                         className={
                           isSeasonCoveredBySeries

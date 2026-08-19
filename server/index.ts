@@ -1,7 +1,7 @@
 // Point d'entrée principal du backend TypeScript
 import express, { NextFunction, Request, Response } from 'express';
 
-import cookieParser from "cookie-parser"
+import cookieParser from 'cookie-parser';
 import { router as authRouter } from './routes/auth';
 import { router as wishlistRouter } from './routes/wishlist';
 import { router as userRouter } from './routes/user';
@@ -23,17 +23,17 @@ initDB();
 Logger.init();
 startDownloadWatcher();
 
-declare module "express-serve-static-core" {
-    interface Request {
-        user: User;
-        correlationId: string;
-    }
+declare module 'express-serve-static-core' {
+  interface Request {
+    user: User;
+    correlationId: string;
+  }
 }
 
 const app: express.Express = express();
 app.disable('x-powered-by');
 app.use(express.json());
-app.use(cookieParser(process.env.COOKIE_SECRET || "development-secret"));
+app.use(cookieParser(process.env.COOKIE_SECRET || 'development-secret'));
 
 app.use(Logger.express());
 
@@ -50,20 +50,20 @@ app.use('/api', notificationRouter);
 
 // Exemple de route racine
 app.get('/api/health', (req, res) => {
-    res.json({ ok: true });
+  res.json({ ok: true });
 });
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    if (err instanceof ErrorCode) {
-        console.error(`Error: ${err.message}`,);
-        res.status(400).json({ error: err.message });
-    } else {
-        console.error(err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-})
+  if (err instanceof ErrorCode) {
+    console.error(`Error: ${err.message}`);
+    res.status(400).json({ error: err.message });
+  } else {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-    console.log(`Serveur backend TS démarré sur le port ${PORT}`);
+  console.log(`Serveur backend TS démarré sur le port ${PORT}`);
 });

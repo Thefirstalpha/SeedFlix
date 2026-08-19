@@ -24,7 +24,6 @@ import { useI18n, type SupportedLanguage } from '../i18n/LanguageProvider';
 import {
   resetSettings
 } from '../services/authService';
-import * as notificationService from '../services/notificationService';
 import { SettingTMDB } from './settings/SettingTMDB';
 import { SettingUsers } from './settings/SettingUsers';
 import { SettingTransmission } from './settings/SettingTransmission';
@@ -34,41 +33,6 @@ import { SettingPassword } from './settings/SettingPassword';
 import { SettingNotification } from './settings/SettingNotification';
 import { SettingFtp } from './settings/SettingFtp';
 import { updateLanguage, updateSpoilerMode } from '../services/settingService';
-
-// Fonction utilitaire générique pour la gestion des sauvegardes asynchrones
-async function handleAsyncSave<T = any>({
-  event,
-  setError,
-  setMessage,
-  setSaving,
-  doSave,
-  successMessage,
-  errorMessage,
-  onSuccess,
-}: {
-  event?: React.FormEvent;
-  setError: (msg: string | null) => void;
-  setMessage: (msg: string | null) => void;
-  setSaving: (saving: boolean) => void;
-  doSave: () => Promise<T>;
-  successMessage: string;
-  errorMessage: string;
-  onSuccess?: (result: T) => void;
-}) {
-  if (event) event.preventDefault();
-  setError(null);
-  setMessage(null);
-  setSaving(true);
-  try {
-    const result = await doSave();
-    if (onSuccess) onSuccess(result);
-    setMessage(successMessage);
-  } catch (submitError: any) {
-    setError(submitError instanceof Error ? submitError.message : errorMessage);
-  } finally {
-    setSaving(false);
-  }
-}
 
 
 const SETTINGS_TABS = ['general', 'notifications', 'api', 'ftp', 'users', 'database', 'factory'] as const;

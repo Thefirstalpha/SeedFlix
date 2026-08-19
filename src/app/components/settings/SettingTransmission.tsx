@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { SubmitEvent, useEffect, useState } from "react";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
@@ -19,16 +19,14 @@ export function SettingTransmission({ setup, onComplete }: { setup: boolean; onC
     const [torrentPassword, setTorrentPassword] = useState('');
     const [torrentMoviesFolder, setTorrentMoviesFolder] = useState('');
     const [torrentSeriesFolder, setTorrentSeriesFolder] = useState('');
-    const [torrentMessage, setTorrentMessage] = useState<string | null>(null);
     const [torrentError, setTorrentError] = useState<string | null>(null);
     const [isTorrentSaving, setIsTorrentSaving] = useState(false);
 
 
-    const handleTorrentSave = async (event: React.FormEvent) => {
+    const handleTorrentSave = async (event: SubmitEvent) => {
         event.preventDefault();
         setTorrentError(null);
         setIsTorrentSaving(true);
-        setTorrentMessage(null);
 
         const transmissionSettings: TransmissionSettings = {
             host: torrentUrl,
@@ -41,7 +39,6 @@ export function SettingTransmission({ setup, onComplete }: { setup: boolean; onC
         };
         try {
             await configureTransmission(transmissionSettings);
-            setTorrentMessage(t('settings.messages.configurationSaved'));
             onComplete?.();
         } catch (submitError) {
             setTorrentError(
@@ -110,7 +107,7 @@ export function SettingTransmission({ setup, onComplete }: { setup: boolean; onC
                             <Label htmlFor="setup-torrent-port">{t('setup.torrent.port')}</Label>
                             <Input
                                 id="setup-torrent-port"
-                                value={torrentPort !== null ? torrentPort : ''}
+                                value={torrentPort ?? ''}
                                 onChange={(e) => setTorrentPort(Number(e.target.value))}
                                 placeholder={t('setup.torrent.portPlaceholder')}
                                 className="border-white/10 bg-slate-900 text-white"

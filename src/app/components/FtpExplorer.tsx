@@ -371,7 +371,7 @@ export function FtpExplorer() {
     useEffect(() => {
         setSelected(new Set());
         void load(path);
-    }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [path]);
 
     const refreshStorage = useCallback(async () => {
         setStorageLoading(true);
@@ -379,13 +379,13 @@ export function FtpExplorer() {
             const { used, limit } = await getStorageUsage();
             setStorageUsed(used);
             setStorageLimit(limit);
-        } catch { }
+        }
         finally { setStorageLoading(false); }
     }, []);
 
     useEffect(() => {
         void refreshStorage();
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
 
     const navigate = (newPath: string) => setPath(newPath);
 
@@ -684,8 +684,8 @@ export function FtpExplorer() {
                         <button type="button" onClick={goUp} disabled={atRoot}
                             title={atRoot ? 'Racine' : 'Dossier parent'}
                             className={`p-1 rounded transition-colors ${atRoot
-                                    ? 'text-white/20 cursor-default'
-                                    : 'hover:bg-white/10 text-white/60 hover:text-white'
+                                ? 'text-white/20 cursor-default'
+                                : 'hover:bg-white/10 text-white/60 hover:text-white'
                                 }`}>
                             <ArrowLeft className="w-4 h-4" />
                         </button>
@@ -705,10 +705,10 @@ export function FtpExplorer() {
                                     onClick={() => !isAboveRoot && !isCurrent && navigate(crumb.path)}
                                     disabled={isCurrent || isAboveRoot}
                                     className={`text-sm px-1 rounded transition-colors ${isCurrent
-                                            ? 'text-white font-medium cursor-default'
-                                            : isAboveRoot
-                                                ? 'text-white/20 cursor-default'
-                                                : 'text-cyan-400 hover:text-cyan-200 hover:bg-white/5'
+                                        ? 'text-white font-medium cursor-default'
+                                        : isAboveRoot
+                                            ? 'text-white/20 cursor-default'
+                                            : 'text-cyan-400 hover:text-cyan-200 hover:bg-white/5'
                                         }`}
                                 >
                                     {isRoot ? (

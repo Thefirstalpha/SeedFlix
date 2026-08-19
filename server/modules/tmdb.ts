@@ -1,6 +1,6 @@
-import { ErrorCode } from "./errors";
-import { messages } from "./i18n";
-import { getTmdbApiKey, updateGlobalConfig } from "./setting";
+import { ErrorCode } from './errors';
+import { messages } from './i18n';
+import { getTmdbApiKey, updateGlobalConfig } from './setting';
 
 const tmdbBaseUrl = 'https://api.themoviedb.org/3';
 
@@ -8,7 +8,6 @@ export enum TmdbType {
   movie = 'movie',
   series = 'tv',
 }
-
 
 function buildFilters(query: Record<string, any>, type: string) {
   const withGenres = Number(query.with_genres);
@@ -66,29 +65,28 @@ export const configureTmdbApiKey = async (apiKey: string) => {
   }
   // Test the API key by making a simple request
   const url = new URL(`${tmdbBaseUrl}/authentication`);
-  const response = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
   if (!response.ok) {
     throw new ErrorCode(messages.tmdb.invalidResponse);
   }
   // If the key is valid, save it in the global config
   updateGlobalConfig({ tmdbApiKey: apiKey });
-}
+};
 
 export const proxyTmdb = async (path: string, filters: Record<string, any>) => {
   const apiKey = await getTmdbApiKey();
-  if (!apiKey)
-    throw new ErrorCode(messages.tmdb.apiKeyNotSet);
+  if (!apiKey) throw new ErrorCode(messages.tmdb.apiKeyNotSet);
   const url = new URL(`${tmdbBaseUrl}${path}`);
   for (const [key, value] of Object.entries(filters)) {
     url.searchParams.set(key, value);
   }
-  const response = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
   if (!response.ok) {
     throw new ErrorCode(messages.tmdb.invalidResponse);
   }
   const data = await response.json();
   return data;
-}
+};
 
 function hasActiveDiscoverFilters(filters: Record<string, any>, type: TmdbType) {
   return Boolean(
@@ -103,20 +101,19 @@ function hasActiveDiscoverFilters(filters: Record<string, any>, type: TmdbType) 
 
 export function buildPopularRequest(mediaType: TmdbType, query: Record<string, any>) {
   const filters = buildFilters(query, mediaType);
-  const apiPath = `/discover/${mediaType}`
-  const popularPath = `/${mediaType}/popular`
+  const apiPath = `/discover/${mediaType}`;
+  const popularPath = `/${mediaType}/popular`;
 
   return hasActiveDiscoverFilters(filters, mediaType)
     ? { path: apiPath, query: filters }
     : {
-      path: popularPath,
-      query: {
-        page: filters.page,
-        language: filters.language,
-      },
-    };
+        path: popularPath,
+        query: {
+          page: filters.page,
+          language: filters.language,
+        },
+      };
 }
-
 
 export function buildGenresRequest(mediaType: TmdbType, query: Record<string, any>) {
   return {
@@ -144,7 +141,6 @@ export function buildSeasonRequest(id: number, seasonNumber: Number, query: Reco
   };
 }
 
-
 export function buildSearchRequest(mediaType: TmdbType, query: Record<string, any>) {
   const apiPath = mediaType === 'movie' ? '/search/movie' : '/search/tv';
   return {
@@ -157,16 +153,18 @@ export function buildSearchRequest(mediaType: TmdbType, query: Record<string, an
   };
 }
 
-
 export async function getTmdbDetails(tmdbId: number, type: 'movie' | 'series') {
-  const request = buildDetailsRequest(type == 'movie' ? TmdbType.movie : TmdbType.series, tmdbId, {});
+  const request = buildDetailsRequest(
+    type == 'movie' ? TmdbType.movie : TmdbType.series,
+    tmdbId,
+    {},
+  );
   const results = await proxyTmdb(request.path, request.query);
 
   if (!results || !results.id) {
     throw new Error('Item not found in TMDB');
   }
 
-  https://image.tmdb.org/t/p/w500/
-  return {
-  }
+  //image.tmdb.org/t/p/w500/
+  return {};
 }

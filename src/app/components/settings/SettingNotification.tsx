@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { SubmitEvent, useState } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 
 
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { useI18n, type SupportedLanguage } from '../../i18n/LanguageProvider';
+import { useI18n } from '../../i18n/LanguageProvider';
 import { sendTestNotification } from '../../services/notificationService';
+import { configureDiscord } from '../../services/settingService';
 
 export function SettingNotification() {
     const { t } = useI18n();
@@ -22,41 +23,7 @@ export function SettingNotification() {
 
 
 
-    const buildNotificationSettingsPayload = (params: {
-        discordWebhookUrl?: string;
-        includeDiscord?: boolean;
-        includeBrowser?: boolean;
-    }) => {
-        const current = (settings?.placeholders?.notifications as Record<string, unknown>) || {};
-        const currentChannels = Array.isArray(current.enabledChannels)
-            ? (current.enabledChannels as string[])
-            : [];
-
-        const nextDiscordWebhookUrl =
-            params.discordWebhookUrl ?? String((current as any).discord?.webhookUrl || '');
-
-        const nextChannels = new Set(currentChannels);
-
-        if (
-            params.includeDiscord === true ||
-            (params.includeDiscord !== false && Boolean(nextDiscordWebhookUrl.trim()))
-        ) {
-            nextChannels.add('discord');
-        } else {
-            nextChannels.delete('discord');
-        }
-
-        return {
-            ...(current || {}),
-            enabledChannels: Array.from(nextChannels),
-            discord: {
-                webhookUrl: nextDiscordWebhookUrl,
-            },
-        };
-    };
-
-
-    const handleDiscordSave = async (event: React.FormEvent) => {
+    const handleDiscordSave = async (event: SubmitEvent) => {
         event.preventDefault();
         setDiscordError(null);
         setDiscordMessage(null);
@@ -70,41 +37,7 @@ export function SettingNotification() {
                 return;
             }
 
-            // Test webhook
-            const testResponse = await fetch(discordWebhookUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    embeds: [
-                        {
-                            title: t('settings.notifications.discord.testTitle'),
-                            description: t('settings.notifications.discord.testDescription'),
-                            color: 0x10b981,
-                            timestamp: new Date().toISOString(),
-                            footer: { text: t('settings.notifications.discord.testFooter') },
-                        },
-                    ],
-                }),
-            });
-
-            if (!testResponse.ok) {
-                setDiscordError(
-                    `Test échoué (${testResponse.status}). Vérifiez que l'URL est correcte et active.`,
-                );
-                setIsDiscordSaving(false);
-                return;
-            }
-
-            // Save configuration
-            const notificationsPayload = buildNotificationSettingsPayload({
-                discordWebhookUrl,
-                includeDiscord: true,
-            });
-            const updatedSettings = buildSettingsWithNotifications(notificationsPayload);
-
-            const savedSettings = await updateSettings(updatedSettings);
-            applyUpdatedSettings(savedSettings);
-            await refresh();
+            await configureDiscord({ webhookUrl: discordWebhookUrl });
             setDiscordTested(true);
             setDiscordMessage(t('settings.messages.discordConfigured'));
             // Fermer le formulaire

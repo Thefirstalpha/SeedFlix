@@ -9,6 +9,7 @@ import { UserList } from "./UserList";
 import { CreatedUserResponse, createUser, deleteUser, listUsers, resetUserPassword } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
 import { Check, Copy } from "lucide-react";
+import { User } from "../../../../common/user";
 
 
 export function SettingUsers() {
