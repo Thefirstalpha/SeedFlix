@@ -25,7 +25,13 @@ LABEL org.opencontainers.image.description="SeedFlix full-stack app (React + Exp
 LABEL org.opencontainers.image.version="${IMAGE_TAG}"
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+# Keep npm CLI in runtime at a patched level because Trivy scans npm's bundled deps in the final image.
+# Remove npm/npx afterward: the app runs with node only in production.
+RUN npm install -g npm@latest \
+	&& npm ci --omit=dev \
+	&& npm cache clean --force \
+	&& rm -rf /usr/local/lib/node_modules/npm \
+	&& rm -f /usr/local/bin/npm /usr/local/bin/npx
 
 # Data directory is owned by node so the app can write runtime files.
 # All code files are owned by root (read-only for the running process).

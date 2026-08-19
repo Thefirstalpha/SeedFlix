@@ -119,8 +119,7 @@
     }
   },
   "overrides": {
-    "picomatch": "4.0.4",
-    "tar": "7.5.22"
+    "picomatch": "4.0.4"
   },
   "pnpm": {
     "overrides": {
