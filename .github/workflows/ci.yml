@@ -59,13 +59,13 @@ jobs:
           trap cleanup EXIT
 
           for i in {1..25}; do
-            if curl --silent --show-error --fail http://127.0.0.1:4000/api/auth/me >/tmp/auth.json; then
+            if curl --silent --show-error --fail http://127.0.0.1:4000/api/health >/tmp/health.json; then
               break
             fi
             sleep 1
           done
 
-          grep -q '"authenticated"' /tmp/auth.json
+          grep -q '"ok":true' /tmp/health.json
 
       - name: Dependency vulnerability audit (runtime)
         run: npm audit --omit=dev --audit-level=high
@@ -103,10 +103,10 @@ jobs:
         run: |
           docker run -d --rm -p 4000:4000 --name seedflix-test local/seedflix:ci
           for i in {1..25}; do
-            if curl --silent --show-error --fail http://127.0.0.1:4000/api/auth/me >/tmp/auth.json; then
+            if curl --silent --show-error --fail http://127.0.0.1:4000/api/health >/tmp/health.json; then
               break
             fi
             sleep 1
           done
-          grep -q '"authenticated"' /tmp/auth.json
+          grep -q '"ok":true' /tmp/health.json
           docker stop seedflix-test

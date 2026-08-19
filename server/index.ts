@@ -31,6 +31,10 @@ app.use(cookieParser(process.env.COOKIE_SECRET || 'development-secret'));
 
 app.use(Logger.express());
 
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true });
+});
+
 app.use('/api', authRouter);
 app.use('/api', userRouter);
 app.use('/api', wishlistRouter);
@@ -41,11 +45,6 @@ app.use('/api/settings/database', dbRouter);
 app.use('/api', settingsRouter);
 app.use('/api', ftpRouter);
 app.use('/api', notificationRouter);
-
-// Exemple de route racine
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true });
-});
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof ErrorCode) {
