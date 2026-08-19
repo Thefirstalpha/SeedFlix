@@ -156,6 +156,11 @@ export function SettingNotification() {
                                 setDiscordFormOpen(true);
                             }
                         }}
+                        onKeyDown={(e) => {
+                            if (!discordFormOpen && (e.key === 'Enter' || e.key === ' ')) {
+                                setDiscordFormOpen(true);
+                            }
+                        }}
                     >
                         <div className="flex items-center justify-between mb-4">
                             <div>

@@ -558,7 +558,6 @@ export function SeriesDetails() {
                       <div className="space-y-3 p-4">
                         {episodes.map((episode) => {
                           const coveredByParent = wishlistStatus && (wishlistStatus?.all_seasons ||
-                            wishlistStatus?.all_seasons ||
                             (selectedSeason !== null &&
                               isSeasonInWishlist(selectedSeason)));
                           const directlyInWishlist =
