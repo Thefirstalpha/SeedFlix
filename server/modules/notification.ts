@@ -100,7 +100,7 @@ export function sendDiscordNotification(
   webhookUrl: string,
   notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>,
 ): Promise<void> {
-  fetch(webhookUrl, {
+  return fetch(webhookUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

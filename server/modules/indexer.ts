@@ -447,7 +447,8 @@ export async function processWishlistIndexer() {
         });
       }
     } catch (error) {
-      console.log(`Error processing wishlist indexer for user ${user.username}: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`Error processing wishlist indexer for user ${user.username}: ${message}`);
     }
   }
 }

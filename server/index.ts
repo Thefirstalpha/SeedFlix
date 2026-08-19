@@ -17,18 +17,10 @@ import { startDownloadWatcher } from './modules/downloadWatcher';
 import { ErrorCode } from './modules/errors';
 
 import { Logger } from './logger';
-import { User } from '../common/user';
 
 initDB();
 Logger.init();
 startDownloadWatcher();
-
-declare module 'express-serve-static-core' {
-  interface Request {
-    user: User;
-    correlationId: string;
-  }
-}
 
 const app: express.Express = express();
 app.disable('x-powered-by');

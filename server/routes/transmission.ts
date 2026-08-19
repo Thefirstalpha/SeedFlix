@@ -7,7 +7,7 @@ import {
   performTransmissionAction,
   startDownload,
   unmanageTorrentForUser,
-} from '../modules/transmission.ts';
+} from '../modules/transmission';
 import { TransmissionSettings } from '../../common/settings';
 import { TorrentDownloadsResponse } from '../../common/torrent';
 

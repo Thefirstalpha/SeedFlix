@@ -12,7 +12,7 @@ import {
   getTransmissionSettings,
   markManagedTorrentCompleted,
   ManagedTorrentEntry,
-} from './transmission.ts';
+} from './transmission';
 
 const POLL_INTERVAL_MS = 30_000;
 
