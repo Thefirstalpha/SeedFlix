@@ -3,7 +3,7 @@
 FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm install -g npm@latest && npm ci --ignore-scripts
+RUN npm install -g npm@latest --ignore-scripts && npm ci --ignore-scripts
 
 FROM deps AS build
 COPY index.html ./
