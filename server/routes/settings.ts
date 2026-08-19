@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authentication, withAdmin } from '../modules/auth';
 import { resetDatabase, runInTransaction } from '../modules/db';
 import { getUser } from '../modules/user';
-import { sendDiscordNotification } from '../modules/notification';
+import { normalizeDiscordWebhookUrl, sendDiscordNotification } from '../modules/notification';
 
 const router = Router();
 router.use(authentication);
@@ -38,18 +38,22 @@ router.post('/settings/spoiler', async (req, res) => {
 router.post('/settings/discord', async (req, res) => {
   const { webhookUrl } = req.body;
   try {
-    sendDiscordNotification(webhookUrl, {
+    const safeWebhookUrl = normalizeDiscordWebhookUrl(webhookUrl);
+
+    await sendDiscordNotification(safeWebhookUrl, {
       title: 'Test Notification',
       message: 'This is a test notification from SeedFlix.',
       type: 'info',
     });
+
     runInTransaction(({ writeStore }) => {
       let user = getUser(req.user.id);
       if (!user) throw new Error('User not found');
-      user.notifications['discord'] = { webhookUrl };
+      user.notifications['discord'] = { webhookUrl: safeWebhookUrl };
       writeStore('user', user.id, user);
     });
-    res.status(200).json({ message: `Discord webhook URL updated to ${webhookUrl}` });
+
+    res.status(200).json({ message: 'Discord webhook URL updated' });
   } catch (error) {
     console.error('Failed to send test Discord notification:', error);
     return res

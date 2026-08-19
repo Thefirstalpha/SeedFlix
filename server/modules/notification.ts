@@ -1,6 +1,9 @@
 import { Notification } from '../../common/notification';
 import { db } from './db';
 
+const DISCORD_WEBHOOK_BASE_URL = 'https://discord.com';
+const DISCORD_WEBHOOK_PATH = /^\/api\/webhooks\/(\d{17,20})\/([A-Za-z0-9_-]{40,200})\/?$/;
+
 // ─── Lecture ─────────────────────────────────────────────────────────────────
 
 function rowToNotification(row: any): Notification {
@@ -96,11 +99,31 @@ export function clearNotifications(userId: number): void {
   db.prepare('DELETE FROM notifications WHERE user_id = ?').run(userId);
 }
 
+export function normalizeDiscordWebhookUrl(input: string): string {
+  const value = String(input || '').trim();
+  const parsed = new URL(value);
+
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Only HTTPS Discord webhooks are allowed.');
+  }
+
+  const match = DISCORD_WEBHOOK_PATH.exec(parsed.pathname);
+  if (!match) {
+    throw new Error('Invalid Discord webhook URL format.');
+  }
+
+  const webhookId = match[1];
+  const webhookToken = match[2];
+  return `${DISCORD_WEBHOOK_BASE_URL}/api/webhooks/${webhookId}/${webhookToken}`;
+}
+
 export function sendDiscordNotification(
   webhookUrl: string,
   notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>,
 ): Promise<void> {
-  return fetch(webhookUrl, {
+  const safeWebhookUrl = normalizeDiscordWebhookUrl(webhookUrl);
+
+  return fetch(safeWebhookUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
