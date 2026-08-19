@@ -7,7 +7,7 @@ import importPlugin from "eslint-plugin-import";
 import prettierPlugin from "eslint-plugin-prettier";
 import prettierConfig from "eslint-config-prettier";
 
-/** @type {import("eslint").Linter.FlatConfig[]} */
+/** @type {import("eslint").Linter.Config[]} */
 export default [
 	js.configs.recommended,
 	prettierConfig,

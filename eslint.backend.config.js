@@ -4,7 +4,7 @@ import tsparser from "@typescript-eslint/parser";
 import prettierPlugin from "eslint-plugin-prettier";
 import prettierConfig from "eslint-config-prettier";
 
-/** @type {import("eslint").Linter.FlatConfig[]} */
+/** @type {import("eslint").Linter.Config[]} */
 export default [
 	js.configs.recommended,
 	prettierConfig,
@@ -12,8 +12,10 @@ export default [
 		files: ["server/**/*.ts"],
 		languageOptions: {
 			parser: tsparser,
-			ecmaVersion: "latest",
-			sourceType: "module",
+			parserOptions: {
+				ecmaVersion: "latest",
+				sourceType: "module"
+			},
 			globals: {
 				process: "readonly",
 				console: "readonly",
