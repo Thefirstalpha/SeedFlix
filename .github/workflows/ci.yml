@@ -42,8 +42,9 @@ jobs:
       - name: Backend syntax checks
         run: |
           set -euo pipefail
+          npx tsc --noEmit --skipLibCheck --incremental false server/*.ts
           npx tsc --noEmit --skipLibCheck --incremental false server/**/*.ts
-          npx tsc --noEmit --skipLibCheck --incremental false common/**/*.ts
+          npx tsc --noEmit --skipLibCheck --incremental false common/*.ts
 
       - name: Service smoke test (server startup + API reachability)
         shell: bash
