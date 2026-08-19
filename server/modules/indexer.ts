@@ -1,10 +1,10 @@
-import { IndexerMovieResponse, IndexerMovieResult, IndexerSeriesResult } from "../../common/indexer";
+import { IndexerMovieResult, IndexerSeriesResult } from "../../common/indexer";
 import { IndexerSettings } from "../../common/settings";
 import { getUsers } from "./auth";
 import { readStore, runInTransaction } from "./db";
 import { ErrorCode } from "./errors";
 import { addNotification } from "./notification";
-import { buildDetailsRequest, buildSearchRequest, proxyTmdb, TmdbType } from "./tmdb";
+import { buildDetailsRequest, proxyTmdb, TmdbType } from "./tmdb";
 import { checkTorznabConnection, rssTorznab, searchTorznab } from "./torznab";
 import { getUser } from "./user";
 import { getWishlist } from "./wishlist";
@@ -235,7 +235,6 @@ export async function searchSeriesIndexer(userId: number, seriesId: number, limi
     let name = series.original_name || series.name;
     if (season !== undefined)
         name = name.concat(` ${String(season).padStart(2, '0')}`);
-    console.log(name)
     const response = await searchTorznab(settings, name, seriesId, limit, offset);
     return await parseSeriesIndexerResponse(response);
 }

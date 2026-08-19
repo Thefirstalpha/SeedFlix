@@ -239,7 +239,7 @@ export function SeriesDetails() {
   };
 
   // ── Wishlist helpers ────────────────────────────────────────────────────────
-const isSeasonCoveredBySeries = wishlistStatus && wishlistStatus.all_seasons;
+  const isSeasonCoveredBySeries = wishlistStatus && wishlistStatus.all_seasons;
 
   const isSeasonInWishlist = (seasonNumber: number) =>
     wishlistStatus && (wishlistStatus.all_seasons || (wishlistStatus.seasons && wishlistStatus.seasons[seasonNumber] && wishlistStatus.seasons[seasonNumber].all_episodes));
@@ -263,11 +263,10 @@ const isSeasonCoveredBySeries = wishlistStatus && wishlistStatus.all_seasons;
 
   const handleSeasonWishlist = async () => {
     if (!series || selectedSeason === null) return;
-    const seasonData = availableSeasons.find((s) => s.seasonNumber === selectedSeason);
     if (isSeasonInWishlist(selectedSeason)) {
       await removeFromWishlist(series.id, selectedSeason);
     } else {
-      await addToWishlist(series.id,selectedSeason, undefined);
+      await addToWishlist(series.id, selectedSeason);
     }
     await refreshStatus();
     window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
@@ -279,7 +278,7 @@ const isSeasonCoveredBySeries = wishlistStatus && wishlistStatus.all_seasons;
     if (isEpisodeDirectlyInWishlist(selectedSeason, episode.episodeNumber)) {
       await removeFromWishlist(series.id, selectedSeason, episode.episodeNumber);
     } else {
-      await addToWishlist(series.id,selectedSeason,episode.episodeNumber);
+      await addToWishlist(series.id, selectedSeason, episode.episodeNumber);
     }
     await refreshStatus();
     window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
@@ -534,8 +533,8 @@ const isSeasonCoveredBySeries = wishlistStatus && wishlistStatus.all_seasons;
                       >
                         <Heart
                           className={`w-4 h-4 mr-1 ${isSeasonInWishlist(selectedSeason)
-                              ? 'fill-current'
-                              : ''
+                            ? 'fill-current'
+                            : ''
                             }`}
                         />
                         {isSeasonCoveredBySeries
@@ -581,8 +580,8 @@ const isSeasonCoveredBySeries = wishlistStatus && wishlistStatus.all_seasons;
                                       spoilerModeEnabled && toggleEpisodeReveal(episode.id)
                                     }
                                     className={`w-full text-left rounded-md ${spoilerModeEnabled
-                                        ? 'transition-colors hover:bg-white/5 px-2 py-1 -mx-2 -my-1'
-                                        : ''
+                                      ? 'transition-colors hover:bg-white/5 px-2 py-1 -mx-2 -my-1'
+                                      : ''
                                       }`}
                                   >
                                     <p className="text-white font-semibold">
@@ -626,8 +625,8 @@ const isSeasonCoveredBySeries = wishlistStatus && wishlistStatus.all_seasons;
                                     >
                                       <Heart
                                         className={`w-4 h-4 ${directlyInWishlist
-                                            ? 'fill-cyan-400 text-cyan-400'
-                                            : 'text-white/50 hover:text-white'
+                                          ? 'fill-cyan-400 text-cyan-400'
+                                          : 'text-white/50 hover:text-white'
                                           }`}
                                       />
                                     </button>

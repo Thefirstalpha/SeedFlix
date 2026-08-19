@@ -17,7 +17,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Progress } from './ui/progress';
 import { useI18n } from '../i18n/LanguageProvider';
 import {
@@ -105,7 +105,7 @@ function DownloadCard({
   handleResume,
   handleUnmanage,
   handleDelete,
-}: {
+}: Readonly<{
   item: TorrentDownloadItem;
   t: any;
   isComplete: (item: TorrentDownloadItem) => boolean;
@@ -115,7 +115,7 @@ function DownloadCard({
   handleResume: (id: number) => void;
   handleUnmanage: (hash: string) => void;
   handleDelete: (id: number) => void;
-}) {
+}>) {
   const completed = isComplete(item);
   const isStopped = item.status === 0;
   const isActive = isActiveDownload(item);

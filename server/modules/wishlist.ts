@@ -62,7 +62,6 @@ export async function getWishlist(userId: number): Promise<WishListItem[]> {
 }
 
 export async function addToWishlist(userId: number, tmdbId: number, type: 'movie' | 'series', seasonNumber?: number, episodeNumber?: number) {
-    console.log(`Adding to wishlist: userId=${userId}, tmdbId=${tmdbId}, type=${type}, seasonNumber=${seasonNumber}, episodeNumber=${episodeNumber}`);
     const request = buildDetailsRequest(type == 'movie' ? TmdbType.movie : TmdbType.series, tmdbId, {});
     const results = await proxyTmdb(request.path, request.query);
 

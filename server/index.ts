@@ -1,7 +1,6 @@
 // Point d'entrée principal du backend TypeScript
 import express, { NextFunction, Request, Response } from 'express';
 
-import { randomUUID } from "crypto"
 import cookieParser from "cookie-parser"
 import { router as authRouter } from './routes/auth';
 import { router as wishlistRouter } from './routes/wishlist';
@@ -31,7 +30,8 @@ declare module "express-serve-static-core" {
     }
 }
 
-const app = express();
+const app: express.Express = express();
+app.disable('x-powered-by');
 app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET || "development-secret"));
 

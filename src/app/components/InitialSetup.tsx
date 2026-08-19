@@ -31,41 +31,6 @@ function parseSupportedLanguage(input: unknown): SupportedLanguage {
   return input === 'en' ? 'en' : 'fr';
 }
 
-function buildFallbackSettings(username = 'admin'): UserSettings {
-  return {
-    profile: {
-      username,
-    },
-    security: {
-      lastPasswordChangeAt: new Date().toISOString(),
-    },
-    apiKeys: {
-      tmdb: '',
-    },
-    placeholders: {
-      notifications: {},
-      preferences: {
-        language: 'fr',
-      },
-      torrent: {
-        url: '',
-        port: '',
-        authRequired: false,
-        username: '',
-        password: '',
-        moviesFolder: '',
-        seriesFolder: '',
-      },
-      indexer: {
-        url: '',
-        token: '',
-        qualities: ['all'],
-        languages: ['all'],
-      },
-    },
-  };
-}
-
 export function InitialSetup() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -82,32 +47,13 @@ export function InitialSetup() {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   const [mustConfigureTmdb, setMustConfigureTmdb] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [isPasswordSaving, setIsPasswordSaving] = useState(false);
 
   const [tmdbApiKey, setTmdbApiKey] = useState('');
   const [tmdbError, setTmdbError] = useState<string | null>(null);
   const [tmdbMessage, setTmdbMessage] = useState<string | null>(null);
   const [isTmdbSaving, setIsTmdbSaving] = useState(false);
 
-  const [torrentUrl, setTorrentUrl] = useState('');
-  const [torrentPort, setTorrentPort] = useState('');
-  const [torrentAuthRequired, setTorrentAuthRequired] = useState(false);
-  const [torrentUsername, setTorrentUsername] = useState('');
-  const [torrentPassword, setTorrentPassword] = useState('');
-  const [torrentMoviesFolder, setTorrentMoviesFolder] = useState('');
-  const [torrentSeriesFolder, setTorrentSeriesFolder] = useState('');
-  const [torrentError, setTorrentError] = useState<string | null>(null);
-  const [isTorrentSaving, setIsTorrentSaving] = useState(false);
 
-  const [indexerUrl, setIndexerUrl] = useState('');
-  const [indexerToken, setIndexerToken] = useState('');
-  const [indexerQualities, setIndexerQualities] = useState<string[]>(['all']);
-  const [indexerLanguages, setIndexerLanguages] = useState<string[]>(['all']);
-  const [indexerError, setIndexerError] = useState<string | null>(null);
-  const [isIndexerSaving, setIsIndexerSaving] = useState(false);
   const [languageCode, setLanguageCode] = useState<SupportedLanguage>('fr');
   const [languageMessage, setLanguageMessage] = useState<string | null>(null);
   const [languageError, setLanguageError] = useState<string | null>(null);

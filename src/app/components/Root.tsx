@@ -8,6 +8,7 @@ import { Button } from './ui/button';
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { useSearchState } from '../context/SearchStateContext';
 import { getUserStatusBar } from '../services/authService';
+import { Notification } from '../../../common/notification';
 
 type UnreadNotificationsEvent = CustomEvent<{ count: number }>;
 
@@ -60,27 +61,14 @@ export function Root() {
   const wishlistTarget = location.pathname === '/wishlist' ? '/' : '/wishlist';
   const {
     user,
-    settings,
     isAuthenticated,
-    logout,
-    needsInitialSetup,
-    mustChangePassword,
-    mustConfigureTmdb,
-    mustConfigureTorrent,
-    mustConfigureIndexer,
+    logout
   } = useAuth();
-  const spoilerModeEnabled = Boolean(
-    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode,
-  );
+  const spoilerModeEnabled = Boolean(user?.settings.spoilerMode);
   const isSetupPage = location.pathname === '/setup';
   const isLoginPage = location.pathname === '/login';
   const shouldShowHeader = !isLoginPage && !isSetupPage;
-  const hasPendingSetup =
-    needsInitialSetup ||
-    mustChangePassword ||
-    mustConfigureTmdb ||
-    mustConfigureTorrent ||
-    mustConfigureIndexer;
+  const hasPendingSetup = user?.flags?.mustSetup;
   const canShowNavigationActions = isAuthenticated && !isSetupPage && !hasPendingSetup;
 
   useEffect(() => {
