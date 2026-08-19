@@ -71,8 +71,8 @@ export function extractLanguage(title: string): string | null {
 
 export function extractSeasonNumber(title: string): number | null {
     const normalized = String(title || '').toLowerCase();
-    const seasonMatch = normalized.match(/(?:^|[^a-z0-9])s(\d{1,3})(?=e\d{1,4}|[^a-z0-9]|$)/);
-    if (seasonMatch && seasonMatch[1]) {
+    const seasonMatch = new RegExp(/(?:^|[^a-z0-9])s(\d{1,3})(?=e\d{1,4}|[^a-z0-9]|$)/).exec(normalized);
+    if (seasonMatch?.[1]) {
         return Number(seasonMatch[1]);
     }
     return null;
@@ -80,9 +80,9 @@ export function extractSeasonNumber(title: string): number | null {
 
 export function extractEpisodeNumber(title: string): number | null {
     const normalized = String(title || '').toLowerCase();
-    const compactMatch = normalized.match(/(?:^|[^a-z0-9])s\d{1,3}e(\d{1,4})(?=[^a-z0-9]|$)/);
+    const compactMatch = new RegExp(/(?:^|[^a-z0-9])s\d{1,3}e(\d{1,4})(?=[^a-z0-9]|$)/).exec(normalized);
     const episodeMatch = compactMatch || normalized.match(/(?:^|[^a-z0-9])e(\d{1,4})(?=[^a-z0-9]|$)/);
-    if (episodeMatch && episodeMatch[1]) {
+    if (episodeMatch?.[1]) {
         return Number(episodeMatch[1]);
     }
     return null;
@@ -113,12 +113,12 @@ export async function configureIndexer(userId: number, settings: IndexerSettings
             throw new Error('User not found');
         }
         user.settings.indexer = settings;
-        await writeStore('user', userId, user);
+        writeStore('user', userId, user);
     });
 }
 
 async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResult[]> {
-    if (!xmlBody.rss || !xmlBody.rss.channel) {
+    if (!xmlBody.rss?.channel) {
         throw new ErrorCode('Invalid Indexer response format');
     }
 
@@ -157,7 +157,7 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
 
 
 async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesResult[]> {
-    if (!xmlBody.rss || !xmlBody.rss.channel) {
+    if (!xmlBody.rss?.channel) {
         throw new ErrorCode('Invalid Indexer response format');
     }
 
@@ -212,7 +212,7 @@ export async function searchMovieIndexer(userId: number, movieId: number, limit 
 
     const request = buildDetailsRequest(TmdbType.movie, movieId, {});
     const movie = await proxyTmdb(request.path, request.query);
-    if (!movie || !movie.id) {
+    if (!movie?.id) {
         throw new ErrorCode('Movie not found in TMDB');
     }
     const name = movie.original_title || movie.title;
@@ -229,7 +229,7 @@ export async function searchSeriesIndexer(userId: number, seriesId: number, limi
 
     const request = buildDetailsRequest(TmdbType.series, seriesId, {});
     const series = await proxyTmdb(request.path, request.query);
-    if (!series || !series.id) {
+    if (!series?.id) {
         throw new ErrorCode('Series not found in TMDB');
     }
     let name = series.original_name || series.name;
@@ -321,7 +321,7 @@ export async function processWishlistIndexer() {
                 } else if (item.type === 'series') {
                     const founds = lastSeries.filter(s => s.tmdbId === String(item.tmdb) &&
                         (item.all_seasons === true ||
-                            (item.seasons !== undefined && item.seasons !== undefined && item.seasons[s.seasonNumber || 1] !== undefined &&
+                            (item.seasons?.[s.seasonNumber || 1] !== undefined &&
                                 (item.seasons[s.seasonNumber || 1].all_episodes === true || (s.episodeNumber !== undefined && item.seasons[s.seasonNumber || 1].episodes.includes(s.episodeNumber || 1))))));
                     if (founds.length > 0) {
                         seriesFounds.push(...founds);
@@ -341,12 +341,12 @@ export async function processWishlistIndexer() {
                     const seriesResult = await getSeriesIndexerResult(user.id);
 
                     // Create keys for found movies and series to compare with blacklist and current results
-                    const moviesKey = moviesResult.map(m => `movie:${m.tmdbId}:${m.guid}`);
-                    const seriesKey = seriesResult.map(s => `series:${s.tmdbId}:${s.guid}`);
+                    const moviesKey = new Set(moviesResult.map(m => `movie:${m.tmdbId}:${m.guid}`));
+                    const seriesKey = new Set(seriesResult.map(s => `series:${s.tmdbId}:${s.guid}`));
 
                     // Filter found movies and series to only keep those not in blacklist and not already in current results
-                    const remainingMovies: IndexerMovieResult[] = moviesFounds.filter(m => !blacklist.includes(`movie:${m.tmdbId}:${m.guid}`) && !moviesKey.includes(`movie:${m.tmdbId}:${m.guid}`));
-                    const remainingSeries: IndexerSeriesResult[] = seriesFounds.filter(s => !blacklist.includes(`series:${s.tmdbId}:${s.guid}`) && !seriesKey.includes(`series:${s.tmdbId}:${s.guid}`));
+                    const remainingMovies: IndexerMovieResult[] = moviesFounds.filter(m => !blacklist.includes(`movie:${m.tmdbId}:${m.guid}`) && !moviesKey.has(`movie:${m.tmdbId}:${m.guid}`));
+                    const remainingSeries: IndexerSeriesResult[] = seriesFounds.filter(s => !blacklist.includes(`series:${s.tmdbId}:${s.guid}`) && !seriesKey.has(`series:${s.tmdbId}:${s.guid}`));
 
                     if (remainingMovies.length > 0) {
                         writeStore('indexer-movie-result', user.id, [...moviesResult, ...remainingMovies]);
