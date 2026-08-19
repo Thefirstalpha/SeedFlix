@@ -3,7 +3,7 @@
 FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm install -g npm@latest && npm ci
+RUN npm install -g npm@latest && npm ci --ignore-scripts
 
 FROM deps AS build
 COPY index.html ./
@@ -27,8 +27,8 @@ LABEL org.opencontainers.image.version="${IMAGE_TAG}"
 COPY package*.json ./
 # Keep npm CLI in runtime at a patched level because Trivy scans npm's bundled deps in the final image.
 # Remove npm/npx afterward: the app runs with node only in production.
-RUN npm install -g npm@latest \
-	&& npm ci --omit=dev \
+RUN npm install -g npm@latest --ignore-scripts \
+	&& npm ci --omit=dev --ignore-scripts \
 	&& npm cache clean --force \
 	&& rm -rf /usr/local/lib/node_modules/npm \
 	&& rm -f /usr/local/bin/npm /usr/local/bin/npx
