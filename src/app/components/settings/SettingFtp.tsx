@@ -5,6 +5,7 @@ import { getFtpConfig, saveFtpConfig } from '../../services/ftpService';
 
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { Switch } from '../../components/ui/switch';
 import { useI18n } from '../../i18n/LanguageProvider';
 
 
@@ -63,7 +64,7 @@ export function SettingFtp() {
     };
 
     return (
-        <Card className="border-cyan-500/30 bg-cyan-950/15 text-white max-w-lg">
+        <Card className="border-cyan-500/30 bg-cyan-950/15 text-white">
             <CardHeader>
                 <CardTitle className="text-cyan-200"> {t('settings.tabs.storage')}</CardTitle>
                 <CardDescription className="text-cyan-100/70">
@@ -86,22 +87,28 @@ export function SettingFtp() {
                             <Label htmlFor="ftp-secure">FTPS (SSL/TLS)</Label>
                         </div>
                     </div>
-                    <div className="space-y-2 flex items-center gap-2">
-                        <input id="ftp-auth-required" type="checkbox" checked={ftpAuthRequired} onChange={e => setFtpAuthRequired(e.target.checked)} />
-                        <Label htmlFor="ftp-auth-required">Authentification requise</Label>
-                    </div>
-                    {ftpAuthRequired && (
-                        <div className="flex gap-4">
-                            <div className="flex-1 space-y-2">
-                                <Label htmlFor="ftp-username">Nom d'utilisateur</Label>
-                                <Input id="ftp-username" type="text" value={ftpUsername} onChange={e => setFtpUsername(e.target.value)} className="bg-slate-900 border-white/10 text-white" />
+                    <div className="space-y-4 rounded-xl border border-white/10 bg-black/10 px-4 py-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="font-medium text-white">Authentification requise</p>
+                                <p className="text-sm text-white/55">Activez si votre serveur FTP demande un identifiant.</p>
                             </div>
-                            <div className="flex-1 space-y-2">
-                                <Label htmlFor="ftp-password">Mot de passe</Label>
-                                <Input id="ftp-password" type="password" value={ftpPassword} onChange={e => setFtpPassword(e.target.value)} className="bg-slate-900 border-white/10 text-white" />
-                            </div>
+                            <Switch checked={ftpAuthRequired} onCheckedChange={setFtpAuthRequired} />
                         </div>
-                    )}
+
+                        {ftpAuthRequired ? (
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label htmlFor="ftp-username">Nom d'utilisateur</Label>
+                                    <Input id="ftp-username" type="text" value={ftpUsername} onChange={e => setFtpUsername(e.target.value)} className="bg-slate-900 border-white/10 text-white" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="ftp-password">Mot de passe</Label>
+                                    <Input id="ftp-password" type="password" value={ftpPassword} onChange={e => setFtpPassword(e.target.value)} className="bg-slate-900 border-white/10 text-white" />
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
                     <div className="space-y-2">
                         <Label htmlFor="ftp-root-folder">Dossier racine</Label>
                         <Input id="ftp-root-folder" type="text" value={ftpRootFolder} onChange={e => setFtpRootFolder(e.target.value)} className="bg-slate-900 border-white/10 text-white" placeholder="/" />

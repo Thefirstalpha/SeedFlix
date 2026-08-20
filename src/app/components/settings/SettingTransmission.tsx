@@ -115,37 +115,39 @@ export function SettingTransmission({ setup, onComplete }: { setup: boolean; onC
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/10 px-4 py-3">
-                        <div>
-                            <p className="font-medium text-white">{t('setup.torrent.authRequired')}</p>
-                            <p className="text-sm text-white/55">{t('setup.torrent.authDescription')}</p>
+                    <div className="space-y-4 rounded-xl border border-white/10 bg-black/10 px-4 py-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="font-medium text-white">{t('setup.torrent.authRequired')}</p>
+                                <p className="text-sm text-white/55">{t('setup.torrent.authDescription')}</p>
+                            </div>
+                            <Switch checked={torrentAuthRequired} onCheckedChange={setTorrentAuthRequired} />
                         </div>
-                        <Switch checked={torrentAuthRequired} onCheckedChange={setTorrentAuthRequired} />
-                    </div>
 
-                    {torrentAuthRequired ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="setup-torrent-username">{t('setup.torrent.username')}</Label>
-                                <Input
-                                    id="setup-torrent-username"
-                                    value={torrentUsername}
-                                    onChange={(event) => setTorrentUsername(event.target.value)}
-                                    className="border-white/10 bg-slate-900 text-white"
-                                />
+                        {torrentAuthRequired ? (
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label htmlFor="setup-torrent-username">{t('setup.torrent.username')}</Label>
+                                    <Input
+                                        id="setup-torrent-username"
+                                        value={torrentUsername}
+                                        onChange={(event) => setTorrentUsername(event.target.value)}
+                                        className="border-white/10 bg-slate-900 text-white"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="setup-torrent-password">{t('setup.torrent.password')}</Label>
+                                    <Input
+                                        id="setup-torrent-password"
+                                        type="password"
+                                        value={torrentPassword}
+                                        onChange={(event) => setTorrentPassword(event.target.value)}
+                                        className="border-white/10 bg-slate-900 text-white"
+                                    />
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="setup-torrent-password">{t('setup.torrent.password')}</Label>
-                                <Input
-                                    id="setup-torrent-password"
-                                    type="password"
-                                    value={torrentPassword}
-                                    onChange={(event) => setTorrentPassword(event.target.value)}
-                                    className="border-white/10 bg-slate-900 text-white"
-                                />
-                            </div>
-                        </div>
-                    ) : null}
+                        ) : null}
+                    </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">

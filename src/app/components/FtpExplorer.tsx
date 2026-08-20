@@ -88,6 +88,18 @@ function sortItems(list: FtpFileInfo[]): FtpFileInfo[] {
     });
 }
 
+function getStorageBarColorClass(percent: number): string {
+    if (percent > 90) return 'bg-red-500';
+    if (percent > 70) return 'bg-amber-500';
+    return 'bg-cyan-500';
+}
+
+function getStorageTextColorClass(percent: number): string {
+    if (percent > 90) return 'text-red-400';
+    if (percent > 70) return 'text-amber-400';
+    return 'text-cyan-300';
+}
+
 // ─── Sélecteur de dossier destination ────────────────────────────────────────
 
 function MoveDialog({
@@ -549,6 +561,8 @@ export function FtpExplorer() {
     const storagePercent = storageUsed !== null && storageLimit
         ? Math.min(100, Math.round((storageUsed / storageLimit) * 100))
         : null;
+    const storageBarColorClass = storagePercent !== null ? getStorageBarColorClass(storagePercent) : 'bg-cyan-500';
+    const storageTextColorClass = storagePercent !== null ? getStorageTextColorClass(storagePercent) : 'text-cyan-300';
     const hasSelection = selected.size > 0;
     const allSelected = items.length > 0 && selected.size === items.length;
 
@@ -618,26 +632,41 @@ export function FtpExplorer() {
             )}
 
             {/* En-tête */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 flex-row items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-white">Mes fichiers</h1>
-                    <div className="flex items-center gap-1.5 mt-0.5">
+
+                    {/* Stockage (compact) */}
+                    <div className="mt-1 flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-0.5">
                         {storageLoading ? (
-                            <>
-                                <Loader2 className="w-3 h-3 animate-spin text-white/30" />
-                                <span className="text-sm text-white/30">Calcul du stockage…</span>
-                            </>
+                            <Loader2 className="w-3 h-3 animate-spin text-white/30" />
                         ) : storageUsed !== null ? (
                             <>
-                                <span className="text-sm text-white/50">
-                                    {formatSize(storageUsed)} utilisés{storageLimit ? ` / ${formatSize(storageLimit)}` : ''}
+                                <div className="h-1.5 w-16 rounded-full bg-white/10 overflow-hidden">
+                                    {storagePercent !== null && (
+                                        <div
+                                            className={`h-full rounded-full transition-all duration-700 ${storageBarColorClass}`}
+                                            style={{ width: `${storagePercent}%` }}
+                                        />
+                                    )}
+                                </div>
+                                <span className="text-xs text-white/60 whitespace-nowrap">
+                                    {formatSize(storageUsed)}{storageLimit ? ` / ${formatSize(storageLimit)}` : ''}
                                 </span>
+                                {storagePercent !== null && (
+                                    <span className={`text-xs font-semibold ${storageTextColorClass}`}>{storagePercent}%</span>
+                                )}
                                 <button type="button" onClick={refreshStorage}
                                     className="text-white/20 hover:text-white/60 transition-colors" title="Actualiser le stockage">
                                     <RefreshCw className="w-3 h-3" />
                                 </button>
                             </>
-                        ) : null}
+                        ) : (
+                            <button type="button" onClick={refreshStorage}
+                                className="text-white/30 hover:text-white/60 transition-colors" title="Actualiser le stockage">
+                                <RefreshCw className="w-3 h-3" />
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -646,13 +675,13 @@ export function FtpExplorer() {
                     <Button size="sm" variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10"
                         onClick={() => uploadInputRef.current?.click()} disabled={uploadProgress !== null}>
                         {uploadProgress !== null
-                            ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" />{uploadProgress}%</>
-                            : <><Upload className="w-4 h-4 mr-1" />Uploader</>}
+                            ? <><Loader2 className="w-4 h-4 sm:mr-1 animate-spin" /><span className="hidden sm:inline">{uploadProgress}%</span></>
+                            : <><Upload className="w-4 h-4 sm:mr-1" /><span className="hidden sm:inline">Uploader</span></>}
                     </Button>
                     <Button size="sm" variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10"
                         onClick={() => { setCreatingFolder(true); setNewFolderName(''); }}>
-                        <FolderPlus className="w-4 h-4 mr-1" />
-                        Nouveau dossier
+                        <FolderPlus className="w-4 h-4 sm:mr-1" />
+                        <span className="hidden sm:inline">Nouveau dossier</span>
                     </Button>
                     <Button size="sm" variant="ghost" className="text-white/60 hover:text-white hover:bg-white/10"
                         onClick={() => load(path, { invalidate: true })} disabled={loading}>
@@ -661,19 +690,6 @@ export function FtpExplorer() {
                 </div>
             </div>
 
-            {/* Barre de stockage */}
-            {storageLoading ? (
-                <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
-                    <div className="h-full w-1/3 rounded-full bg-white/20 animate-pulse" />
-                </div>
-            ) : storagePercent !== null ? (
-                <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
-                    <div
-                        className={`h-full rounded-full transition-all duration-700 ${storagePercent > 90 ? 'bg-red-500' : storagePercent > 70 ? 'bg-amber-500' : 'bg-cyan-500'}`}
-                        style={{ width: `${storagePercent}%` }}
-                    />
-                </div>
-            ) : null}
 
             {/* Breadcrumb */}
             <div className="flex items-center gap-1 flex-wrap">
@@ -812,7 +828,7 @@ export function FtpExplorer() {
                                         className="flex items-center text-white/20 hover:text-white/60 transition-colors">
                                         {isSelected
                                             ? <CheckSquare className="w-3.5 h-3.5 text-cyan-400" />
-                                            : <Square className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100" />}
+                                            : <Square className="w-3.5 h-3.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100" />}
                                     </button>
 
                                     {/* Nom */}
@@ -844,18 +860,18 @@ export function FtpExplorer() {
                                         <>
                                             {!item.isDirectory && (
                                                 <a href={getDownloadUrl(fullPath)} download={item.name}
-                                                    className="p-1 rounded text-white/0 group-hover:text-white/50 hover:!text-cyan-300 hover:bg-white/10 transition-colors"
+                                                    className="p-1 rounded text-white/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:!text-cyan-300 hover:bg-white/10 transition-colors"
                                                     title="Télécharger">
                                                     <Download className="w-3.5 h-3.5" />
                                                 </a>
                                             )}
                                             <button type="button" onClick={() => startRename(item)} disabled={busy}
-                                                className="p-1 rounded text-white/0 group-hover:text-white/50 hover:!text-amber-300 hover:bg-white/10 transition-colors"
+                                                className="p-1 rounded text-white/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:!text-amber-300 hover:bg-white/10 transition-colors"
                                                 title="Renommer">
                                                 <Pencil className="w-3.5 h-3.5" />
                                             </button>
                                             <button type="button" onClick={() => handleDeleteSingle(item)} disabled={busy}
-                                                className="p-1 rounded text-white/0 group-hover:text-white/50 hover:!text-red-400 hover:bg-white/10 transition-colors"
+                                                className="p-1 rounded text-white/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:!text-red-400 hover:bg-white/10 transition-colors"
                                                 title="Supprimer">
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </button>
