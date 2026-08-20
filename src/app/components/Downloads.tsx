@@ -202,36 +202,40 @@ function DownloadCard({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1.5 pt-0.5">
+        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
           {!completed && isActive && (
             <Button size="sm" onClick={() => handlePause(item.id)}
               disabled={actionInProgress === `pause-${item.id}`}
+              title={t('downloads.pause')}
               className="h-7 px-2 text-xs border bg-amber-600/40 hover:bg-amber-600/60 text-amber-200 border-amber-500/30">
               {actionInProgress === `pause-${item.id}`
                 ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <><Pause className="w-3 h-3 mr-1" />{t('downloads.pause')}</>}
+                : <><Pause className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">{t('downloads.pause')}</span></>}
             </Button>
           )}
           {!completed && isPaused && (
             <Button size="sm" onClick={() => handleResume(item.id)}
               disabled={actionInProgress === `resume-${item.id}`}
+              title={t('downloads.resume')}
               className="h-7 px-2 text-xs border bg-cyan-600/40 hover:bg-cyan-600/60 text-cyan-200 border-cyan-500/30">
               {actionInProgress === `resume-${item.id}`
                 ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <><Play className="w-3 h-3 mr-1" />{t('downloads.resume')}</>}
+                : <><Play className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">{t('downloads.resume')}</span></>}
             </Button>
           )}
           {item.managedBySeedflix && (
             <Button size="sm" onClick={() => handleUnmanage(item.hashString || '')}
               disabled={actionInProgress === `unmanage-${item.hashString}`}
+              title={t('downloads.dontTrack')}
               className="h-7 px-2 text-xs border bg-slate-600/30 hover:bg-slate-600/50 text-slate-300 border-slate-500/20">
               {actionInProgress === `unmanage-${item.hashString}`
                 ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <><Unlink className="w-3 h-3 mr-1" />{t('downloads.dontTrack')}</>}
+                : <><Unlink className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">{t('downloads.dontTrack')}</span></>}
             </Button>
           )}
           <Button size="sm" onClick={() => handleDelete(item.id)}
             disabled={actionInProgress === `delete-${item.id}`}
+            title={t('downloads.remove')}
             className={`h-7 px-2 text-xs border transition-all ${
               actionInProgress === `delete-${item.id}`
                 ? 'bg-red-600/10 text-red-300/50 border-red-500/10 cursor-wait'
@@ -241,14 +245,15 @@ function DownloadCard({
             }`}>
             {actionInProgress === `delete-${item.id}`
               ? <Loader2 className="w-3 h-3 animate-spin" />
-              : <><Trash2 className="w-3 h-3 mr-1" />{t('downloads.remove')}</>}
+              : <><Trash2 className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">{t('downloads.remove')}</span></>}
           </Button>
           <Button size="sm" variant="outline"
             onClick={() => setShowRawDetails((prev) => !prev)}
+            title="Détails"
             className="h-7 px-2 text-xs border-white/20 bg-white/5 text-white/60 hover:bg-white/10">
             {showRawDetails
-              ? <><ChevronUp className="w-3 h-3 mr-1" />Détails</>
-              : <><ChevronDown className="w-3 h-3 mr-1" />Détails</>}
+              ? <><ChevronUp className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">Détails</span></>
+              : <><ChevronDown className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">Détails</span></>}
           </Button>
         </div>
 
