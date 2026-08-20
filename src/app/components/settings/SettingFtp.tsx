@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { SubmitEvent, useEffect, useState } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { getFtpConfig, saveFtpConfig } from '../../services/ftpService';
@@ -39,7 +39,7 @@ export function SettingFtp() {
     }, []);
 
     // Tester la connexion ET enregistrer (la validation est faite côté backend)
-    const handleSave = async (event: React.FormEvent) => {
+    const handleSave = async (event: SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
         setFtpError(null);
         setFtpMessage(null);

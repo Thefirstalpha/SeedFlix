@@ -16,7 +16,7 @@ router.use(authentication);
 
 router.get('/transmission/configure', async (req, res) => {
   const userId = req.user.id;
-  let transmissionSettings = await getTransmissionSettings(userId);
+  let transmissionSettings = getTransmissionSettings(userId);
   if (transmissionSettings && 'password' in transmissionSettings) {
     delete transmissionSettings.password; // Do not send password to client
   }

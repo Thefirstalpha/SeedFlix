@@ -32,12 +32,12 @@ router.delete('/wishlists', async (req, res) => {
 
 router.get('/wishlist/:id', async (req, res) => {
   const wishlist = await getWishlist(req.user.id);
-  const item = wishlist.find((i) => i.tmdb === parseInt(req.params.id));
+  const item = wishlist.find((i) => i.tmdb === Number.parseInt(req.params.id));
   res.json({ exists: !!item, content: item });
 });
 
 router.delete('/wishlist/:id', async (req, res) => {
-  await deleteWishlist(req.user.id, parseInt(req.params.id));
+  await deleteWishlist(req.user.id, Number.parseInt(req.params.id));
   res.json({ ok: true });
 });
 

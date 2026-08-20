@@ -10,7 +10,7 @@ import { Switch } from "../ui/switch";
 
 
 
-export function SettingTransmission({ setup, onComplete }: { setup: boolean; onComplete?: (() => void) | undefined }) {
+export function SettingTransmission({ setup, onComplete }: { setup: boolean; onComplete?: (() => void) }) {
     const { t } = useI18n();
     const [torrentUrl, setTorrentUrl] = useState('');
     const [torrentPort, setTorrentPort] = useState<number | null>(null);
@@ -131,7 +131,7 @@ export function SettingTransmission({ setup, onComplete }: { setup: boolean; onC
                                     <Input
                                         id="setup-torrent-username"
                                         value={torrentUsername}
-                                        onChange={(event) => setTorrentUsername(event.target.value)}
+                                        onChange={(event) => setTorrentUsername(event?.target?.value)}
                                         className="border-white/10 bg-slate-900 text-white"
                                     />
                                 </div>

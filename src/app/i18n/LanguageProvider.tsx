@@ -77,7 +77,7 @@ function parseSupportedLanguage(input: unknown): SupportedLanguage {
   return 'fr';
 }
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
+export function LanguageProvider({ children }: Readonly<{ children: ReactNode }>) {
   const { user } = useAuth();
   const [language, setLanguage] = useState<SupportedLanguage>('fr');
 
@@ -314,6 +314,12 @@ export interface I18nMessages {
     maxYear: string;
     allRatings: string;
     minRating: string;
+    genreLabel: string;
+    languageLabel: string;
+    yearLabel: string;
+    yearTo: string;
+    ratingLabel: string;
+    resetFilters: string;
     popularMovies: string;
     popularSeries: string;
     noMoviesMatch: string;
