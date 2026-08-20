@@ -349,11 +349,6 @@ export function SeriesDetails() {
               ? t('seriesDetails.removeSeries')
               : t('seriesDetails.addSeries')}
           </Button>
-
-          <Badge className="bg-cyan-600/20 text-cyan-100 border border-cyan-500/30 px-3 py-1">
-            <Tv className="w-4 h-4 mr-2" />
-            {series.status || t('seriesDetails.unknownStatus')}
-          </Badge>
         </div>
       </div>
 
