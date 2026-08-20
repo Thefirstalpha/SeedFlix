@@ -290,6 +290,9 @@ export function FtpExplorer() {
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     const uploadInputRef = useRef<HTMLInputElement>(null);
 
+    // Fil d'Ariane (scroll horizontal)
+    const breadcrumbScrollRef = useRef<HTMLDivElement>(null);
+
     // Confirmation de suppression (unitaire ou groupée)
     const [pendingDelete, setPendingDelete] = useState<FtpFileInfo[] | null>(null);
 
@@ -383,6 +386,12 @@ export function FtpExplorer() {
     useEffect(() => {
         setSelected(new Set());
         void load(path);
+    }, [path]);
+
+    // Toujours afficher le dossier courant (fin du fil d'Ariane)
+    useEffect(() => {
+        const el = breadcrumbScrollRef.current;
+        if (el) el.scrollLeft = el.scrollWidth;
     }, [path]);
 
     const refreshStorage = useCallback(async () => {
@@ -692,14 +701,14 @@ export function FtpExplorer() {
 
 
             {/* Breadcrumb */}
-            <div className="flex items-center gap-1 flex-wrap">
+            <div className="flex items-center gap-1">
                 {/* Flèche retour — toujours visible, grisée à la racine */}
                 {(() => {
                     const atRoot = path === rootFolder.replace(/\/$/, '') || path === rootFolder;
                     return (
                         <button type="button" onClick={goUp} disabled={atRoot}
                             title={atRoot ? 'Racine' : 'Dossier parent'}
-                            className={`p-1 rounded transition-colors ${atRoot
+                            className={`shrink-0 p-1 rounded transition-colors ${atRoot
                                 ? 'text-white/20 cursor-default'
                                 : 'hover:bg-white/10 text-white/60 hover:text-white'
                                 }`}>
@@ -707,36 +716,38 @@ export function FtpExplorer() {
                         </button>
                     );
                 })()}
-                {breadcrumbs
-                    .filter(crumb => crumb.label !== '/' || crumb.path === rootFolder.replace(/\/$/, '') || crumb.path === rootFolder)
-                    .map((crumb, i, arr) => {
-                        const isRoot = crumb.path === rootFolder.replace(/\/$/, '') || crumb.path === rootFolder;
-                        const isAboveRoot = !isRoot && !crumb.path.startsWith(rootFolder.endsWith('/') ? rootFolder : rootFolder + '/');
-                        const isCurrent = i === arr.length - 1;
-                        return (
-                            <span key={crumb.path} className="flex items-center gap-1">
-                                {i > 0 && <span className="text-white/30 text-sm">/</span>}
-                                <button
-                                    type="button"
-                                    onClick={() => !isAboveRoot && !isCurrent && navigate(crumb.path)}
-                                    disabled={isCurrent || isAboveRoot}
-                                    className={`text-sm px-1 rounded transition-colors ${isCurrent
-                                        ? 'text-white font-medium cursor-default'
-                                        : isAboveRoot
-                                            ? 'text-white/20 cursor-default'
-                                            : 'text-cyan-400 hover:text-cyan-200 hover:bg-white/5'
-                                        }`}
-                                >
-                                    {isRoot ? (
-                                        <span className="flex items-center gap-1">
-                                            <HardDrive className="w-3.5 h-3.5" />
-                                            {crumb.label !== '/' && <span>{crumb.label}</span>}
-                                        </span>
-                                    ) : crumb.label}
-                                </button>
-                            </span>
-                        );
-                    })}
+                <div ref={breadcrumbScrollRef} className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto whitespace-nowrap">
+                    {breadcrumbs
+                        .filter(crumb => crumb.label !== '/' || crumb.path === rootFolder.replace(/\/$/, '') || crumb.path === rootFolder)
+                        .map((crumb, i, arr) => {
+                            const isRoot = crumb.path === rootFolder.replace(/\/$/, '') || crumb.path === rootFolder;
+                            const isAboveRoot = !isRoot && !crumb.path.startsWith(rootFolder.endsWith('/') ? rootFolder : rootFolder + '/');
+                            const isCurrent = i === arr.length - 1;
+                            return (
+                                <span key={crumb.path} className="flex items-center gap-1 shrink-0">
+                                    {i > 0 && <span className="text-white/30 text-sm">/</span>}
+                                    <button
+                                        type="button"
+                                        onClick={() => !isAboveRoot && !isCurrent && navigate(crumb.path)}
+                                        disabled={isCurrent || isAboveRoot}
+                                        className={`text-sm px-1 rounded transition-colors ${isCurrent
+                                            ? 'text-white font-medium cursor-default'
+                                            : isAboveRoot
+                                                ? 'text-white/20 cursor-default'
+                                                : 'text-cyan-400 hover:text-cyan-200 hover:bg-white/5'
+                                            }`}
+                                    >
+                                        {isRoot ? (
+                                            <span className="flex items-center gap-1">
+                                                <HardDrive className="w-3.5 h-3.5" />
+                                                {crumb.label !== '/' && <span>{crumb.label}</span>}
+                                            </span>
+                                        ) : crumb.label}
+                                    </button>
+                                </span>
+                            );
+                        })}
+                </div>
             </div>
 
             {/* Erreur */}
