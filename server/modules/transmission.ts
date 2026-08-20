@@ -55,8 +55,6 @@ function toManagedTorrentEntry(input: Record<string, unknown>): ManagedTorrentEn
   };
 }
 
-
-
 export function getManagedTorrents(userId: number): ManagedTorrentEntry[] {
   const raw = readStore(transmissionManagedTorrentsStore, userId);
   if (!Array.isArray(raw)) {
