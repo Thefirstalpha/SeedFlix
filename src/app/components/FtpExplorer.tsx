@@ -632,7 +632,7 @@ export function FtpExplorer() {
             )}
 
             {/* En-tête */}
-            <div className="flex flex-col gap-3 flex-row items-center justify-between">
+            <div className="flex flex-col gap-3 flex-row items-end justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-white">Mes fichiers</h1>
 
