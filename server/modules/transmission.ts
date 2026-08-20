@@ -204,7 +204,7 @@ export async function configureTransmission(userId: number, settings: Transmissi
       throw new Error('User not found');
     }
     user.settings.transmission = settings;
-    await writeStore('user', userId, user);
+    writeStore('user', userId, user);
   });
 }
 

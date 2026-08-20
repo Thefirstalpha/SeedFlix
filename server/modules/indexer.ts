@@ -85,7 +85,7 @@ export function extractEpisodeNumber(title: string): number | null {
   const compactMatch = new RegExp(/(?:^|[^a-z0-9])s\d{1,3}e(\d{1,4})(?=[^a-z0-9]|$)/).exec(
     normalized,
   );
-  const episodeMatch = compactMatch || normalized.match(/(?:^|[^a-z0-9])e(\d{1,4})(?=[^a-z0-9]|$)/);
+  const episodeMatch = compactMatch || new RegExp(/(?:^|[^a-z0-9])e(\d{1,4})(?=[^a-z0-9]|$)/).exec(normalized);
   if (episodeMatch?.[1]) {
     return Number(episodeMatch[1]);
   }

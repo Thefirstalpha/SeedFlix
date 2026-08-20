@@ -11,7 +11,12 @@ export async function getWishlist(userId: number): Promise<WishListItem[]> {
   for (const item of whishlist) {
     if (typeof item === 'object' && item !== null) {
       const tmdb = Number(item.tmdb);
-      const type = item.type === 'movie' ? 'movie' : item.type === 'series' ? 'series' : null;
+      let type: 'movie' | 'series' | null = null;
+      if (item.type === 'movie') {
+        type = 'movie';
+      } else if (item.type === 'series') {
+        type = 'series';
+      }
       const title = String(item.title || '');
       const releaseDate = String(item.releaseDate || '');
       const genre = String(item.genre || '');
@@ -30,12 +35,12 @@ export async function getWishlist(userId: number): Promise<WishListItem[]> {
       if (item.seasons && typeof item.seasons === 'object') {
         for (const [key, value] of Object.entries(item.seasons)) {
           const seasonNumber = Number(key);
-          if (isNaN(seasonNumber) || typeof value !== 'object' || value === null) {
+          if (Number.isNaN(seasonNumber) || typeof value !== 'object' || value === null) {
             continue;
           }
           const all_episodes = Boolean((value as any).all_episodes);
           const episodes = Array.isArray((value as any)?.episodes)
-            ? (value as any).episodes.map(Number).filter((num: number) => !isNaN(num))
+            ? (value as any).episodes.map(Number).filter((num: number) => !Number.isNaN(num))
             : [];
           seasons[seasonNumber] = {
             season_number: seasonNumber,
@@ -45,7 +50,7 @@ export async function getWishlist(userId: number): Promise<WishListItem[]> {
         }
       }
 
-      if (!isNaN(tmdb) && type && title && releaseDate && addedAt && original_title) {
+      if (!Number.isNaN(tmdb) && type && title && releaseDate && addedAt && original_title) {
         parsed.push({
           tmdb,
           type,
@@ -79,7 +84,7 @@ export async function addToWishlist(
   );
   const results = await proxyTmdb(request.path, request.query);
 
-  if (!results || !results.id) {
+  if (!results?.id) {
     throw new Error('Item not found in TMDB');
   }
 
@@ -109,15 +114,13 @@ export async function addToWishlist(
                 existingItem.seasons[seasonNumber].episodes.push(episodeNumber);
               }
             }
-          } else {
-            if (existingItem.seasons[seasonNumber] !== undefined) {
+          } else if (existingItem.seasons[seasonNumber] !== undefined) {
               existingItem.seasons[seasonNumber] = {
                 season_number: seasonNumber,
                 all_episodes: true,
                 episodes: [],
               };
             }
-          }
         } else {
           existingItem.all_seasons = true;
           existingItem.seasons = {};
@@ -192,12 +195,12 @@ export async function deleteWishlist(
             delete item.seasons[seasonNumber];
           }
           if (item.seasons && Object.keys(item.seasons).length === 0) {
-            whishlist = whishlist.filter((item: WishListItem) => !(item.tmdb === tmdbId));
+            whishlist = whishlist.filter((item: WishListItem) => item.tmdb !== tmdbId);
           }
         }
       }
     } else {
-      whishlist = whishlist.filter((item: WishListItem) => !(item.tmdb === tmdbId));
+      whishlist = whishlist.filter((item: WishListItem) => item.tmdb !== tmdbId);
     }
     writeStore('whishlist', userId, whishlist);
   });

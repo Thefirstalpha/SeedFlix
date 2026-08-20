@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
 router.get('/:userid/:namespace', async (req, res) => {
   const namespace = String(req.params.namespace || '').trim();
   const userId = Number(req.params.userid);
-  if (!namespace || isNaN(userId)) {
+  if (!namespace || Number.isNaN(userId)) {
     res.status(400).json({ error: messages.settings.failedLoadSettings });
     return;
   }
