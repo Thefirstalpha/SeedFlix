@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button } from './ui/button';
+import { Button } from '../ui/button';
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -10,7 +10,7 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
   AlertDialogAction,
-} from './ui/alert-dialog';
+} from '../ui/alert-dialog';
 import { RectangleEllipsis, Trash2 } from 'lucide-react';
 
 interface User {

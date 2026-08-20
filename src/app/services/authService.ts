@@ -1,54 +1,11 @@
+import { UserStatusBar } from '../../../common/user';
+import { User } from '../../../common/user';
 import { API_BASE_URL } from '../config/tmdb';
 
-export interface AuthUser {
-  id: number;
-  username: string;
-}
 
 export interface AuthResponse {
   authenticated?: boolean;
-  user?: AuthUser | null;
-  settings?: UserSettings;
-  mustChangePassword: boolean;
-  mustConfigureTmdb: boolean;
-  mustConfigureTorrent: boolean;
-  mustConfigureIndexer: boolean;
-  shouldChangePassword: boolean;
-  legalAccepted: boolean;
-  needsInitialSetup: boolean;
-}
-
-export interface UserSettings {
-  appInfo?: {
-    imageTag?: string;
-  };
-  profile: {
-    username: string;
-  };
-  security: {
-    lastPasswordChangeAt?: string;
-  };
-  apiKeys?: {
-    tmdb?: string;
-  };
-  placeholders: {
-    notifications?: Record<string, unknown>;
-    preferences?: Record<string, unknown>;
-    torrent?: {
-      url?: string;
-      port?: string;
-      authRequired?: boolean;
-      username?: string;
-      password?: string;
-      moviesFolder?: string;
-      seriesFolder?: string;
-    };
-    indexer?: {
-      url?: string;
-      token?: string;
-      defaultQuality?: string;
-    };
-  };
+  user?: User | null;
 }
 
 export interface IndexerTestResponse {
@@ -71,7 +28,7 @@ export interface TmdbApiKeyTestResponse {
 const AUTH_BASE = `${API_BASE_URL}/auth`;
 const SETTINGS_BASE = `${API_BASE_URL}/settings`;
 
-async function parseJson<T>(response: Response, fallbackError = 'Request failed'): Promise<T> {
+export async function parseJson<T>(response: Response, fallbackError = 'Request failed'): Promise<T> {
   const text = await response.text();
   let data: unknown = null;
 
@@ -108,13 +65,6 @@ export async function getCurrentAuth(): Promise<AuthResponse> {
     return {
       user: null,
       authenticated: false,
-      mustChangePassword: false,
-      mustConfigureTmdb: false,
-      mustConfigureTorrent: false,
-      mustConfigureIndexer: false,
-      legalAccepted: false,
-      needsInitialSetup: false,
-      shouldChangePassword: false,
     };
   }
 }
@@ -145,31 +95,14 @@ export async function acceptLegal() {
   return parseJson<{ ok: true }>(response);
 }
 
-export async function changePassword(currentPassword: string, newPassword: string) {
-  const response = await fetch(`${AUTH_BASE}/change-password`, {
+export async function changePassword(newPassword: string) {
+  const response = await fetch(`${AUTH_BASE}/reset-password`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ currentPassword, newPassword }),
+    body: JSON.stringify({ password: newPassword }),
   });
   return parseJson<{ ok: true }>(response);
-}
-
-export async function getSettings() {
-  const response = await fetch(SETTINGS_BASE, {
-    credentials: 'include',
-  });
-  return parseJson<UserSettings>(response);
-}
-
-export async function updateSettings(settings: UserSettings) {
-  const response = await fetch(SETTINGS_BASE, {
-    method: 'PUT',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(settings),
-  });
-  return parseJson<UserSettings>(response);
 }
 
 export async function getGlobalSettings() {
@@ -197,66 +130,23 @@ export async function resetSettings() {
   return parseJson<{ ok: true; loggedOut: true }>(response);
 }
 
-export async function testIndexerConnection(url: string, token: string) {
-  const response = await fetch(`${API_BASE_URL}/indexer/test`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, token }),
-  });
-  return parseJson<IndexerTestResponse>(response);
-}
-
-export async function testTorrentConnection(payload: {
-  url: string;
-  port: string;
-  authRequired: boolean;
-  username: string;
-  password: string;
-}) {
-  const response = await fetch(`${API_BASE_URL}/torrent/test`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  return parseJson<TorrentTestResponse>(response);
-}
-
-export async function testTmdbApiKey(apiKey: string) {
-  const response = await fetch(`${API_BASE_URL}/tmdb/test-key`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ apiKey }),
-  });
-  return parseJson<TmdbApiKeyTestResponse>(response, 'Clé API invalide');
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // User Management
 // ─────────────────────────────────────────────────────────────────────────────
-
-export interface User {
-  id: number;
-  username: string;
-}
 
 export interface DatabaseNamespaceEntry {
   namespace: string;
   updatedAt: string;
 }
 
-export interface DatabaseNamespaceValue extends DatabaseNamespaceEntry {
-  value: string;
-}
 
 export interface CreatedUserResponse extends User {
-  generatedPassword: string;
+  username: string;
+  password: string;
 }
 
-export async function listUsers() {
-  const response = await fetch(`${API_BASE_URL}/users`, {
+export async function listUsers(withAdmin = false): Promise<User[]> {
+  const response = await fetch(`${API_BASE_URL}/users?admin=${withAdmin}`, {
     credentials: 'include',
   });
   return parseJson<User[]>(response, 'Impossible de charger la liste des utilisateurs');
@@ -285,7 +175,7 @@ export async function resetUserPassword(userId: number) {
     method: 'POST',
     credentials: 'include',
   });
-  return parseJson<{ ok: true; generatedPassword: string }>(
+  return parseJson<{ ok: true; password: string }>(
     response,
     'Impossible de réinitialiser le mot de passe',
   );
@@ -301,25 +191,36 @@ export async function listDatabaseNamespaces() {
   );
 }
 
-export async function getDatabaseNamespace(namespace: string) {
-  const response = await fetch(`${SETTINGS_BASE}/database/${encodeURIComponent(namespace)}`, {
+export async function getDatabaseNamespace(userId: number, namespace: string) {
+  const response = await fetch(`${SETTINGS_BASE}/database/${encodeURIComponent(userId)}/${encodeURIComponent(namespace)}`, {
     credentials: 'include',
   });
-  return parseJson<DatabaseNamespaceValue>(
+  return parseJson(
     response,
     "Impossible de charger l'entrée de base de données",
   );
 }
 
-export async function updateDatabaseNamespace(namespace: string, value: string) {
-  const response = await fetch(`${SETTINGS_BASE}/database/${encodeURIComponent(namespace)}`, {
+export async function updateDatabaseNamespace(userId: number, namespace: string, value: string) {
+  const response = await fetch(`${SETTINGS_BASE}/database/${encodeURIComponent(userId)}/${encodeURIComponent(namespace)}`, {
     method: 'PUT',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value }),
   });
-  return parseJson<DatabaseNamespaceValue>(
+  return parseJson(
     response,
     "Impossible de mettre à jour l'entrée de base de données",
   );
+}
+
+
+
+
+export async function getUserStatusBar() {
+  const response = await fetch(`${API_BASE_URL}/user`, {
+    credentials: 'include',
+  });
+
+  return parseJson<UserStatusBar>(response);
 }

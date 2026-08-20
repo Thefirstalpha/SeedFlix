@@ -1,6 +1,6 @@
 import type { TorrentResultsLabels } from '../components/TorrentResultsPanel';
+import type { Translator } from '../i18n/LanguageProvider';
 
-type Translator = (key: string, params?: Record<string, unknown>) => string;
 
 type BuildOptions = {
   sectionKey: 'movieDetails' | 'seriesDetails';

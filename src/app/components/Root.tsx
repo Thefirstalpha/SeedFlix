@@ -1,20 +1,16 @@
-import { Download, Heart, LogOut, Settings, User, Bell, Menu } from 'lucide-react';
+import { Download, HardDrive, Heart, LogOut, Settings, User, Bell, Menu } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/LanguageProvider';
-import * as notificationService from '../services/notificationService';
-import type { Notification } from '../services/notificationService';
-import { getSeriesWishlistCount } from '../services/seriesWishlistService';
-import { getTorrentDownloads } from '../services/torrentService';
-import { getWishlistCount } from '../services/wishlistService';
 import { Button } from './ui/button';
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { useSearchState } from '../context/SearchStateContext';
+import { getUserStatusBar } from '../services/authService';
+import { Notification } from '../../../common/notification';
 
 type UnreadNotificationsEvent = CustomEvent<{ count: number }>;
-const NOTIFICATIONS_POLL_INTERVAL_MS = 5000;
 
 function showNotificationToast(type: Notification['type'], title: string, description: string) {
   switch (type) {
@@ -65,159 +61,73 @@ export function Root() {
   const wishlistTarget = location.pathname === '/wishlist' ? '/' : '/wishlist';
   const {
     user,
-    settings,
     isAuthenticated,
-    logout,
-    needsInitialSetup,
-    mustChangePassword,
-    mustConfigureTmdb,
-    mustConfigureTorrent,
-    mustConfigureIndexer,
+    logout
   } = useAuth();
-  const spoilerModeEnabled = Boolean(
-    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode,
-  );
+  const spoilerModeEnabled = Boolean(user?.settings.spoilerMode);
   const isSetupPage = location.pathname === '/setup';
   const isLoginPage = location.pathname === '/login';
   const shouldShowHeader = !isLoginPage && !isSetupPage;
-  const hasPendingSetup =
-    needsInitialSetup ||
-    mustChangePassword ||
-    mustConfigureTmdb ||
-    mustConfigureTorrent ||
-    mustConfigureIndexer;
+  const hasPendingSetup = user?.flags?.mustSetup;
   const canShowNavigationActions = isAuthenticated && !isSetupPage && !hasPendingSetup;
-
-  useEffect(() => {
-    if (!canShowNavigationActions) {
-      setWishlistCount(0);
-      return;
-    }
-
-    const loadCount = async () => {
-      const [movieCount, seriesCount] = await Promise.all([
-        getWishlistCount(),
-        getSeriesWishlistCount(),
-      ]);
-      setWishlistCount(movieCount + seriesCount);
-    };
-
-    void loadCount();
-
-    const handleImmediateWishlistRefresh = () => {
-      void loadCount();
-    };
-
-    window.addEventListener('seedflix:wishlist-refresh-request', handleImmediateWishlistRefresh);
-
-    return () => {
-      window.removeEventListener(
-        'seedflix:wishlist-refresh-request',
-        handleImmediateWishlistRefresh,
-      );
-    };
-  }, [canShowNavigationActions, location.pathname]);
 
   useEffect(() => {
     if (!isAuthenticated || isSetupPage || hasPendingSetup) {
       setDownloadsCount(0);
-      return;
-    }
-
-    const loadDownloadsCount = async () => {
-      try {
-        const response = await getTorrentDownloads();
-        setDownloadsCount(response.activeCount || 0);
-      } catch {
-        setDownloadsCount(0);
-      }
-    };
-
-    void loadDownloadsCount();
-    const interval = setInterval(() => {
-      void loadDownloadsCount();
-    }, 7000);
-
-    return () => clearInterval(interval);
-  }, [isAuthenticated, isSetupPage, hasPendingSetup, location.pathname]);
-
-  useEffect(() => {
-    if (!isAuthenticated || isSetupPage || hasPendingSetup) {
+      setWishlistCount(0);
       setUnreadNotificationsCount(0);
       return;
     }
 
-    const loadUnreadCount = async () => {
+    const loadUserStatusBar = async () => {
       try {
-        const data = await notificationService.getNotifications(1, true);
-        const latestUnread = Array.isArray(data.notifications) ? data.notifications[0] : undefined;
-        const nextUnreadCount = Number(data.unreadCount || 0);
-        const previousUnreadCount = previousUnreadCountRef.current;
+        const response = await getUserStatusBar();
+        const nextUnread = response.notifications || 0;
+        const previousUnread = previousUnreadCountRef.current;
 
-        if (
-          hasHydratedUnreadRef.current &&
-          nextUnreadCount > previousUnreadCount &&
-          location.pathname !== '/notifications'
-        ) {
-          const delta = nextUnreadCount - previousUnreadCount;
-          if (latestUnread) {
-            const toastTitle = delta > 1 ? `${delta} nouvelles notifications` : latestUnread.title;
-            const safeLatestMessage = getSafeNotificationMessage(
-              latestUnread.message,
-              spoilerModeEnabled,
-              latestUnread.data?.mediaType,
-            );
-            const toastDescription =
-              delta > 1
-                ? `${safeLatestMessage} (et ${delta - 1} autre${delta - 1 > 1 ? 's' : ''})`
-                : safeLatestMessage;
+        setDownloadsCount(response.downloads || 0);
+        setWishlistCount(response.wishlist || 0);
+        setUnreadNotificationsCount(nextUnread);
 
-            showNotificationToast(latestUnread.type, toastTitle, toastDescription);
+        // Toast si nouvelles notifications
+        if (hasHydratedUnreadRef.current && nextUnread > previousUnread && location.pathname !== '/notifications') {
+          const delta = nextUnread - previousUnread;
+          const latest = response.latestNotification;
+          if (latest) {
+            const toastTitle = delta > 1 ? `${delta} nouvelles notifications` : latest.title;
+            const safeMsg = getSafeNotificationMessage(latest.message, spoilerModeEnabled, undefined);
+            const toastDesc = delta > 1 ? `${safeMsg} (et ${delta - 1} autre${delta - 1 > 1 ? 's' : ''})` : safeMsg;
+            showNotificationToast(latest.type as any, toastTitle, toastDesc);
           } else {
-            toast.info(
-              delta > 1 ? t('root.toasts.manyNew', { count: delta }) : t('root.toasts.oneNew'),
-              {
-                description: t('root.toasts.updatesAvailable'),
-              },
-            );
+            toast.info(delta > 1 ? `${delta} nouvelles notifications` : '1 nouvelle notification');
           }
         }
 
         hasHydratedUnreadRef.current = true;
-        previousUnreadCountRef.current = nextUnreadCount;
-        setUnreadNotificationsCount(nextUnreadCount);
-        window.dispatchEvent(
-          new CustomEvent('seedflix:notifications-updated', {
-            detail: { count: nextUnreadCount },
-          }),
-        );
+        previousUnreadCountRef.current = nextUnread;
+        window.dispatchEvent(new CustomEvent('seedflix:notifications-updated', { detail: { count: nextUnread } }));
       } catch {
+        setDownloadsCount(0);
+        setWishlistCount(0);
         setUnreadNotificationsCount(0);
       }
     };
 
-    void loadUnreadCount();
+    void loadUserStatusBar();
     const interval = setInterval(() => {
-      void loadUnreadCount();
-    }, NOTIFICATIONS_POLL_INTERVAL_MS);
+      void loadUserStatusBar();
+    }, 7000);
 
-    const handleImmediateRefresh = () => {
-      void loadUnreadCount();
-    };
-    window.addEventListener('seedflix:notifications-refresh-request', handleImmediateRefresh);
+    window.addEventListener('seedflix:wishlist-refresh-request', loadUserStatusBar);
+    window.addEventListener('seedflix:notifications-refresh-request', loadUserStatusBar);
+
 
     return () => {
+      window.removeEventListener('seedflix:wishlist-refresh-request', loadUserStatusBar);
+      window.removeEventListener('seedflix:notifications-refresh-request', loadUserStatusBar);
       clearInterval(interval);
-      window.removeEventListener('seedflix:notifications-refresh-request', handleImmediateRefresh);
     };
-  }, [
-    isAuthenticated,
-    isSetupPage,
-    hasPendingSetup,
-    location.pathname,
-    settings,
-    spoilerModeEnabled,
-  ]);
+  }, [isAuthenticated, isSetupPage, hasPendingSetup, location.pathname]);
 
   useEffect(() => {
     const handleUnreadUpdate = (event: Event) => {
@@ -286,10 +196,10 @@ export function Root() {
               <div className="hidden items-center gap-3 md:flex">
                 <Link
                   to="/downloads"
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+                  className="flex items-center gap-2 px-3 py-2 lg:px-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
                 >
                   <Download className="w-5 h-5 text-cyan-300" />
-                  <span className="text-white font-medium">{t('root.downloads')}</span>
+                  <span className="hidden text-white font-medium lg:inline">{t('root.downloads')}</span>
                   {downloadsCount > 0 && (
                     <span className="bg-cyan-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                       {downloadsCount}
@@ -297,14 +207,24 @@ export function Root() {
                   )}
                 </Link>
 
+                {user?.settings?.ftp?.host && (
+                  <Link
+                    to="/files"
+                    className="flex items-center gap-2 px-3 py-2 lg:px-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+                  >
+                    <HardDrive className="w-5 h-5 text-emerald-400" />
+                    <span className="hidden text-white font-medium lg:inline">Mes fichiers</span>
+                  </Link>
+                )}
+
                 <Link
                   to={wishlistTarget}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+                  className="flex items-center gap-2 px-3 py-2 lg:px-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
                 >
                   <Heart
                     className={`w-5 h-5 ${wishlistCount > 0 ? 'text-purple-400 fill-purple-400' : 'text-white'}`}
                   />
-                  <span className="text-white font-medium">{t('root.wishlist')}</span>
+                  <span className="hidden text-white font-medium lg:inline">{t('root.wishlist')}</span>
                   {wishlistCount > 0 && (
                     <span className="bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                       {wishlistCount}
@@ -329,13 +249,13 @@ export function Root() {
                   <div ref={userMenuRef} className="relative self-stretch flex items-stretch">
                     <Button
                       variant="ghost"
-                      className="h-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white hover:bg-white/10 hover:text-white"
+                      className="h-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 lg:px-4 text-white hover:bg-white/10 hover:text-white"
                       onClick={() => setIsUserMenuOpen((open) => !open)}
                       aria-expanded={isUserMenuOpen}
                       aria-haspopup="menu"
                     >
-                      <User className="w-4 h-4 mr-2" />
-                      {user?.username}
+                      <User className="w-4 h-4 lg:mr-2" />
+                      <span className="hidden lg:inline">{user?.username}</span>
                     </Button>
 
                     {isUserMenuOpen && (
@@ -381,7 +301,7 @@ export function Root() {
                   </SheetTrigger>
                   <SheetContent side="right" className="border-white/10 bg-slate-950 text-white">
                     <SheetHeader className="pb-2">
-                      <SheetTitle className="text-white">{t('root.openMenu')}</SheetTitle>
+                      <SheetTitle className="text-white"></SheetTitle>
                     </SheetHeader>
 
                     <div className="px-4 pb-4 space-y-2">
@@ -403,6 +323,18 @@ export function Root() {
                               )}
                             </Link>
                           </SheetClose>
+
+                          {user?.settings?.ftp?.host && (
+                            <SheetClose asChild>
+                              <Link
+                                to="/files"
+                                className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                              >
+                                <HardDrive className="w-4 h-4 text-emerald-400" />
+                                Mes fichiers
+                              </Link>
+                            </SheetClose>
+                          )}
 
                           <SheetClose asChild>
                             <Link

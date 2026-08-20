@@ -31,7 +31,7 @@ jobs:
 
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Lint (frontend + backend)
         run: npm run lint
@@ -41,20 +41,16 @@ jobs:
 
       - name: Backend syntax checks
         run: |
-          node --check server/index.js
-          node --check server/config.js
-          node --check server/modules/auth.js
-          node --check server/modules/notifications.js
-          node --check server/modules/tmdb.js
-          node --check server/modules/torznab.js
-          node --check server/modules/transmission.js
-          node --check server/modules/wishlist.js
+          set -euo pipefail
+          ./node_modules/.bin/tsc --noEmit --skipLibCheck --incremental false server/*.ts
+          ./node_modules/.bin/tsc --noEmit --skipLibCheck --incremental false server/**/*.ts
+          ./node_modules/.bin/tsc --noEmit --skipLibCheck --incremental false common/*.ts
 
       - name: Service smoke test (server startup + API reachability)
         shell: bash
         run: |
           set -euo pipefail
-          node server/index.js > /tmp/server.log 2>&1 &
+          ./node_modules/.bin/tsx server/index.ts > /tmp/server.log 2>&1 &
           SERVER_PID=$!
 
           cleanup() {
@@ -63,13 +59,14 @@ jobs:
           trap cleanup EXIT
 
           for i in {1..25}; do
-            if curl --silent --show-error --fail http://127.0.0.1:4000/api/auth/me >/tmp/auth.json; then
+            if curl --silent --show-error --fail http://127.0.0.1:4000/api/health >/tmp/health.json; then
               break
             fi
             sleep 1
           done
 
-          grep -q '"authenticated"' /tmp/auth.json
+          cat /tmp/server.log
+          grep -q '"ok":true' /tmp/health.json
 
       - name: Dependency vulnerability audit (runtime)
         run: npm audit --omit=dev --audit-level=high
@@ -107,10 +104,10 @@ jobs:
         run: |
           docker run -d --rm -p 4000:4000 --name seedflix-test local/seedflix:ci
           for i in {1..25}; do
-            if curl --silent --show-error --fail http://127.0.0.1:4000/api/auth/me >/tmp/auth.json; then
+            if curl --silent --show-error --fail http://127.0.0.1:4000/api/health >/tmp/health.json; then
               break
             fi
             sleep 1
           done
-          grep -q '"authenticated"' /tmp/auth.json
+          grep -q '"ok":true' /tmp/health.json
           docker stop seedflix-test

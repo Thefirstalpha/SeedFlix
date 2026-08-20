@@ -7,7 +7,7 @@ import importPlugin from "eslint-plugin-import";
 import prettierPlugin from "eslint-plugin-prettier";
 import prettierConfig from "eslint-config-prettier";
 
-/** @type {import("eslint").Linter.FlatConfig[]} */
+/** @type {import("eslint").Linter.Config[]} */
 export default [
 	js.configs.recommended,
 	prettierConfig,
@@ -24,7 +24,12 @@ export default [
 			globals: {
 				React: "readonly",
 				HTMLDivElement: "readonly",
+				HTMLInputElement: "readonly",
+				HTMLFormElement: "readonly",
+				HTMLButtonElement: "readonly",
+				HTMLSelectElement: "readonly",
 				HTMLImageElement: "readonly",
+				File: "readonly",
 				URLSearchParams: "readonly",
 				Node: "readonly",
 				Notification: "readonly",
@@ -38,6 +43,7 @@ export default [
 				clearTimeout: "readonly",
 				clearInterval: "readonly",
 				fetch: "readonly",
+				XMLHttpRequest: "readonly",
 				navigator: "readonly",
 				CustomEvent: "readonly",
 				Event: "readonly",

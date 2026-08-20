@@ -1,9 +1,12 @@
 # syntax=docker/dockerfile:1
 
+ARG NPM_VERSION=11.6.2
+
 FROM node:24-alpine AS deps
+ARG NPM_VERSION
 WORKDIR /app
 COPY package*.json ./
-RUN npm install -g npm@latest && npm ci
+RUN npm install -g npm@${NPM_VERSION} --ignore-scripts && npm ci --ignore-scripts
 
 FROM deps AS build
 COPY index.html ./
@@ -16,6 +19,7 @@ RUN npm run build
 
 FROM node:24-alpine AS runtime
 ARG IMAGE_TAG=dev
+ARG NPM_VERSION
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
@@ -25,17 +29,27 @@ LABEL org.opencontainers.image.description="SeedFlix full-stack app (React + Exp
 LABEL org.opencontainers.image.version="${IMAGE_TAG}"
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+# Keep npm CLI in runtime at a patched level because Trivy scans npm's bundled deps in the final image.
+# Remove npm/npx afterward: the app runs with node only in production.
+RUN npm install -g npm@${NPM_VERSION} --ignore-scripts \
+	&& npm ci --omit=dev --ignore-scripts \
+	&& npm cache clean --force \
+	&& rm -rf /usr/local/lib/node_modules/npm \
+	&& rm -f /usr/local/bin/npm /usr/local/bin/npx
 
 # Data directory is owned by node so the app can write runtime files.
 # All code files are owned by root (read-only for the running process).
-RUN mkdir -p /app/server/modules /app/data && chown node:node /app/data
+RUN mkdir -p /app/server/modules /app/server/routes /app/server/types /app/common /app/data \
+	&& chown node:node /app/data
 COPY --chown=root:root --chmod=444 server/* ./server/
 COPY --chown=root:root --chmod=444 server/modules/* ./server/modules/
+COPY --chown=root:root --chmod=444 server/routes/* ./server/routes/
+COPY --chown=root:root --chmod=444 server/types/* ./server/types/
+COPY --chown=root:root --chmod=444 common/* ./common/
 COPY --chown=root:root --chmod=555 --from=build /app/dist ./dist
 
 # Use the non-root user that already exists in the official Node image.
 USER node
 
 EXPOSE 4000
-CMD ["node", "server/index.js"]
+CMD ["./node_modules/.bin/tsx", "server/index.ts"]

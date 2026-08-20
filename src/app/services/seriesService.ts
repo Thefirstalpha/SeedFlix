@@ -1,3 +1,4 @@
+import { IndexerSeriesResponse } from '../../../common/indexer';
 import { API_BASE_URL, getTmdbImageUrl, getTmdbLanguageParam } from '../config/tmdb';
 import type {
   Series,
@@ -27,30 +28,6 @@ export interface SeriesDiscoverFilters {
   yearTo?: number;
   minRating?: number;
   originalLanguage?: string;
-}
-
-export interface TorznabSeriesResult {
-  title: string;
-  link: string;
-  downloadUrl?: string;
-  tmdbId?: string | null;
-  guid?: string;
-  pubDate?: string;
-  size?: number | null;
-  sizeHuman?: string | null;
-  seeders?: number | null;
-  leechers?: number | null;
-  quality?: string | null;
-  language?: string | null;
-  categories?: string[];
-  attributes?: Record<string, string>;
-}
-
-export interface TorznabSeriesSearchResponse {
-  ok: boolean;
-  query: string;
-  sourceTitle?: string | null;
-  items: TorznabSeriesResult[];
 }
 
 const TV_GENRE_MAP: { [key: number]: string } = {
@@ -164,26 +141,6 @@ function convertTMDBToEpisodes(seasonDetails: TMDBSeriesSeasonDetails): SeriesEp
 
 function getMockSeries(): Series[] {
   return [
-    {
-      id: 900001,
-      title: 'Chroniques du Néon',
-      year: 2026,
-      rating: 8.4,
-      language: 'Anglais',
-      genre: 'Science-Fiction',
-      poster:
-        'https://images.unsplash.com/photo-1515630278258-407f66498911?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      id: 900002,
-      title: 'Brigade Nocturne',
-      year: 2025,
-      rating: 7.9,
-      language: 'Francais',
-      genre: 'Crime',
-      poster:
-        'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=800&q=80',
-    },
   ];
 }
 
@@ -216,7 +173,7 @@ export async function getPopularSeriesPage(
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/series/popular?${params.toString()}`);
+    const response = await fetch(`${API_BASE_URL}/tmdb/series/popular?${params.toString()}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch popular series');
@@ -245,7 +202,7 @@ export async function getSeriesGenres(uiLanguage = 'fr'): Promise<SeriesGenreIte
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/series/genres?language=${encodeURIComponent(tmdbLanguage)}`,
+      `${API_BASE_URL}/tmdb/series/genres?language=${encodeURIComponent(tmdbLanguage)}`,
     );
     if (!response.ok) {
       throw new Error('Failed to fetch series genres');
@@ -291,7 +248,7 @@ export async function discoverSeriesPage(
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/series/discover?${params.toString()}`);
+    const response = await fetch(`${API_BASE_URL}/tmdb/series/discover?${params.toString()}`);
     if (!response.ok) {
       throw new Error('Failed to discover series');
     }
@@ -322,7 +279,7 @@ export async function searchSeriesPage(
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/series/search?language=${encodeURIComponent(tmdbLanguage)}&query=${encodeURIComponent(
+      `${API_BASE_URL}/tmdb/series/search?language=${encodeURIComponent(tmdbLanguage)}&query=${encodeURIComponent(
         query,
       )}&page=${page}`,
     );
@@ -354,7 +311,7 @@ export async function getSeriesById(id: number, uiLanguage = 'fr'): Promise<Seri
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/series/${id}?language=${encodeURIComponent(tmdbLanguage)}`,
+      `${API_BASE_URL}/tmdb/series/details/${id}?language=${encodeURIComponent(tmdbLanguage)}`,
     );
 
     if (!response.ok) {
@@ -378,7 +335,7 @@ export async function getSeriesSeasonEpisodes(
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/series/${seriesId}/seasons/${seasonNumber}?language=${encodeURIComponent(tmdbLanguage)}`,
+      `${API_BASE_URL}/tmdb/series/details/${seriesId}/seasons/${seasonNumber}?language=${encodeURIComponent(tmdbLanguage)}`,
     );
 
     if (!response.ok) {
@@ -394,15 +351,16 @@ export async function getSeriesSeasonEpisodes(
 }
 
 export async function searchSeriesReleases(
-  query: string,
-  limit = 12,
   tmdbId?: number | string,
-): Promise<TorznabSeriesSearchResponse> {
-  const tmdbPart =
-    tmdbId !== undefined && tmdbId !== null ? `&tmdbId=${encodeURIComponent(String(tmdbId))}` : '';
-
+  limit = 12,
+  season?: string | number,
+): Promise<IndexerSeriesResponse> {
+  let additionalFilter = '';
+  if (season !== undefined) {
+    additionalFilter += `&season=${season}`;
+  }
   const response = await fetch(
-    `${API_BASE_URL}/indexer/search?query=${encodeURIComponent(query)}&limit=${limit}${tmdbPart}`,
+    `${API_BASE_URL}/indexer/search/series/${tmdbId}?limit=${limit}${additionalFilter}`,
     {
       credentials: 'include',
     },
@@ -415,8 +373,6 @@ export async function searchSeriesReleases(
 
   return {
     ok: Boolean(data?.ok),
-    query: String(data?.query || query),
-    sourceTitle: data?.sourceTitle ? String(data.sourceTitle) : null,
     items: Array.isArray(data?.items) ? data.items : [],
   };
 }

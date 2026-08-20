@@ -1,4 +1,6 @@
-const en = {
+import { I18nMessages } from "../LanguageProvider";
+
+const en: I18nMessages = {
   common: {
     appName: 'SeedFlix',
     save: 'Save',
@@ -64,8 +66,7 @@ const en = {
     progress: 'Step {{current}} of {{total}}',
     stepLabel: 'Step {{index}}',
     password: {
-      cardTitle: 'Change the default password',
-      cardDescription: 'This step secures the administrator account immediately',
+      description: 'Change the default password',
       cardTitleUser: 'Set your password',
       cardDescriptionUser:
         'Your account was created by the administrator. Choose a new personal password.',
@@ -175,17 +176,47 @@ const en = {
       allTorrents: 'All torrents',
       empty: 'No torrents match the selected filters.',
     },
+    sort: {
+      label: 'Sort by',
+      addedDate: 'Date added',
+      name: 'Name',
+      progress: 'Progress',
+      rateDownload: 'Rate',
+      totalSize: 'Size',
+      uploadRatio: 'Ratio',
+      uploadEfficiency: 'Upload efficiency',
+      ascending: 'Ascending',
+      descending: 'Descending',
+    },
     unknown: 'Unknown',
     finished: 'Finished',
     rate: 'Rate',
     eta: 'ETA',
     peers: 'Peers',
+    totalSize: 'Size',
+    remaining: 'Remaining',
+    ratio: 'Ratio',
+    uploadEfficiency: '{{value}} GB/day',
+    uploadEfficiencyHint: 'GB uploaded per day since the torrent was added',
+    added: 'Added',
+    managedBadge: 'SeedFlix managed',
+    unmanagedBadge: 'External',
+    showRawDetails: 'Show raw details',
+    hideRawDetails: 'Hide raw details',
+    rawDetails: 'Raw torrent details',
     errorPrefix: 'Error',
     pause: 'Pause',
     resume: 'Resume',
     remove: 'Remove',
+    removeWithData: 'Delete + files',
     dontTrack: "Don't track",
     loadFailed: 'Failed to load downloads',
+    confirmDeleteWithData: {
+      title: 'Delete the torrent and its files?',
+      description: 'The torrent will be removed from the client and the downloaded files will be permanently deleted from disk. This action cannot be undone.',
+      cancel: 'Cancel',
+      confirm: 'Delete permanently',
+    },
   },
   home: {
     emptySearch: 'No results found for this search with the active filters.',
@@ -204,6 +235,12 @@ const en = {
     maxYear: 'Max year',
     allRatings: 'All ratings',
     minRating: 'Rating >= {{value}}',
+    genreLabel: 'Genre',
+    languageLabel: 'Language',
+    yearLabel: 'Year',
+    yearTo: 'to',
+    ratingLabel: 'Minimum rating',
+    resetFilters: 'Reset',
     popularMovies: 'Popular movies',
     popularSeries: 'Popular series',
     noMoviesMatch: 'No movies match.',
@@ -413,6 +450,10 @@ const en = {
       users: 'Users',
       database: 'Database',
       factory: 'Reset',
+      storage: 'Storage',
+    },
+    storage: {
+      description: 'Configure your FTP/FTPS access for remote storage of your files.',
     },
     about: {
       versionLabel: 'Image version: {{version}}',
@@ -449,7 +490,7 @@ const en = {
       tmdbSaved: 'TMDB API key saved successfully.',
       configFailed: 'Configuration failed',
       savedButTestFailed: 'Configuration saved, but connection test failed',
-      savedButTestFailedWithReason: 'Configuration saved, but test failed: {{reason}}',
+      configurationFailed: 'Configuration failed: {{reason}}',
       discordWebhookRequired: 'Discord webhook URL is required',
       discordConfigured: 'Discord webhook configured and tested successfully!',
       browserUnsupported: 'This browser does not support web notifications.',
@@ -461,7 +502,7 @@ const en = {
       resetFailed: 'Reset failed',
       testNotificationSent: 'Test notification sent',
       testNotificationFailed: 'Unable to send test notification',
-      configurationSavedWithResponse: 'Configuration saved. {{response}}',
+      configurationSaved: 'Configuration saved.',
     },
     security: {
       title: 'Change password',
@@ -503,6 +544,7 @@ const en = {
         url: 'Indexer URL',
         token: 'API token',
         defaultQuality: 'Default quality',
+        defaultLanguage: 'Default language',
       },
     },
     notifications: {
@@ -529,6 +571,8 @@ const en = {
         none: 'No browser registered.',
         current: 'Current browser',
         registered: 'Registered browser',
+        removeTitle: 'Remove this browser?',
+        removeDescription: 'This browser will no longer receive SeedFlix notifications.',
       },
       test: {
         title: 'Test notification',
@@ -601,17 +645,7 @@ const en = {
       confirmDescription:
         'All local data will be reset (user, settings, movies/series wishlists) and your session will expire. This action cannot be undone.',
       confirmAction: 'Yes, reset',
-    },
-    quality: {
-      all: 'All qualities',
-      '2160p': '2160p (4K)',
-      '1080p': '1080p',
-      '720p': '720p',
-      '480p': '480p',
-      bluray: 'BluRay',
-      webdl: 'WEB-DL / WEBRip',
-      hdtv: 'HDTV',
-    },
+    }
   },
 } as const;
 

@@ -1,4 +1,6 @@
-const fr = {
+import { I18nMessages } from "../LanguageProvider";
+
+const fr : I18nMessages = {
   common: {
     appName: 'SeedFlix',
     save: 'Enregistrer',
@@ -64,8 +66,7 @@ const fr = {
     progress: 'Étape {{current}} sur {{total}}',
     stepLabel: 'Étape {{index}}',
     password: {
-      cardTitle: 'Changez le mot de passe par défaut',
-      cardDescription: 'Cette étape sécurise immédiatement le compte administrateur',
+      description: 'Changez le mot de passe par défaut',
       cardTitleUser: 'Définissez votre mot de passe',
       cardDescriptionUser:
         "Votre compte a été créé par l'administrateur. Choisissez un nouveau mot de passe personnel.",
@@ -176,17 +177,47 @@ const fr = {
       allTorrents: 'Tous les torrents',
       empty: 'Aucun torrent pour les filtres sélectionnés.',
     },
+    sort: {
+      label: 'Trier par',
+      addedDate: "Date d'ajout",
+      name: 'Nom',
+      progress: 'Progression',
+      rateDownload: 'Débit',
+      totalSize: 'Taille',
+      uploadRatio: 'Ratio',
+      uploadEfficiency: 'Efficacité upload',
+      ascending: 'Croissant',
+      descending: 'Décroissant',
+    },
     unknown: 'Inconnu',
     finished: 'Terminé',
     rate: 'Débit',
     eta: 'ETA',
     peers: 'Peers',
+    totalSize: 'Taille',
+    remaining: 'Restant',
+    ratio: 'Ratio',
+    uploadEfficiency: '{{value}} Go/j',
+    uploadEfficiencyHint: "Go envoyés par jour depuis l'ajout du torrent",
+    added: 'Ajouté',
+    managedBadge: 'Suivi SeedFlix',
+    unmanagedBadge: 'Externe',
+    showRawDetails: 'Afficher les détails bruts',
+    hideRawDetails: 'Masquer les détails bruts',
+    rawDetails: 'Détails bruts du torrent',
     errorPrefix: 'Erreur',
     pause: 'Pause',
     resume: 'Reprendre',
     remove: 'Supprimer',
+    removeWithData: 'Supprimer + fichiers',
     dontTrack: 'Ne plus suivre',
     loadFailed: 'Impossible de charger les téléchargements',
+    confirmDeleteWithData: {
+      title: 'Supprimer le torrent et ses fichiers ?',
+      description: 'Le torrent sera retiré du client et les fichiers téléchargés seront définitivement effacés du disque. Cette action est irréversible.',
+      cancel: 'Annuler',
+      confirm: 'Supprimer définitivement',
+    },
   },
   home: {
     emptySearch: 'Aucun résultat trouvé pour cette recherche avec les filtres actifs.',
@@ -205,6 +236,12 @@ const fr = {
     maxYear: 'Date max (année)',
     allRatings: 'Toutes les notes',
     minRating: 'Note >= {{value}}',
+    genreLabel: 'Genre',
+    languageLabel: 'Langue',
+    yearLabel: 'Année',
+    yearTo: 'à',
+    ratingLabel: 'Note minimale',
+    resetFilters: 'Réinitialiser',
     popularMovies: 'Films populaires',
     popularSeries: 'Séries populaires',
     noMoviesMatch: 'Aucun film ne correspond.',
@@ -415,6 +452,10 @@ const fr = {
       users: 'Utilisateurs',
       database: 'Base de données',
       factory: 'Réinitialisation',
+      storage: 'Stockage',
+    },
+    storage: {
+      description: 'Configurez votre accès FTP/FTPS pour le stockage distant de vos fichiers.',
     },
     about: {
       versionLabel: "Version de l'image: {{version}}",
@@ -454,7 +495,7 @@ const fr = {
       tmdbSaved: 'Clé API TMDB configurée avec succès.',
       configFailed: 'Configuration impossible',
       savedButTestFailed: 'Configuration enregistrée, mais le test de connexion a échoué',
-      savedButTestFailedWithReason: 'Configuration enregistrée, mais le test a échoué: {{reason}}',
+      configurationFailed: 'La configuration a échoué: {{reason}}',
       discordWebhookRequired: "L'URL du webhook Discord est requise",
       discordConfigured: 'Webhook Discord configuré et testé avec succès!',
       browserUnsupported: 'Ce navigateur ne supporte pas les notifications web.',
@@ -466,7 +507,7 @@ const fr = {
       resetFailed: 'Réinitialisation impossible',
       testNotificationSent: 'Notification de test envoyee',
       testNotificationFailed: "Impossible d'envoyer la notification de test",
-      configurationSavedWithResponse: 'Configuration enregistrée. {{response}}',
+      configurationSaved: 'Configuration enregistrée.',
     },
     security: {
       title: 'Modifier le mot de passe',
@@ -505,10 +546,11 @@ const fr = {
       indexer: {
         title: 'Indexer',
         description:
-          'Configurez votre indexer pour consulter des résultats issus de sources autorisées.',
+          "Fournissez l'URL Torznab et le jeton API pour consulter et évaluer les résultats provenant de vos indexeurs autorisés.",
         url: "URL de l'indexer",
         token: 'Jeton API',
         defaultQuality: 'Qualité par défaut',
+        defaultLanguage: 'Langue par défaut',
       },
     },
     notifications: {
@@ -536,6 +578,8 @@ const fr = {
         none: 'Aucun navigateur enregistré.',
         current: 'Navigateur actuel',
         registered: 'Navigateur enregistré',
+        removeTitle: 'Supprimer ce navigateur ?',
+        removeDescription: 'Ce navigateur ne recevra plus les notifications SeedFlix.',
       },
       test: {
         title: 'Notification de test',
@@ -610,17 +654,7 @@ const fr = {
       confirmDescription:
         'Toutes les données locales seront remises à zéro (utilisateur, paramètres, wishlist films/séries) puis votre session sera expirée. Cette action est irréversible.',
       confirmAction: 'Oui, réinitialiser',
-    },
-    quality: {
-      all: 'Toutes qualités',
-      '2160p': '2160p (4K)',
-      '1080p': '1080p',
-      '720p': '720p',
-      '480p': '480p',
-      bluray: 'BluRay',
-      webdl: 'WEB-DL / WEBRip',
-      hdtv: 'HDTV',
-    },
+    }
   },
 } as const;
 

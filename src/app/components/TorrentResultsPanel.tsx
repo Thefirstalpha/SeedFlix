@@ -3,6 +3,10 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
+import { addTorrentToClient } from '../services/torrentService';
+import { IndexerMovieResult, IndexerSeriesResult } from '../../../common/indexer';
+import { useEffect, useState } from 'react';
+import { useI18n } from '../i18n/LanguageProvider';
 
 export interface TorrentReleaseItem {
   title: string;
@@ -46,32 +50,25 @@ export type TorrentResultsLabels = {
   sortBySizeAria: string;
 };
 
+export interface FilterOption {
+  quality?: string;
+  language?: string;
+  season?: string;
+  sortBy: 'size' | 'date';
+  sortOrder: 'asc' | 'desc';
+}
+
 interface TorrentResultsPanelProps {
   title: string;
   description?: string;
-  qualityFilter: string;
-  onQualityFilterChange: (value: string) => void;
-  languageFilter: string;
-  onLanguageFilterChange: (value: string) => void;
-  seasonFilter?: string;
-  onSeasonFilterChange?: (value: string) => void;
+  type: 'movie' | 'series';
+  filter: FilterOption;
+  onFilterChange: (filter: FilterOption) => void;
   availableReleaseSeasons?: string[];
   availableReleaseLanguages: string[];
-  sortBy: 'size' | 'date';
-  onSortByChange: (value: 'size' | 'date') => void;
-  sortOrder: 'asc' | 'desc';
-  onSortOrderToggle: () => void;
   isReleaseLoading: boolean;
   releaseError: string | null;
-  torrentStatus: string | null;
-  torrentError: string | null;
-  filteredResults: TorrentReleaseItem[];
-  paginatedResults: TorrentReleaseItem[];
-  addingTorrentLink: string | null;
-  onAddTorrent: (torrentUrl: string) => void;
-  currentPage: number;
-  onCurrentPageChange: (page: number) => void;
-  totalPages: number;
+  filteredResults: IndexerMovieResult[] | IndexerSeriesResult[];
   locale: string;
   labels: TorrentResultsLabels;
 }
@@ -81,32 +78,60 @@ const QUALITY_OPTIONS = ['2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'h
 export function TorrentResultsPanel({
   title,
   description,
-  qualityFilter,
-  onQualityFilterChange,
-  languageFilter,
-  onLanguageFilterChange,
-  seasonFilter,
-  onSeasonFilterChange,
+  type,
+  filter,
+  onFilterChange,
   availableReleaseSeasons,
   availableReleaseLanguages,
-  sortBy,
-  onSortByChange,
-  sortOrder,
-  onSortOrderToggle,
   isReleaseLoading,
   releaseError,
-  torrentStatus,
-  torrentError,
   filteredResults,
-  paginatedResults,
-  addingTorrentLink,
-  onAddTorrent,
-  currentPage,
-  onCurrentPageChange,
-  totalPages,
   locale,
   labels,
 }: TorrentResultsPanelProps) {
+
+  const { t } = useI18n();
+  const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
+  const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
+  const [torrentError, setTorrentError] = useState<string | null>(null);
+
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+
+  const handleAddTorrent = async (target: IndexerSeriesResult | IndexerMovieResult) => {
+    setTorrentStatus(null);
+    setTorrentError(null);
+
+    try {
+      const response = await addTorrentToClient(target.guid, type);
+      setTorrentStatus(
+        response.duplicate
+          ? t('seriesDetails.messages.duplicateTorrent')
+          : t('seriesDetails.messages.torrentAdded'),
+      );
+    } catch (error) {
+      setTorrentError(
+        error instanceof Error ? error.message : t('seriesDetails.errors.addTorrentFailed'),
+      );
+    } finally {
+      setAddingTorrentLink(null);
+    }
+  };
+
+
+  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE);
+  const paginatedResults = filteredResults.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]);
+
+
   return (
     <Card className="bg-white/5 border-white/10">
       <CardContent className="p-6 space-y-4">
@@ -116,14 +141,14 @@ export function TorrentResultsPanel({
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          {onSeasonFilterChange && availableReleaseSeasons ? (
+          {availableReleaseSeasons ? (
             <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
               <label className="text-sm text-white/70 whitespace-nowrap font-medium">
                 {labels.season}
               </label>
               <select
-                value={seasonFilter || 'all'}
-                onChange={(event) => onSeasonFilterChange(event.target.value)}
+                value={filter.season || 'all'}
+                onChange={(event) => onFilterChange({ ...filter, season: event.target.value })}
                 className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
               >
                 <option value="all">{labels.all}</option>
@@ -141,8 +166,8 @@ export function TorrentResultsPanel({
               {labels.quality}
             </label>
             <select
-              value={qualityFilter}
-              onChange={(event) => onQualityFilterChange(event.target.value)}
+              value={filter.quality || 'all'}
+              onChange={(event) => onFilterChange({ ...filter, quality: event.target.value })}
               className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
             >
               <option value="all">{labels.all}</option>
@@ -163,8 +188,8 @@ export function TorrentResultsPanel({
               {labels.language}
             </label>
             <select
-              value={languageFilter}
-              onChange={(event) => onLanguageFilterChange(event.target.value)}
+              value={filter.language || 'all'}
+              onChange={(event) => onFilterChange({ ...filter, language: event.target.value })}
               className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
             >
               <option value="all">{labels.all}</option>
@@ -180,10 +205,10 @@ export function TorrentResultsPanel({
             <span className="text-sm text-white/70 font-medium">{labels.sort}</span>
             <ToggleGroup
               type="single"
-              value={sortBy}
+              value={filter.sortBy}
               onValueChange={(value) => {
                 if (value) {
-                  onSortByChange(value as 'size' | 'date');
+                  onFilterChange({ ...filter, sortBy: value as 'size' | 'date' });
                 }
               }}
               className="border border-white/20 rounded-md bg-slate-900/30"
@@ -205,10 +230,10 @@ export function TorrentResultsPanel({
             </ToggleGroup>
             <Button
               size="sm"
-              onClick={onSortOrderToggle}
+              onClick={() => onFilterChange({ ...filter, sortOrder: filter.sortOrder === 'desc' ? 'asc' : 'desc' })}
               className="h-9 px-3 border border-white/20 text-white/80 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all"
             >
-              {sortOrder === 'desc' ? '↓' : '↑'}
+              {filter.sortOrder === 'desc' ? '↓' : '↑'}
             </Button>
           </div>
         </div>
@@ -239,7 +264,7 @@ export function TorrentResultsPanel({
                     <div className="flex flex-wrap gap-2 items-center">
                       <Button
                         size="sm"
-                        onClick={() => onAddTorrent(torrentLink)}
+                        onClick={async () => await handleAddTorrent(item)}
                         disabled={addingTorrentLink === torrentLink}
                         className="bg-cyan-600 hover:bg-cyan-700 text-white w-full sm:w-auto"
                       >
@@ -293,12 +318,6 @@ export function TorrentResultsPanel({
                         </Badge>
                       ) : null}
                     </div>
-
-                    {Array.isArray(item.categories) && item.categories.length > 0 ? (
-                      <p className="text-xs text-white/50 line-clamp-1 break-all">
-                        {labels.categories(item.categories.join(', '))}
-                      </p>
-                    ) : null}
                   </div>
                 );
               })}
@@ -308,7 +327,7 @@ export function TorrentResultsPanel({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onCurrentPageChange(Math.max(currentPage - 1, 1))}
+                onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
                 disabled={currentPage === 1}
               >
                 {labels.previous}
@@ -320,7 +339,7 @@ export function TorrentResultsPanel({
 
               <select
                 value={currentPage}
-                onChange={(event) => onCurrentPageChange(Number(event.target.value))}
+                onChange={(event) => setCurrentPage(Number(event.target.value))}
                 className="bg-slate-900 border border-white/20 text-white rounded-md px-2 py-1 text-sm"
               >
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -333,7 +352,7 @@ export function TorrentResultsPanel({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onCurrentPageChange(Math.min(currentPage + 1, totalPages))}
+                onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages))}
                 disabled={currentPage === totalPages}
               >
                 {labels.next}

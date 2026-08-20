@@ -1,16 +1,21 @@
 import js from "@eslint/js";
+import tseslint from "@typescript-eslint/eslint-plugin";
+import tsparser from "@typescript-eslint/parser";
 import prettierPlugin from "eslint-plugin-prettier";
 import prettierConfig from "eslint-config-prettier";
 
-/** @type {import("eslint").Linter.FlatConfig[]} */
+/** @type {import("eslint").Linter.Config[]} */
 export default [
 	js.configs.recommended,
 	prettierConfig,
 	{
-		files: ["server/**/*.js"],
+		files: ["server/**/*.ts"],
 		languageOptions: {
-			ecmaVersion: "latest",
-			sourceType: "module",
+			parser: tsparser,
+			parserOptions: {
+				ecmaVersion: "latest",
+				sourceType: "module"
+			},
 			globals: {
 				process: "readonly",
 				console: "readonly",
@@ -26,10 +31,13 @@ export default [
 			}
 		},
 		plugins: {
+			"@typescript-eslint": tseslint,
 			"prettier": prettierPlugin
 		},
 		rules: {
-			"prettier/prettier": "error"
+			"no-unused-vars": "off",
+			"@typescript-eslint/no-unused-vars": ["error", { "vars": "all", "varsIgnorePattern": "^_", "args": "after-used", "argsIgnorePattern": "^_" }],
+			"prettier/prettier": ["error", { "endOfLine": "auto" }]
 			// Ajoute ici des règles spécifiques Node si besoin
 		}
 	}

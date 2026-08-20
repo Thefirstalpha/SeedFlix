@@ -1,7 +1,7 @@
-import { ArrowLeft, Calendar, Clapperboard, Heart, Star, Tv } from 'lucide-react';
+import { ArrowLeft, Calendar, Clapperboard, Heart, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { TorrentResultsPanel } from './TorrentResultsPanel';
+import { TorrentResultsPanel, FilterOption } from './TorrentResultsPanel';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
@@ -13,81 +13,54 @@ import {
   getSeriesById,
   getSeriesSeasonEpisodes,
   searchSeriesReleases,
-  type TorznabSeriesResult,
 } from '../services/seriesService';
 import {
-  addToSeriesWishlist,
+  addToWishlist,
   getSeriesWishlistStatus,
-  removeFromSeriesWishlist,
+  removeFromWishlist,
 } from '../services/seriesWishlistService';
 import { buildTorrentResultsLabels } from '../services/torrentResultsLabels';
-import { addTorrentToClient } from '../services/torrentService';
 import type { SeriesDetails as SeriesDetailsModel, SeriesEpisode } from '../types/series';
-import type { SeriesWishlistStatus } from '../types/seriesWishlist';
+import { WishListItem } from '../../../common/wishlist';
+import { IndexerSeriesResult } from '../../../common/indexer';
 
-const EMPTY_STATUS: SeriesWishlistStatus = {
-  seriesInWishlist: false,
-  seasonsInWishlist: [],
-  episodesInWishlist: [],
-};
 
-const SERIES_QUALITY_FILTERS = ['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv'];
+const SERIES_QUALITY_FILTERS = new Set(['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv']);
 const SERIES_RELEASE_SEARCH_LIMIT = 100;
-
-function detectSeasonFromRelease(item: TorznabSeriesResult): string {
-  const title = String(item.title || '');
-  const attrs = item.attributes || {};
-
-  const attrSeason = String(attrs.season || attrs.seasonnum || attrs.seasonnumber || '').trim();
-  if (/^\d+$/.test(attrSeason)) {
-    return `S${attrSeason.padStart(2, '0')}`;
-  }
-
-  // Matcher S##E## (épisodes individuels) ou S## seul
-  const seasonMatch =
-    title.match(/S(\d{1,2})(?:E\d{1,2})?/i) || title.match(/\bSeason[ ._-]?(\d{1,2})\b/i);
-  if (seasonMatch?.[1]) {
-    return `S${String(seasonMatch[1]).padStart(2, '0')}`;
-  }
-
-  return 'unknown';
-}
 
 export function SeriesDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { settings } = useAuth();
+  const { user } = useAuth();
   const { t, language } = useI18n();
   const [series, setSeries] = useState<SeriesDetailsModel | null>(null);
   const [episodes, setEpisodes] = useState<SeriesEpisode[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
-  const [wishlistStatus, setWishlistStatus] = useState<SeriesWishlistStatus>(EMPTY_STATUS);
-  const [releaseResults, setReleaseResults] = useState<TorznabSeriesResult[]>([]);
+  const [wishlistStatus, setWishlistStatus] = useState<WishListItem | undefined>(undefined);
+  const [releaseResults, setReleaseResults] = useState<IndexerSeriesResult[]>([]);
   const [isReleaseLoading, setIsReleaseLoading] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
-  const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
-  const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
-  const [torrentError, setTorrentError] = useState<string | null>(null);
-  const [qualityFilter, setQualityFilter] = useState('all');
-  const [seasonFilter, setSeasonFilter] = useState('all');
-  const [languageFilter, setLanguageFilter] = useState('all');
-  const [sortBy, setSortBy] = useState<'size' | 'date'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [filter, setFilter] = useState<FilterOption>({
+    quality: 'all',
+    season: 'all',
+    language: 'all',
+    sortBy: 'date' as 'size' | 'date',
+    sortOrder: 'desc' as 'asc' | 'desc',
+  });
   const [revealedEpisodeIds, setRevealedEpisodeIds] = useState<number[]>([]);
-  const ITEMS_PER_PAGE = 10;
-  const spoilerModeEnabled = Boolean(
-    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode,
-  );
+  const spoilerModeEnabled = user?.settings?.spoilerMode || false;
 
   useEffect(() => {
     const preferred = String(
-      settings?.placeholders?.indexer?.defaultQuality || 'all',
+      user?.settings?.indexer?.qualities || 'all',
     ).toLowerCase();
-    setQualityFilter(SERIES_QUALITY_FILTERS.includes(preferred) ? preferred : 'all');
-  }, [settings?.placeholders?.indexer?.defaultQuality]);
+    setFilter((prev) => ({
+      ...prev,
+      quality: SERIES_QUALITY_FILTERS.has(preferred) ? preferred : 'all',
+    }));
+  }, [user?.settings?.indexer?.qualities]);
 
   useEffect(() => {
     loadSeriesDetails();
@@ -103,15 +76,14 @@ export function SeriesDetails() {
 
   // Recherche additionnelle quand on filtre sur une saison pour attraper les épisodes individuels
   useEffect(() => {
-    if (!series || seasonFilter === 'all') {
+    if (!series || filter.season === 'all') {
       return;
     }
 
     const loadSeasonEpisodeReleases = async () => {
       try {
         // Recherche ciblée avec le format "Series S01E" pour attraper les épisodes individuels
-        const episodeQuery = `${series.originalTitle || series.title} ${seasonFilter}E`;
-        const indexerResponse = await searchSeriesReleases(episodeQuery, 50);
+        const indexerResponse = await searchSeriesReleases(series.id, 50, filter.season === 'all' ? undefined : filter.season);
 
         // Fusionner avec les résultats existants en évitant les doublons
         setReleaseResults((prev) => {
@@ -133,7 +105,13 @@ export function SeriesDetails() {
     };
 
     loadSeasonEpisodeReleases();
-  }, [series, seasonFilter]);
+  }, [series, filter.season]);
+
+  useEffect(() => {
+    if (series) {
+      loadReleases(series.id);
+    }
+  }, [filter.season, series]);
 
   const availableSeasons = useMemo(() => {
     if (!series) {
@@ -152,42 +130,32 @@ export function SeriesDetails() {
 
   const filteredReleaseResults = useMemo(() => {
     let filtered = releaseResults.filter((item) => {
-      const qualityOk = qualityFilter === 'all' || normalizeQuality(item.quality) === qualityFilter;
-      const seasonOk = seasonFilter === 'all' || detectSeasonFromRelease(item) === seasonFilter;
+      const qualityOk = filter.quality === 'all' || normalizeQuality(item.quality) === filter.quality;
       const languageOk =
-        languageFilter === 'all' || normalizeIndexerLanguage(item.language) === languageFilter;
-      return qualityOk && seasonOk && languageOk;
+        filter.language === 'all' || normalizeIndexerLanguage(item.language) === filter.language;
+      return qualityOk && languageOk;
     });
 
     // Appliquer le tri
     filtered.sort((a, b) => {
       let comparison = 0;
 
-      if (sortBy === 'size') {
+      if (filter.sortBy === 'size') {
         const sizeA = Number(a.size || 0);
         const sizeB = Number(b.size || 0);
         comparison = sizeA - sizeB;
-      } else if (sortBy === 'date') {
+      } else if (filter.sortBy === 'date') {
         const dateA = a.pubDate ? new Date(a.pubDate).getTime() : 0;
         const dateB = b.pubDate ? new Date(b.pubDate).getTime() : 0;
         comparison = dateA - dateB;
       }
 
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return filter.sortOrder === 'asc' ? comparison : -comparison;
     });
 
     return filtered;
-  }, [releaseResults, qualityFilter, seasonFilter, languageFilter, sortBy, sortOrder]);
+  }, [releaseResults, filter]);
 
-  const totalPages = Math.ceil(filteredReleaseResults.length / ITEMS_PER_PAGE);
-  const paginatedResults = filteredReleaseResults.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE,
-  );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [qualityFilter, seasonFilter, languageFilter, sortBy, sortOrder]);
 
   useEffect(() => {
     setRevealedEpisodeIds([]);
@@ -221,25 +189,7 @@ export function SeriesDetails() {
         setSelectedSeason(defaultSeason ? defaultSeason.seasonNumber : null);
         setWishlistStatus(await getSeriesWishlistStatus(seriesData.id));
 
-        setIsReleaseLoading(true);
-        setReleaseError(null);
-        try {
-          const indexerResponse = await searchSeriesReleases(
-            seriesData.originalTitle || seriesData.title,
-            SERIES_RELEASE_SEARCH_LIMIT,
-            seriesData.id,
-          );
-          setReleaseResults(indexerResponse.items);
-        } catch (indexerLoadError) {
-          setReleaseError(
-            indexerLoadError instanceof Error
-              ? indexerLoadError.message
-              : t('seriesDetails.errors.indexerSearchFailed'),
-          );
-          setReleaseResults([]);
-        } finally {
-          setIsReleaseLoading(false);
-        }
+
       } else {
         setReleaseResults([]);
       }
@@ -266,58 +216,23 @@ export function SeriesDetails() {
     setWishlistStatus(await getSeriesWishlistStatus(series.id));
   };
 
-  const handleAddTorrent = async (torrentUrl: string) => {
-    setTorrentStatus(null);
-    setTorrentError(null);
-    setAddingTorrentLink(torrentUrl);
-
-    try {
-      const response = await addTorrentToClient(torrentUrl, 'series');
-      setTorrentStatus(
-        response.duplicate
-          ? t('seriesDetails.messages.duplicateTorrent')
-          : t('seriesDetails.messages.torrentAdded'),
-      );
-    } catch (error) {
-      setTorrentError(
-        error instanceof Error ? error.message : t('seriesDetails.errors.addTorrentFailed'),
-      );
-    } finally {
-      setAddingTorrentLink(null);
-    }
-  };
-
   // ── Wishlist helpers ────────────────────────────────────────────────────────
-
-  const isSeasonCoveredBySeries = wishlistStatus.seriesInWishlist;
-
-  const isSeasonDirectlyInWishlist = (seasonNumber: number) =>
-    wishlistStatus.seasonsInWishlist.includes(seasonNumber);
+  const isSeasonCoveredBySeries = wishlistStatus?.all_seasons;
 
   const isSeasonInWishlist = (seasonNumber: number) =>
-    wishlistStatus.seriesInWishlist || wishlistStatus.seasonsInWishlist.includes(seasonNumber);
+    wishlistStatus && (wishlistStatus.all_seasons || (wishlistStatus.seasons?.[seasonNumber]?.all_episodes));
 
   const isEpisodeDirectlyInWishlist = (seasonNumber: number, episodeNumber: number) =>
-    wishlistStatus.episodesInWishlist.some(
-      (e) => e.seasonNumber === seasonNumber && e.episodeNumber === episodeNumber,
-    );
+    wishlistStatus?.seasons?.[seasonNumber]?.episodes?.includes(episodeNumber);
 
   // ── Wishlist actions ────────────────────────────────────────────────────────
 
   const handleSeriesWishlist = async () => {
     if (!series) return;
-    if (wishlistStatus.seriesInWishlist) {
-      await removeFromSeriesWishlist(`series_${series.id}`);
+    if (wishlistStatus?.all_seasons) {
+      await removeFromWishlist(series.id);
     } else {
-      await addToSeriesWishlist({
-        type: 'series',
-        seriesId: series.id,
-        seriesTitle: series.title,
-        seriesPoster: series.poster,
-        year: series.year,
-        rating: series.rating,
-        genre: series.genre,
-      });
+      await addToWishlist(series.id);
     }
     await refreshStatus();
     window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
@@ -326,21 +241,10 @@ export function SeriesDetails() {
 
   const handleSeasonWishlist = async () => {
     if (!series || selectedSeason === null) return;
-    const seasonData = availableSeasons.find((s) => s.seasonNumber === selectedSeason);
-    if (isSeasonDirectlyInWishlist(selectedSeason)) {
-      await removeFromSeriesWishlist(`season_${series.id}_${selectedSeason}`);
+    if (isSeasonInWishlist(selectedSeason)) {
+      await removeFromWishlist(series.id, selectedSeason);
     } else {
-      await addToSeriesWishlist({
-        type: 'season',
-        seriesId: series.id,
-        seriesTitle: series.title,
-        seriesPoster: series.poster,
-        year: series.year,
-        rating: series.rating,
-        genre: series.genre,
-        seasonNumber: selectedSeason,
-        seasonName: seasonData?.name ?? t('seriesDetails.seasonNumber', { number: selectedSeason }),
-      });
+      await addToWishlist(series.id, selectedSeason);
     }
     await refreshStatus();
     window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
@@ -350,25 +254,9 @@ export function SeriesDetails() {
   const handleEpisodeWishlist = async (episode: SeriesEpisode) => {
     if (!series || selectedSeason === null) return;
     if (isEpisodeDirectlyInWishlist(selectedSeason, episode.episodeNumber)) {
-      await removeFromSeriesWishlist(
-        `episode_${series.id}_${selectedSeason}_${episode.episodeNumber}`,
-      );
+      await removeFromWishlist(series.id, selectedSeason, episode.episodeNumber);
     } else {
-      await addToSeriesWishlist({
-        type: 'episode',
-        seriesId: series.id,
-        seriesTitle: series.title,
-        seriesPoster: series.poster,
-        year: series.year,
-        rating: series.rating,
-        genre: series.genre,
-        seasonNumber: selectedSeason,
-        seasonName:
-          availableSeasons.find((s) => s.seasonNumber === selectedSeason)?.name ??
-          t('seriesDetails.seasonNumber', { number: selectedSeason }),
-        episodeNumber: episode.episodeNumber,
-        episodeName: episode.name,
-      });
+      await addToWishlist(series.id, selectedSeason, episode.episodeNumber);
     }
     await refreshStatus();
     window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
@@ -379,6 +267,30 @@ export function SeriesDetails() {
     setRevealedEpisodeIds((prev) =>
       prev.includes(episodeId) ? prev.filter((id) => id !== episodeId) : [...prev, episodeId],
     );
+  };
+
+
+
+  const loadReleases = async (id: number) => {
+    setIsReleaseLoading(true);
+    setReleaseError(null);
+    try {
+      const indexerResponse = await searchSeriesReleases(
+        id,
+        SERIES_RELEASE_SEARCH_LIMIT,
+        filter.season === 'all' ? undefined : filter.season,
+      );
+      setReleaseResults(indexerResponse.items);
+    } catch (indexerLoadError) {
+      setReleaseError(
+        indexerLoadError instanceof Error
+          ? indexerLoadError.message
+          : t('seriesDetails.errors.indexerSearchFailed'),
+      );
+      setReleaseResults([]);
+    } finally {
+      setIsReleaseLoading(false);
+    }
   };
 
   if (isLoading) {
@@ -425,23 +337,18 @@ export function SeriesDetails() {
           <Button
             onClick={handleSeriesWishlist}
             className={
-              wishlistStatus.seriesInWishlist
+              wishlistStatus?.all_seasons
                 ? 'bg-cyan-600 hover:bg-cyan-700 text-white'
                 : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
             }
           >
             <Heart
-              className={`w-5 h-5 mr-2 ${wishlistStatus.seriesInWishlist ? 'fill-current' : ''}`}
+              className={`w-5 h-5 mr-2 ${wishlistStatus?.all_seasons ? 'fill-current' : ''}`}
             />
-            {wishlistStatus.seriesInWishlist
+            {wishlistStatus?.all_seasons
               ? t('seriesDetails.removeSeries')
               : t('seriesDetails.addSeries')}
           </Button>
-
-          <Badge className="bg-cyan-600/20 text-cyan-100 border border-cyan-500/30 px-3 py-1">
-            <Tv className="w-4 h-4 mr-2" />
-            {series.status || t('seriesDetails.unknownStatus')}
-          </Badge>
         </div>
       </div>
 
@@ -511,7 +418,7 @@ export function SeriesDetails() {
                 <span>{series.rating}/10</span>
               </div>
               <Badge className="bg-cyan-600 text-white">{series.genre}</Badge>
-              {series.voteCount && (
+              {!!(series.voteCount) && (
                 <span className="text-white/60">
                   {t('seriesDetails.votes', { count: series.voteCount.toLocaleString() })}
                 </span>
@@ -587,26 +494,25 @@ export function SeriesDetails() {
                     {selectedSeason !== null && (
                       <Button
                         size="sm"
-                        disabled={isSeasonCoveredBySeries}
+                        disabled={wishlistStatus?.all_seasons}
                         onClick={handleSeasonWishlist}
                         className={
                           isSeasonCoveredBySeries
                             ? 'bg-white/5 text-white/40 border border-white/10 cursor-not-allowed'
-                            : isSeasonDirectlyInWishlist(selectedSeason)
+                            : isSeasonInWishlist(selectedSeason)
                               ? 'bg-cyan-600 hover:bg-cyan-700 text-white'
                               : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
                         }
                       >
                         <Heart
-                          className={`w-4 h-4 mr-1 ${
-                            !isSeasonCoveredBySeries && isSeasonDirectlyInWishlist(selectedSeason)
-                              ? 'fill-current'
-                              : ''
-                          }`}
+                          className={`w-4 h-4 mr-1 ${isSeasonInWishlist(selectedSeason)
+                            ? 'fill-current'
+                            : ''
+                            }`}
                         />
                         {isSeasonCoveredBySeries
                           ? t('seriesDetails.coveredBySeries')
-                          : isSeasonDirectlyInWishlist(selectedSeason)
+                          : isSeasonInWishlist(selectedSeason)
                             ? t('seriesDetails.removeSeason')
                             : t('seriesDetails.addSeason')}
                       </Button>
@@ -616,7 +522,7 @@ export function SeriesDetails() {
                   {/* Episodes list */}
                   {isLoadingEpisodes ? (
                     <div className="space-y-3">
-                      {[...Array(3)].map((_, i) => (
+                      {[...new Array(3)].map((_, i) => (
                         <div key={i} className="h-20 bg-white/5 rounded-lg animate-pulse" />
                       ))}
                     </div>
@@ -624,10 +530,9 @@ export function SeriesDetails() {
                     <ScrollArea className="h-[500px] w-full rounded-lg border border-white/10">
                       <div className="space-y-3 p-4">
                         {episodes.map((episode) => {
-                          const coveredByParent =
-                            wishlistStatus.seriesInWishlist ||
+                          const coveredByParent = wishlistStatus && (wishlistStatus?.all_seasons ||
                             (selectedSeason !== null &&
-                              wishlistStatus.seasonsInWishlist.includes(selectedSeason));
+                              isSeasonInWishlist(selectedSeason)));
                           const directlyInWishlist =
                             selectedSeason !== null &&
                             isEpisodeDirectlyInWishlist(selectedSeason, episode.episodeNumber);
@@ -646,11 +551,10 @@ export function SeriesDetails() {
                                     onClick={() =>
                                       spoilerModeEnabled && toggleEpisodeReveal(episode.id)
                                     }
-                                    className={`w-full text-left rounded-md ${
-                                      spoilerModeEnabled
-                                        ? 'transition-colors hover:bg-white/5 px-2 py-1 -mx-2 -my-1'
-                                        : ''
-                                    }`}
+                                    className={`w-full text-left rounded-md ${spoilerModeEnabled
+                                      ? 'transition-colors hover:bg-white/5 px-2 py-1 -mx-2 -my-1'
+                                      : ''
+                                      }`}
                                   >
                                     <p className="text-white font-semibold">
                                       {t('seriesDetails.episodeNumber', {
@@ -692,11 +596,10 @@ export function SeriesDetails() {
                                       className="p-1.5 rounded-full hover:bg-white/10 transition-colors"
                                     >
                                       <Heart
-                                        className={`w-4 h-4 ${
-                                          directlyInWishlist
-                                            ? 'fill-cyan-400 text-cyan-400'
-                                            : 'text-white/50 hover:text-white'
-                                        }`}
+                                        className={`w-4 h-4 ${directlyInWishlist
+                                          ? 'fill-cyan-400 text-cyan-400'
+                                          : 'text-white/50 hover:text-white'
+                                          }`}
                                       />
                                     </button>
                                   )}
@@ -745,29 +648,14 @@ export function SeriesDetails() {
           <TorrentResultsPanel
             title={t('seriesDetails.indexer.title')}
             description={t('seriesDetails.indexer.description')}
-            qualityFilter={qualityFilter}
-            onQualityFilterChange={setQualityFilter}
-            languageFilter={languageFilter}
-            onLanguageFilterChange={setLanguageFilter}
-            seasonFilter={seasonFilter}
-            onSeasonFilterChange={setSeasonFilter}
+            type="series"
+            filter={filter}
+            onFilterChange={setFilter}
             availableReleaseSeasons={availableReleaseSeasons}
             availableReleaseLanguages={availableReleaseLanguages}
-            sortBy={sortBy}
-            onSortByChange={setSortBy}
-            sortOrder={sortOrder}
-            onSortOrderToggle={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
             isReleaseLoading={isReleaseLoading}
             releaseError={releaseError}
-            torrentStatus={torrentStatus}
-            torrentError={torrentError}
             filteredResults={filteredReleaseResults}
-            paginatedResults={paginatedResults}
-            addingTorrentLink={addingTorrentLink}
-            onAddTorrent={handleAddTorrent}
-            currentPage={currentPage}
-            onCurrentPageChange={setCurrentPage}
-            totalPages={totalPages}
             locale={language === 'fr' ? 'fr-FR' : 'en-US'}
             labels={torrentPanelLabels}
           />

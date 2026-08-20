@@ -1,93 +1,62 @@
 import { ArrowLeft, Star, Calendar, Clock, User, Heart } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
-import { TorrentResultsPanel } from './TorrentResultsPanel';
+import { FilterOption, TorrentResultsPanel } from './TorrentResultsPanel';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
-import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/LanguageProvider';
 import { normalizeIndexerLanguage, normalizeQuality } from '../services/indexerNormalization';
 import {
   getMovieById,
   searchMovieReleases,
-  type TorznabMovieResult,
 } from '../services/movieService';
 import { buildTorrentResultsLabels } from '../services/torrentResultsLabels';
-import { addTorrentToClient } from '../services/torrentService';
 import { addToWishlist, removeFromWishlist, isInWishlist } from '../services/wishlistService';
 import type { Movie } from '../types/movie';
-
-const MOVIE_QUALITY_FILTERS = ['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv'];
+import { IndexerMovieResult } from '../../../common/indexer';
 
 export function MovieDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { settings } = useAuth();
   const { t, language } = useI18n();
   const [movie, setMovie] = useState<Movie | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [inWishlist, setInWishlist] = useState(false);
-  const [releaseResults, setReleaseResults] = useState<TorznabMovieResult[]>([]);
+  const [releaseResults, setReleaseResults] = useState<IndexerMovieResult[]>([]);
   const [isReleaseLoading, setIsReleaseLoading] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
-  const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
-  const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
-  const [torrentError, setTorrentError] = useState<string | null>(null);
-  const [qualityFilter, setQualityFilter] = useState('all');
-  const [languageFilter, setLanguageFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<'size' | 'date'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const ITEMS_PER_PAGE = 10;
-
-  useEffect(() => {
-    const preferred = String(
-      settings?.placeholders?.indexer?.defaultQuality || 'all',
-    ).toLowerCase();
-    setQualityFilter(MOVIE_QUALITY_FILTERS.includes(preferred) ? preferred : 'all');
-  }, [settings?.placeholders?.indexer?.defaultQuality]);
+  const [filter, setFilter] = useState<FilterOption>({ quality: 'all', language: 'all', season: 'all', sortBy: 'date', sortOrder: 'desc' });
 
   const filteredReleaseResults = useMemo(() => {
     let results = releaseResults.filter((item) => {
       const languageOk =
-        languageFilter === 'all' || normalizeIndexerLanguage(item.language) === languageFilter;
+        filter.language === 'all' || normalizeIndexerLanguage(item.language) === filter.language;
 
-      if (qualityFilter === 'all') {
+      if (filter.quality === 'all') {
         return languageOk;
       }
 
-      return normalizeQuality(item.quality) === qualityFilter && languageOk;
+      return normalizeQuality(item.quality) === filter.quality && languageOk;
     });
 
     // Apply sorting
-    if (sortBy === 'size') {
+    if (filter.sortBy === 'size') {
       results.sort((a, b) => {
-        const sizeA = a.sizeBytes || 0;
-        const sizeB = b.sizeBytes || 0;
-        return sortOrder === 'desc' ? sizeB - sizeA : sizeA - sizeB;
+        const sizeA = a.size || 0;
+        const sizeB = b.size || 0;
+        return filter.sortOrder === 'desc' ? sizeB - sizeA : sizeA - sizeB;
       });
-    } else if (sortBy === 'date') {
+    } else if (filter.sortBy === 'date') {
       results.sort((a, b) => {
         const dateA = a.pubDate ? new Date(a.pubDate).getTime() : 0;
         const dateB = b.pubDate ? new Date(b.pubDate).getTime() : 0;
-        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+        return filter.sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
     }
 
     return results;
-  }, [releaseResults, qualityFilter, languageFilter, sortBy, sortOrder]);
-
-  const totalPages = Math.ceil(filteredReleaseResults.length / ITEMS_PER_PAGE);
-  const paginatedResults = filteredReleaseResults.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE,
-  );
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [qualityFilter, languageFilter, sortBy, sortOrder]);
+  }, [releaseResults, filter]);
 
   const availableReleaseLanguages = Array.from(
     new Set(releaseResults.map((item) => normalizeIndexerLanguage(item.language)).filter(Boolean)),
@@ -110,25 +79,7 @@ export function MovieDetails() {
       if (movieData) {
         setInWishlist(await isInWishlist(movieData.id));
 
-        setIsReleaseLoading(true);
-        setReleaseError(null);
-        try {
-          const indexerResponse = await searchMovieReleases(
-            movieData.originalTitle || movieData.title,
-            12,
-            movieData.id,
-          );
-          setReleaseResults(indexerResponse.items);
-        } catch (indexerError) {
-          setReleaseError(
-            indexerError instanceof Error
-              ? indexerError.message
-              : t('movieDetails.errors.indexerSearchFailed'),
-          );
-          setReleaseResults([]);
-        } finally {
-          setIsReleaseLoading(false);
-        }
+
       } else {
         setReleaseResults([]);
       }
@@ -146,7 +97,7 @@ export function MovieDetails() {
       await removeFromWishlist(movie.id);
       setInWishlist(false);
     } else {
-      await addToWishlist(movie);
+      await addToWishlist(movie.id);
       setInWishlist(true);
     }
 
@@ -154,24 +105,31 @@ export function MovieDetails() {
     window.dispatchEvent(new CustomEvent('seedflix:notifications-refresh-request'));
   };
 
-  const handleAddTorrent = async (torrentUrl: string) => {
-    setTorrentStatus(null);
-    setTorrentError(null);
-    setAddingTorrentLink(torrentUrl);
+  
+  useEffect(() => {
+    if (movie) {
+      loadReleases(movie.id);
+    }
+  }, [filter.season, movie]);
 
+  const loadReleases = async (tmdbId: number) => {
+    setIsReleaseLoading(true);
+    setReleaseError(null);
     try {
-      const response = await addTorrentToClient(torrentUrl);
-      setTorrentStatus(
-        response.duplicate
-          ? t('movieDetails.messages.duplicateTorrent')
-          : t('movieDetails.messages.torrentAdded'),
+      const indexerResponse = await searchMovieReleases(
+        100,
+        tmdbId,
       );
-    } catch (error) {
-      setTorrentError(
-        error instanceof Error ? error.message : t('movieDetails.errors.addTorrentFailed'),
+      setReleaseResults(indexerResponse.items);
+    } catch (indexerError) {
+      setReleaseError(
+        indexerError instanceof Error
+          ? indexerError.message
+          : t('movieDetails.errors.indexerSearchFailed'),
       );
+      setReleaseResults([]);
     } finally {
-      setAddingTorrentLink(null);
+      setIsReleaseLoading(false);
     }
   };
 
@@ -222,11 +180,10 @@ export function MovieDetails() {
 
         <Button
           onClick={toggleWishlist}
-          className={`${
-            inWishlist
+          className={`${inWishlist
               ? 'bg-purple-600 hover:bg-purple-700 text-white'
               : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-          }`}
+            }`}
         >
           <Heart className={`w-5 h-5 mr-2 ${inWishlist ? 'fill-current' : ''}`} />
           {inWishlist ? t('movieDetails.removeFromWishlist') : t('movieDetails.addToWishlist')}
@@ -358,26 +315,13 @@ export function MovieDetails() {
 
           <TorrentResultsPanel
             title={t('movieDetails.indexer.title')}
-            qualityFilter={qualityFilter}
-            onQualityFilterChange={setQualityFilter}
-            languageFilter={languageFilter}
-            onLanguageFilterChange={setLanguageFilter}
+            filter={filter}
+            type="movie"
+            onFilterChange={setFilter}
             availableReleaseLanguages={availableReleaseLanguages}
-            sortBy={sortBy}
-            onSortByChange={setSortBy}
-            sortOrder={sortOrder}
-            onSortOrderToggle={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
             isReleaseLoading={isReleaseLoading}
             releaseError={releaseError}
-            torrentStatus={torrentStatus}
-            torrentError={torrentError}
             filteredResults={filteredReleaseResults}
-            paginatedResults={paginatedResults}
-            addingTorrentLink={addingTorrentLink}
-            onAddTorrent={handleAddTorrent}
-            currentPage={currentPage}
-            onCurrentPageChange={setCurrentPage}
-            totalPages={totalPages}
             locale={language === 'fr' ? 'fr-FR' : 'en-US'}
             labels={torrentPanelLabels}
           />
@@ -385,11 +329,10 @@ export function MovieDetails() {
           <div>
             <Button
               onClick={toggleWishlist}
-              className={`w-full sm:w-auto ${
-                inWishlist
+              className={`w-full sm:w-auto ${inWishlist
                   ? 'bg-purple-600 hover:bg-purple-700 text-white'
                   : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-              }`}
+                }`}
             >
               <Heart className={`w-5 h-5 mr-2 ${inWishlist ? 'fill-current' : ''}`} />
               {inWishlist ? t('movieDetails.removeFromWishlist') : t('movieDetails.addToWishlist')}

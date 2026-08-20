@@ -29,7 +29,7 @@ function emitUnreadNotificationsUpdated(count: number) {
 
 export default function Notifications() {
   const navigate = useNavigate();
-  const { user, settings } = useAuth();
+  const { user } = useAuth();
   const { t, language } = useI18n();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,11 +92,9 @@ export default function Notifications() {
   };
 
   const isIndexerSuggestion = (notification: Notification) =>
-    String(notification.data?.source || '') === 'indexer-rss';
+    String(notification.type || '') === 'search';
 
-  const spoilerModeEnabled = Boolean(
-    (settings?.placeholders?.preferences as Record<string, unknown> | undefined)?.spoilerMode,
-  );
+  const spoilerModeEnabled = Boolean(user?.settings.spoilerMode || false);
 
   const maskEpisodeLabel = (value: string) =>
     value.replace(/(S\d{1,2}E\d{1,2})(?:\s*[-–]\s*[^:\n]+)?/i, '$1');
@@ -120,8 +118,7 @@ export default function Notifications() {
       return;
     }
 
-    const tab = targetKey.startsWith('movie:') ? 'movies' : 'series';
-    const params = new URLSearchParams({ tab, target: targetKey });
+    const params = new URLSearchParams({ tab: notification.data.type, target: targetKey });
     navigate(`/wishlist?${params.toString()}`);
   };
 

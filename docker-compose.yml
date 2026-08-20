@@ -12,6 +12,7 @@ services:
       PORT: 4000
       DEBUG: ${DEBUG:-false}
       REQUEST_LOGS: ${REQUEST_LOGS:-true}
+      COOKIE_SECRET: ${COOKIE_SECRET:-development-secret}
     volumes:
       - ./data:/app/data
     restart: unless-stopped
