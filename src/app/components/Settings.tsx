@@ -74,6 +74,9 @@ export function Settings() {
   const [isPreferencesSaving, setIsPreferencesSaving] = useState(false);
 
 
+  const [version, setVersion] = useState('dev');
+
+
   const isAdmin = user?.username === 'admin';
 
   const tabParam = searchParams.get('tab');
@@ -162,12 +165,20 @@ export function Settings() {
     }
   };
 
+
+  useEffect(() => {
+    fetch('/VERSION')
+      .then((response) => response.text())
+      .then((data) => setVersion(data))
+      .catch((error) => console.error("Erreur de lecture", error));
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-white">{t('settings.title')}</h2>
         <p className="mt-2 text-sm text-white/60">
-          {t('settings.about.versionLabel', { version: 'dev' })}
+          Version: {version}
         </p>
       </div>
       <Tabs

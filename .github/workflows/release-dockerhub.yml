@@ -38,6 +38,10 @@ jobs:
             type=raw,value=latest
             type=raw,value=dev
 
+      - name: Add version
+        run: |
+          echo "${{ github.event.release.tag_name }}" > public/VERSION
+
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
@@ -73,6 +77,10 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Add version
+        run: |
+          echo "dev-${{ github.event.head_commit.id }}" > public/VERSION
 
       - name: Build and push image (dev)
         uses: docker/build-push-action@v6
