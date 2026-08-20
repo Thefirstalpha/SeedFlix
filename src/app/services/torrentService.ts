@@ -74,13 +74,14 @@ export async function resumeTorrent(id: number) {
   return parseJson<{ ok: boolean; message: string }>(response);
 }
 
-export async function deleteTorrent(id: number) {
+export async function deleteTorrent(id: number, deleteData = false) {
   const response = await fetch(`${API_BASE_URL}/transmission/delete/${id}`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-    }
+    },
+    body: JSON.stringify({ deleteData }),
   });
 
   return parseJson<{ ok: boolean; message: string }>(response);

@@ -16,6 +16,7 @@ export interface TorrentDownloadItem {
     errorString: string;
     hashString: string;
     uploadRatio: number;
+    uploadedEver: number;
     managedBySeedflix?: boolean;
 }
 

@@ -65,7 +65,10 @@ router.post('/transmission/pause/:id', async (req, res) => {
 
 router.post('/transmission/delete/:id', async (req, res) => {
   const id = Number(req.params.id);
-  await performTransmissionAction('torrent-remove', req.user.id, id);
+  const deleteData = Boolean(req.body?.deleteData);
+  await performTransmissionAction('torrent-remove', req.user.id, id, {
+    'delete-local-data': deleteData,
+  });
   res.status(200).json({ status: 'ok' });
 });
 

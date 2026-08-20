@@ -290,6 +290,7 @@ export async function getDownloadsTransmission(
         'errorString',
         'peersConnected',
         'uploadRatio',
+        'uploadedEver',
       ],
     },
   });
@@ -321,6 +322,7 @@ export async function getDownloadsTransmission(
         errorString: torrent.errorString || '',
         managedBySeedflix,
         uploadRatio: Number(torrent.uploadRatio || 0),
+        uploadedEver: Number(torrent.uploadedEver || 0),
       };
       return data;
     })
@@ -328,7 +330,12 @@ export async function getDownloadsTransmission(
   return torrents;
 }
 
-export async function performTransmissionAction(action: string, userId: number, torrentId: number) {
+export async function performTransmissionAction(
+  action: string,
+  userId: number,
+  torrentId: number,
+  extraArguments: Record<string, unknown> = {},
+) {
   const settings = getTransmissionSettings(userId);
   if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
 
@@ -336,6 +343,7 @@ export async function performTransmissionAction(action: string, userId: number, 
     method: action,
     arguments: {
       ids: [torrentId],
+      ...extraArguments,
     },
   });
 

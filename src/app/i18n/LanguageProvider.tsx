@@ -276,6 +276,18 @@ export interface I18nMessages {
       allTorrents: string;
       empty: string;
     };
+    sort: {
+      label: string;
+      addedDate: string;
+      name: string;
+      progress: string;
+      rateDownload: string;
+      totalSize: string;
+      uploadRatio: string;
+      uploadEfficiency: string;
+      ascending: string;
+      descending: string;
+    };
     unknown: string;
     finished: string;
     rate: string;
@@ -284,6 +296,8 @@ export interface I18nMessages {
     totalSize: string;
     remaining: string;
     ratio: string;
+    uploadEfficiency: string;
+    uploadEfficiencyHint: string;
     added: string;
     managedBadge: string;
     unmanagedBadge: string;
@@ -294,8 +308,15 @@ export interface I18nMessages {
     pause: string;
     resume: string;
     remove: string;
+    removeWithData: string;
     dontTrack: string;
     loadFailed: string;
+    confirmDeleteWithData: {
+      title: string;
+      description: string;
+      cancel: string;
+      confirm: string;
+    };
   };
   home: {
     emptySearch: string;
