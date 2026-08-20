@@ -18,7 +18,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
-import { Progress } from './ui/progress';
 import { useI18n } from '../i18n/LanguageProvider';
 import {
   getTorrentDownloads,
@@ -148,24 +147,34 @@ function DownloadCard({
         </div>
 
         {/* Barre de progression */}
-        {!completed && <Progress value={item.progress} className="h-1 bg-white/10" />}
+        {!completed && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-white/60">{item.statusLabel}</span>
+              <span className="font-semibold text-cyan-300">{item.progress.toFixed(1)}%</span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-cyan-500 transition-all duration-700"
+                style={{ width: `${Math.min(100, Math.max(0, item.progress))}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Badges métriques */}
         <div className="flex flex-wrap gap-1.5">
-          {!completed && (
-            <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-xs py-0 h-5">
-              {item.progress.toFixed(1)}%
-            </Badge>
-          )}
           {completed && (
             <Badge className="border-emerald-500/50 bg-emerald-600/40 text-emerald-200 text-xs py-0 h-5">
               ✓ {t('downloads.finished')}
             </Badge>
           )}
-          <Badge variant="outline"
-            className={`text-xs py-0 h-5 ${completed ? 'border-emerald-500/40 text-emerald-300' : 'border-white/30 text-white/70'}`}>
-            {item.statusLabel}
-          </Badge>
+          {completed && (
+            <Badge variant="outline"
+              className="text-xs py-0 h-5 border-emerald-500/40 text-emerald-300">
+              {item.statusLabel}
+            </Badge>
+          )}
           {!completed && !isPaused && (
             <>
               <Badge variant="outline" className="border-lime-500/40 text-lime-300 text-xs py-0 h-5">
@@ -318,12 +327,12 @@ export function Downloads() {
   const isActiveDownload = (item: TorrentDownloadItem) =>
     !isComplete(item) && [3, 4].includes(item.status);
 
-  const loadDownloads = async (includeAll: boolean = false) => {
+  const loadDownloads = async (includeAll: boolean = false, force: boolean = false) => {
     try {
       const response = await getTorrentDownloads(includeAll);
       // Check if we're in action cooldown; if so, don't update state from polling
       const timeSinceLastAction = Date.now() - lastActionTimeRef.current;
-      if (timeSinceLastAction < ACTION_COOLDOWN_MS) {
+      if (!force && timeSinceLastAction < ACTION_COOLDOWN_MS) {
         // Still in cooldown, ignore this polling update
         return;
       }
@@ -377,11 +386,15 @@ export function Downloads() {
     setDownloads((prev) => prev.map((item) => (item.id === id ? { ...item, status: 0 } : item)));
     try {
       await pauseTorrent(id);
+      // Laisse le temps au client torrent d'appliquer la pause avant de rafraîchir,
+      // sinon le fetch immédiat peut renvoyer l'ancien statut (effet de rollback visuel).
+      await new Promise((resolve) => setTimeout(resolve, 700));
     } catch (err) {
       console.error('Erreur lors de la pause:', err);
     } finally {
       setActionInProgress(null);
-      void loadDownloads(showAllTorrentsRef.current);
+      lastActionTimeRef.current = Date.now();
+      void loadDownloads(showAllTorrentsRef.current, true);
     }
   };
 
@@ -396,7 +409,7 @@ export function Downloads() {
       console.error('Erreur lors de la reprise:', err);
     } finally {
       setActionInProgress(null);
-      void loadDownloads(showAllTorrentsRef.current);
+      void loadDownloads(showAllTorrentsRef.current, true);
     }
   };
 
@@ -411,7 +424,7 @@ export function Downloads() {
       console.error('Erreur lors de la suppression:', err);
     } finally {
       setActionInProgress(null);
-      void loadDownloads(showAllTorrentsRef.current);
+      void loadDownloads(showAllTorrentsRef.current, true);
     }
   };
 
@@ -428,7 +441,7 @@ export function Downloads() {
       console.error('Erreur lors du retrait du suivi:', err);
     } finally {
       setActionInProgress(null);
-      void loadDownloads(showAllTorrentsRef.current);
+      void loadDownloads(showAllTorrentsRef.current, true);
     }
   };
 
