@@ -65,6 +65,7 @@ jobs:
             sleep 1
           done
 
+          cat /tmp/server.log
           grep -q '"ok":true' /tmp/health.json
 
       - name: Dependency vulnerability audit (runtime)
