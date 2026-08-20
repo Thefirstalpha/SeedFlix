@@ -80,7 +80,7 @@ jobs:
 
       - name: Add version
         run: |
-          echo "dev-${{ github.event.head_commit.id }}" > public/VERSION
+          echo "dev-${{ github.sha }}" > public/VERSION
 
       - name: Build and push image (dev)
         uses: docker/build-push-action@v6
