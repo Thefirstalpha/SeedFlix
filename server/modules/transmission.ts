@@ -36,7 +36,7 @@ function normalizeTorrentHash(value: unknown): string {
 
 function toManagedTorrentEntry(input: Record<string, unknown>): ManagedTorrentEntry | null {
   const hash = normalizeTorrentHash(input.hash);
-  const link = String(input.link || '').trim();
+  const link = String(input.link).trim();
   if (!hash || !link) {
     return null;
   }
@@ -54,6 +54,8 @@ function toManagedTorrentEntry(input: Record<string, unknown>): ManagedTorrentEn
     completedNotifiedAt,
   };
 }
+
+
 
 export function getManagedTorrents(userId: number): ManagedTorrentEntry[] {
   const raw = readStore(transmissionManagedTorrentsStore, userId);

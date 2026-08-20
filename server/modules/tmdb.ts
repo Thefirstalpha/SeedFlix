@@ -132,7 +132,7 @@ export function buildDetailsRequest(mediaType: TmdbType, id: number, query: Reco
   };
 }
 
-export function buildSeasonRequest(id: number, seasonNumber: Number, query: Record<string, any>) {
+export function buildSeasonRequest(id: number, seasonNumber: number, query: Record<string, any>) {
   return {
     path: `/tv/${id}/season/${seasonNumber}`,
     query: {
@@ -161,7 +161,7 @@ export async function getTmdbDetails(tmdbId: number, type: 'movie' | 'series') {
   );
   const results = await proxyTmdb(request.path, request.query);
 
-  if (!results || !results.id) {
+  if (!results?.id) {
     throw new Error('Item not found in TMDB');
   }
 

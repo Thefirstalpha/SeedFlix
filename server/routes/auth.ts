@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { messages } from '../modules/i18n';
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 import { db, runInTransaction } from '../modules/db';
 import { config } from '../config';
 import { authentication, hashPassword, resetPassword } from '../modules/auth';

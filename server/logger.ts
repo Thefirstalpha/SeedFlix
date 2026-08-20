@@ -1,7 +1,7 @@
-import { AsyncLocalStorage } from 'async_hooks';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { Request, Response, NextFunction } from 'express';
 import { bold, cyan, magenta, yellow, red, gray } from 'colorette';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 
 export interface RequestContext {
   correlationId: string;
@@ -31,7 +31,7 @@ export function loggerMiddleware(req: Request, res: Response, next: NextFunction
 }
 
 export class Logger {
-  static original = {
+  static readonly original = {
     log: console.log,
     info: console.info,
     warn: console.warn,

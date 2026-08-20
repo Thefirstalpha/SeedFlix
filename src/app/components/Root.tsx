@@ -301,7 +301,7 @@ export function Root() {
                   </SheetTrigger>
                   <SheetContent side="right" className="border-white/10 bg-slate-950 text-white">
                     <SheetHeader className="pb-2">
-                      <SheetTitle className="text-white">{t('root.openMenu')}</SheetTitle>
+                      <SheetTitle className="text-white"></SheetTitle>
                     </SheetHeader>
 
                     <div className="px-4 pb-4 space-y-2">

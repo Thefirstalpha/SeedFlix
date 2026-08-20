@@ -1,7 +1,7 @@
 export interface TransmissionSettings {
     host: string;
     port: number;
-    authRequired: boolean | false;
+    authRequired: boolean;
     username: string | null;
     password: string | null | undefined;
     moviesFolder: string;
@@ -20,7 +20,7 @@ export interface FtpSettings {
     host: string;
     port: number;
     secure: boolean;
-    authRequired: boolean | false;
+    authRequired: boolean;
     username: string | undefined;
     password: string | undefined;
     rootFolder: string;
