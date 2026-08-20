@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { config } from '../config';
 import { createUser, getUser } from './user';
 
+ensureDatabaseDirectory();
 export const db: DatabaseSync = new DatabaseSync(config.databasePath);
 
 function ensureDatabaseDirectory(): void {
@@ -21,7 +22,6 @@ function ensureDatabaseDirectory(): void {
 }
 
 export const initDB = () => {
-  ensureDatabaseDirectory();
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
   db.exec(`CREATE TABLE IF NOT EXISTS kv_store (
