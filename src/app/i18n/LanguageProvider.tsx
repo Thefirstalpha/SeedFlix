@@ -668,6 +668,8 @@ export interface I18nMessages {
         none: string;
         current: string;
         registered: string;
+        removeTitle: string;
+        removeDescription: string;
       };
       test: {
         title: string;

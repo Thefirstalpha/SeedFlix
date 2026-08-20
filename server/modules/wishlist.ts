@@ -115,12 +115,12 @@ export async function addToWishlist(
               }
             }
           } else if (existingItem.seasons[seasonNumber] !== undefined) {
-              existingItem.seasons[seasonNumber] = {
-                season_number: seasonNumber,
-                all_episodes: true,
-                episodes: [],
-              };
-            }
+            existingItem.seasons[seasonNumber] = {
+              season_number: seasonNumber,
+              all_episodes: true,
+              episodes: [],
+            };
+          }
         } else {
           existingItem.all_seasons = true;
           existingItem.seasons = {};

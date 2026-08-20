@@ -1,5 +1,16 @@
 import { FtpSettings, IndexerSettings, TransmissionSettings } from "./settings";
 
+export interface WebPushSubscription {
+    id: string;
+    name: string;
+    endpoint: string;
+    keys: {
+        p256dh: string;
+        auth: string;
+    };
+    createdAt: string;
+}
+
 export interface StatusBarNotification {
     title: string;
     message: string;
@@ -33,5 +44,8 @@ export interface User {
         discord: {
             webhookUrl: string | null;
         } | null;
+        web: {
+            subscriptions: WebPushSubscription[];
+        };
     };
 }

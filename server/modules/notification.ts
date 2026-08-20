@@ -1,8 +1,86 @@
+import { randomUUID } from 'node:crypto';
+import webPush from 'web-push';
 import { Notification } from '../../common/notification';
+import { User, WebPushSubscription } from '../../common/user';
 import { db } from './db';
+import { readGlobalConfig, updateGlobalConfig } from './setting';
+import { getUser, updateUser } from './user';
 
 const DISCORD_WEBHOOK_BASE_URL = 'https://discord.com';
 const DISCORD_WEBHOOK_PATH = /^\/api\/webhooks\/(\d{17,20})\/([A-Za-z0-9_-]{40,200})\/?$/;
+const WEB_PUSH_SUBJECT = process.env.WEB_PUSH_SUBJECT || 'mailto:admin@seedflix.local';
+type NotificationPayload = Omit<Notification, 'id' | 'createdAt' | 'isRead'>;
+
+function getWebPushVapidKeys() {
+  const existingKeys = readGlobalConfig().webPushVapidKeys;
+  if (existingKeys) return existingKeys;
+
+  const generatedKeys = webPush.generateVAPIDKeys();
+  updateGlobalConfig({ webPushVapidKeys: generatedKeys });
+  return generatedKeys;
+}
+
+export function getWebPushPublicKey(): string {
+  return getWebPushVapidKeys().publicKey;
+}
+
+function configureWebPush(): void {
+  const keys = getWebPushVapidKeys();
+  webPush.setVapidDetails(WEB_PUSH_SUBJECT, keys.publicKey, keys.privateKey);
+}
+
+function validateWebPushInput(input: any): Omit<WebPushSubscription, 'id' | 'createdAt'> {
+  const name = String(input?.name || '').trim();
+  const endpoint = String(input?.subscription?.endpoint || '').trim();
+  const p256dh = String(input?.subscription?.keys?.p256dh || '').trim();
+  const auth = String(input?.subscription?.keys?.auth || '').trim();
+
+  if (!name || name.length > 80) throw new Error('Invalid browser name.');
+  const parsedEndpoint = new URL(endpoint);
+  if (parsedEndpoint.protocol !== 'https:') throw new Error('Invalid push endpoint.');
+  if (!p256dh || !auth) throw new Error('Invalid push subscription keys.');
+
+  return { name, endpoint: parsedEndpoint.toString(), keys: { p256dh, auth } };
+}
+
+export function listWebPushSubscriptions(userId: number): WebPushSubscription[] {
+  return getUser(userId)?.notifications.web.subscriptions ?? [];
+}
+
+export function addWebPushSubscription(userId: number, input: any): WebPushSubscription {
+  const user = getUser(userId);
+  if (!user) throw new Error('User not found');
+
+  const validated = validateWebPushInput(input);
+  const existing = user.notifications.web.subscriptions.find(
+    (subscription) => subscription.endpoint === validated.endpoint,
+  );
+  const saved: WebPushSubscription = {
+    ...validated,
+    id: existing?.id || randomUUID(),
+    createdAt: existing?.createdAt || new Date().toISOString(),
+  };
+  user.notifications.web.subscriptions = [
+    ...user.notifications.web.subscriptions.filter(
+      (subscription) => subscription.endpoint !== validated.endpoint,
+    ),
+    saved,
+  ];
+  updateUser(user);
+  return saved;
+}
+
+export function removeWebPushSubscription(userId: number, subscriptionId: string): boolean {
+  const user = getUser(userId);
+  if (!user) return false;
+  const subscriptions = user.notifications.web.subscriptions.filter(
+    (subscription) => subscription.id !== subscriptionId,
+  );
+  if (subscriptions.length === user.notifications.web.subscriptions.length) return false;
+  user.notifications.web.subscriptions = subscriptions;
+  updateUser(user);
+  return true;
+}
 
 // ─── Lecture ─────────────────────────────────────────────────────────────────
 
@@ -58,10 +136,7 @@ export function getUnreadCount(userId: number): number {
 
 // ─── Ajout ────────────────────────────────────────────────────────────────────
 
-export function addNotification(
-  userId: number,
-  notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>,
-) {
+export function addNotification(userId: number, notification: NotificationPayload) {
   db.prepare(
     'INSERT INTO notifications (user_id, title, message, type, read, data) VALUES (?, ?, ?, ?, 0, ?)',
   ).run(
@@ -71,6 +146,63 @@ export function addNotification(
     notification.type,
     notification.data ? JSON.stringify(notification.data) : null,
   );
+
+  const user: User | null = getUser(userId);
+  if (user?.notifications?.discord?.webhookUrl) {
+    sendDiscordNotification(user.notifications.discord.webhookUrl, notification).catch((err) => {
+      console.error(`Failed to send Discord notification: ${err.message}`);
+    });
+  }
+  if (user?.notifications.web.subscriptions.length) {
+    sendWebPushNotifications(user, notification).catch((err) => {
+      console.error(`Failed to send web push notification: ${err.message}`);
+    });
+  }
+}
+
+async function sendWebPushNotifications(
+  user: User,
+  notification: NotificationPayload,
+): Promise<void> {
+  configureWebPush();
+  const expiredIds: string[] = [];
+  const payload = JSON.stringify({
+    title: notification.title,
+    message: notification.message,
+    type: notification.type,
+    url: '/notifications',
+  });
+
+  await Promise.allSettled(
+    user.notifications.web.subscriptions.map(async (subscription) => {
+      try {
+        await webPush.sendNotification(
+          {
+            endpoint: subscription.endpoint,
+            keys: subscription.keys,
+          },
+          payload,
+        );
+      } catch (error: any) {
+        if (error?.statusCode === 404 || error?.statusCode === 410) {
+          expiredIds.push(subscription.id);
+          return;
+        }
+        throw error;
+      }
+    }),
+  );
+
+  if (expiredIds.length) {
+    const latestUser = getUser(user.id);
+    if (latestUser) {
+      latestUser.notifications.web.subscriptions =
+        latestUser.notifications.web.subscriptions.filter(
+          (subscription) => !expiredIds.includes(subscription.id),
+        );
+      updateUser(latestUser);
+    }
+  }
 }
 
 // ─── Marquer comme lu ─────────────────────────────────────────────────────────
@@ -119,7 +251,7 @@ export function normalizeDiscordWebhookUrl(input: string): string {
 
 export function sendDiscordNotification(
   webhookUrl: string,
-  notification: Omit<Notification, 'id' | 'createdAt' | 'isRead'>,
+  notification: NotificationPayload,
 ): Promise<void> {
   const safeWebhookUrl = normalizeDiscordWebhookUrl(webhookUrl);
 

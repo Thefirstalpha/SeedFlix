@@ -1,6 +1,35 @@
-import { User } from '../../common/user';
+import { User, WebPushSubscription } from '../../common/user';
 import { createAuth } from './auth';
 import { db, readStore, runInTransaction } from './db';
+
+function normalizeWebPushSubscriptions(subscriptions: unknown): WebPushSubscription[] {
+  if (!Array.isArray(subscriptions)) return [];
+
+  return subscriptions
+    .filter(
+      (subscription: any) =>
+        subscription?.id &&
+        subscription?.name &&
+        subscription?.endpoint &&
+        subscription?.keys?.p256dh &&
+        subscription?.keys?.auth,
+    )
+    .map((subscription: any) => ({
+      id: String(subscription.id),
+      name: String(subscription.name),
+      endpoint: String(subscription.endpoint),
+      keys: {
+        p256dh: String(subscription.keys.p256dh),
+        auth: String(subscription.keys.auth),
+      },
+      createdAt: String(subscription.createdAt || new Date(0).toISOString()),
+    }));
+}
+
+function normalizeDiscordNotification(discord: any): User['notifications']['discord'] {
+  if (discord === null || discord === undefined) return null;
+  return { webhookUrl: String(discord.webhookUrl) };
+}
 
 export const getUser = (id: number): User | null => {
   const user = readStore('user', id);
@@ -71,12 +100,10 @@ export const getUser = (id: number): User | null => {
       spoilerMode: Boolean(user.settings.spoilerMode || false),
     },
     notifications: {
-      discord:
-        user.notifications?.discord === null || user.notifications?.discord === undefined
-          ? null
-          : {
-              webhookUrl: String(user.notifications.discord.webhookUrl),
-            },
+      discord: normalizeDiscordNotification(user.notifications?.discord),
+      web: {
+        subscriptions: normalizeWebPushSubscriptions(user.notifications?.web?.subscriptions),
+      },
     },
   };
 };
@@ -104,6 +131,9 @@ export const createUser = (
       },
       notifications: {
         discord: null,
+        web: {
+          subscriptions: [],
+        },
       },
     };
     writeStore('user', user.id, user);

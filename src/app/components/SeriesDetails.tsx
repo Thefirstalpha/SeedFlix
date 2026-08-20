@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar, Clapperboard, Heart, Star, Tv } from 'lucide-react';
+import { ArrowLeft, Calendar, Clapperboard, Heart, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { TorrentResultsPanel, FilterOption } from './TorrentResultsPanel';

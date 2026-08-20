@@ -2,7 +2,14 @@ import { Router } from 'express';
 import { authentication, withAdmin } from '../modules/auth';
 import { resetDatabase, runInTransaction } from '../modules/db';
 import { getUser } from '../modules/user';
-import { normalizeDiscordWebhookUrl, sendDiscordNotification } from '../modules/notification';
+import {
+  addWebPushSubscription,
+  getWebPushPublicKey,
+  listWebPushSubscriptions,
+  normalizeDiscordWebhookUrl,
+  removeWebPushSubscription,
+  sendDiscordNotification,
+} from '../modules/notification';
 
 const router = Router();
 router.use(authentication);
@@ -60,6 +67,32 @@ router.post('/settings/discord', async (req, res) => {
       .status(400)
       .json({ error: 'Failed to send test Discord notification. Please check the webhook URL.' });
   }
+});
+
+router.get('/settings/web-push', (req, res) => {
+  res.json({
+    publicKey: getWebPushPublicKey(),
+    subscriptions: listWebPushSubscriptions(req.user.id),
+  });
+});
+
+router.post('/settings/web-push', (req, res) => {
+  try {
+    const subscription = addWebPushSubscription(req.user.id, req.body);
+    res.status(201).json({ subscription });
+  } catch (error) {
+    res
+      .status(400)
+      .json({ error: error instanceof Error ? error.message : 'Invalid subscription' });
+  }
+});
+
+router.delete('/settings/web-push/:id', (req, res) => {
+  if (!removeWebPushSubscription(req.user.id, String(req.params.id))) {
+    res.status(404).json({ error: 'Browser subscription not found' });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 export { router };

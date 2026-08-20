@@ -578,6 +578,8 @@ const fr : I18nMessages = {
         none: 'Aucun navigateur enregistré.',
         current: 'Navigateur actuel',
         registered: 'Navigateur enregistré',
+        removeTitle: 'Supprimer ce navigateur ?',
+        removeDescription: 'Ce navigateur ne recevra plus les notifications SeedFlix.',
       },
       test: {
         title: 'Notification de test',

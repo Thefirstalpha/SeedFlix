@@ -1,5 +1,13 @@
 import { IndexerSettings, TransmissionSettings } from "../../../common/settings";
+import type { WebPushSubscription } from '../../../common/user';
 
+interface BrowserPushSubscription {
+    toJSON(): {
+        endpoint?: string;
+        expirationTime?: number | null;
+        keys?: Record<string, string>;
+    };
+}
 
 export async function isTmdbConfigure(): Promise<boolean> {
     const response = await fetch(`/api/tmdb/configure`, {
@@ -90,5 +98,42 @@ export async function configureDiscord(settings: { webhookUrl: string }) {
     if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to configure Discord settings');
+    }
+}
+
+export async function getWebPushSettings() {
+    const response = await fetch('/api/settings/web-push', { credentials: 'include' });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to load web push settings');
+    }
+    return response.json() as Promise<{
+        publicKey: string;
+        subscriptions: WebPushSubscription[];
+    }>;
+}
+
+export async function addWebPushBrowser(name: string, subscription: BrowserPushSubscription) {
+    const response = await fetch('/api/settings/web-push', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, subscription: subscription.toJSON() }),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add browser');
+    }
+    return response.json() as Promise<{ subscription: WebPushSubscription }>;
+}
+
+export async function removeWebPushBrowser(subscriptionId: string) {
+    const response = await fetch(`/api/settings/web-push/${encodeURIComponent(subscriptionId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove browser');
     }
 }

@@ -2,12 +2,23 @@ import { readStore, runInTransaction } from './db';
 
 interface GlobalConfig {
   tmdbApiKey: string | null;
+  webPushVapidKeys: {
+    publicKey: string;
+    privateKey: string;
+  } | null;
 }
 
 export function readGlobalConfig(): GlobalConfig {
   const config = readStore('global_config', 0);
   return {
     tmdbApiKey: config?.tmdbApiKey || null,
+    webPushVapidKeys:
+      config?.webPushVapidKeys?.publicKey && config?.webPushVapidKeys?.privateKey
+        ? {
+            publicKey: String(config.webPushVapidKeys.publicKey),
+            privateKey: String(config.webPushVapidKeys.privateKey),
+          }
+        : null,
   };
 }
 
@@ -20,7 +31,7 @@ export function updateGlobalConfig(newConfig: Partial<GlobalConfig>) {
 }
 
 export async function getTmdbApiKey() {
-  const config = await readGlobalConfig();
+  const config = readGlobalConfig();
   if (config.tmdbApiKey) {
     return config.tmdbApiKey;
   }

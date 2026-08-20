@@ -571,6 +571,8 @@ const en: I18nMessages = {
         none: 'No browser registered.',
         current: 'Current browser',
         registered: 'Registered browser',
+        removeTitle: 'Remove this browser?',
+        removeDescription: 'This browser will no longer receive SeedFlix notifications.',
       },
       test: {
         title: 'Test notification',
