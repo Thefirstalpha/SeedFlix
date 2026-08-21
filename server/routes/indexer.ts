@@ -18,7 +18,7 @@ router.use(authentication);
 
 router.get('/indexer/configure', async (req, res) => {
   const userId = req.user.id;
-  let indexerSettings = await getIndexerSettings(userId);
+  let indexerSettings = getIndexerSettings(userId);
   if (indexerSettings && 'token' in indexerSettings) delete indexerSettings.token;
 
   res.status(200).json(indexerSettings);

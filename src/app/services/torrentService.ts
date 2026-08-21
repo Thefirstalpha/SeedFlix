@@ -1,4 +1,4 @@
-import { TorrentDownloadsResponse } from '../../../common/torrent';
+import { TorrentDownloadsResponse, TorrentStatsResponse } from '../../../common/torrent';
 import { API_BASE_URL } from '../config/tmdb';
 
 export interface TorrentAddResponse {
@@ -48,6 +48,13 @@ export async function getTorrentDownloads(includeAll = false): Promise<TorrentDo
   });
 
   return parseJson<TorrentDownloadsResponse>(response);
+}
+export async function getTorrentStats(): Promise<TorrentStatsResponse> {
+  const response = await fetch(`${API_BASE_URL}/transmission/stats`, {
+    credentials: 'include',
+  });
+
+  return parseJson<TorrentStatsResponse>(response);
 }
 
 export async function pauseTorrent(id: number) {

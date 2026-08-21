@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { SubmitEvent, useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -11,7 +11,7 @@ import { configureIndexer } from "../../services/settingService";
 const QUALITY_OPTIONS = ['2160p', '1080p', '720p', '480p'];
 const LANGUAGE_OPTIONS = ['VO', 'VFF', 'VF2', 'VFQ', 'VOSTFR', 'MULTI'];
 
-export function SettingIndexer({ setup, onComplete }: { setup: boolean; onComplete?: (() => void) | undefined }) {
+export function SettingIndexer({ setup, onComplete }: Readonly<{ setup: boolean; onComplete?: (() => void) }>) {
     const { t } = useI18n();
     const [indexerUrl, setIndexerUrl] = useState('');
     const [indexerToken, setIndexerToken] = useState('');
@@ -22,7 +22,7 @@ export function SettingIndexer({ setup, onComplete }: { setup: boolean; onComple
     const [isIndexerSaving, setIsIndexerSaving] = useState(false);
 
 
-    const handleIndexerSave = async (event: React.FormEvent) => {
+    const handleIndexerSave = async (event: SubmitEvent) => {
         event.preventDefault();
         setIndexerError(null);
         setIsIndexerSaving(true);
@@ -78,29 +78,29 @@ export function SettingIndexer({ setup, onComplete }: { setup: boolean; onComple
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleIndexerSave} className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                        <Label htmlFor="indexer-url">{t('settings.api.indexer.url')}</Label>
-                        <Input
-                            id="indexer-url"
-                            placeholder="https://indexer.example.com"
-                            value={indexerUrl}
-                            onChange={(e) => setIndexerUrl(e.target.value)}
-                            className="bg-slate-900 border-white/10 text-white"
-                        />
-                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="indexer-url">{t('settings.api.indexer.url')}</Label>
+                            <Input
+                                id="indexer-url"
+                                placeholder="https://indexer.example.com"
+                                value={indexerUrl}
+                                onChange={(e) => setIndexerUrl(e.target.value)}
+                                className="bg-slate-900 border-white/10 text-white"
+                            />
+                        </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="indexer-token">{t('settings.api.indexer.token')}</Label>
-                        <Input
-                            id="indexer-token"
-                            type="password"
-                            placeholder="••••••••••••••••"
-                            value={indexerToken}
-                            onChange={(e) => setIndexerToken(e.target.value)}
-                            className="bg-slate-900 border-white/10 text-white"
-                        />
-                    </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="indexer-token">{t('settings.api.indexer.token')}</Label>
+                            <Input
+                                id="indexer-token"
+                                type="password"
+                                placeholder="••••••••••••••••"
+                                value={indexerToken}
+                                onChange={(e) => setIndexerToken(e.target.value)}
+                                className="bg-slate-900 border-white/10 text-white"
+                            />
+                        </div>
                     </div>
 
                     <div className="space-y-2">
@@ -163,21 +163,20 @@ export function SettingIndexer({ setup, onComplete }: { setup: boolean; onComple
                                 disabled={isIndexerSaving}
                                 className="bg-cyan-600 text-white hover:bg-cyan-700"
                             >
-                                {isIndexerSaving ? t('setup.indexer.testing') : t('setup.indexer.testAndFinish')}
+                                {isIndexerSaving ? t('settings.testing') : t('settings.testAndSave')}
                             </Button>
                         </div>
-                    )
-                        : (
-                            <Button
-                                type="submit"
-                                disabled={isIndexerSaving}
-                                className="bg-blue-600 hover:bg-blue-700 text-white"
-                            >
-                                {isIndexerSaving
-                                    ? t('settings.api.common.savingAndTesting')
-                                    : t('settings.api.common.saveAndTest')}
-                            </Button>
-                        )}
+                    ) : (
+                        <Button
+                            type="submit"
+                            disabled={isIndexerSaving}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                            {isIndexerSaving
+                                ? t('settings.api.common.savingAndTesting')
+                                : t('settings.api.common.saveAndTest')}
+                        </Button>
+                    )}
                 </form>
             </CardContent>
         </Card>

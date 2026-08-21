@@ -4,12 +4,13 @@ import {
   configureTransmission,
   getDownloadsTransmission,
   getTransmissionSettings,
+  getTransmissionStats,
   performTransmissionAction,
   startDownload,
   unmanageTorrentForUser,
 } from '../modules/transmission';
 import { TransmissionSettings } from '../../common/settings';
-import { TorrentDownloadsResponse } from '../../common/torrent';
+import { TorrentDownloadsResponse, TorrentStatsResponse } from '../../common/torrent';
 
 const router = Router();
 router.use(authentication);
@@ -49,6 +50,11 @@ router.get('/transmission/downloads', async (req, res) => {
     torrents: items,
   };
   res.status(200).json(response);
+});
+
+router.get('/transmission/stats', async (req, res) => {
+  const stats: TorrentStatsResponse = await getTransmissionStats(req.user.id);
+  res.status(200).json(stats);
 });
 
 router.post('/transmission/resume/:id', async (req, res) => {

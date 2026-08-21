@@ -5,6 +5,7 @@ export interface TorrentDownloadItem {
     statusLabel: string;
     progress: number;
     rateDownload: number;
+    rateUpload: number;
     eta: number;
     totalSize: number;
     downloadDir: string;
@@ -24,4 +25,13 @@ export interface TorrentDownloadsResponse {
     ok: boolean;
     torrents: TorrentDownloadItem[];
     activeCount: number;
+}
+
+
+export interface TorrentStatsResponse {
+    activeTorrentCount: number;
+    pausedTorrentCount: number;
+    torrentCount: number;
+    downloadSpeed: number;
+    uploadSpeed: number;
 }

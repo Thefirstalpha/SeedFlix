@@ -62,9 +62,11 @@ const en: I18nMessages = {
       tmdb: 'TMDB key',
       torrent: 'Torrent client',
       indexer: 'Indexer',
+      ftp: 'Storage',
     },
     progress: 'Step {{current}} of {{total}}',
     stepLabel: 'Step {{index}}',
+    skip: 'Skip',
     password: {
       description: 'Change the default password',
       cardTitleUser: 'Set your password',
@@ -165,7 +167,9 @@ const en: I18nMessages = {
   },
   downloads: {
     title: 'Downloads',
-    activeSummary: '{{active}} active out of {{total}} torrent(s)',
+    totalCount: '{{total}} torrent(s)',
+    uploadRate: '↑ {{value}} MB/s',
+    downloadRate: '↓ {{value}} MB/s',
     loading: 'Loading downloads...',
     empty: 'No active downloads.',
     filters: {
@@ -443,6 +447,8 @@ const en: I18nMessages = {
   },
   settings: {
     title: 'Settings',
+    testing: 'Testing...',
+    testAndSave: 'Test and save',
     tabs: {
       general: 'General',
       configuration: 'Configuration',
