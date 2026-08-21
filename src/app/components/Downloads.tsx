@@ -27,8 +27,9 @@ import {
   resumeTorrent,
   deleteTorrent,
   unmanageTorrent,
+  getTorrentStats,
 } from '../services/torrentService';
-import { TorrentDownloadItem } from '../../../common/torrent';
+import { TorrentDownloadItem, TorrentStatsResponse } from '../../../common/torrent';
 
 function formatRate(bytesPerSec: number) {
   if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) {
@@ -141,11 +142,10 @@ function DownloadCard({
   return (
     <Card
       key={item.id}
-      className={`border-white/10 text-white transition-all ${
-        completed
-          ? 'bg-gradient-to-r from-emerald-900/30 to-emerald-800/20 border-emerald-500/30'
-          : 'bg-white/5'
-      }`}
+      className={`border-white/10 text-white transition-all ${completed
+        ? 'bg-gradient-to-r from-emerald-900/30 to-emerald-800/20 border-emerald-500/30'
+        : 'bg-white/5'
+        }`}
     >
       <CardContent className="px-3 py-2.5 space-y-2 [&:last-child]:pb-2.5">
         {/* Ligne 1 : nom + icône */}
@@ -153,8 +153,8 @@ function DownloadCard({
           {completed
             ? <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
             : isPaused
-            ? <Circle className="w-4 h-4 text-white/30 flex-shrink-0" />
-            : <Loader2 className="w-4 h-4 text-cyan-400 flex-shrink-0 animate-spin" />}
+              ? <Circle className="w-4 h-4 text-white/30 flex-shrink-0" />
+              : <Loader2 className="w-4 h-4 text-cyan-400 flex-shrink-0 animate-spin" />}
           <span className="text-sm font-medium truncate flex-1">{item.name}</span>
           {item.error > 0 && item.errorString && (
             <span className="text-xs text-red-400 truncate max-w-[160px]" title={item.errorString}>
@@ -268,13 +268,12 @@ function DownloadCard({
           <Button size="sm" onClick={() => handleDelete(item.id)}
             disabled={actionInProgress === `delete-${item.id}`}
             title={t('downloads.remove')}
-            className={`h-7 px-2 text-xs border transition-all ${
-              actionInProgress === `delete-${item.id}`
-                ? 'bg-red-600/10 text-red-300/50 border-red-500/10 cursor-wait'
-                : completed
+            className={`h-7 px-2 text-xs border transition-all ${actionInProgress === `delete-${item.id}`
+              ? 'bg-red-600/10 text-red-300/50 border-red-500/10 cursor-wait'
+              : completed
                 ? 'bg-red-600/40 hover:bg-red-600/60 text-red-200 border-red-500/30'
                 : 'bg-red-600/20 hover:bg-red-600/40 text-red-300 border-red-500/20'
-            }`}>
+              }`}>
             {actionInProgress === `delete-${item.id}`
               ? <Loader2 className="w-3 h-3 animate-spin" />
               : <><Trash2 className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">{t('downloads.remove')}</span></>}
@@ -368,6 +367,7 @@ function sortDownloads(downloads: TorrentDownloadItem[], sortKey: SortKey, sortD
 export function Downloads() {
   const { t } = useI18n();
   const [downloads, setDownloads] = useState<TorrentDownloadItem[]>([]);
+  const [stats, setStats] = useState<TorrentStatsResponse | null>(null);
   const [showActive, setShowActive] = useState(true);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showAllTorrents, setShowAllTorrents] = useState(false);
@@ -411,11 +411,27 @@ export function Downloads() {
     }
   };
 
+  const loadStats = async () => {
+    try {
+      const response = await getTorrentStats();
+      setStats(response);
+      setError(null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : t('downloads.loadFailed'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     setIsLoading(true);
     void loadDownloads(showAllTorrentsRef.current);
+    void loadStats();
+
+    // Refresh downloads and stats every 5 seconds
     const interval = setInterval(() => {
       void loadDownloads(showAllTorrentsRef.current);
+      void loadStats();
     }, 5000);
 
     return () => clearInterval(interval);
@@ -442,11 +458,6 @@ export function Downloads() {
       sortDir,
     ),
     [downloads, showActive, showCompleted, showAllTorrents, sortKey, sortDir],
-  );
-
-  const activeCount = useMemo(
-    () => downloads.filter((item) => isActiveDownload(item)).length,
-    [downloads],
   );
 
   const handlePause = async (id: number) => {
@@ -561,7 +572,21 @@ export function Downloads() {
         <div>
           <h2 className="text-3xl font-bold text-white">{t('downloads.title')}</h2>
           <p className="text-white/60">
-            {t('downloads.activeSummary', { active: activeCount, total: downloads.length })}
+            {stats ? (
+              <>
+                <span>
+                  {t('downloads.totalCount', { total: stats.torrentCount })}
+                </span>
+                <span> • </span>
+                <span className="text-green-300">
+                  {t('downloads.uploadRate', { value: (stats.uploadSpeed / 1024 / 1024).toFixed(2) })}
+                </span>
+                <span> • </span>
+                <span className="text-red-300">
+                  {t('downloads.downloadRate', { value: (stats.downloadSpeed / 1024 / 1024).toFixed(2) })}
+                </span>
+              </>
+            ) : null}
           </p>
         </div>
       </div>

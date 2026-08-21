@@ -165,7 +165,9 @@ const en: I18nMessages = {
   },
   downloads: {
     title: 'Downloads',
-    activeSummary: '{{active}} active out of {{total}} torrent(s)',
+    totalCount: '{{total}} torrent(s)',
+    uploadRate: '↑ {{value}} MB/s',
+    downloadRate: '↓ {{value}} MB/s',
     loading: 'Loading downloads...',
     empty: 'No active downloads.',
     filters: {

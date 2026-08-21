@@ -265,7 +265,9 @@ export interface I18nMessages {
   };
   downloads: {
     title: string;
-    activeSummary: string;
+    totalCount: string;
+    uploadRate: string;
+    downloadRate: string;
     loading: string;
     empty: string;
     filters: {

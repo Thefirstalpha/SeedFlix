@@ -1,5 +1,5 @@
 import { TransmissionSettings } from '../../common/settings';
-import { TorrentDownloadItem } from '../../common/torrent';
+import { TorrentDownloadItem, TorrentStatsResponse } from '../../common/torrent';
 import { readStore, runInTransaction } from './db';
 import { ErrorCode } from './errors';
 import { messages } from './i18n';
@@ -280,6 +280,7 @@ export async function getDownloadsTransmission(
         'status',
         'percentDone',
         'rateDownload',
+        'rateUpload',
         'eta',
         'totalSize',
         'downloadDir',
@@ -311,6 +312,7 @@ export async function getDownloadsTransmission(
         statusLabel: transmissionStatusLabels[torrent.status] || 'Unknown',
         progress: Math.round(Number(torrent.percentDone || 0) * 1000) / 10,
         rateDownload: Number(torrent.rateDownload || 0),
+        rateUpload: Number(torrent.rateUpload || 0),
         eta: Number(torrent.eta || 0),
         totalSize: Number(torrent.totalSize || 0),
         downloadDir: torrent.downloadDir,
@@ -328,6 +330,22 @@ export async function getDownloadsTransmission(
     })
     .filter((torrent: TorrentDownloadItem) => (includeAll ? true : torrent.managedBySeedflix));
   return torrents;
+}
+
+export async function getTransmissionStats(userId: number): Promise<TorrentStatsResponse> {
+  const settings = getTransmissionSettings(userId);
+  if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
+  const response = await executeTransmissionRpc(settings, {
+    method: 'session-stats',
+  });
+  const data = await response.json();
+  return {
+    activeTorrentCount: Number(data?.arguments?.activeTorrentCount || 0),
+    pausedTorrentCount: Number(data?.arguments?.pausedTorrentCount || 0),
+    torrentCount: Number(data?.arguments?.torrentCount || 0),
+    downloadSpeed: Number(data?.arguments?.downloadSpeed || 0),
+    uploadSpeed: Number(data?.arguments?.uploadSpeed || 0),
+  };
 }
 
 export async function performTransmissionAction(
