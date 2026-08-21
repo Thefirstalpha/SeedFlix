@@ -178,9 +178,11 @@ export interface I18nMessages {
       tmdb: string;
       torrent: string;
       indexer: string;
+      ftp: string;
     };
     progress: string;
     stepLabel: string;
+    skip: string;
     password: {
       description: string;
       cardTitleUser: string;
@@ -544,6 +546,8 @@ export interface I18nMessages {
   };
   settings: {
     title: string;
+    testing: string;
+    testAndSave: string;
     tabs: {
       general: string;
       configuration: string;

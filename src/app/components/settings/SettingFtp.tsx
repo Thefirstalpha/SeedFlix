@@ -9,7 +9,7 @@ import { Switch } from '../../components/ui/switch';
 import { useI18n } from '../../i18n/LanguageProvider';
 
 
-export function SettingFtp() {
+export function SettingFtp({ setup, onComplete }: { setup?: boolean; onComplete?: () => void }) {
     const { t } = useI18n();
 
     // État pour la configuration FTP
@@ -35,7 +35,7 @@ export function SettingFtp() {
             setFtpUsername(config.username || '');
             setFtpRootFolder(config.rootFolder || '/');
             setFtpStorageLimit(config.storageLimit !== null ? String(config.storageLimit) : '');
-        }).catch(() => {});
+        }).catch(() => { });
     }, []);
 
     // Tester la connexion ET enregistrer (la validation est faite côté backend)
@@ -56,6 +56,7 @@ export function SettingFtp() {
                 storageLimit: ftpStorageLimit ? Number(ftpStorageLimit) : null,
             });
             setFtpMessage('Connexion réussie — configuration enregistrée.');
+            onComplete?.();
         } catch (e: any) {
             setFtpError(e.message || 'Erreur lors de l\'enregistrement.');
         } finally {
@@ -119,9 +120,21 @@ export function SettingFtp() {
                     </div>
                     {ftpMessage && <p className="text-sm text-emerald-300">{ftpMessage}</p>}
                     {ftpError && <p className="text-sm text-red-300">{ftpError}</p>}
-                    <Button type="submit" disabled={isSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
-                        {isSaving ? 'Test en cours...' : 'Tester et enregistrer'}
-                    </Button>
+
+                    {setup ? (
+                        <div className="flex items-center justify-end gap-3">
+                            <Button disabled={isSaving} className="bg-gray-600 hover:bg-gray-700 text-white" onClick={onComplete}>
+                                {t('setup.skip')}
+                            </Button>
+                            <Button type="submit" disabled={isSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                                {isSaving ? t('settings.testing') : t('settings.testAndSave')}
+                            </Button>
+                        </div>
+                    ) : (
+                        <Button type="submit" disabled={isSaving} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                            {isSaving ? t('settings.testing') : t('settings.testAndSave')}
+                        </Button>
+                    )}
                 </form>
             </CardContent>
         </Card>

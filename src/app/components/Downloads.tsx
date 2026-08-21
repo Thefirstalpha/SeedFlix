@@ -368,9 +368,15 @@ export function Downloads() {
   const { t } = useI18n();
   const [downloads, setDownloads] = useState<TorrentDownloadItem[]>([]);
   const [stats, setStats] = useState<TorrentStatsResponse | null>(null);
-  const [showActive, setShowActive] = useState(true);
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [showAllTorrents, setShowAllTorrents] = useState(false);
+  const [filter, setFilter] = useState<{
+    showActive: boolean;
+    showCompleted: boolean;
+    showAllTorrents: boolean;
+  }>({
+    showActive: true,
+    showCompleted: false,
+    showAllTorrents: false,
+  });
   const [pendingDeleteWithData, setPendingDeleteWithData] = useState<TorrentDownloadItem | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('addedDate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -379,14 +385,14 @@ export function Downloads() {
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
   // Keep a ref to the current source filter value for polling
-  const showAllTorrentsRef = useRef(showAllTorrents);
+  const showAllTorrentsRef = useRef(filter.showAllTorrents);
   // Track last action time to avoid race conditions with polling
   const lastActionTimeRef = useRef<number>(0);
   const ACTION_COOLDOWN_MS = 2000; // 2 seconds after an action, polling won't update state
 
   useEffect(() => {
-    showAllTorrentsRef.current = showAllTorrents;
-  }, [showAllTorrents]);
+    showAllTorrentsRef.current = filter.showAllTorrents;
+  }, [filter.showAllTorrents]);
 
   // A torrent is considered complete when there's nothing left to download
   const isComplete = (item: TorrentDownloadItem) => item.leftUntilDone === 0 || item.isFinished;
@@ -442,22 +448,22 @@ export function Downloads() {
     lastActionTimeRef.current = Date.now();
     const silentRefresh = async () => {
       try {
-        const response = await getTorrentDownloads(showAllTorrents);
+        const response = await getTorrentDownloads(filter.showAllTorrents);
         setDownloads(response.torrents);
       } catch {
         // Silent fail, don't disrupt UX
       }
     };
     void silentRefresh();
-  }, [showAllTorrents]);
+  }, [filter.showAllTorrents]);
 
   const filteredDownloads = useMemo(
     () => sortDownloads(
-      filterDownloads(downloads, showAllTorrents, showActive, showCompleted, isComplete),
+      filterDownloads(downloads, filter.showAllTorrents, filter.showActive, filter.showCompleted, isComplete),
       sortKey,
       sortDir,
     ),
-    [downloads, showActive, showCompleted, showAllTorrents, sortKey, sortDir],
+    [downloads, filter.showActive, filter.showCompleted, filter.showAllTorrents, sortKey, sortDir],
   );
 
   const handlePause = async (id: number) => {
@@ -609,39 +615,39 @@ export function Downloads() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
-              onClick={() => setShowActive((prev) => !prev)}
+              onClick={() => setFilter((prev) => ({ ...prev, showActive: !prev.showActive }))}
               className={
-                showActive
+                filter.showActive
                   ? 'bg-cyan-500/60 hover:bg-cyan-500/70 text-white gap-1'
                   : 'bg-white/10 text-white hover:bg-white/20'
               }
             >
-              {showActive ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+              {filter.showActive ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
               {t('downloads.filters.active')}
             </Button>
             <Button
               size="sm"
-              onClick={() => setShowCompleted((prev) => !prev)}
+              onClick={() => setFilter((prev) => ({ ...prev, showCompleted: !prev.showCompleted }))}
               className={
-                showCompleted
+                filter.showCompleted
                   ? 'bg-emerald-500/60 hover:bg-emerald-500/70 text-white gap-1'
                   : 'bg-white/10 text-white hover:bg-white/20'
               }
             >
-              {showCompleted ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+              {filter.showCompleted ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
               {t('downloads.filters.completed')}
             </Button>
             <div className="w-px h-6 bg-white/20 mx-1" />
             <Button
               size="sm"
-              onClick={() => setShowAllTorrents((prev) => !prev)}
+              onClick={() => setFilter((prev) => ({ ...prev, showAllTorrents: !prev.showAllTorrents }))}
               className={
-                showAllTorrents
+                filter.showAllTorrents
                   ? 'bg-violet-500/60 hover:bg-violet-500/70 text-white gap-1'
                   : 'bg-white/10 text-white hover:bg-white/20'
               }
             >
-              {showAllTorrents ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+              {filter.showAllTorrents ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
               {t('downloads.filters.allTorrents')}
             </Button>
             <div className="w-px h-6 bg-white/20 mx-1" />

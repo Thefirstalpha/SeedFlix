@@ -62,9 +62,11 @@ const fr : I18nMessages = {
       tmdb: 'Clé TMDB',
       torrent: 'Client torrent',
       indexer: 'Indexer',
+      ftp: 'Stockage'
     },
     progress: 'Étape {{current}} sur {{total}}',
     stepLabel: 'Étape {{index}}',
+    skip: 'Ignorer',
     password: {
       description: 'Changez le mot de passe par défaut',
       cardTitleUser: 'Définissez votre mot de passe',
@@ -447,6 +449,8 @@ const fr : I18nMessages = {
   },
   settings: {
     title: 'Paramètres',
+    testing: 'Test en cours...',
+    testAndSave: 'Tester et enregistrer',
     tabs: {
       general: 'Général',
       configuration: 'Configurations',

@@ -126,7 +126,7 @@ export const createUser = (
         indexer: null,
         transmission: null,
         ftp: null,
-        language: null,
+        language: 'en',
         spoilerMode: false,
       },
       notifications: {

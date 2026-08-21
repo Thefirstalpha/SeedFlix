@@ -25,6 +25,7 @@ import { configureTmdb, isTmdbConfigure, updateLanguage } from '../services/sett
 import { SettingTransmission } from './settings/SettingTransmission';
 import { SettingIndexer } from './settings/SettingIndexer';
 import { SettingPassword } from './settings/SettingPassword';
+import { SettingFtp } from './settings/SettingFtp';
 
 function parseSupportedLanguage(input: unknown): SupportedLanguage {
   return input === 'en' ? 'en' : 'fr';
@@ -39,7 +40,7 @@ export function InitialSetup() {
     user,
     refresh,
   } = useAuth();
-  const hasPendingSetup = user?.flags?.mustSetup || user?.settings?.indexer === null || user?.settings?.transmission === null;
+  const hasPendingSetup = user?.flags?.mustSetup || user?.settings?.indexer === null || user?.settings?.transmission === null || user?.settings?.ftp === null;
   const { t, availableLanguages, setLanguage } = useI18n();
 
   const [activeStep, setActiveStep] = useState(0);
@@ -96,6 +97,12 @@ export function InitialSetup() {
           title: t('setup.steps.indexer'),
           icon: RadioTower,
           required: user?.settings?.indexer === null,
+        },
+        {
+          key: 'ftp',
+          title: t('setup.steps.ftp'),
+          icon: Server,
+          required: user?.settings?.ftp === null,
         },
       ]
         .filter((step) => isAdmin || step.key !== 'tmdb'),
@@ -158,7 +165,7 @@ export function InitialSetup() {
       block: 'nearest',
       inline: 'center',
     });
-  }, [activeStep, totalSteps]);
+  }, [activeStep, totalSteps, user, isLoading]);
 
   if (!isLoading && !isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
@@ -469,6 +476,12 @@ export function InitialSetup() {
       {currentStep?.key === 'indexer' ? (
         <SettingIndexer setup={true} onComplete={goToNextVisibleStep}></SettingIndexer>
       ) : null}
+
+      
+      {currentStep?.key === 'ftp' ? (
+          <SettingFtp setup={true} onComplete={goToNextVisibleStep}></SettingFtp>
+      ) : null}
+
     </div>
   );
 }
