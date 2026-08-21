@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { SubmitEvent, useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -11,7 +11,7 @@ import { configureIndexer } from "../../services/settingService";
 const QUALITY_OPTIONS = ['2160p', '1080p', '720p', '480p'];
 const LANGUAGE_OPTIONS = ['VO', 'VFF', 'VF2', 'VFQ', 'VOSTFR', 'MULTI'];
 
-export function SettingIndexer({ setup, onComplete }: { setup: boolean; onComplete?: (() => void) | undefined }) {
+export function SettingIndexer({ setup, onComplete }: Readonly<{ setup: boolean; onComplete?: (() => void) }>) {
     const { t } = useI18n();
     const [indexerUrl, setIndexerUrl] = useState('');
     const [indexerToken, setIndexerToken] = useState('');
@@ -22,7 +22,7 @@ export function SettingIndexer({ setup, onComplete }: { setup: boolean; onComple
     const [isIndexerSaving, setIsIndexerSaving] = useState(false);
 
 
-    const handleIndexerSave = async (event: React.FormEvent) => {
+    const handleIndexerSave = async (event: SubmitEvent) => {
         event.preventDefault();
         setIndexerError(null);
         setIsIndexerSaving(true);

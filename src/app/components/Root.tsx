@@ -95,7 +95,7 @@ export function Root() {
           const latest = response.latestNotification;
           if (latest) {
             const toastTitle = delta > 1 ? `${delta} nouvelles notifications` : latest.title;
-            const safeMsg = getSafeNotificationMessage(latest.message, spoilerModeEnabled, undefined);
+            const safeMsg = getSafeNotificationMessage(latest.message, spoilerModeEnabled);
             const toastDesc = delta > 1 ? `${safeMsg} (et ${delta - 1} autre${delta - 1 > 1 ? 's' : ''})` : safeMsg;
             showNotificationToast(latest.type as any, toastTitle, toastDesc);
           } else {

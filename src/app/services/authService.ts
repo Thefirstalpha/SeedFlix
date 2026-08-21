@@ -1,5 +1,4 @@
-import { UserStatusBar } from '../../../common/user';
-import { User } from '../../../common/user';
+import { UserStatusBar, User } from '../../../common/user';
 import { API_BASE_URL } from '../config/tmdb';
 
 

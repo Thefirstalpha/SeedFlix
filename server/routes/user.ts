@@ -46,13 +46,13 @@ router.post('/users', withAdmin, (req, res) => {
 });
 
 router.delete('/users/:id', withAdmin, (req, res) => {
-  const userId = parseInt(String(req.params.id), 10);
+  const userId = Number.parseInt(String(req.params.id), 10);
   deleteUser(userId);
   res.json({ ok: true });
 });
 
 router.post('/users/:id/reset-password', withAdmin, (req, res) => {
-  const userId = parseInt(String(req.params.id), 10);
+  const userId = Number.parseInt(String(req.params.id), 10);
   if (userId === 1) {
     res.status(400).json({ error: messages.auth.cannotModifyAdmin });
     return;
