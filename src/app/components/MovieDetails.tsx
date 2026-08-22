@@ -105,7 +105,7 @@ export function MovieDetails() {
     window.dispatchEvent(new CustomEvent('seedflix:notifications-refresh-request'));
   };
 
-  
+
   useEffect(() => {
     if (movie) {
       loadReleases(movie.id);
@@ -117,8 +117,7 @@ export function MovieDetails() {
     setReleaseError(null);
     try {
       const indexerResponse = await searchMovieReleases(
-        100,
-        tmdbId,
+        { tmdbId: tmdbId, limit: 100 }
       );
       setReleaseResults(indexerResponse.items);
     } catch (indexerError) {
@@ -181,8 +180,8 @@ export function MovieDetails() {
         <Button
           onClick={toggleWishlist}
           className={`${inWishlist
-              ? 'bg-purple-600 hover:bg-purple-700 text-white'
-              : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+            ? 'bg-purple-600 hover:bg-purple-700 text-white'
+            : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
             }`}
         >
           <Heart className={`w-5 h-5 mr-2 ${inWishlist ? 'fill-current' : ''}`} />
@@ -269,7 +268,7 @@ export function MovieDetails() {
               <span className="text-2xl font-bold text-white">{movie.rating}</span>
               <span className="text-white/60">/10</span>
             </div>
-            {movie.voteCount && (
+            {!!(movie.voteCount) && (
               <span className="text-white/60">
                 {t('movieDetails.votes', { count: movie.voteCount.toLocaleString() })}
               </span>
@@ -301,7 +300,7 @@ export function MovieDetails() {
                 <div className="flex flex-wrap gap-2">
                   {movie.actors.map((actor, index) => (
                     <Badge
-                      key={index}
+                      key={actor + index}
                       variant="outline"
                       className="max-w-full border-white/20 text-white bg-white/5 px-3 py-1 break-words"
                     >
@@ -330,8 +329,8 @@ export function MovieDetails() {
             <Button
               onClick={toggleWishlist}
               className={`w-full sm:w-auto ${inWishlist
-                  ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                  : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+                ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
                 }`}
             >
               <Heart className={`w-5 h-5 mr-2 ${inWishlist ? 'fill-current' : ''}`} />

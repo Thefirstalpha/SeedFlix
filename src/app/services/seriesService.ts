@@ -350,11 +350,15 @@ export async function getSeriesSeasonEpisodes(
   }
 }
 
-export async function searchSeriesReleases(
-  tmdbId?: number | string,
-  limit = 12,
-  season?: string | number,
-): Promise<IndexerSeriesResponse> {
+export async function searchSeriesReleases({
+  tmdbId,
+  season,
+  limit = 12
+}: {
+  tmdbId: number | string;
+  season?: string | number;
+  limit?: number;
+}): Promise<IndexerSeriesResponse> {
   let additionalFilter = '';
   if (season !== undefined) {
     additionalFilter += `&season=${season}`;

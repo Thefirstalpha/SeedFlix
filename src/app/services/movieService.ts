@@ -337,10 +337,13 @@ export async function getMovieById(id: number, uiLanguage = 'fr'): Promise<Movie
   }
 }
 
-export async function searchMovieReleases(
-  tmdbId: number | string,
-  limit = 12
-): Promise<IndexerMovieResponse> {
+export async function searchMovieReleases({
+  tmdbId,
+  limit = 100,
+}: {
+  tmdbId: number | string;
+  limit?: number;
+}): Promise<IndexerMovieResponse> {
   const response = await fetch(
     `${API_BASE_URL}/indexer/search/movies/${String(tmdbId)}?limit=${limit}`,
     {
