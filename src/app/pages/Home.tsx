@@ -1,11 +1,11 @@
 import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
-import { MovieCard } from './MovieCard';
-import { SeriesCard } from './SeriesCard';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
+import { MovieCard } from '../components/MovieCard';
+import { SeriesCard } from '../components/SeriesCard';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { useSearchState } from '../context/SearchStateContext';
-import { useI18n } from '../i18n/LanguageProvider';
+import { Translator, useI18n } from '../i18n/LanguageProvider';
 import { getMovieGenres, getPopularMoviesPage, searchMoviesPage } from '../services/movieService';
 import { getPopularSeriesPage, getSeriesGenres, searchSeriesPage } from '../services/seriesService';
 
@@ -80,7 +80,7 @@ function normalizeLanguageCode(language: string | null | undefined): string {
 
 function getLanguageLabel(
   language: string,
-  t: (key: string, vars?: Record<string, string | number>) => string,
+  t: Translator,
 ): string {
   const normalized = normalizeLanguageCode(language);
 

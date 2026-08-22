@@ -14,18 +14,18 @@ import { useAuth } from '../context/AuthContext';
 import {
   acceptLegal
 } from '../services/authService';
-import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Checkbox } from './ui/checkbox';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Progress } from './ui/progress';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Checkbox } from '../components/ui/checkbox';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Progress } from '../components/ui/progress';
 import { useI18n, type SupportedLanguage } from '../i18n/LanguageProvider';
 import { configureTmdb, isTmdbConfigure, updateLanguage } from '../services/settingService';
-import { SettingTransmission } from './settings/SettingTransmission';
-import { SettingIndexer } from './settings/SettingIndexer';
-import { SettingPassword } from './settings/SettingPassword';
-import { SettingFtp } from './settings/SettingFtp';
+import { SettingTransmission } from '../components/settings/SettingTransmission';
+import { SettingIndexer } from '../components/settings/SettingIndexer';
+import { SettingPassword } from '../components/settings/SettingPassword';
+import { SettingFtp } from '../components/settings/SettingFtp';
 
 function parseSupportedLanguage(input: unknown): SupportedLanguage {
   return input === 'en' ? 'en' : 'fr';

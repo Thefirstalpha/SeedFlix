@@ -11,27 +11,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from './ui/alert-dialog';
-import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+} from '../components/ui/alert-dialog';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 
 
-import { Label } from './ui/label';
-import { Switch } from './ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Label } from '../components/ui/label';
+import { Switch } from '../components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useAuth } from '../context/AuthContext';
 import { useI18n, type SupportedLanguage } from '../i18n/LanguageProvider';
 import {
   resetSettings
 } from '../services/authService';
-import { SettingTMDB } from './settings/SettingTMDB';
-import { SettingUsers } from './settings/SettingUsers';
-import { SettingTransmission } from './settings/SettingTransmission';
-import { SettingIndexer } from './settings/SettingIndexer';
-import { SettingDatabase } from './settings/SettingDatabase';
-import { SettingPassword } from './settings/SettingPassword';
-import { SettingNotification } from './settings/SettingNotification';
-import { SettingFtp } from './settings/SettingFtp';
+import { SettingTMDB } from '../components/settings/SettingTMDB';
+import { SettingUsers } from '../components/settings/SettingUsers';
+import { SettingTransmission } from '../components/settings/SettingTransmission';
+import { SettingIndexer } from '../components/settings/SettingIndexer';
+import { SettingDatabase } from '../components/settings/SettingDatabase';
+import { SettingPassword } from '../components/settings/SettingPassword';
+import { SettingNotification } from '../components/settings/SettingNotification';
+import { SettingFtp } from '../components/settings/SettingFtp';
 import { updateLanguage, updateSpoilerMode } from '../services/settingService';
 
 

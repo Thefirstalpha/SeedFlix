@@ -1,10 +1,10 @@
 import { ArrowLeft, Star, Calendar, Clock, User, Heart } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
-import { FilterOption, TorrentResultsPanel } from './TorrentResultsPanel';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Card, CardContent } from './ui/card';
+import { FilterOption, TorrentResultsPanel } from '../components/TorrentResultsPanel';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import { Card, CardContent } from '../components/ui/card';
 import { useI18n } from '../i18n/LanguageProvider';
 import { normalizeIndexerLanguage, normalizeQuality } from '../services/indexerNormalization';
 import {

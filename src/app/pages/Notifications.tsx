@@ -11,13 +11,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from './ui/alert-dialog';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Card } from './ui/card';
+} from '../components/ui/alert-dialog';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
 import { useI18n } from '../i18n/LanguageProvider';
-import type { Notification } from '../services/notificationService';
 import * as notificationService from '../services/notificationService';
+import { Notification } from '../../../common/notification';
 
 function emitUnreadNotificationsUpdated(count: number) {
   window.dispatchEvent(
@@ -113,12 +113,13 @@ export default function Notifications() {
     }
 
     const targetKey = String(notification.data?.targetKey || '').trim();
-    if (!targetKey) {
+    const type = String(notification.data?.type || '').trim();
+    if (!targetKey || !type) {
       navigate('/wishlist');
       return;
     }
 
-    const params = new URLSearchParams({ tab: notification.data.type, target: targetKey });
+    const params = new URLSearchParams({ tab: type, target: targetKey });
     navigate(`/wishlist?${params.toString()}`);
   };
 

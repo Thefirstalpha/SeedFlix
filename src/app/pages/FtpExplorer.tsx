@@ -25,7 +25,7 @@ import {
     Square,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from './ui/button';
+import { Button } from '../components/ui/button';
 import { useAuth } from '../context/AuthContext';
 import {
     deleteBatch,

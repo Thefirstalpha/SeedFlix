@@ -5,7 +5,6 @@ import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { useI18n } from '../i18n/LanguageProvider';
 import { IndexerMovieResult, IndexerSeriesResult } from '../../../common/indexer';
-import { getEpisodeCode } from './WishList';
 
 interface WishListCardProps {
   poster: string;
@@ -22,6 +21,23 @@ interface WishListCardProps {
   children?: ReactNode;
 }
 
+
+
+
+export const getEpisodeCode = (
+    targetKey: string,
+    fallbackSeason?: number | null,
+    fallbackEpisode?: number | null,
+  ) => {
+    const match = new RegExp(/^episode:\d+:(\d+):(\d+)$/i).exec(String(targetKey || ''));
+    const season = match?.[1] ? Number(match[1]) : Number(fallbackSeason || 0);
+    const episode = match?.[2] ? Number(match[2]) : Number(fallbackEpisode || 0);
+    if (!Number.isFinite(season) || !Number.isFinite(episode) || season <= 0 || episode <= 0) {
+      return '';
+    }
+    return `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
+  };
+
 export function WishListCard({
   poster,
   title,
@@ -35,7 +51,7 @@ export function WishListCard({
   onRejectAllIndexerResults,
   onAddTorrent,
   children,
-}: WishListCardProps) {
+}: Readonly<WishListCardProps>) {
   const { t } = useI18n();
 
   const groupKey = targets[0]?.tmdbId ?? type;
@@ -79,7 +95,6 @@ export function WishListCard({
           <div
             className="space-y-3"
             onClick={(event) => event.stopPropagation()}
-            tabIndex={0}
             role="presentation"
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {

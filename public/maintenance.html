@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SeedFlix - Maintenance</title>
   <style>
     body {
@@ -22,9 +23,11 @@
     h1 {
       font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
       font-feature-settings: normal;
-      font-size: 36px;
       font-variation-settings: normal;
       font-weight: 900;
+      font-size: 42px;
+      margin: 0;
+      letter-spacing: 2px;
     }
 
     .logo {
@@ -54,12 +57,6 @@
       color: #b57bff;
     }
 
-    h1 {
-      font-size: 42px;
-      margin: 0;
-      letter-spacing: 2px;
-    }
-
     p {
       font-size: 20px;
       margin-top: 15px;
@@ -70,7 +67,12 @@
       background: rgba(255, 255, 255, 0.05);
       padding: 30px 50px;
       border-radius: 15px;
+      -webkit-backdrop-filter: blur(6px);
       backdrop-filter: blur(6px);
+    }
+
+    svg {
+      display: block;
     }
   </style>
 </head>
@@ -79,8 +81,8 @@
 
   <div class="logo">
     <div class="logo-icon">
-      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" style="display: block;" viewBox="0 0 2048 2048" width="512"
-        height="512" preserveAspectRatio="xMidYMid meet">
+      <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048" width="512" height="512"
+        preserveAspectRatio="xMidYMid meet">
         <path transform="translate(0,0)" fill="rgb(73,50,116)"
           d="M 223.479 0 L 1822.49 0 C 1830.66 6.42636 1853.96 9.27983 1865.5 13.9816 C 1895.62 26.0839 1923.99 42.1475 1949.86 61.7479 C 1992.08 98.7248 2018.84 138.296 2036.45 191.962 C 2041.21 206.466 2042.96 220.784 2048 235.477 L 2048 1807.06 C 2042.9 1814.5 2041.73 1837.44 2038.73 1847.36 C 2029.25 1878.68 2008.87 1920.85 1987.53 1945.96 C 1968.46 1967.76 1963.1 1972.21 1941.38 1990.51 C 1909.17 2012.17 1889 2024.61 1851.56 2037.18 C 1840.95 2040.74 1805.82 2044.51 1801.74 2048 L 253.223 2048 C 248.591 2047.32 242.366 2045.69 237.103 2044.81 C 177.648 2035.49 147.471 2020.71 99.3933 1984.32 C 89.4722 1976.53 71.0581 1958.43 62.9176 1949.03 C 47.7415 1928.97 34.7481 1911.26 24.3409 1887.93 C 18.2608 1874.31 14.0703 1860.12 8.35421 1846.73 C 7.66974 1839.99 2.00585 1817.06 0 1809.71 L 0 235.248 C 0.881531 232.999 0.599366 232.607 0.988089 230.453 C 13.0884 163.418 49.9922 100.178 102.896 57.5215 C 103.815 56.9841 106.149 55.1356 107.129 54.4038 C 123.007 46.8162 142.742 29.6561 161.146 22.4669 C 170.645 18.7563 179.171 15.002 188.969 11.5879 C 197.675 8.55393 218.145 4.1293 223.479 0 z" />
         <path transform="translate(0,0)" fill="rgb(34,23,49)"
