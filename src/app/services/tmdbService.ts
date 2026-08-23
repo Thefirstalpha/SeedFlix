@@ -1,0 +1,98 @@
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
+export type TmdbVideo = {
+    id: string;
+    iso_639_1: string;
+    iso_3166_1: string;
+    key: string;
+    name: string;
+    site: string;
+    size: number;
+    type: string;
+    official: boolean;
+    published_at: string;
+};
+
+export function extractTrailers(videos: TmdbVideo[], preferredLanguage: string = 'fr'): TmdbVideo[] {
+    if (!Array.isArray(videos)) return [];
+
+    // Filter YouTube trailers & teasers
+    const validVideos = videos.filter(
+        (v) =>
+            v?.site === 'YouTube' &&
+            v.key &&
+            (v.type === 'Trailer' || v.type === 'Teaser') &&
+            v.iso_639_1 === preferredLanguage,
+    );
+
+    // Deduplicate by YouTube key
+    const seenKeys = new Set<string>();
+    const uniqueVideos = validVideos.filter((v) => {
+        if (seenKeys.has(v.key)) return false;
+        seenKeys.add(v.key);
+        return true;
+    });
+
+    return uniqueVideos.sort((a, b) => {
+        // 1. Trailer over Teaser
+        if (a.type !== b.type) {
+            return a.type === 'Trailer' ? -1 : 1;
+        }
+
+        // 2. Official first
+        if (a.official !== b.official) {
+            return a.official ? -1 : 1;
+        }
+
+        // 3. Language preference: FR/EN prioritizing preferred language
+        const langOrder = (lang: string) => {
+            const normalized = (lang || '').toLowerCase();
+            if (normalized === preferredLanguage.toLowerCase()) return 4;
+            if (preferredLanguage === 'fr' && normalized === 'en') return 3;
+            if (preferredLanguage === 'en' && normalized === 'fr') return 3;
+            if (normalized === 'fr' || normalized === 'en') return 2;
+            return 1;
+        };
+
+        const langDiff = langOrder(b.iso_639_1) - langOrder(a.iso_639_1);
+        if (langDiff !== 0) return langDiff;
+
+        // 4. Quality (1080 > 720 > 480)
+        if ((a.size || 0) !== (b.size || 0)) {
+            return (b.size || 0) - (a.size || 0);
+        }
+
+        // 5. Name score
+        const nameScore = (name: string) => {
+            const lowerName = (name || '').toLowerCase();
+            if (lowerName.includes('official') || lowerName.includes('officielle')) return 3;
+            if (lowerName.includes('trailer') || lowerName.includes('bande-annonce')) return 2;
+            if (lowerName.includes('teaser')) return 1;
+            return 0;
+        };
+        const nameDiff = nameScore(b.name) - nameScore(a.name);
+        if (nameDiff !== 0) return nameDiff;
+
+        // 6. Date: more recent first
+        const dateA = a.published_at ? new Date(a.published_at).getTime() : 0;
+        const dateB = b.published_at ? new Date(b.published_at).getTime() : 0;
+        return dateB - dateA;
+    });
+}
+
+export function pickBestTrailer(videos: TmdbVideo[], preferredLanguage: string = 'fr'): TmdbVideo | undefined {
+    const trailers = extractTrailers(videos, preferredLanguage);
+    return trailers[0];
+}
+
+export async function getTmdbVideos(
+    tmdbId: number,
+    type: 'movie' | 'series',
+): Promise<{ id: number; results: TmdbVideo[] }> {
+    const response = await fetch(`${API_BASE_URL}/tmdb/${type}/videos/${tmdbId}`);
+
+    if (!response.ok) {
+        throw new Error('Failed to fetch TMDB videos');
+    }
+    return response.json();
+}

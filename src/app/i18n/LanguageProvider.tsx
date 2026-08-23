@@ -367,10 +367,15 @@ export interface I18nMessages {
     notFoundTitle: string;
     backHome: string;
     back: string;
+    watchTrailer: string;
+    trailerModalTitle: string;
     addToWishlist: string;
     removeFromWishlist: string;
     votes: string;
     synopsis: string;
+    trailers: string;
+    trailerLangFr: string;
+    trailerLangEn: string;
     director: string;
     cast: string;
     messages: {
@@ -411,11 +416,16 @@ export interface I18nMessages {
     notFoundTitle: string;
     backHome: string;
     back: string;
+    watchTrailer: string;
+    trailerModalTitle: string;
     addSeries: string;
     removeSeries: string;
     unknownStatus: string;
     votes: string;
     synopsis: string;
+    trailers: string;
+    trailerLangFr: string;
+    trailerLangEn: string;
     creatorsAndNetworks: string;
     creatorsLabel: string;
     networksLabel: string;

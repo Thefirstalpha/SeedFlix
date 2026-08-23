@@ -2,6 +2,7 @@ import { ArrowLeft, Calendar, Clapperboard, Heart, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { TorrentResultsPanel, FilterOption } from '../components/TorrentResultsPanel';
+import { TrailersSection } from '../components/TrailersSection';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -19,6 +20,7 @@ import {
   getSeriesWishlistStatus,
   removeFromWishlist,
 } from '../services/seriesWishlistService';
+import { getTmdbVideos, extractTrailers, TmdbVideo } from '../services/tmdbService';
 import { buildTorrentResultsLabels } from '../services/torrentResultsLabels';
 import type { SeriesDetails as SeriesDetailsModel, SeriesEpisode } from '../types/series';
 import { WishListItem } from '../../../common/wishlist';
@@ -41,6 +43,7 @@ export function SeriesDetails() {
   const [releaseResults, setReleaseResults] = useState<IndexerSeriesResult[]>([]);
   const [isReleaseLoading, setIsReleaseLoading] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
+  const [trailersList, setTrailersList] = useState<TmdbVideo[]>([]);
   const [filter, setFilter] = useState<FilterOption>({
     quality: 'all',
     season: 'all',
@@ -62,7 +65,12 @@ export function SeriesDetails() {
   }, [user?.settings?.indexer?.qualities]);
 
   useEffect(() => {
-    loadSeriesDetails();
+    if (!id) return;
+    const seriesId = Number(id);
+    if (!Number.isFinite(seriesId)) return;
+
+    loadSeriesDetails(seriesId);
+    loadSeriesTrailers(seriesId);
   }, [id, language]);
 
   useEffect(() => {
@@ -178,10 +186,10 @@ export function SeriesDetails() {
     [t],
   );
 
-  const loadSeriesDetails = async () => {
+  const loadSeriesDetails = async (seriesId: number) => {
     setIsLoading(true);
     try {
-      const seriesData = await getSeriesById(Number(id), language);
+      const seriesData = await getSeriesById(seriesId, language);
       setSeries(seriesData);
 
       if (seriesData) {
@@ -199,6 +207,22 @@ export function SeriesDetails() {
       console.error('Error loading series details:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadSeriesTrailers = async (seriesId: number) => {
+    try {
+      const videos = await getTmdbVideos(seriesId, 'series');
+      const allVideos = videos?.results || [];
+      const sortedTrailers = extractTrailers(allVideos, 'fr')[0];
+      const englishTrailers = extractTrailers(allVideos, 'en')[0];
+      const combinedTrailers = [sortedTrailers, englishTrailers]
+        .filter((t): t is TmdbVideo => Boolean(t?.key))
+        .filter((v, idx, arr) => arr.findIndex((x) => x.key === v.key) === idx);
+      setTrailersList(combinedTrailers);
+    } catch (error) {
+      console.error('Error loading trailers:', error);
+      setTrailersList([]);
     }
   };
 
@@ -434,6 +458,9 @@ export function SeriesDetails() {
             <p className="text-white/80 text-lg leading-relaxed break-words">{series.plot}</p>
           </div>
 
+          {/* Trailers */}
+          <TrailersSection trailers={trailersList} mediaTitle={series.title} type="series" />
+
           <Card className="bg-white/5 border-white/10">
             <CardContent className="p-6 space-y-3">
               <h3 className="text-xl font-semibold text-white">
@@ -665,6 +692,7 @@ export function SeriesDetails() {
           />
         </div>
       </div>
+
     </div>
   );
 }

@@ -760,21 +760,28 @@ export function FtpExplorer() {
 
             {/* Barre d'actions groupées */}
             {hasSelection && (
-                <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-800/60 px-3 py-2">
-                    <span className="text-sm text-white/70 flex-1">
-                        {selected.size} élément{selected.size > 1 ? 's' : ''} sélectionné{selected.size > 1 ? 's' : ''}
-                    </span>
-                    <Button size="sm" variant="ghost" onClick={() => setShowMoveDialog(true)}
-                        className="text-cyan-300 hover:text-cyan-100 hover:bg-white/10 h-7">
-                        <MoveRight className="w-3.5 h-3.5 mr-1" />Déplacer
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDeleteSelected()}
-                        className="text-red-400 hover:text-red-200 hover:bg-red-500/10 h-7">
-                        <Trash2 className="w-3.5 h-3.5 mr-1" />Supprimer ({selected.size})
-                    </Button>
-                    <button type="button" onClick={() => setSelected(new Set())} className="text-white/30 hover:text-white p-1">
-                        <X className="w-4 h-4" />
-                    </button>
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-slate-800/60 px-3 py-2">
+                    <div className="flex items-center gap-0.5 shrink-0">
+                        <CheckSquare className="w-3.5 h-3.5 text-cyan-400" />
+                        <span className="text-sm text-white/70 min-w-0">
+                            {selected.size}/{items.length}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+                        <Button size="sm" variant="ghost" onClick={() => setShowMoveDialog(true)}
+                            className="text-cyan-300 hover:text-cyan-100 hover:bg-white/10 h-7 px-1 sm:px-2 text-xs sm:text-sm">
+                            <MoveRight className="w-3.5 h-3.5 mr-1" />Déplacer
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => handleDeleteSelected()}
+                            className="text-red-400 hover:text-red-200 hover:bg-red-500/10 h-7 px-1 sm:px-2 text-xs sm:text-sm">
+                            <Trash2 className="w-3.5 h-3.5 mr-1" />Supprimer ({selected.size})
+                        </Button>
+                        <button type="button" onClick={() => setSelected(new Set())}
+                            className="text-white/40 hover:text-white p-1 rounded hover:bg-white/10 transition-colors shrink-0"
+                            title="Désélectionner tout">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             )}
 

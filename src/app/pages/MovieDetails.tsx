@@ -2,6 +2,7 @@ import { ArrowLeft, Star, Calendar, Clock, User, Heart } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
 import { FilterOption, TorrentResultsPanel } from '../components/TorrentResultsPanel';
+import { TrailersSection } from '../components/TrailersSection';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -15,6 +16,11 @@ import { buildTorrentResultsLabels } from '../services/torrentResultsLabels';
 import { addToWishlist, removeFromWishlist, isInWishlist } from '../services/wishlistService';
 import type { Movie } from '../types/movie';
 import { IndexerMovieResult } from '../../../common/indexer';
+import { getTmdbVideos, extractTrailers, TmdbVideo } from '../services/tmdbService';
+
+export type { TmdbVideo };
+export const extractMovieTrailers = extractTrailers;
+
 
 export function MovieDetails() {
   const { id } = useParams();
@@ -26,6 +32,7 @@ export function MovieDetails() {
   const [releaseResults, setReleaseResults] = useState<IndexerMovieResult[]>([]);
   const [isReleaseLoading, setIsReleaseLoading] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
+  const [trailersList, setTrailersList] = useState<TmdbVideo[]>([]);
   const [filter, setFilter] = useState<FilterOption>({ quality: 'all', language: 'all', season: 'all', sortBy: 'date', sortOrder: 'desc' });
 
   const filteredReleaseResults = useMemo(() => {
@@ -68,18 +75,21 @@ export function MovieDetails() {
   );
 
   useEffect(() => {
-    loadMovieDetails();
+    if (!id) return;
+    const movieId = Number(id);
+    if (!Number.isFinite(movieId)) return;
+
+    loadMovieDetails(movieId);
+    loadMovieTrailers(movieId);
   }, [id, language]);
 
-  const loadMovieDetails = async () => {
+  const loadMovieDetails = async (movieId: number) => {
     setIsLoading(true);
     try {
-      const movieData = await getMovieById(Number(id), language);
+      const movieData = await getMovieById(movieId, language);
       setMovie(movieData);
       if (movieData) {
         setInWishlist(await isInWishlist(movieData.id));
-
-
       } else {
         setReleaseResults([]);
       }
@@ -89,6 +99,24 @@ export function MovieDetails() {
       setIsLoading(false);
     }
   };
+
+  const loadMovieTrailers = async (movieId: number) => {
+    try {
+      const videos = await getTmdbVideos(movieId, 'movie');
+      const allVideos = videos?.results || [];
+      const sortedTrailers = extractMovieTrailers(allVideos, 'fr')[0];
+      const englishTrailers = extractMovieTrailers(allVideos, 'en')[0];
+      const combinedTrailers = [sortedTrailers, englishTrailers]
+        .filter((t): t is TmdbVideo => Boolean(t?.key))
+        .filter((v, idx, arr) => arr.findIndex((x) => x.key === v.key) === idx);
+      setTrailersList(combinedTrailers);
+    } catch (error) {
+      console.error('Error loading trailers:', error);
+      setTrailersList([]);
+    }
+  };
+
+
 
   const toggleWishlist = async () => {
     if (!movie) return;
@@ -177,16 +205,18 @@ export function MovieDetails() {
           {t('movieDetails.back')}
         </Button>
 
-        <Button
-          onClick={toggleWishlist}
-          className={`${inWishlist
-            ? 'bg-purple-600 hover:bg-purple-700 text-white'
-            : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-            }`}
-        >
-          <Heart className={`w-5 h-5 mr-2 ${inWishlist ? 'fill-current' : ''}`} />
-          {inWishlist ? t('movieDetails.removeFromWishlist') : t('movieDetails.addToWishlist')}
-        </Button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button
+            onClick={toggleWishlist}
+            className={`${inWishlist
+              ? 'bg-purple-600 hover:bg-purple-700 text-white'
+              : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+              }`}
+          >
+            <Heart className={`w-5 h-5 mr-2 ${inWishlist ? 'fill-current' : ''}`} />
+            {inWishlist ? t('movieDetails.removeFromWishlist') : t('movieDetails.addToWishlist')}
+          </Button>
+        </div>
       </div>
 
       {/* Backdrop Image */}
@@ -281,6 +311,10 @@ export function MovieDetails() {
             <p className="text-white/80 text-lg leading-relaxed break-words">{movie.plot}</p>
           </div>
 
+          
+          {/* Trailers */}
+          <TrailersSection trailers={trailersList} mediaTitle={movie.title} type="movie" />
+
           {/* Director */}
           <Card className="bg-white/5 border-white/10">
             <CardContent className="p-6">
@@ -312,6 +346,7 @@ export function MovieDetails() {
             </Card>
           )}
 
+
           <TorrentResultsPanel
             title={t('movieDetails.indexer.title')}
             filter={filter}
@@ -325,7 +360,7 @@ export function MovieDetails() {
             labels={torrentPanelLabels}
           />
 
-          <div>
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               onClick={toggleWishlist}
               className={`w-full sm:w-auto ${inWishlist
