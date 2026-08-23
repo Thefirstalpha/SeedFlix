@@ -590,6 +590,15 @@ export interface I18nMessages {
       saved: string;
       failed: string;
     };
+    pullAuto: {
+      title: string;
+      description: string;
+      toggleLabel: string;
+      toggleHelp: string;
+      save: string;
+      saved: string;
+      failed: string;
+    };
     language: {
       title: string;
       description: string;

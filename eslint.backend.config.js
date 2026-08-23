@@ -27,7 +27,8 @@ export default [
 				setInterval: "readonly",
 				clearInterval: "readonly",
 				AbortController: "readonly",
-				structuredClone: "readonly"
+				structuredClone: "readonly",
+				NodeJS: "readonly"
 			}
 		},
 		plugins: {

@@ -34,9 +34,10 @@ import { SettingNotification } from '../components/settings/SettingNotification'
 import { SettingFtp } from '../components/settings/SettingFtp';
 import { SettingLogs } from '../components/settings/SettingLogs';
 import { updateLanguage, updateSpoilerMode } from '../services/settingService';
+import { SettingPullAuto } from '../components/settings/SettingPullAuto';
 
 
-const SETTINGS_TABS = ['general', 'notifications', 'api', 'transmission', 'indexer', 'ftp', 'users', 'database', 'logs', 'factory'] as const;
+const SETTINGS_TABS = ['general', 'notifications', 'global', 'transmission', 'indexer', 'ftp', 'users', 'database', 'logs', 'factory'] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 function parseSupportedLanguage(input: unknown): SupportedLanguage {
@@ -228,7 +229,7 @@ export function Settings() {
             {user?.username === 'admin' && (
               <>
                 <TabsTrigger
-                  value="api"
+                  value="global"
                   className="flex-none text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white"
                 >
                   {t('settings.tabs.configuration')}
@@ -335,8 +336,9 @@ export function Settings() {
         {user?.username === 'admin' && (
           <>
 
-            <TabsContent value="api">
+            <TabsContent value="global" className="space-y-6">
               <SettingTMDB></SettingTMDB>
+              <SettingPullAuto></SettingPullAuto>
             </TabsContent>
 
             <TabsContent value="users">

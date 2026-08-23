@@ -135,7 +135,6 @@ export async function resetSettings() {
 
 export interface DatabaseNamespaceEntry {
   namespace: string;
-  updatedAt: string;
 }
 
 

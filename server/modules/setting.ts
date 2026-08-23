@@ -2,6 +2,7 @@ import { readStore, runInTransaction } from './db';
 
 interface GlobalConfig {
   tmdbApiKey: string | null;
+  pullAuto: boolean;
   webPushVapidKeys: {
     publicKey: string;
     privateKey: string;
@@ -12,6 +13,7 @@ export function readGlobalConfig(): GlobalConfig {
   const config = readStore('global_config', 0);
   return {
     tmdbApiKey: config?.tmdbApiKey || null,
+    pullAuto: config?.pullAuto ?? true,
     webPushVapidKeys:
       config?.webPushVapidKeys?.publicKey && config?.webPushVapidKeys?.privateKey
         ? {

@@ -23,6 +23,15 @@ export async function isTmdbConfigure(): Promise<boolean> {
     }
     return false;
 }
+export async function getPullAuto(): Promise<boolean> {
+    const response = await fetch(`/api/settings/pull-auto`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await response.json();
+    return Boolean(data.pullAuto);
+}
 
 export async function configureTmdb(tmdbApiKey: string) {
     const response = await fetch(`/api/tmdb/configure`, {
@@ -34,6 +43,19 @@ export async function configureTmdb(tmdbApiKey: string) {
     if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to configure TMDB API key');
+    }
+}
+
+export async function updatePullAuto(pullAuto: boolean) {
+    const response = await fetch(`/api/settings/pull-auto`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pullAuto: pullAuto }),
+    });
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update pull auto setting');
     }
 }
 
@@ -68,7 +90,7 @@ export async function updateLanguage(language: string) {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({language: language}),
+        body: JSON.stringify({ language: language }),
     });
     if (!response.ok) {
         const errorData = await response.json();
@@ -81,7 +103,7 @@ export async function updateSpoilerMode(spoiler: boolean) {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({spoiler: spoiler}),
+        body: JSON.stringify({ spoiler: spoiler }),
     });
     if (!response.ok) {
         const errorData = await response.json();

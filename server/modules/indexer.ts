@@ -4,6 +4,7 @@ import { getUsers } from './auth';
 import { readStore, runInTransaction } from './db';
 import { ErrorCode } from './errors';
 import { addNotification } from './notification';
+import { readGlobalConfig } from './setting';
 import { buildDetailsRequest, proxyTmdb, TmdbType } from './tmdb';
 import { checkTorznabConnection, rssTorznab, searchTorznab } from './torznab';
 import { getUser } from './user';
@@ -455,5 +456,23 @@ export async function processWishlistIndexer() {
 }
 
 // Process wishlist every 5 minutes to check for new releases in the indexer
-setInterval(processWishlistIndexer, 5 * 60 * 1000);
-setTimeout(processWishlistIndexer, 1000);
+let intervalId: NodeJS.Timeout | null = null;
+
+export function updateIndexerProcess() {
+  const config = readGlobalConfig();
+  if (config.pullAuto) {
+    if (!intervalId) {
+      console.info('Starting wishlist indexer process...');
+      intervalId = setInterval(processWishlistIndexer, 5 * 60 * 1000);
+    }
+  } else if (intervalId) {
+    console.info('Stopping wishlist indexer process...');
+    clearInterval(intervalId);
+    intervalId = null;
+  }
+}
+
+// Call updateIndexerProcess on server start to initialize the process based on the current configuration
+setTimeout(() => {
+  updateIndexerProcess();
+}, 1000);
