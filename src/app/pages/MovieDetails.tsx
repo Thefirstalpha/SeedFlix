@@ -107,7 +107,7 @@ export function MovieDetails() {
       const sortedTrailers = extractMovieTrailers(allVideos, 'fr')[0];
       const englishTrailers = extractMovieTrailers(allVideos, 'en')[0];
       const combinedTrailers = [sortedTrailers, englishTrailers]
-        .filter((t): t is TmdbVideo => Boolean(t && t.key))
+        .filter((t): t is TmdbVideo => Boolean(t?.key))
         .filter((v, idx, arr) => arr.findIndex((x) => x.key === v.key) === idx);
       setTrailersList(combinedTrailers);
     } catch (error) {

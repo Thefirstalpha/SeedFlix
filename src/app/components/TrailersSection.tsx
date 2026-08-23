@@ -16,7 +16,7 @@ export function TrailersSection({
   trailers,
   mediaTitle,
   type = 'movie',
-}: TrailersSectionProps) {
+}: Readonly<TrailersSectionProps>) {
   const { t } = useI18n();
   const [selectedTrailer, setSelectedTrailer] = useState<TmdbVideo | null>(null);
   const [isOpen, setIsOpen] = useState(false);
