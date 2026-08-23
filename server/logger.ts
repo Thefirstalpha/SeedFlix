@@ -1,7 +1,10 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Request, Response, NextFunction } from 'express';
-import { bold, cyan, magenta, yellow, red, gray } from 'colorette';
+import { createColors } from 'colorette';
 import { randomUUID } from 'node:crypto';
+
+const colors = createColors({ useColor: true });
+const { bold, cyan, magenta, yellow, red, gray, green, blue } = colors;
 
 export interface RequestContext {
   correlationId: string;
@@ -15,6 +18,8 @@ export function getContext(): RequestContext | undefined {
 
 const HTTP_LOG_FORMAT = ':correlationId :type :method :url :status - :response-time ms';
 const BACKEND_LOG_FORMAT = ':correlationId :type :message';
+
+const MAX_LOG_BUFFER_SIZE = 2000;
 
 export function loggerMiddleware(req: Request, res: Response, next: NextFunction) {
   const correlationId = randomUUID();
@@ -43,24 +48,49 @@ export class Logger {
     return loggerMiddleware;
   }
 
+  private static appendToBuffer(msg: string) {
+    Logger.buffer.push(msg);
+    if (Logger.buffer.length > MAX_LOG_BUFFER_SIZE) {
+      Logger.buffer.shift();
+    }
+  }
+
   static log(original: (...args: any[]) => void, type: string, ...args: any[]) {
     const ctx = getContext();
     const correlationId = ctx ? ctx.correlationId : 'no-context';
-    const msg = BACKEND_LOG_FORMAT.replace(':correlationId', correlationId)
+    const msg = BACKEND_LOG_FORMAT.replace(':correlationId', gray(correlationId))
       .replace(':type', type)
       .replace(':message', args ? args.map(String).join(' ') : '');
-    Logger.buffer.push(msg);
+    Logger.appendToBuffer(msg);
     original(msg);
   }
 
   static http(req: Request, res: Response, duration: number) {
-    const msg = HTTP_LOG_FORMAT.replace(':correlationId', req.correlationId)
+    const statusColor =
+      res.statusCode >= 500
+        ? red
+        : res.statusCode >= 400
+          ? yellow
+          : res.statusCode >= 300
+            ? cyan
+            : green;
+
+    const methodColor =
+      req.method === 'GET'
+        ? blue
+        : req.method === 'POST'
+          ? green
+          : req.method === 'DELETE'
+            ? red
+            : yellow;
+
+    const msg = HTTP_LOG_FORMAT.replace(':correlationId', gray(req.correlationId))
       .replace(':type', bold(cyan('[HTTP]')))
-      .replace(':method', req.method)
+      .replace(':method', bold(methodColor(req.method)))
       .replace(':url', req.originalUrl)
-      .replace(':status', String(res.statusCode))
-      .replace(':response-time', String(duration));
-    Logger.buffer.push(msg);
+      .replace(':status', bold(statusColor(String(res.statusCode))))
+      .replace(':response-time', gray(String(duration)));
+    Logger.appendToBuffer(msg);
     Logger.original.info(msg);
   }
 

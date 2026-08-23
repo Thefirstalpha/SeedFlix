@@ -652,6 +652,23 @@ const fr : I18nMessages = {
       saveFailed: "Impossible d'enregistrer cette entrée",
       invalidJson: "Le contenu n'est pas un JSON valide.",
     },
+    logs: {
+      title: 'Journaux serveur',
+      live: 'En direct',
+      paused: 'En pause',
+      pause: 'Mettre en pause le flux',
+      resume: 'Reprendre le flux en direct',
+      autoScroll: 'Défilement auto',
+      clear: 'Effacer la vue',
+      copy: 'Copier les logs',
+      copied: 'Copié !',
+      filterPlaceholder: 'Filtrer les logs (ex. HTTP, error, correlation ID)...',
+      allLevels: 'Tous',
+      noLogs: 'Aucun log disponible',
+      noMatchingLogs: 'Aucun log ne correspond au filtre',
+      linesCount: '{{count}} lignes',
+      jumpToBottom: 'Aller en bas',
+    },
     factory: {
       title: "Réinitialisation d'usine",
       description:

@@ -643,6 +643,23 @@ const en: I18nMessages = {
       saveFailed: 'Unable to save this entry',
       invalidJson: 'Content is not valid JSON.',
     },
+    logs: {
+      title: 'Server Logs',
+      live: 'Live',
+      paused: 'Paused',
+      pause: 'Pause live stream',
+      resume: 'Resume live stream',
+      autoScroll: 'Auto-scroll',
+      clear: 'Clear view',
+      copy: 'Copy logs',
+      copied: 'Copied!',
+      filterPlaceholder: 'Filter logs (e.g. HTTP, error, correlation ID)...',
+      allLevels: 'All',
+      noLogs: 'No logs available',
+      noMatchingLogs: 'No logs match your filter',
+      linesCount: '{{count}} lines',
+      jumpToBottom: 'Jump to bottom',
+    },
     factory: {
       title: 'Factory reset',
       description:

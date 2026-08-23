@@ -734,6 +734,23 @@ export interface I18nMessages {
       saveFailed: string;
       invalidJson: string;
     };
+    logs: {
+      title: string;
+      live: string;
+      paused: string;
+      pause: string;
+      resume: string;
+      autoScroll: string;
+      clear: string;
+      copy: string;
+      copied: string;
+      filterPlaceholder: string;
+      allLevels: string;
+      noLogs: string;
+      noMatchingLogs: string;
+      linesCount: string;
+      jumpToBottom: string;
+    };
     factory: {
       title: string;
       description: string;
