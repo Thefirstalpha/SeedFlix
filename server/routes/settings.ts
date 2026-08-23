@@ -10,6 +10,8 @@ import {
   removeWebPushSubscription,
   sendDiscordNotification,
 } from '../modules/notification';
+import { readGlobalConfig, updateGlobalConfig } from '../modules/setting';
+import { updateIndexerProcess } from '../modules/indexer';
 
 const router = Router();
 router.use(authentication);
@@ -18,6 +20,18 @@ router.post('/settings/reset', withAdmin, async (req, res) => {
   resetDatabase();
   res.clearCookie('session');
   res.status(200).json({ ok: true, loggedOut: true, message: 'Database reset successfully' });
+});
+
+router.get('/settings/pull-auto', withAdmin, async (req, res) => {
+  const config = readGlobalConfig();
+  res.status(200).json({ pullAuto: config.pullAuto });
+});
+
+router.post('/settings/pull-auto', withAdmin, async (req, res) => {
+  const { pullAuto } = req.body;
+  updateGlobalConfig({ pullAuto: Boolean(pullAuto) });
+  updateIndexerProcess(); // Update the indexer process based on the new pullAuto setting
+  res.status(200).json({ ok: true });
 });
 
 router.post('/settings/language', async (req, res) => {

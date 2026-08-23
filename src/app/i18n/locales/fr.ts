@@ -496,6 +496,15 @@ const fr : I18nMessages = {
       saved: 'Mode spoiler mis à jour.',
       failed: 'Mise à jour du mode spoiler impossible',
     },
+    pullAuto: {
+      title: 'Pull automatique',
+      description: 'Activez ou désactivez le pull automatique de nouveaux contenus depuis votre indexer.',
+      toggleLabel: 'Activer le pull automatique',
+      toggleHelp: "Quand activé, SeedFlix effectuera automatiquement le pull de nouveaux contenus depuis votre indexer.",
+      save: 'Enregistrer le paramètre de pull automatique',
+      saved: 'Paramètre de pull automatique mis à jour.',
+      failed: 'Impossible de mettre à jour le paramètre de pull automatique',
+    },
     language: {
       title: "Langue de l'interface",
       description: "Sélectionnez la langue utilisée dans l'application.",
