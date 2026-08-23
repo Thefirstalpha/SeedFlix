@@ -12,6 +12,7 @@ import {
   rejectAllIndexerResultsByGuids,
 } from '../modules/indexer';
 import { IndexerMovieResponse, IndexerSeriesResponse } from '../../common/indexer';
+import { cache } from '../cache';
 
 const router = Router();
 router.use(authentication);
@@ -39,7 +40,7 @@ router.post('/indexer/configure', async (req, res) => {
   res.status(200).json({ message: 'Indexer settings configured successfully' });
 });
 
-router.get('/indexer/search/movies/:id', async (req, res) => {
+router.get('/indexer/search/movies/:id', cache(120), async (req, res) => {
   const id = Number(req.params.id);
   const limit = Number(req.query.limit) || 100;
   const offset = Number(req.query.offset) || 0;
@@ -51,7 +52,7 @@ router.get('/indexer/search/movies/:id', async (req, res) => {
   res.status(200).json(data);
 });
 
-router.get('/indexer/search/series/:id', async (req, res) => {
+router.get('/indexer/search/series/:id', cache(120), async (req, res) => {
   const id = Number(req.params.id);
   const limit = Number(req.query.limit) || 100;
   const offset = Number(req.query.offset) || 0;

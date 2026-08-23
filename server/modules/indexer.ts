@@ -454,5 +454,6 @@ export async function processWishlistIndexer() {
   }
 }
 
-setInterval(processWishlistIndexer, 60 * 1000);
+// Process wishlist every 5 minutes to check for new releases in the indexer
+setInterval(processWishlistIndexer, 5 * 60 * 1000);
 setTimeout(processWishlistIndexer, 1000);
