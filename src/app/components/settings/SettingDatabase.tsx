@@ -35,14 +35,14 @@ const DatabaseSelectableList: React.FC<DatabaseSelectableListProps> = ({
     emptyMessageKey = 'settings.database.empty',
     onReload,
 }) => (
-    <div className="w-full space-y-3 rounded-lg border border-white/10 bg-slate-900/40 p-4">
-        <div className="flex items-center justify-between gap-2">
-            <h3 className="font-medium text-white">{title}</h3>
+    <div className="w-full space-y-3 rounded-lg border border-white/10 bg-slate-900/40 p-3.5 sm:p-4 min-w-0 max-w-full">
+        <div className="flex items-center justify-between gap-2 min-w-0">
+            <h3 className="font-medium text-white truncate text-sm sm:text-base">{title}</h3>
             <Button
                 type="button"
                 variant="outline"
                 onClick={onReload}
-                className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white shrink-0 text-xs px-2.5 sm:px-3 h-8"
             >
                 {t('settings.database.refreshList')}
             </Button>
@@ -53,19 +53,19 @@ const DatabaseSelectableList: React.FC<DatabaseSelectableListProps> = ({
         ) : items.length === 0 ? (
             <p className="text-sm text-white/60">{t(emptyMessageKey)}</p>
         ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-56 sm:max-h-72 lg:max-h-[480px] overflow-y-auto pr-1">
                 {items.map((item) => (
                     <button
                         key={item.key}
                         type="button"
                         onClick={item.onSelect}
-                        className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${item.isSelected
+                        className={`w-full rounded-md border px-3 py-2 text-left transition-colors min-w-0 max-w-full ${item.isSelected
                             ? 'border-teal-400/40 bg-teal-500/15 text-teal-100'
                             : 'border-white/10 bg-slate-950/50 text-white/80 hover:bg-white/5'
                             }`}
                     >
-                        <p className="font-mono text-sm">{item.title}</p>
-                        {item.subtitle ? <p className="mt-1 text-xs text-white/50">{item.subtitle}</p> : null}
+                        <p className="font-mono text-xs sm:text-sm truncate">{item.title}</p>
+                        {item.subtitle ? <p className="mt-1 text-xs text-white/50 truncate">{item.subtitle}</p> : null}
                     </button>
                 ))}
             </div>
@@ -82,28 +82,6 @@ interface DatabaseNamespaceListProps {
     onSelect: (namespace: string) => void;
 }
 
-export const DatabaseNamespaceList: React.FC<DatabaseNamespaceListProps> = ({
-    t,
-    isLoading,
-    namespaces,
-    selectedNamespace,
-    onReload,
-    onSelect,
-}) => (
-    <DatabaseSelectableList
-        t={t}
-        title={t('settings.database.namespaces')}
-        isLoading={isLoading}
-        items={namespaces.map((entry) => ({
-            key: entry.namespace,
-            title: entry.namespace,
-            subtitle: t('settings.database.updatedAt', { value: entry.updatedAt || '-' }),
-            isSelected: selectedNamespace === entry.namespace,
-            onSelect: () => onSelect(entry.namespace),
-        }))}
-        onReload={onReload}
-    />
-);
 
 export interface DatabaseRawEditorPanelProps {
     t: TranslateFn;
@@ -164,20 +142,20 @@ export const DatabaseRawEditorPanel: React.FC<DatabaseRawEditorPanelProps> = ({
     message,
     error,
 }) => (
-    <div className="w-full space-y-4 rounded-lg border border-white/10 bg-slate-900/40 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h3 className="font-medium text-white">
+    <div className="w-full space-y-4 rounded-lg border border-white/10 bg-slate-900/40 p-3.5 sm:p-4 min-w-0 max-w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0">
+            <div className="min-w-0 flex-1">
+                <h3 className="font-medium text-white truncate text-sm sm:text-base" title={selectedNamespace || undefined}>
                     {selectedNamespace || t('settings.database.noSelection')}
                 </h3>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <Button
                     type="button"
                     variant="outline"
                     onClick={(__e) => void onReload()}
                     disabled={!selectedNamespace || isLoadingValue || isSavingValue}
-                    className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                    className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white text-xs px-2.5 sm:px-3 h-8"
                 >
                     {t('settings.database.reload')}
                 </Button>
@@ -186,7 +164,7 @@ export const DatabaseRawEditorPanel: React.FC<DatabaseRawEditorPanelProps> = ({
                     variant="outline"
                     onClick={(__e) => onPrettyFormat()}
                     disabled={!selectedNamespace || isLoadingValue || isSavingValue}
-                    className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                    className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white text-xs px-2.5 sm:px-3 h-8"
                 >
                     {t('settings.database.prettyFormat')}
                 </Button>
@@ -194,27 +172,30 @@ export const DatabaseRawEditorPanel: React.FC<DatabaseRawEditorPanelProps> = ({
                     type="button"
                     onClick={(__e) => void onSave()}
                     disabled={!selectedNamespace || isLoadingValue || isSavingValue}
-                    className="bg-teal-600 hover:bg-teal-700 text-white"
+                    className="bg-teal-600 hover:bg-teal-700 text-white text-xs px-3 sm:px-4 h-8"
                 >
                     {isSavingValue ? t('common.saving') : t('common.save')}
                 </Button>
             </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 min-w-0 max-w-full">
             <Label htmlFor="database-raw-value">{t('settings.database.rawEditor')}</Label>
-            <Textarea
-                id="database-raw-value"
-                value={rawValue}
-                onChange={(__event) => onRawValueChange(__event.currentTarget.value)}
-                disabled={!selectedNamespace || isLoadingValue}
-                className="min-h-[420px] bg-slate-950 border-white/10 font-mono text-sm text-white"
-                spellCheck={false}
-            />
+            <div className="w-full min-w-0 max-w-full overflow-hidden rounded-md">
+                <Textarea
+                    id="database-raw-value"
+                    value={rawValue}
+                    onChange={(__event) => onRawValueChange(__event.currentTarget.value)}
+                    disabled={!selectedNamespace || isLoadingValue}
+                    className="min-h-[320px] sm:min-h-[420px] max-h-[600px] w-full max-w-full min-w-0 bg-slate-950 border-white/10 font-mono text-xs sm:text-sm text-white resize-y overflow-x-auto [field-sizing:fixed]"
+                    style={{ fieldSizing: 'fixed' } as React.CSSProperties}
+                    spellCheck={false}
+                />
+            </div>
         </div>
 
-        {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
-        {error ? <p className="text-sm text-red-300">{error}</p> : null}
+        {message ? <p className="text-sm text-emerald-300 break-words">{message}</p> : null}
+        {error ? <p className="text-sm text-red-300 break-words">{error}</p> : null}
     </div>
 );
 
@@ -366,26 +347,30 @@ export function SettingDatabase() {
     }, [handleDatabaseReload, isAdmin, selectedDatabaseNamespace, selectedUser]);
 
     return (
-        <Card className="border-teal-500/30 bg-teal-950/15 text-white">
-            <CardHeader>
+        <Card className="border-teal-500/30 bg-teal-950/15 text-white w-full max-w-full overflow-hidden">
+            <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
                 <CardTitle className="text-teal-200">{t('settings.database.title')}</CardTitle>
                 <CardDescription className="text-teal-100/70">
                     {t('settings.database.description')}
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            <CardContent className="space-y-6 p-4 sm:p-6">
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 break-words">
                     {t('settings.database.warning')}
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-[minmax(0,280px)_minmax(0,280px)_minmax(0,1fr)]">
-                    <DatabaseNamespaceList
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,260px)_minmax(0,260px)_minmax(0,1fr)] lg:grid-cols-[minmax(0,220px)_minmax(0,220px)_minmax(0,1fr)] grid-cols-1 w-full min-w-0">
+                    <DatabaseSelectableList
                         t={t}
+                        title={t('settings.database.namespaces')}
                         isLoading={isLoadingDatabaseNamespaces}
-                        namespaces={databaseNamespaces}
-                        selectedNamespace={selectedDatabaseNamespace}
+                        items={databaseNamespaces.map((entry) => ({
+                            key: entry.namespace,
+                            title: entry.namespace,
+                            isSelected: selectedDatabaseNamespace === entry.namespace,
+                            onSelect: () => setSelectedDatabaseNamespace(entry.namespace),
+                        }))}
                         onReload={handleDatabaseNamespacesReload}
-                        onSelect={setSelectedDatabaseNamespace}
                     />
                     <DatabaseUserList
                         t={t}

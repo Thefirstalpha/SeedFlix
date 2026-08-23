@@ -53,13 +53,13 @@ export function TrailersSection({
 
   return (
     <>
-      <Card className="bg-white/5 border-white/10">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Film className={`w-5 h-5 ${colorClasses.icon}`} />
-            <h3 className="text-xl font-semibold text-white">{sectionTitle}</h3>
+      <Card className="bg-white/5 border-white/10 w-full overflow-hidden">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-center gap-3 mb-4 min-w-0">
+            <Film className={`w-5 h-5 shrink-0 ${colorClasses.icon}`} />
+            <h3 className="text-xl font-semibold text-white truncate">{sectionTitle}</h3>
           </div>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full min-w-0">
             {trailers.map((trailer) => {
               const isFr = trailer.iso_639_1?.toLowerCase() === 'fr';
               const isEn = trailer.iso_639_1?.toLowerCase() === 'en';
@@ -74,19 +74,19 @@ export function TrailersSection({
                   key={trailer.id || trailer.key}
                   type="button"
                   onClick={() => handleOpenTrailer(trailer)}
-                  className={`group flex items-center justify-between gap-3 p-3 rounded-lg bg-white/5 border border-white/10 text-left transition-all cursor-pointer ${colorClasses.cardHover}`}
+                  className={`group flex items-center justify-between gap-3 p-3 rounded-lg bg-white/5 border border-white/10 text-left transition-all cursor-pointer w-full min-w-0 ${colorClasses.cardHover}`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div
                       className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition-colors ${colorClasses.playBg}`}
                     >
                       <Play className="w-4 h-4 fill-current ml-0.5" />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className={`text-white text-sm font-medium truncate ${colorClasses.titleHover}`}>
                         {trailer.name}
                       </p>
-                      <p className="text-white/50 text-xs">
+                      <p className="text-white/50 text-xs truncate">
                         {trailer.type} {trailer.size ? `• ${trailer.size}p` : ''}
                       </p>
                     </div>
@@ -94,7 +94,7 @@ export function TrailersSection({
 
                   <Badge
                     variant="outline"
-                    className={`shrink-0 text-xs font-semibold ${
+                    className={`shrink-0 text-xs font-semibold whitespace-nowrap ml-2 ${
                       isFr
                         ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
                         : isEn
@@ -112,11 +112,11 @@ export function TrailersSection({
       </Card>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-4xl sm:max-w-4xl w-[95vw] p-0 overflow-hidden bg-slate-950 border-white/10 text-white shadow-2xl">
-          <DialogHeader className="p-4 pb-2 border-b border-white/10">
-            <DialogTitle className="text-lg font-semibold flex items-center gap-2 text-white">
-              <Play className={`w-4 h-4 ${colorClasses.dialogIcon}`} />
-              {selectedTrailer?.name || mediaTitle}
+        <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-4xl p-0 gap-0 overflow-hidden bg-slate-950 border-white/10 text-white shadow-2xl">
+          <DialogHeader className="p-3.5 sm:p-4 pb-2 border-b border-white/10 pr-12">
+            <DialogTitle className="text-base sm:text-lg font-semibold flex items-center gap-2 text-white min-w-0">
+              <Play className={`w-4 h-4 shrink-0 ${colorClasses.dialogIcon}`} />
+              <span className="truncate">{selectedTrailer?.name || mediaTitle}</span>
             </DialogTitle>
           </DialogHeader>
           <div className="relative w-full aspect-video bg-black">
