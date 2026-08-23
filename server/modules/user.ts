@@ -35,6 +35,7 @@ export const getUser = (id: number): User | null => {
   const user = readStore('user', id);
   if (!user) return null;
 
+  const initialPassword = Boolean(user?.flags?.initialPassword);
   const mustUpdatePassword = Boolean(user?.flags?.mustUpdatePassword);
   const legalAccepted = Boolean(user?.flags?.legalAccepted);
   const hasIndexer = user.settings?.indexer !== null;
@@ -44,7 +45,8 @@ export const getUser = (id: number): User | null => {
     id: Number(user.id),
     username: String(user.username),
     flags: {
-      mustSetup: Boolean(!legalAccepted || mustUpdatePassword || !hasIndexer || !hasTransmission),
+      mustSetup: Boolean(!legalAccepted || initialPassword || !hasIndexer || !hasTransmission),
+      initialPassword,
       mustUpdatePassword,
       legalAccepted,
     },
@@ -119,7 +121,8 @@ export const createUser = (
       username,
       flags: {
         mustSetup: true,
-        mustUpdatePassword: true,
+        initialPassword: true,
+        mustUpdatePassword: false,
         legalAccepted: false,
       },
       settings: {

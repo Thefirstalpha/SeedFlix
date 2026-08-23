@@ -454,6 +454,8 @@ const fr : I18nMessages = {
     tabs: {
       general: 'Général',
       configuration: 'Configurations',
+      transmission: 'Client torrent',
+      indexer: 'Indexer',
       notifications: 'Notifications',
       users: 'Utilisateurs',
       database: 'Base de données',
@@ -469,7 +471,7 @@ const fr : I18nMessages = {
     preferences: {
       title: "Préférences d'affichage",
       description:
-        'Configurez la langue et le comportement anti-spoiler. Les changements sont enregistrés automatiquement.',
+        'Configurez la langue et le comportement anti-spoiler.',
       saved: 'Préférences mises à jour.',
       failed: 'Mise à jour des préférences impossible',
     },

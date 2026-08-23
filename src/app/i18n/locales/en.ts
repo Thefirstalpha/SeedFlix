@@ -452,6 +452,8 @@ const en: I18nMessages = {
     tabs: {
       general: 'General',
       configuration: 'Configuration',
+      transmission: 'Torrent client',
+      indexer: 'Indexer',
       notifications: 'Notifications',
       users: 'Users',
       database: 'Database',
@@ -466,7 +468,7 @@ const en: I18nMessages = {
     },
     preferences: {
       title: 'Display preferences',
-      description: 'Configure language and spoiler behavior. Changes are saved automatically.',
+      description: 'Configure language and spoiler behavior.',
       saved: 'Preferences updated.',
       failed: 'Unable to update preferences',
     },

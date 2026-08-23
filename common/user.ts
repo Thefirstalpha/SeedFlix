@@ -30,6 +30,7 @@ export interface User {
     username: string;
     flags: {
         mustSetup: boolean;
+        initialPassword: boolean;
         mustUpdatePassword: boolean;
         legalAccepted: boolean;
     };

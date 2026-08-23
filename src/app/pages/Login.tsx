@@ -1,5 +1,5 @@
 import { LockKeyhole, User } from 'lucide-react';
-import { useState } from 'react';
+import { SubmitEvent, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -38,7 +38,7 @@ export function Login() {
     return <Navigate to={nextPath} replace />;
   }
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = async (event: SubmitEvent) => {
     event.preventDefault();
     setError(null);
     setIsSubmitting(true);

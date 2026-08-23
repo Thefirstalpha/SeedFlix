@@ -31,6 +31,8 @@ export function loggerMiddleware(req: Request, res: Response, next: NextFunction
 }
 
 export class Logger {
+  static readonly buffer: string[] = [];
+
   static readonly original = {
     log: console.log,
     info: console.info,
@@ -47,6 +49,7 @@ export class Logger {
     const msg = BACKEND_LOG_FORMAT.replace(':correlationId', correlationId)
       .replace(':type', type)
       .replace(':message', args ? args.map(String).join(' ') : '');
+    Logger.buffer.push(msg);
     original(msg);
   }
 
@@ -57,6 +60,7 @@ export class Logger {
       .replace(':url', req.originalUrl)
       .replace(':status', String(res.statusCode))
       .replace(':response-time', String(duration));
+    Logger.buffer.push(msg);
     Logger.original.info(msg);
   }
 
