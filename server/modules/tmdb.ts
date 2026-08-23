@@ -132,6 +132,15 @@ export function buildDetailsRequest(mediaType: TmdbType, id: number, query: Reco
   };
 }
 
+export function buildVideosRequest(mediaType: TmdbType, id: number) {
+  return {
+    path: `/${mediaType}/${id}/videos`,
+    query: {
+      include_video_language: 'fr,en,null',
+    },
+  };
+}
+
 export function buildSeasonRequest(id: number, seasonNumber: number, query: Record<string, any>) {
   return {
     path: `/tv/${id}/season/${seasonNumber}`,

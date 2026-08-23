@@ -1,10 +1,11 @@
-import { ArrowLeft, Calendar, Clapperboard, Heart, Star } from 'lucide-react';
+import { ArrowLeft, Calendar, Clapperboard, Film, Heart, Play, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { TorrentResultsPanel, FilterOption } from '../components/TorrentResultsPanel';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/LanguageProvider';
@@ -19,6 +20,7 @@ import {
   getSeriesWishlistStatus,
   removeFromWishlist,
 } from '../services/seriesWishlistService';
+import { getTmdbVideos, extractTrailers, TmdbVideo } from '../services/tmdbService';
 import { buildTorrentResultsLabels } from '../services/torrentResultsLabels';
 import type { SeriesDetails as SeriesDetailsModel, SeriesEpisode } from '../types/series';
 import { WishListItem } from '../../../common/wishlist';
@@ -41,6 +43,9 @@ export function SeriesDetails() {
   const [releaseResults, setReleaseResults] = useState<IndexerSeriesResult[]>([]);
   const [isReleaseLoading, setIsReleaseLoading] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
+  const [selectedTrailer, setSelectedTrailer] = useState<TmdbVideo | null>(null);
+  const [trailersList, setTrailersList] = useState<TmdbVideo[]>([]);
+  const [isTrailerOpen, setIsTrailerOpen] = useState(false);
   const [filter, setFilter] = useState<FilterOption>({
     quality: 'all',
     season: 'all',
@@ -62,7 +67,12 @@ export function SeriesDetails() {
   }, [user?.settings?.indexer?.qualities]);
 
   useEffect(() => {
-    loadSeriesDetails();
+    if (!id) return;
+    const seriesId = Number(id);
+    if (!Number.isFinite(seriesId)) return;
+
+    loadSeriesDetails(seriesId);
+    loadSeriesTrailers(seriesId);
   }, [id, language]);
 
   useEffect(() => {
@@ -178,10 +188,10 @@ export function SeriesDetails() {
     [t],
   );
 
-  const loadSeriesDetails = async () => {
+  const loadSeriesDetails = async (seriesId: number) => {
     setIsLoading(true);
     try {
-      const seriesData = await getSeriesById(Number(id), language);
+      const seriesData = await getSeriesById(seriesId, language);
       setSeries(seriesData);
 
       if (seriesData) {
@@ -199,6 +209,23 @@ export function SeriesDetails() {
       console.error('Error loading series details:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadSeriesTrailers = async (seriesId: number) => {
+    try {
+      const videos = await getTmdbVideos(seriesId, 'series');
+      const allVideos = videos?.results || [];
+      const sortedTrailers = extractTrailers(allVideos, 'fr')[0];
+      const englishTrailers = extractTrailers(allVideos, 'en')[0];
+      const combinedTrailers = [sortedTrailers, englishTrailers]
+        .filter((t): t is TmdbVideo => Boolean(t && t.key))
+        .filter((v, idx, arr) => arr.findIndex((x) => x.key === v.key) === idx);
+      setTrailersList(combinedTrailers);
+    } catch (error) {
+      console.error('Error loading trailers:', error);
+      setTrailersList([]);
+      setSelectedTrailer(null);
     }
   };
 
@@ -434,6 +461,68 @@ export function SeriesDetails() {
             <p className="text-white/80 text-lg leading-relaxed break-words">{series.plot}</p>
           </div>
 
+          {/* Trailers */}
+          {trailersList.length > 0 && (
+            <Card className="bg-white/5 border-white/10">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <Film className="w-5 h-5 text-cyan-400" />
+                  <h3 className="text-xl font-semibold text-white">{t('seriesDetails.trailers')}</h3>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {trailersList.map((trailer) => {
+                    const isFr = trailer.iso_639_1?.toLowerCase() === 'fr';
+                    const isEn = trailer.iso_639_1?.toLowerCase() === 'en';
+                    const langLabel = isFr
+                      ? t('seriesDetails.trailerLangFr')
+                      : isEn
+                      ? t('seriesDetails.trailerLangEn')
+                      : (trailer.iso_639_1 || '').toUpperCase();
+
+                    return (
+                      <button
+                        key={trailer.id || trailer.key}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTrailer(trailer);
+                          setIsTrailerOpen(true);
+                        }}
+                        className="group flex items-center justify-between gap-3 p-3 rounded-lg bg-white/5 hover:bg-cyan-600/20 border border-white/10 hover:border-cyan-500/40 text-left transition-all cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 shrink-0 rounded-full bg-cyan-600/20 group-hover:bg-cyan-600 text-cyan-300 group-hover:text-white flex items-center justify-center transition-colors">
+                            <Play className="w-4 h-4 fill-current ml-0.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-white text-sm font-medium truncate group-hover:text-cyan-200">
+                              {trailer.name}
+                            </p>
+                            <p className="text-white/50 text-xs">
+                              {trailer.type} {trailer.size ? `• ${trailer.size}p` : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        <Badge
+                          variant="outline"
+                          className={`shrink-0 text-xs font-semibold ${
+                            isFr
+                              ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                              : isEn
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                              : 'bg-white/10 text-white/70 border-white/20'
+                          }`}
+                        >
+                          {langLabel}
+                        </Badge>
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="bg-white/5 border-white/10">
             <CardContent className="p-6 space-y-3">
               <h3 className="text-xl font-semibold text-white">
@@ -665,6 +754,29 @@ export function SeriesDetails() {
           />
         </div>
       </div>
+
+      {/* Trailer Dialog */}
+      <Dialog open={isTrailerOpen} onOpenChange={setIsTrailerOpen}>
+        <DialogContent className="max-w-4xl sm:max-w-4xl w-[95vw] p-0 overflow-hidden bg-slate-950 border-white/10 text-white shadow-2xl">
+          <DialogHeader className="p-4 pb-2 border-b border-white/10">
+            <DialogTitle className="text-lg font-semibold flex items-center gap-2 text-white">
+              <Play className="w-4 h-4 text-cyan-400 fill-cyan-400" />
+              {selectedTrailer?.name || series.title}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="relative w-full aspect-video bg-black">
+            {isTrailerOpen && selectedTrailer && (
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${selectedTrailer.key}?autoplay=1`}
+                title={selectedTrailer.name || series.title}
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

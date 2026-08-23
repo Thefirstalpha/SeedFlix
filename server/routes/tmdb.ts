@@ -6,6 +6,7 @@ import {
   buildPopularRequest,
   buildSearchRequest,
   buildSeasonRequest,
+  buildVideosRequest,
   configureTmdbApiKey,
   proxyTmdb,
   TmdbType,
@@ -56,6 +57,14 @@ router.get('/tmdb/:type/details/:id', async (req, res) => {
   const type = req.params.type === 'movie' ? TmdbType.movie : TmdbType.series;
   const id = Number(req.params.id);
   const request = buildDetailsRequest(type, id, req.query);
+  const results = await proxyTmdb(request.path, request.query);
+  res.json(results);
+});
+
+router.get('/tmdb/:type/videos/:id', async (req, res) => {
+  const type = req.params.type === 'movie' ? TmdbType.movie : TmdbType.series;
+  const id = Number(req.params.id);
+  const request = buildVideosRequest(type, id);
   const results = await proxyTmdb(request.path, request.query);
   res.json(results);
 });
