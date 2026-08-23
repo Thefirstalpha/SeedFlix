@@ -1,11 +1,11 @@
 import { Heart, Trash2, Tv, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Checkbox } from './ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { WishListCard } from './WishListCard';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import { Checkbox } from '../components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { getEpisodeCode, WishListCard } from '../components/WishListCard';
 import { useI18n } from '../i18n/LanguageProvider';
 import {
   getIndexerMovieResults,
@@ -17,23 +17,6 @@ import { addTorrentToClient } from '../services/torrentService';
 import { getWishlist, removeMultipleFromWishlist } from '../services/wishlistService';
 import { WishListItem } from '../../../common/wishlist';
 import { IndexerMovieResult, IndexerSeriesResult } from '../../../common/indexer';
-
-
-
-
-export const getEpisodeCode = (
-    targetKey: string,
-    fallbackSeason?: number | null,
-    fallbackEpisode?: number | null,
-  ) => {
-    const match = String(targetKey || '').match(/^episode:\d+:(\d+):(\d+)$/i);
-    const season = match?.[1] ? Number(match[1]) : Number(fallbackSeason || 0);
-    const episode = match?.[2] ? Number(match[2]) : Number(fallbackEpisode || 0);
-    if (!Number.isFinite(season) || !Number.isFinite(episode) || season <= 0 || episode <= 0) {
-      return '';
-    }
-    return `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
-  };
 
 
 export function WishList() {

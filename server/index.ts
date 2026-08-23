@@ -14,6 +14,7 @@ import { router as dbRouter } from './routes/db';
 import { router as settingsRouter } from './routes/settings';
 import { router as ftpRouter } from './routes/ftp';
 import { router as notificationRouter } from './routes/notification';
+import { router as adminRouter } from './routes/admin';
 import { initDB } from './modules/db';
 import { startDownloadWatcher } from './modules/downloadWatcher';
 import { ErrorCode } from './modules/errors';
@@ -66,6 +67,7 @@ app.use('/api/settings/database', dbRouter);
 app.use('/api', settingsRouter);
 app.use('/api', ftpRouter);
 app.use('/api', notificationRouter);
+app.use('/api', adminRouter);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof ErrorCode) {

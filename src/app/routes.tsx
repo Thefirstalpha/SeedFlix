@@ -1,17 +1,17 @@
 import { createBrowserRouter } from 'react-router';
-import { Downloads } from './components/Downloads';
-import { FtpExplorer } from './components/FtpExplorer';
-import { Home } from './components/Home';
-import { InitialSetup } from './components/InitialSetup';
-import { Login } from './components/Login';
-import { MovieDetails } from './components/MovieDetails';
-import { NotFound } from './components/NotFound';
-import Notifications from './components/Notifications';
+import { Downloads } from './pages/Downloads';
+import { FtpExplorer } from './pages/FtpExplorer';
+import { Home } from './pages/Home';
+import { InitialSetup } from './pages/InitialSetup';
+import { Login } from './pages/Login';
+import { MovieDetails } from './pages/MovieDetails';
+import { NotFound } from './pages/NotFound';
+import Notifications from './pages/Notifications';
 import { RequireAuth } from './components/RequireAuth';
 import { Root } from './components/Root';
-import { SeriesDetails } from './components/SeriesDetails';
-import { Settings } from './components/Settings';
-import { WishList } from './components/WishList';
+import { SeriesDetails } from './pages/SeriesDetails';
+import { Settings } from './pages/Settings';
+import { WishList } from './pages/WishList';
 
 export const router = createBrowserRouter([
   {

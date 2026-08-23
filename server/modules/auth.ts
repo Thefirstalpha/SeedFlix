@@ -62,6 +62,12 @@ export function resetAuth(userId: number) {
   db.prepare(
     "UPDATE auth_users SET salt = ?, hash = ?, updated_at = datetime('now') WHERE user_id = ?",
   ).run(salt, hash, userId);
+  runInTransaction(async ({ writeStore }) => {
+    const user = getUser(userId);
+    if (!user) throw new Error('User not found');
+    user.flags.mustUpdatePassword = true;
+    writeStore('user', user.id, user);
+  });
   return generatedPassword;
 }
 

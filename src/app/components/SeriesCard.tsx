@@ -8,7 +8,7 @@ interface SeriesCardProps {
   series: Series;
 }
 
-export function SeriesCard({ series }: SeriesCardProps) {
+export function SeriesCard({ series }: Readonly<SeriesCardProps>) {
   return (
     <Link to={`/series/${series.id}`}>
       <Card className="overflow-hidden bg-white/5 border-white/10 hover:bg-white/10 transition-all hover:scale-105 group">

@@ -9,7 +9,7 @@ import { Switch } from '../../components/ui/switch';
 import { useI18n } from '../../i18n/LanguageProvider';
 
 
-export function SettingFtp({ setup, onComplete }: { setup?: boolean; onComplete?: () => void }) {
+export function SettingFtp({ setup, onComplete }: Readonly<{ setup?: boolean; onComplete?: () => void }>) {
     const { t } = useI18n();
 
     // État pour la configuration FTP

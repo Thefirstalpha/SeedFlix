@@ -79,7 +79,7 @@ function parseSupportedLanguage(input: unknown): SupportedLanguage {
 
 export function LanguageProvider({ children }: Readonly<{ children: ReactNode }>) {
   const { user } = useAuth();
-  const [language, setLanguage] = useState<SupportedLanguage>('fr');
+  const [language, setLanguage] = useState<SupportedLanguage>('en');
 
   useEffect(() => {
     const settingsLanguage = parseSupportedLanguage(
@@ -551,6 +551,8 @@ export interface I18nMessages {
     tabs: {
       general: string;
       configuration: string;
+      transmission: string;
+      indexer: string;
       notifications: string;
       users: string;
       database: string;
@@ -731,6 +733,23 @@ export interface I18nMessages {
       entryLoadFailed: string;
       saveFailed: string;
       invalidJson: string;
+    };
+    logs: {
+      title: string;
+      live: string;
+      paused: string;
+      pause: string;
+      resume: string;
+      autoScroll: string;
+      clear: string;
+      copy: string;
+      copied: string;
+      filterPlaceholder: string;
+      allLevels: string;
+      noLogs: string;
+      noMatchingLogs: string;
+      linesCount: string;
+      jumpToBottom: string;
     };
     factory: {
       title: string;

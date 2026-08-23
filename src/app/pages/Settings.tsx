@@ -11,31 +11,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from './ui/alert-dialog';
-import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+} from '../components/ui/alert-dialog';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 
 
-import { Label } from './ui/label';
-import { Switch } from './ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Label } from '../components/ui/label';
+import { Switch } from '../components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useAuth } from '../context/AuthContext';
 import { useI18n, type SupportedLanguage } from '../i18n/LanguageProvider';
 import {
   resetSettings
 } from '../services/authService';
-import { SettingTMDB } from './settings/SettingTMDB';
-import { SettingUsers } from './settings/SettingUsers';
-import { SettingTransmission } from './settings/SettingTransmission';
-import { SettingIndexer } from './settings/SettingIndexer';
-import { SettingDatabase } from './settings/SettingDatabase';
-import { SettingPassword } from './settings/SettingPassword';
-import { SettingNotification } from './settings/SettingNotification';
-import { SettingFtp } from './settings/SettingFtp';
+import { SettingTMDB } from '../components/settings/SettingTMDB';
+import { SettingUsers } from '../components/settings/SettingUsers';
+import { SettingTransmission } from '../components/settings/SettingTransmission';
+import { SettingIndexer } from '../components/settings/SettingIndexer';
+import { SettingDatabase } from '../components/settings/SettingDatabase';
+import { SettingPassword } from '../components/settings/SettingPassword';
+import { SettingNotification } from '../components/settings/SettingNotification';
+import { SettingFtp } from '../components/settings/SettingFtp';
+import { SettingLogs } from '../components/settings/SettingLogs';
 import { updateLanguage, updateSpoilerMode } from '../services/settingService';
 
 
-const SETTINGS_TABS = ['general', 'notifications', 'api', 'ftp', 'users', 'database', 'factory'] as const;
+const SETTINGS_TABS = ['general', 'notifications', 'api', 'transmission', 'indexer', 'ftp', 'users', 'database', 'logs', 'factory'] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 function parseSupportedLanguage(input: unknown): SupportedLanguage {
@@ -64,10 +65,10 @@ export function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { isAuthenticated, isLoading, user, refresh } =
     useAuth();
-  const { t, availableLanguages, setLanguage } = useI18n();
+  const { t, language, availableLanguages, setLanguage } = useI18n();
   const [resetError, setResetError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
-  const [languageCode, setLanguageCode] = useState<SupportedLanguage>(user?.settings?.language as SupportedLanguage || 'en');
+  const [languageCode, setLanguageCode] = useState<SupportedLanguage>(language);
   const [spoilerMode, setSpoilerMode] = useState(user?.settings?.spoilerMode as boolean || false);
   const [preferencesMessage, setPreferencesMessage] = useState<string | null>(null);
   const [preferencesError, setPreferencesError] = useState<string | null>(null);
@@ -207,10 +208,16 @@ export function Settings() {
               {t('settings.tabs.notifications')}
             </TabsTrigger>
             <TabsTrigger
-              value="api"
+              value="transmission"
               className="flex-none text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white"
             >
-              {t('settings.tabs.configuration')}
+              {t('settings.tabs.transmission')}
+            </TabsTrigger>
+            <TabsTrigger
+              value="indexer"
+              className="flex-none text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              {t('settings.tabs.indexer')}
             </TabsTrigger>
             <TabsTrigger
               value="ftp"
@@ -219,28 +226,38 @@ export function Settings() {
               {t('settings.tabs.storage')}
             </TabsTrigger>
             {user?.username === 'admin' && (
-              <TabsTrigger
-                value="users"
-                className="flex-none text-white data-[state=active]:bg-orange-600 data-[state=active]:text-white"
-              >
-                {t('settings.tabs.users')}
-              </TabsTrigger>
-            )}
-            {user?.username === 'admin' && (
-              <TabsTrigger
-                value="database"
-                className="flex-none text-white data-[state=active]:bg-teal-600 data-[state=active]:text-white"
-              >
-                {t('settings.tabs.database')}
-              </TabsTrigger>
-            )}
-            {user?.username === 'admin' && (
-              <TabsTrigger
-                value="factory"
-                className="flex-none text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
-              >
-                {t('settings.tabs.factory')}
-              </TabsTrigger>
+              <>
+                <TabsTrigger
+                  value="api"
+                  className="flex-none text-white data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                >
+                  {t('settings.tabs.configuration')}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="users"
+                  className="flex-none text-white data-[state=active]:bg-orange-600 data-[state=active]:text-white"
+                >
+                  {t('settings.tabs.users')}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="database"
+                  className="flex-none text-white data-[state=active]:bg-teal-600 data-[state=active]:text-white"
+                >
+                  {t('settings.tabs.database')}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="logs"
+                  className="flex-none text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+                >
+                  Logs
+                </TabsTrigger>
+                <TabsTrigger
+                  value="factory"
+                  className="flex-none text-white data-[state=active]:bg-red-600 data-[state=active]:text-white"
+                >
+                  {t('settings.tabs.factory')}
+                </TabsTrigger>
+              </>
             )}
           </TabsList>
         </div>
@@ -300,13 +317,11 @@ export function Settings() {
           <SettingPassword setup={false}></SettingPassword>
         </TabsContent>
 
-        <TabsContent value="api">
-          {user?.username === 'admin' ? (
-            <SettingTMDB></SettingTMDB>
-          ) : null}
-
+        <TabsContent value="transmission">
           <SettingTransmission setup={false}></SettingTransmission>
+        </TabsContent>
 
+        <TabsContent value="indexer">
           <SettingIndexer setup={false}></SettingIndexer>
         </TabsContent>
 
@@ -319,12 +334,20 @@ export function Settings() {
 
         {user?.username === 'admin' && (
           <>
+
+            <TabsContent value="api">
+              <SettingTMDB></SettingTMDB>
+            </TabsContent>
+
             <TabsContent value="users">
               <SettingUsers></SettingUsers>
             </TabsContent>
 
             <TabsContent value="database">
               <SettingDatabase></SettingDatabase>
+            </TabsContent>
+            <TabsContent value="logs">
+              <SettingLogs></SettingLogs>
             </TabsContent>
 
             <TabsContent value="factory">

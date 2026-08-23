@@ -454,6 +454,8 @@ const fr : I18nMessages = {
     tabs: {
       general: 'Général',
       configuration: 'Configurations',
+      transmission: 'Client torrent',
+      indexer: 'Indexer',
       notifications: 'Notifications',
       users: 'Utilisateurs',
       database: 'Base de données',
@@ -469,7 +471,7 @@ const fr : I18nMessages = {
     preferences: {
       title: "Préférences d'affichage",
       description:
-        'Configurez la langue et le comportement anti-spoiler. Les changements sont enregistrés automatiquement.',
+        'Configurez la langue et le comportement anti-spoiler.',
       saved: 'Préférences mises à jour.',
       failed: 'Mise à jour des préférences impossible',
     },
@@ -649,6 +651,23 @@ const fr : I18nMessages = {
       entryLoadFailed: 'Impossible de charger cette entrée',
       saveFailed: "Impossible d'enregistrer cette entrée",
       invalidJson: "Le contenu n'est pas un JSON valide.",
+    },
+    logs: {
+      title: 'Journaux serveur',
+      live: 'En direct',
+      paused: 'En pause',
+      pause: 'Mettre en pause le flux',
+      resume: 'Reprendre le flux en direct',
+      autoScroll: 'Défilement auto',
+      clear: 'Effacer la vue',
+      copy: 'Copier les logs',
+      copied: 'Copié !',
+      filterPlaceholder: 'Filtrer les logs (ex. HTTP, error, correlation ID)...',
+      allLevels: 'Tous',
+      noLogs: 'Aucun log disponible',
+      noMatchingLogs: 'Aucun log ne correspond au filtre',
+      linesCount: '{{count}} lignes',
+      jumpToBottom: 'Aller en bas',
     },
     factory: {
       title: "Réinitialisation d'usine",

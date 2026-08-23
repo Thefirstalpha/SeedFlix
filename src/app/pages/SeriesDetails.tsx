@@ -1,11 +1,11 @@
 import { ArrowLeft, Calendar, Clapperboard, Heart, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { TorrentResultsPanel, FilterOption } from './TorrentResultsPanel';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Card, CardContent } from './ui/card';
-import { ScrollArea } from './ui/scroll-area';
+import { TorrentResultsPanel, FilterOption } from '../components/TorrentResultsPanel';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import { Card, CardContent } from '../components/ui/card';
+import { ScrollArea } from '../components/ui/scroll-area';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/LanguageProvider';
 import { normalizeIndexerLanguage, normalizeQuality } from '../services/indexerNormalization';
@@ -26,7 +26,6 @@ import { IndexerSeriesResult } from '../../../common/indexer';
 
 
 const SERIES_QUALITY_FILTERS = new Set(['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv']);
-const SERIES_RELEASE_SEARCH_LIMIT = 100;
 
 export function SeriesDetails() {
   const { id } = useParams();
@@ -83,7 +82,10 @@ export function SeriesDetails() {
     const loadSeasonEpisodeReleases = async () => {
       try {
         // Recherche ciblée avec le format "Series S01E" pour attraper les épisodes individuels
-        const indexerResponse = await searchSeriesReleases(series.id, 50, filter.season === 'all' ? undefined : filter.season);
+        const indexerResponse = await searchSeriesReleases({
+          tmdbId: series.id,
+          season: filter.season === 'all' ? undefined : filter.season,
+        });
 
         // Fusionner avec les résultats existants en évitant les doublons
         setReleaseResults((prev) => {
@@ -275,11 +277,10 @@ export function SeriesDetails() {
     setIsReleaseLoading(true);
     setReleaseError(null);
     try {
-      const indexerResponse = await searchSeriesReleases(
-        id,
-        SERIES_RELEASE_SEARCH_LIMIT,
-        filter.season === 'all' ? undefined : filter.season,
-      );
+      const indexerResponse = await searchSeriesReleases({
+        tmdbId: id,
+        season: filter.season === 'all' ? undefined : filter.season,
+      });
       setReleaseResults(indexerResponse.items);
     } catch (indexerLoadError) {
       setReleaseError(
@@ -520,13 +521,15 @@ export function SeriesDetails() {
                   </div>
 
                   {/* Episodes list */}
-                  {isLoadingEpisodes ? (
+                  {isLoadingEpisodes && (
                     <div className="space-y-3">
                       {[...new Array(3)].map((_, i) => (
                         <div key={i} className="h-20 bg-white/5 rounded-lg animate-pulse" />
                       ))}
                     </div>
-                  ) : episodes.length > 0 ? (
+                  )}
+                  
+                  {(!isLoadingEpisodes && episodes.length > 0) ? (
                     <ScrollArea className="h-[500px] w-full rounded-lg border border-white/10">
                       <div className="space-y-3 p-4">
                         {episodes.map((episode) => {
@@ -588,6 +591,7 @@ export function SeriesDetails() {
                                   ) : (
                                     <button
                                       onClick={() => handleEpisodeWishlist(episode)}
+                                      type="button"
                                       title={
                                         directlyInWishlist
                                           ? t('seriesDetails.removeEpisode')
