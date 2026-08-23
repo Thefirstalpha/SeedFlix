@@ -73,15 +73,6 @@ const DatabaseSelectableList: React.FC<DatabaseSelectableListProps> = ({
     </div>
 );
 
-interface DatabaseNamespaceListProps {
-    t: TranslateFn;
-    isLoading: boolean;
-    namespaces: Array<{ namespace: string; updatedAt?: string }>;
-    selectedNamespace: string | null;
-    onReload: () => void;
-    onSelect: (namespace: string) => void;
-}
-
 
 export interface DatabaseRawEditorPanelProps {
     t: TranslateFn;

@@ -106,9 +106,11 @@ export function runInTransaction(callback: (db: { writeStore: typeof writeStore 
   }
 }
 
-export function listNamespaces(): { namespace: string}[] {
-  const rows = db.prepare('SELECT DISTINCT namespace, updated_at FROM kv_store GROUP BY namespace').all();
-  return rows.map((row: any) => ({ namespace: row.namespace}));
+export function listNamespaces(): { namespace: string }[] {
+  const rows = db
+    .prepare('SELECT DISTINCT namespace, updated_at FROM kv_store GROUP BY namespace')
+    .all();
+  return rows.map((row: any) => ({ namespace: row.namespace }));
 }
 
 export function resetDatabase() {
