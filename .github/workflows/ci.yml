@@ -21,12 +21,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -51,7 +51,7 @@ jobs:
         run: npm run test:backend:coverage
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v3
+        uses: SonarSource/sonarcloud-github-action@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -87,7 +87,7 @@ jobs:
         run: docker build --pull . --build-arg IMAGE_TAG=ci-${{ github.sha }} -t local/seedflix:ci
 
       - name: Trivy filesystem vulnerability scan
-        uses: aquasecurity/trivy-action@v0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           version: latest
           scan-type: fs
@@ -101,7 +101,7 @@ jobs:
           exit-code: "1"
 
       - name: Trivy Docker image vulnerability scan
-        uses: aquasecurity/trivy-action@v0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           version: latest
           image-ref: local/seedflix:ci
