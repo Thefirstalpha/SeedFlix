@@ -19,7 +19,7 @@
     "test": "vitest run",
     "test:backend": "vitest run tests/server",
     "test:watch": "vitest",
-    "check": "npm run lint && npm run test && npm run build && node --check server/index.js"
+    "check": "npm run lint && npm run test && npm run build && node --check server/index.ts"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

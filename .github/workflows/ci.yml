@@ -46,6 +46,10 @@ jobs:
           ./node_modules/.bin/tsc --noEmit --skipLibCheck --incremental false server/**/*.ts
           ./node_modules/.bin/tsc --noEmit --skipLibCheck --incremental false common/*.ts
 
+      - name: Unit & Integration tests (backend)
+        run: npm run test:backend
+
+
       - name: Service smoke test (server startup + API reachability)
         shell: bash
         run: |
