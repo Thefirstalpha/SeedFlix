@@ -111,15 +111,15 @@ export default function Notifications() {
     if (!isIndexerSuggestion(notification)) {
       return;
     }
-
-    const targetKey = String(notification.data?.targetKey ?? '').trim();
+    
+    const tmdbId = String(notification.data?.tmdbId ?? '').trim();
     const type = String(notification.data?.type ?? '').trim();
-    if (!targetKey || !type) {
+    if (!tmdbId || !type) {
       navigate('/wishlist');
       return;
     }
 
-    const params = new URLSearchParams({ tab: type, target: targetKey });
+    const params = new URLSearchParams({ tab: type, target: tmdbId });
     navigate(`/wishlist?${params.toString()}`);
   };
 
