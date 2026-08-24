@@ -135,9 +135,14 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
     const link = block?.link;
     const guidMatch = block.guid;
     const pubDateMatch = block?.pubDate;
-    const attributes = block['torznab:attr'].reduce(
+    const rawAttrs = Array.isArray(block?.['torznab:attr'])
+      ? block['torznab:attr']
+      : block?.['torznab:attr']
+        ? [block['torznab:attr']]
+        : [];
+    const attributes = rawAttrs.reduce(
       (acc: Record<string, any>, item: { name: string; value: any }) => {
-        acc[item.name] = item.value;
+        if (item?.name) acc[item.name] = item.value;
         return acc;
       },
       {},
@@ -182,7 +187,7 @@ async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesRe
     const pubDateMatch = block?.pubDate;
     const attributes = block['torznab:attr'].reduce(
       (acc: Record<string, any>, item: { name: string; value: any }) => {
-        acc[item.name] = item.value;
+        if (item?.name) acc[item.name] = item.value;
         return acc;
       },
       {},

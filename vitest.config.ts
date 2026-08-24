@@ -6,6 +6,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['tests/**/*.test.ts'],
+    fileParallelism: false,
     env: {
       SEEDFLIX_DATA_DIR: path.resolve(__dirname, 'data/test'),
     },
