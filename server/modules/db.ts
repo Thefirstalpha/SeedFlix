@@ -61,8 +61,13 @@ CREATE TABLE IF NOT EXISTS notifications (
 `);
   const adminUser = getUser(1);
   if (!adminUser) {
-    const { password } = createUser('admin', 'admin');
-    console.info(`Admin user created with password: ${password}`);
+    const existingAuth = db
+      .prepare('SELECT user_id FROM auth_users WHERE username = ?')
+      .get('admin');
+    if (!existingAuth) {
+      const { password } = createUser('admin', 'admin');
+      console.info(`Admin user created with password: ${password}`);
+    }
   }
 };
 
