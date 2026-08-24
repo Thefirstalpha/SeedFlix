@@ -9,6 +9,11 @@ export default defineConfig({
     env: {
       SEEDFLIX_DATA_DIR: path.resolve(__dirname, 'data/test'),
     },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text'],
+      reportsDirectory: './coverage', 
+    }
   },
   resolve: {
     alias: {

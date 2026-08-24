@@ -16,8 +16,8 @@
     "lint:backend:fix": "eslint --config eslint.backend.config.js server/ --fix",
     "lint:frontend": "eslint --config eslint.frontend.config.js src/",
     "lint:frontend:fix": "eslint --config eslint.frontend.config.js src/ --fix",
-    "test": "vitest run",
-    "test:backend": "vitest run tests/server",
+    "test": "vitest run --coverage",
+    "test:backend": "vitest run tests/server --coverage",
     "test:watch": "vitest",
     "check": "npm run lint && npm run test && npm run build && node --check server/index.ts"
   },
@@ -98,6 +98,7 @@
     "@typescript-eslint/eslint-plugin": "^8.58.1",
     "@typescript-eslint/parser": "^8.58.1",
     "@vitejs/plugin-react": "4.7.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "concurrently": "^9.2.3",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
