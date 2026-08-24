@@ -11,9 +11,17 @@ export default defineConfig({
     },
     coverage: {
       provider: 'v8',
-      reporter: ['text'],
-      reportsDirectory: './coverage', 
-    }
+      reporter: ['text', 'lcov'],
+      reportsDirectory: './coverage',
+      include: ['server/**/*.ts'],
+      exclude: [
+        '**/*.d.ts',
+        'node_modules/**',
+        'dist/**',
+        'tests/**',
+        'server/index.ts',
+      ],
+    },
   },
   resolve: {
     alias: {
@@ -21,4 +29,3 @@ export default defineConfig({
     },
   },
 });
-
