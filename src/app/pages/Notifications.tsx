@@ -111,15 +111,15 @@ export default function Notifications() {
     if (!isIndexerSuggestion(notification)) {
       return;
     }
-
-    const targetKey = String(notification.data?.targetKey || '').trim();
-    const type = String(notification.data?.type || '').trim();
-    if (!targetKey || !type) {
+    
+    const tmdbId = String(notification.data?.tmdbId ?? '').trim();
+    const type = String(notification.data?.type ?? '').trim();
+    if (!tmdbId || !type) {
       navigate('/wishlist');
       return;
     }
 
-    const params = new URLSearchParams({ tab: type, target: targetKey });
+    const params = new URLSearchParams({ tab: type, target: tmdbId });
     navigate(`/wishlist?${params.toString()}`);
   };
 
@@ -270,7 +270,7 @@ export default function Notifications() {
                       <Badge className="bg-blue-600 text-white">{t('notificationsPage.new')}</Badge>
                     )}
                   </div>
-                  <p className="text-sm text-white/85 mb-2">{getNotificationMessage(notif)}</p>
+                  <p className="text-sm text-white/85 mb-2 overflow-ellipsis overflow-hidden break-words">{getNotificationMessage(notif)}</p>
                   <p className="text-xs text-white/60">
                     {new Date(notif.createdAt).toLocaleString(
                       language === 'fr' ? 'fr-FR' : 'en-US',

@@ -6,6 +6,8 @@ import { createUser, getUser } from './user';
 
 ensureDatabaseDirectory();
 export const db: DatabaseSync = new DatabaseSync(config.databasePath);
+db.exec('PRAGMA journal_mode = WAL');
+db.exec('PRAGMA busy_timeout = 5000');
 
 function ensureDatabaseDirectory(): void {
   const dbDirectory = path.dirname(config.databasePath);
@@ -61,8 +63,13 @@ CREATE TABLE IF NOT EXISTS notifications (
 `);
   const adminUser = getUser(1);
   if (!adminUser) {
-    const { password } = createUser('admin', 'admin');
-    console.info(`Admin user created with password: ${password}`);
+    const existingAuth = db
+      .prepare('SELECT user_id FROM auth_users WHERE username = ?')
+      .get('admin');
+    if (!existingAuth) {
+      const { password } = createUser('admin', 'admin');
+      console.info(`Admin user created with password: ${password}`);
+    }
   }
 };
 
@@ -117,6 +124,8 @@ export function resetDatabase() {
   db.exec('DELETE FROM kv_store');
   db.exec('DELETE FROM auth_sessions');
   db.exec('DELETE FROM auth_users');
+  db.exec('DELETE FROM notifications');
+  db.exec("DELETE FROM sqlite_sequence WHERE name IN ('auth_users', 'notifications')");
   const { password } = createUser('admin', 'admin');
   console.info(`Admin user created with password: ${password}`);
 }

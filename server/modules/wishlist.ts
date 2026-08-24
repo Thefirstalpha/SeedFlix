@@ -114,7 +114,7 @@ export async function addToWishlist(
                 existingItem.seasons[seasonNumber].episodes.push(episodeNumber);
               }
             }
-          } else if (existingItem.seasons[seasonNumber] !== undefined) {
+          } else {
             existingItem.seasons[seasonNumber] = {
               season_number: seasonNumber,
               all_episodes: true,

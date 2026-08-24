@@ -70,6 +70,7 @@ router.post('/auth/reset-password', authentication, (req, res) => {
     let user = getUser(req.user.id);
     if (!user) throw new Error('User not found');
     user.flags.mustUpdatePassword = false;
+    user.flags.initialPassword = false;
     writeStore('user', user.id, user);
   });
   res.json({ ok: true });

@@ -71,13 +71,12 @@ async function pollUser(userId: number): Promise<void> {
 }
 
 async function poll(): Promise<void> {
-  console.log('[DownloadWatcher] Lancement du poll des téléchargements Transmission');
   const userIds = getAllUserIds();
   await Promise.allSettled(userIds.map(pollUser));
 }
 
 export function startDownloadWatcher(): void {
-  console.log('[DownloadWatcher] Démarrage de la surveillance des téléchargements');
+  console.log('[DownloadWatcher] Starting download watcher...');
   // Premier passage immédiat pour initialiser les états
   poll().catch(() => {});
   setInterval(() => poll().catch(() => {}), POLL_INTERVAL_MS);

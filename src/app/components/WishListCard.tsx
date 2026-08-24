@@ -58,7 +58,7 @@ export function WishListCard({
   const rejectAllKey = `${groupKey}:reject-all`;
 
   return (
-    <Card className="border-white/10 bg-white/5 transition-all">
+    <Card className="border-white/10 bg-white/5 transition-all" id={`wishlist-target-${groupKey}`}>
       <CardContent className="p-4 space-y-4">
         <div className="flex items-start gap-4">
           <img src={poster} alt={title} className="w-16 rounded object-cover aspect-[2/3]" />

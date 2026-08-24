@@ -22,7 +22,12 @@ const BACKEND_LOG_FORMAT = ':correlationId :type :message';
 
 const MAX_LOG_BUFFER_SIZE = 2000;
 
-const WHITELISTED_HTTP_PATHS = ['GET /api/user', 'GET /api/auth/me', 'GET /api/admin/logs'];
+const WHITELISTED_HTTP_PATHS = new Set([
+  'GET /api/user',
+  'GET /api/auth/me',
+  'GET /api/admin/logs',
+  'GET /api/health',
+]);
 
 export function loggerMiddleware(req: Request, res: Response, next: NextFunction) {
   const correlationId = randomUUID();
@@ -69,10 +74,7 @@ export class Logger {
   }
 
   static http(req: Request, res: Response, duration: number) {
-    if (
-      WHITELISTED_HTTP_PATHS.includes(`${req.method} ${req.originalUrl}`) &&
-      res.statusCode < 400
-    ) {
+    if (WHITELISTED_HTTP_PATHS.has(`${req.method} ${req.originalUrl}`) && res.statusCode < 400) {
       return;
     }
 

@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
 
+
 jobs:
   docker-build-and-push:
     name: Build and Push Docker image
@@ -25,18 +26,17 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/seedflix
+          images: ${{ vars.DOCKERHUB_USERNAME }}/seedflix
           tags: |
             type=raw,value=${{ github.event.release.tag_name }}
             type=raw,value=latest
-            type=raw,value=dev
 
       - name: Add version
         run: |
@@ -56,7 +56,7 @@ jobs:
       - name: Publish summary
         run: |
           echo "### Docker image published" >> $GITHUB_STEP_SUMMARY
-          echo "- Repository: ${{ secrets.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
+          echo "- Repository: ${{ vars.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
           echo "- Tag release: ${{ github.event.release.tag_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- Additional tag: latest" >> $GITHUB_STEP_SUMMARY
           echo "- Additional tag: dev" >> $GITHUB_STEP_SUMMARY
@@ -75,7 +75,7 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Add version
@@ -88,12 +88,12 @@ jobs:
           context: .
           pull: true
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/seedflix:dev
+          tags: ${{ vars.DOCKERHUB_USERNAME }}/seedflix:dev
           build-args: |
             IMAGE_TAG=dev
 
       - name: Publish summary (dev)
         run: |
           echo "### Docker image published (dev)" >> $GITHUB_STEP_SUMMARY
-          echo "- Repository: ${{ secrets.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
+          echo "- Repository: ${{ vars.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
           echo "- Tag: dev" >> $GITHUB_STEP_SUMMARY

@@ -144,7 +144,7 @@ export const DatabaseRawEditorPanel: React.FC<DatabaseRawEditorPanelProps> = ({
                 <Button
                     type="button"
                     variant="outline"
-                    onClick={(__e) => void onReload()}
+                    onClick={(__e) => onReload()}
                     disabled={!selectedNamespace || isLoadingValue || isSavingValue}
                     className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white text-xs px-2.5 sm:px-3 h-8"
                 >
@@ -161,7 +161,7 @@ export const DatabaseRawEditorPanel: React.FC<DatabaseRawEditorPanelProps> = ({
                 </Button>
                 <Button
                     type="button"
-                    onClick={(__e) => void onSave()}
+                    onClick={(__e) => onSave()}
                     disabled={!selectedNamespace || isLoadingValue || isSavingValue}
                     className="bg-teal-600 hover:bg-teal-700 text-white text-xs px-3 sm:px-4 h-8"
                 >
@@ -242,7 +242,7 @@ export function SettingDatabase() {
         try {
             const fetchedUsers = await listUsers(true);
             setUsers(fetchedUsers);
-            setSelectedUser((current) => {
+            setSelectedUser((current : User | null) => {
                 if (current && fetchedUsers.some((entry) => entry.id === current.id)) {
                     return current;
                 }

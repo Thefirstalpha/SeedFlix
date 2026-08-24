@@ -135,9 +135,14 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
     const link = block?.link;
     const guidMatch = block.guid;
     const pubDateMatch = block?.pubDate;
-    const attributes = block['torznab:attr'].reduce(
+    const rawAttrs = Array.isArray(block?.['torznab:attr'])
+      ? block['torznab:attr']
+      : block?.['torznab:attr']
+        ? [block['torznab:attr']]
+        : [];
+    const attributes = rawAttrs.reduce(
       (acc: Record<string, any>, item: { name: string; value: any }) => {
-        acc[item.name] = item.value;
+        if (item?.name) acc[item.name] = item.value;
         return acc;
       },
       {},
@@ -182,7 +187,7 @@ async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesRe
     const pubDateMatch = block?.pubDate;
     const attributes = block['torznab:attr'].reduce(
       (acc: Record<string, any>, item: { name: string; value: any }) => {
-        acc[item.name] = item.value;
+        if (item?.name) acc[item.name] = item.value;
         return acc;
       },
       {},
@@ -347,14 +352,14 @@ export async function processWishlistIndexer() {
       const seriesFounds: IndexerSeriesResult[] = [];
       for (const item of wishlist) {
         if (item.type === 'movie') {
-          const founds = lastMovies.filter((m) => m.tmdbId === String(item.tmdb));
+          const founds = lastMovies.filter((m) => String(m.tmdbId) === String(item.tmdb));
           if (founds.length > 0) {
             moviesFounds.push(...founds);
           }
         } else if (item.type === 'series') {
           const founds = lastSeries.filter(
             (s) =>
-              s.tmdbId === String(item.tmdb) &&
+              String(s.tmdbId) === String(item.tmdb) &&
               (item.all_seasons === true ||
                 (item.seasons?.[s.seasonNumber || 1] !== undefined &&
                   (item.seasons[s.seasonNumber || 1].all_episodes === true ||
