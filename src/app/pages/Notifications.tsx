@@ -112,8 +112,8 @@ export default function Notifications() {
       return;
     }
 
-    const targetKey = String(notification.data?.targetKey || '').trim();
-    const type = String(notification.data?.type || '').trim();
+    const targetKey = String(notification.data?.targetKey ?? '').trim();
+    const type = String(notification.data?.type ?? '').trim();
     if (!targetKey || !type) {
       navigate('/wishlist');
       return;

@@ -29,7 +29,7 @@ const transmissionStatusLabels: Record<number, string> = {
 };
 
 function normalizeTorrentHash(value: unknown): string {
-  return String(value || '')
+  return String(value ?? '')
     .trim()
     .toLowerCase();
 }
@@ -84,7 +84,7 @@ function writeManagedTorrents(userId: number, entries: ManagedTorrentEntry[]) {
 
 function registerManagedTorrent(userId: number, hash: string, link: string, name: string) {
   const normalizedHash = normalizeTorrentHash(hash);
-  const normalizedLink = String(link || '').trim();
+  const normalizedLink = String(link ?? '').trim();
   if (!normalizedHash || !normalizedLink) {
     return;
   }
