@@ -25,19 +25,15 @@ jobs:
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
-        env:
-          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
-        env:
-          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         with:
-          images: ${{ env.DOCKERHUB_USERNAME }}/seedflix
+          images: ${{ vars.DOCKERHUB_USERNAME }}/seedflix
           tags: |
             type=raw,value=${{ github.event.release.tag_name }}
             type=raw,value=latest
@@ -58,11 +54,9 @@ jobs:
             IMAGE_TAG=${{ github.event.release.tag_name }}
 
       - name: Publish summary
-        env:
-          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         run: |
           echo "### Docker image published" >> $GITHUB_STEP_SUMMARY
-          echo "- Repository: ${{ env.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
+          echo "- Repository: ${{ vars.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
           echo "- Tag release: ${{ github.event.release.tag_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- Additional tag: latest" >> $GITHUB_STEP_SUMMARY
           echo "- Additional tag: dev" >> $GITHUB_STEP_SUMMARY
@@ -80,10 +74,8 @@ jobs:
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
-        env:
-          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Add version
@@ -92,20 +84,16 @@ jobs:
 
       - name: Build and push image (dev)
         uses: docker/build-push-action@v6
-        env:
-          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         with:
           context: .
           pull: true
           push: true
-          tags: ${{ env.DOCKERHUB_USERNAME }}/seedflix:dev
+          tags: ${{ vars.DOCKERHUB_USERNAME }}/seedflix:dev
           build-args: |
             IMAGE_TAG=dev
 
       - name: Publish summary (dev)
-        env:
-          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         run: |
           echo "### Docker image published (dev)" >> $GITHUB_STEP_SUMMARY
-          echo "- Repository: ${{ env.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
+          echo "- Repository: ${{ vars.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
           echo "- Tag: dev" >> $GITHUB_STEP_SUMMARY
