@@ -270,7 +270,7 @@ export default function Notifications() {
                       <Badge className="bg-blue-600 text-white">{t('notificationsPage.new')}</Badge>
                     )}
                   </div>
-                  <p className="text-sm text-white/85 mb-2">{getNotificationMessage(notif)}</p>
+                  <p className="text-sm text-white/85 mb-2 overflow-ellipsis overflow-hidden break-words">{getNotificationMessage(notif)}</p>
                   <p className="text-xs text-white/60">
                     {new Date(notif.createdAt).toLocaleString(
                       language === 'fr' ? 'fr-FR' : 'en-US',
