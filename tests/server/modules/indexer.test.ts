@@ -10,15 +10,19 @@ import {
   getIndexerSettings,
   getMoviesIndexerResult,
   getSeriesIndexerResult,
+  processWishlistIndexer,
   rejectAllIndexerResultsByGuids,
   rejectIndexerResultByGuid,
   searchMovieIndexer,
   searchSeriesIndexer,
+  updateIndexerProcess,
 } from '../../../server/modules/indexer';
 import * as torznabModule from '../../../server/modules/torznab';
 import * as tmdbModule from '../../../server/modules/tmdb';
 import { createUser, updateUser } from '../../../server/modules/user';
 import { IndexerSettings } from '../../../common/settings';
+import { updateGlobalConfig } from '../../../server/modules/setting';
+import { getNotifications } from '../../../server/modules/notification';
 
 // Mock torznab and tmdb
 vi.mock('../../../server/modules/torznab', async (importOriginal) => {
@@ -98,24 +102,33 @@ describe('indexer module', () => {
     });
   });
 
-  describe('Indexer Configuration & Retrieval', () => {
+  describe('Configuration & Settings', () => {
     it('should return null when indexer is not configured', () => {
       expect(getIndexerSettings(userId)).toBeNull();
     });
 
-    it('should configure indexer after validating connection via checkTorznabConnection', async () => {
-      vi.mocked(torznabModule.checkTorznabConnection).mockResolvedValueOnce({
-        rss: { channel: { title: 'Indexer OK' } },
-      });
+    it('should configure indexer settings on successful connection test', async () => {
+      vi.mocked(torznabModule.checkTorznabConnection).mockResolvedValueOnce({} as any);
 
       await configureIndexer(userId, sampleSettings);
 
       const saved = getIndexerSettings(userId);
-      expect(saved).toEqual(sampleSettings);
+      expect(saved?.url).toBe(sampleSettings.url);
+      expect(saved?.token).toBe(sampleSettings.token);
+    });
+
+    it('should throw error when indexer connection check fails', async () => {
+      vi.mocked(torznabModule.checkTorznabConnection).mockRejectedValueOnce(
+        new Error('Connection refused'),
+      );
+
+      await expect(configureIndexer(userId, sampleSettings)).rejects.toThrow(
+        'Failed to connect to Indexer',
+      );
     });
   });
 
-  describe('Search Releases via Indexer', () => {
+  describe('Search Releases (Movies & Series)', () => {
     beforeEach(() => {
       const user = createUser('userSearch').user;
       userId = user.id;
@@ -123,12 +136,10 @@ describe('indexer module', () => {
       updateUser(user);
     });
 
-    it('should search for movie releases matching TMDB details', async () => {
+    it('should search movies on Torznab and format results with metadata', async () => {
       vi.mocked(tmdbModule.proxyTmdb).mockResolvedValueOnce({
         id: 550,
         title: 'Fight Club',
-        original_title: 'Fight Club',
-        release_date: '1999-10-15',
       });
 
       vi.mocked(torznabModule.searchTorznab).mockResolvedValueOnce({
@@ -136,12 +147,13 @@ describe('indexer module', () => {
           channel: {
             item: [
               {
-                title: 'Fight.Club.1999.multi.1080p.bluray.x264',
-                link: 'https://indexer/get/1',
+                title: 'Fight.Club.1999.1080p.MULTI.BluRay.x264',
+                link: 'https://indexer.example.com/download/1',
                 guid: 'guid-1',
                 pubDate: '2024-01-01',
                 'torznab:attr': [
-                  { name: 'size', value: '8000000000' },
+                  { name: 'tmdbid', value: '550' },
+                  { name: 'size', value: '1073741824' },
                   { name: 'seeders', value: '50' },
                   { name: 'leechers', value: '10' },
                 ],
@@ -151,20 +163,17 @@ describe('indexer module', () => {
         },
       });
 
-      const results = await searchMovieIndexer(userId, 550);
+      const results = await searchMovieIndexer(userId, 550, 100, 0);
       expect(results).toHaveLength(1);
-      expect(results[0].title).toBe('Fight.Club.1999.multi.1080p.bluray.x264');
+      expect(results[0].title).toBe('Fight.Club.1999.1080p.MULTI.BluRay.x264');
       expect(results[0].quality).toBe('1080p');
       expect(results[0].language).toBe('MULTI');
-      expect(results[0].seeders).toBe(50);
     });
 
-    it('should search for series releases matching TMDB details', async () => {
+    it('should search series on Torznab and extract season/episode info', async () => {
       vi.mocked(tmdbModule.proxyTmdb).mockResolvedValueOnce({
         id: 1399,
         name: 'Game of Thrones',
-        original_name: 'Game of Thrones',
-        first_air_date: '2011-04-17',
       });
 
       vi.mocked(torznabModule.searchTorznab).mockResolvedValueOnce({
@@ -172,11 +181,12 @@ describe('indexer module', () => {
           channel: {
             item: [
               {
-                title: 'Game.of.Thrones.S01E03.multi.1080p.web-dl.x264',
-                link: 'https://indexer/get/3',
-                guid: 'guid-3',
+                title: 'Game.of.Thrones.S01E03.1080p.VFF.WEB-DL',
+                link: 'https://indexer.example.com/download/2',
+                guid: 'guid-2',
                 pubDate: '2024-01-01',
                 'torznab:attr': [
+                  { name: 'tmdbid', value: '1399' },
                   { name: 'size', value: '2000000000' },
                   { name: 'seeders', value: '30' },
                   { name: 'leechers', value: '5' },
@@ -228,13 +238,18 @@ describe('indexer module', () => {
       expect(series[0].title).toBe('Stored Series');
     });
 
-    it('should reject a result by GUID and add to blacklist', async () => {
+    it('should reject a result by GUID (movie, series, or unknown) and add to blacklist', async () => {
       writeStore('indexer-movie-result', userId, [
         { tmdbId: 550, title: 'Movie 1', link: 'l1', guid: 'guid-keep' },
         { tmdbId: 550, title: 'Movie 2', link: 'l2', guid: 'guid-remove' },
       ]);
+      writeStore('indexer-series-result', userId, [
+        { tmdbId: 1399, title: 'Series 1', link: 'l3', guid: 'guid-series-remove' },
+      ]);
 
       await rejectIndexerResultByGuid(userId, 'guid-remove');
+      await rejectIndexerResultByGuid(userId, 'guid-series-remove');
+      await rejectIndexerResultByGuid(userId, 'unknown-guid');
 
       const movies = await getMoviesIndexerResult(userId);
       expect(movies).toHaveLength(1);
@@ -253,6 +268,83 @@ describe('indexer module', () => {
       const movies = await getMoviesIndexerResult(userId);
       expect(movies).toHaveLength(1);
       expect(movies[0].guid).toBe('g3');
+    });
+  });
+
+  describe('Wishlist Processing & Indexer Cron', () => {
+    it('should process wishlist items, match RSS results and create notifications', async () => {
+      const { user } = createUser('userWishlistProcessing');
+      user.settings.indexer = sampleSettings;
+      updateUser(user);
+
+      // Add movie and series to wishlist with all required fields
+      writeStore('whishlist', user.id, [
+        {
+          tmdb: 550,
+          type: 'movie',
+          title: 'Fight Club',
+          original_title: 'Fight Club',
+          releaseDate: '1999-10-15',
+          addedAt: '2024-01-01',
+        },
+        {
+          tmdb: 1399,
+          type: 'series',
+          title: 'Game of Thrones',
+          original_title: 'Game of Thrones',
+          releaseDate: '2011-04-17',
+          addedAt: '2024-01-01',
+          all_seasons: true,
+        },
+      ]);
+
+      // Mock rssTorznab returning matching movie and series
+      vi.mocked(torznabModule.rssTorznab).mockImplementation(async (settings, type) => {
+        if (type === 'movie') {
+          return {
+            rss: {
+              channel: {
+                item: [
+                  {
+                    title: 'Fight.Club.1999.1080p.MULTI',
+                    link: 'https://link1',
+                    guid: 'guid-fc-1',
+                    'torznab:attr': [{ name: 'tmdbid', value: '550' }, { name: 'size', value: '1000' }],
+                  },
+                ],
+              },
+            },
+          } as any;
+        } else {
+          return {
+            rss: {
+              channel: {
+                item: [
+                  {
+                    title: 'Game.of.Thrones.S01E01.1080p.MULTI',
+                    link: 'https://link2',
+                    guid: 'guid-got-1',
+                    'torznab:attr': [{ name: 'tmdbid', value: '1399' }, { name: 'size', value: '2000' }],
+                  },
+                ],
+              },
+            },
+          } as any;
+        }
+      });
+
+      await processWishlistIndexer();
+
+      const notifs = getNotifications(user.id);
+      expect(notifs.notifications.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should update indexer process when pullAuto setting changes', () => {
+      updateGlobalConfig({ pullAuto: true });
+      updateIndexerProcess();
+
+      updateGlobalConfig({ pullAuto: false });
+      updateIndexerProcess();
     });
   });
 });

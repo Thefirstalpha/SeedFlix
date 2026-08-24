@@ -7,6 +7,7 @@ import {
   deleteNotification,
   getNotifications,
   getUnreadCount,
+  getWebPushPublicKey,
   listWebPushSubscriptions,
   markAllAsRead,
   markAsRead,
@@ -14,6 +15,7 @@ import {
   sendDiscordNotification,
 } from '../../../server/modules/notification';
 import { createUser } from '../../../server/modules/user';
+import webPush from 'web-push';
 
 describe('notification module', () => {
   let userId: number;
@@ -89,9 +91,23 @@ describe('notification module', () => {
       expect(deleted).toBe(true);
       expect(getNotifications(userId).notifications).toHaveLength(0);
     });
+
+    it('should clear all notifications for user', () => {
+      addNotification(userId, { title: 'A', message: '1', type: 'info' });
+      addNotification(userId, { title: 'B', message: '2', type: 'info' });
+
+      clearNotifications(userId);
+      expect(getNotifications(userId).notifications).toHaveLength(0);
+    });
   });
 
-  describe('Web Push Subscriptions', () => {
+  describe('Web Push Subscriptions & Delivery', () => {
+    it('should get or generate VAPID public key', () => {
+      const publicKey = getWebPushPublicKey();
+      expect(publicKey).toBeDefined();
+      expect(typeof publicKey).toBe('string');
+    });
+
     it('should add, list, and remove push subscriptions', () => {
       const sub = {
         name: 'Chrome on Mac',
@@ -108,6 +124,35 @@ describe('notification module', () => {
 
       removeWebPushSubscription(userId, added.id);
       expect(listWebPushSubscriptions(userId)).toHaveLength(0);
+    });
+
+    it('should dispatch push notification and prune expired 410 subscriptions', async () => {
+      const sub = {
+        name: 'Expired Browser',
+        subscription: {
+          endpoint: 'https://fcm.googleapis.com/fcm/send/expired',
+          keys: { auth: 'auth-key', p256dh: 'p256dh-key' },
+        },
+      };
+      addWebPushSubscription(userId, sub);
+
+      const sendSpy = vi.spyOn(webPush, 'sendNotification').mockRejectedValueOnce({
+        statusCode: 410,
+        message: 'Gone',
+      });
+
+      addNotification(userId, {
+        title: 'Push Test',
+        message: 'Testing push delivery',
+        type: 'info',
+      });
+
+      // Wait for background async web push delivery
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(sendSpy).toHaveBeenCalled();
+      const subs = listWebPushSubscriptions(userId);
+      expect(subs).toHaveLength(0);
     });
   });
 

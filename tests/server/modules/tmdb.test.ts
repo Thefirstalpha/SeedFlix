@@ -4,9 +4,11 @@ import {
   buildDetailsRequest,
   buildGenresRequest,
   buildPopularRequest,
+  buildSearchRequest,
   buildSeasonRequest,
   buildVideosRequest,
   configureTmdbApiKey,
+  getTmdbDetails,
   proxyTmdb,
   TmdbType,
 } from '../../../server/modules/tmdb';
@@ -31,6 +33,17 @@ describe('tmdb module', () => {
 
       const tvReq = buildDetailsRequest(TmdbType.series, 1399, {});
       expect(tvReq.path).toBe('/tv/1399');
+    });
+
+    it('should build search requests for movie and series', () => {
+      const searchMovie = buildSearchRequest(TmdbType.movie, { query: 'Inception', page: 2 });
+      expect(searchMovie.path).toBe('/search/movie');
+      expect(searchMovie.query.query).toBe('Inception');
+      expect(searchMovie.query.page).toBe(2);
+
+      const searchSeries = buildSearchRequest(TmdbType.series, { query: 'Breaking Bad' });
+      expect(searchSeries.path).toBe('/search/tv');
+      expect(searchSeries.query.query).toBe('Breaking Bad');
     });
 
     it('should build genres and videos requests', () => {
@@ -92,6 +105,33 @@ describe('tmdb module', () => {
       expect(result).toEqual(mockResponse);
     });
 
+    it('should get TMDB details with getTmdbDetails', async () => {
+      updateGlobalConfig({ tmdbApiKey: 'mock-key' });
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 550, title: 'Fight Club' }),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const details = await getTmdbDetails(550, 'movie');
+      expect(details).toBeDefined();
+    });
+
+    it('should throw error when getTmdbDetails receives item without id', async () => {
+      updateGlobalConfig({ tmdbApiKey: 'mock-key' });
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      await expect(getTmdbDetails(999999, 'movie')).rejects.toThrow('Item not found in TMDB');
+    });
+
     it('should throw error when TMDB returns non-OK status', async () => {
       updateGlobalConfig({ tmdbApiKey: 'mock-key' });
 
@@ -106,4 +146,3 @@ describe('tmdb module', () => {
     });
   });
 });
-

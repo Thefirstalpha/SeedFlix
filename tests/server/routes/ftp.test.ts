@@ -20,6 +20,11 @@ vi.mock('../../../server/modules/ftp', async (importOriginal) => {
     removeDirectory: vi.fn(),
     removeBatch: vi.fn(),
     moveBatch: vi.fn(),
+    rename: vi.fn(),
+    getFileSize: vi.fn(),
+    getLastModified: vi.fn(),
+    downloadToStream: vi.fn(),
+    uploadFromStream: vi.fn(),
     getStorageUsage: vi.fn(),
   };
 });
@@ -36,6 +41,11 @@ describe('Route: /api/ftp', () => {
   const mockedRemoveDir = vi.mocked(ftpModule.removeDirectory);
   const mockedRemoveBatch = vi.mocked(ftpModule.removeBatch);
   const mockedMoveBatch = vi.mocked(ftpModule.moveBatch);
+  const mockedRename = vi.mocked(ftpModule.rename);
+  const mockedGetFileSize = vi.mocked(ftpModule.getFileSize);
+  const mockedGetLastModified = vi.mocked(ftpModule.getLastModified);
+  const mockedDownloadToStream = vi.mocked(ftpModule.downloadToStream);
+  const mockedUploadFromStream = vi.mocked(ftpModule.uploadFromStream);
   const mockedGetStorage = vi.mocked(ftpModule.getStorageUsage);
 
   beforeAll(() => {
@@ -155,6 +165,20 @@ describe('Route: /api/ftp', () => {
     expect(resDir.status).toBe(200);
   });
 
+  it('should rename file or folder via POST /api/ftp/rename', async () => {
+    const { user } = createUser('ftpUserRename');
+    const cookie = createSessionCookie(user.id);
+    mockedRename.mockResolvedValueOnce(undefined);
+
+    const res = await request(app)
+      .post('/api/ftp/rename')
+      .set('Cookie', cookie)
+      .send({ oldPath: '/old.mkv', newPath: '/new.mkv' });
+
+    expect(res.status).toBe(200);
+    expect(mockedRename).toHaveBeenCalledWith(user.id, '/old.mkv', '/new.mkv');
+  });
+
   it('should batch delete and batch move files via /api/ftp/delete-batch & /api/ftp/move', async () => {
     const { user } = createUser('ftpUser7');
     const cookie = createSessionCookie(user.id);
@@ -174,6 +198,52 @@ describe('Route: /api/ftp', () => {
     expect(resMove.status).toBe(200);
   });
 
+  it('should download file stream via GET /api/ftp/download', async () => {
+    const { user } = createUser('ftpUserDownload');
+    const cookie = createSessionCookie(user.id);
+    mockedGetFileSize.mockResolvedValueOnce(Buffer.byteLength('file-content'));
+    mockedDownloadToStream.mockImplementation(async (uid, p, res) => {
+      res.write('file-content');
+      res.end();
+    });
+
+    const res = await request(app)
+      .get('/api/ftp/download?path=/file.txt')
+      .set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(res.body.toString()).toBe('file-content');
+  });
+
+  it('should upload file stream via POST /api/ftp/upload', async () => {
+    const { user } = createUser('ftpUserUpload');
+    const cookie = createSessionCookie(user.id);
+    mockedUploadFromStream.mockResolvedValueOnce(undefined);
+
+    const res = await request(app)
+      .post('/api/ftp/upload?path=/uploads/file.txt')
+      .set('Cookie', cookie)
+      .send('file content');
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
+
+  it('should get file info via GET /api/ftp/info', async () => {
+    const { user } = createUser('ftpUserInfo');
+    const cookie = createSessionCookie(user.id);
+    mockedGetFileSize.mockResolvedValueOnce(2048);
+    mockedGetLastModified.mockResolvedValueOnce(new Date('2024-01-01'));
+
+    const res = await request(app)
+      .get('/api/ftp/info?path=/file.txt')
+      .set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.size).toBe(2048);
+  });
+
   it('should get storage usage via GET /api/ftp/storage', async () => {
     const { user } = createUser('ftpUser8');
     const cookie = createSessionCookie(user.id);
@@ -191,4 +261,3 @@ describe('Route: /api/ftp', () => {
     expect(res.body.used).toBe(5000);
   });
 });
-
