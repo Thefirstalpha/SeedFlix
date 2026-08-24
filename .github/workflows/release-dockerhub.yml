@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
 
+
 jobs:
   docker-build-and-push:
     name: Build and Push Docker image
@@ -24,6 +25,8 @@ jobs:
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -31,6 +34,8 @@ jobs:
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         with:
           images: ${{ env.DOCKERHUB_USERNAME }}/seedflix
           tags: |
@@ -53,6 +58,8 @@ jobs:
             IMAGE_TAG=${{ github.event.release.tag_name }}
 
       - name: Publish summary
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         run: |
           echo "### Docker image published" >> $GITHUB_STEP_SUMMARY
           echo "- Repository: ${{ env.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
@@ -73,6 +80,8 @@ jobs:
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -83,6 +92,8 @@ jobs:
 
       - name: Build and push image (dev)
         uses: docker/build-push-action@v6
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         with:
           context: .
           pull: true
@@ -92,6 +103,8 @@ jobs:
             IMAGE_TAG=dev
 
       - name: Publish summary (dev)
+        env:
+          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
         run: |
           echo "### Docker image published (dev)" >> $GITHUB_STEP_SUMMARY
           echo "- Repository: ${{ env.DOCKERHUB_USERNAME }}/seedflix" >> $GITHUB_STEP_SUMMARY
