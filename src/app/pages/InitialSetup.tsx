@@ -40,7 +40,7 @@ export function InitialSetup() {
     user,
     refresh,
   } = useAuth();
-  const hasPendingSetup = user?.flags?.mustSetup || user?.settings?.indexer === null || user?.settings?.transmission === null || user?.settings?.ftp === null;
+  const hasPendingSetup = user?.flags?.mustSetup || user?.flags?.initialPassword === true || user?.settings?.indexer === null || user?.settings?.transmission === null || user?.settings?.ftp === null;
   const { t, availableLanguages, setLanguage } = useI18n();
 
   const [activeStep, setActiveStep] = useState(0);
@@ -78,7 +78,7 @@ export function InitialSetup() {
           key: 'password',
           title: t('setup.steps.security'),
           icon: ShieldCheck,
-          required: user?.flags?.mustUpdatePassword === true,
+          required: user?.flags?.mustUpdatePassword === true || user?.flags?.initialPassword === true,
         },
         {
           key: 'tmdb',
