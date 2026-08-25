@@ -383,12 +383,8 @@ export async function processWishlistIndexer() {
       console.log(`Processing wishlist indexer for user ${user.username}`);
       const lastMovies = await getLastMovies(user.id);
       const lastSeries = await getLastSeries(user.id);
-      const { movies: moviesFounds, series: seriesFounds } = await extractWishlistItemsFromIndexerResults(
-        wishlist,
-        lastMovies,
-        lastSeries,
-      );
-      
+      const { movies: moviesFounds, series: seriesFounds } =
+        await extractWishlistItemsFromIndexerResults(wishlist, lastMovies, lastSeries);
 
       if (moviesFounds.length > 0 || seriesFounds.length > 0) {
         console.log(
