@@ -193,85 +193,95 @@ export function TorrentResultsPanel({
     return (
       <div
         key={item.guid || item.link || `${item.title}_${index}`}
-        className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2 hover:bg-slate-900/60 transition-colors"
+        className="rounded-lg border border-white/10 bg-slate-900/40 p-2.5 sm:p-3 hover:bg-slate-900/60 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
       >
-        <p className="text-white font-medium line-clamp-2 break-all">{item.title}</p>
-
-        <div className="flex flex-wrap gap-2 items-center">
+        <div className="shrink-0 self-start sm:self-center">
           <Button
             size="sm"
             onClick={async () => await handleAddTorrent(item)}
             disabled={addingTorrentLink === torrentLink}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white w-full sm:w-auto"
+            className="bg-cyan-600 hover:bg-cyan-700 text-white whitespace-nowrap"
           >
             {addingTorrentLink === torrentLink ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                 {labels.adding}
               </>
             ) : (
               <>
-                <Download className="w-4 h-4 mr-2" />
+                <Download className="w-3.5 h-3.5 mr-1.5" />
                 {labels.addToClient}
               </>
             )}
           </Button>
-
-          {/* Series Specific Pack or Episode Tag */}
-          {isPack && (
-            <Badge className="bg-purple-600/20 text-purple-300 border-purple-500/40">
-              <FolderArchive className="w-3 h-3 mr-1 inline" />
-              {labels.packBadge || 'Pack saison'}
-            </Badge>
-          )}
-          {itemEpisode !== null && (
-            <Badge className="bg-cyan-600/20 text-cyan-200 border-cyan-500/40">
-              <Tv className="w-3 h-3 mr-1 inline" />
-              {itemSeason !== null
-                ? `S${String(itemSeason).padStart(2, '0')}E${String(itemEpisode).padStart(2, '0')}`
-                : labels.episodeBadge
-                  ? labels.episodeBadge(itemEpisode)
-                  : `Épisode ${itemEpisode}`}
-            </Badge>
-          )}
-
-          {item.quality ? (
-            <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
-              {labels.qualityBadge(item.quality)}
-            </Badge>
-          ) : null}
-
-          {item.language ? (
-            <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
-              {labels.languageBadge(item.language)}
-            </Badge>
-          ) : null}
-
-          {item.sizeHuman ? (
-            <Badge variant="outline" className="border-white/30 text-white/80">
-              {labels.sizeBadge(item.sizeHuman)}
-            </Badge>
-          ) : null}
-
-          {item.pubDate ? (
-            <Badge variant="outline" className="border-blue-500/40 text-blue-300">
-              <Calendar className="w-3 h-3 mr-1 inline" />
-              {new Date(item.pubDate).toLocaleDateString(locale)}
-            </Badge>
-          ) : null}
-
-          {Number.isFinite(item.seeders || Number.NaN) && (item.seeders || 0) >= 0 ? (
-            <Badge variant="outline" className="border-lime-500/40 text-lime-300">
-              {labels.seeders(item.seeders || 0)}
-            </Badge>
-          ) : null}
-
-          {Number.isFinite(item.leechers || Number.NaN) && (item.leechers || 0) >= 0 ? (
-            <Badge variant="outline" className="border-orange-500/40 text-orange-300">
-              {labels.peers(item.leechers || 0)}
-            </Badge>
-          ) : null}
         </div>
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <p
+            className="text-white font-medium line-clamp-2 overflow-hidden leading-snug text-sm"
+            title={item.title}
+          >
+            {item.title}
+          </p>
+
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {/* Series Specific Pack or Episode Tag */}
+            {isPack && (
+              <Badge className="bg-purple-600/20 text-purple-300 border-purple-500/40 text-[11px] px-2 py-0.5">
+                <FolderArchive className="w-3 h-3 mr-1 inline" />
+                {labels.packBadge || 'Pack saison'}
+              </Badge>
+            )}
+            {itemEpisode !== null && (
+              <Badge className="bg-cyan-600/20 text-cyan-200 border-cyan-500/40 text-[11px] px-2 py-0.5">
+                <Tv className="w-3 h-3 mr-1 inline" />
+                {itemSeason !== null
+                  ? `S${String(itemSeason).padStart(2, '0')}E${String(itemEpisode).padStart(2, '0')}`
+                  : labels.episodeBadge
+                    ? labels.episodeBadge(itemEpisode)
+                    : `Épisode ${itemEpisode}`}
+              </Badge>
+            )}
+
+            {item.quality ? (
+              <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-[11px] px-2 py-0.5">
+                {labels.qualityBadge(item.quality)}
+              </Badge>
+            ) : null}
+
+            {item.language ? (
+              <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 text-[11px] px-2 py-0.5">
+                {labels.languageBadge(item.language)}
+              </Badge>
+            ) : null}
+
+            {item.sizeHuman ? (
+              <Badge variant="outline" className="border-white/30 text-white/80 text-[11px] px-2 py-0.5">
+                {labels.sizeBadge(item.sizeHuman)}
+              </Badge>
+            ) : null}
+
+            {item.pubDate ? (
+              <Badge variant="outline" className="border-blue-500/40 text-blue-300 text-[11px] px-2 py-0.5">
+                <Calendar className="w-3 h-3 mr-1 inline" />
+                {new Date(item.pubDate).toLocaleDateString(locale)}
+              </Badge>
+            ) : null}
+
+            {Number.isFinite(item.seeders || Number.NaN) && (item.seeders || 0) >= 0 ? (
+              <Badge variant="outline" className="border-lime-500/40 text-lime-300 text-[11px] px-2 py-0.5">
+                {labels.seeders(item.seeders || 0)}
+              </Badge>
+            ) : null}
+
+            {Number.isFinite(item.leechers || Number.NaN) && (item.leechers || 0) >= 0 ? (
+              <Badge variant="outline" className="border-orange-500/40 text-orange-300 text-[11px] px-2 py-0.5">
+                {labels.peers(item.leechers || 0)}
+              </Badge>
+            ) : null}
+          </div>
+        </div>
+
+        
       </div>
     );
   };
@@ -447,25 +457,25 @@ export function TorrentResultsPanel({
                   <button
                     type="button"
                     onClick={() => toggleSectionCollapse(section.id)}
-                    className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 text-left transition-colors cursor-pointer select-none"
+                    className="w-full flex items-center justify-between p-2.5 sm:p-3 bg-white/5 hover:bg-white/10 text-left transition-colors cursor-pointer select-none"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       {section.iconType === 'season' && (
-                        <Layers className="w-5 h-5 text-cyan-400 shrink-0" />
+                        <Layers className="w-4 h-4 text-cyan-400 shrink-0" />
                       )}
                       {section.iconType === 'episode' && (
-                        <Tv className="w-5 h-5 text-cyan-300 shrink-0" />
+                        <Tv className="w-4 h-4 text-cyan-300 shrink-0" />
                       )}
                       {section.iconType === 'pack' && (
-                        <FolderArchive className="w-5 h-5 text-purple-400 shrink-0" />
+                        <FolderArchive className="w-4 h-4 text-purple-400 shrink-0" />
                       )}
                       {section.iconType === 'complete' && (
-                        <FolderArchive className="w-5 h-5 text-emerald-400 shrink-0" />
+                        <FolderArchive className="w-4 h-4 text-emerald-400 shrink-0" />
                       )}
                       {section.iconType === 'other' && (
-                        <Tv className="w-5 h-5 text-white/60 shrink-0" />
+                        <Tv className="w-4 h-4 text-white/60 shrink-0" />
                       )}
-                      <span className="text-base font-semibold text-white truncate">
+                      <span className="text-sm font-semibold text-white truncate">
                         {section.title}
                       </span>
                     </div>
@@ -474,21 +484,21 @@ export function TorrentResultsPanel({
                       {section.badge && (
                         <Badge
                           variant="outline"
-                          className="border-white/20 text-white/80 text-xs px-2 py-0.5"
+                          className="border-white/20 text-white/80 text-[11px] px-2 py-0.5"
                         >
                           {section.badge}
                         </Badge>
                       )}
                       {isCollapsed ? (
-                        <ChevronRight className="w-4 h-4 text-white/60" />
+                        <ChevronRight className="w-3.5 h-3.5 text-white/60" />
                       ) : (
-                        <ChevronDown className="w-4 h-4 text-white/60" />
+                        <ChevronDown className="w-3.5 h-3.5 text-white/60" />
                       )}
                     </div>
                   </button>
 
                   {!isCollapsed && (
-                    <div className="p-4 space-y-3 border-t border-white/10 bg-slate-950/20">
+                    <div className="p-2.5 sm:p-3 space-y-2 border-t border-white/10 bg-slate-950/20">
                       {section.items.map((item, idx) => renderReleaseItem(item, idx))}
                     </div>
                   )}

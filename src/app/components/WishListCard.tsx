@@ -128,16 +128,13 @@ export function WishListCard({
     return (
       <div
         key={itemKey}
-        className="rounded-lg border border-white/10 bg-slate-900/60 p-3 space-y-2 hover:bg-slate-900/80 transition-colors"
+        className="rounded-lg border border-white/10 bg-slate-900/60 p-2.5 sm:p-3 hover:bg-slate-900/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
         onClick={(e) => e.stopPropagation()}
         role="presentation"
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
         }}
-      >
-        <p className="text-sm text-white font-medium break-all">{target.title}</p>
-
-        <div className="flex flex-wrap gap-2 items-center">
+      ><div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
           <Button
             size="sm"
             onClick={(event) => {
@@ -145,7 +142,7 @@ export function WishListCard({
               onAddTorrent(target);
             }}
             disabled={actionKey === addKey}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white"
+            className="bg-cyan-600 hover:bg-cyan-700 text-white whitespace-nowrap"
           >
             {actionKey === addKey ? (
               <>
@@ -168,7 +165,7 @@ export function WishListCard({
               onRejectIndexerResult(target);
             }}
             disabled={actionKey === rejectKey}
-            className="border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 hover:text-red-100"
+            className="border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20 hover:text-red-100 whitespace-nowrap"
           >
             {actionKey === rejectKey ? (
               <>
@@ -179,59 +176,69 @@ export function WishListCard({
               t('wishlistPage.indexerResults.actions.reject')
             )}
           </Button>
+        </div>
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <p
+            className="text-sm text-white font-medium break-all sm:break-words line-clamp-2 leading-snug"
+            title={target.title}
+          >
+            {target.title}
+          </p>
 
-          {isPack && (
-            <Badge className="bg-purple-600/20 text-purple-300 border-purple-500/40 text-xs">
-              <FolderArchive className="w-3 h-3 mr-1 inline" />
-              {t('wishlistPage.indexerResults.packBadge')}
-            </Badge>
-          )}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {isPack && (
+              <Badge className="bg-purple-600/20 text-purple-300 border-purple-500/40 text-[11px] px-2 py-0.5">
+                <FolderArchive className="w-3 h-3 mr-1 inline" />
+                {t('wishlistPage.indexerResults.packBadge')}
+              </Badge>
+            )}
 
-          {itemEpisode !== null && (
-            <Badge className="bg-cyan-600/20 text-cyan-200 border-cyan-500/40 text-xs">
-              <Tv className="w-3 h-3 mr-1 inline" />
-              {itemSeason !== null
-                ? `S${String(itemSeason).padStart(2, '0')}E${String(itemEpisode).padStart(2, '0')}`
-                : t('wishlistPage.indexerResults.episodeBadge', { episode: itemEpisode })}
-            </Badge>
-          )}
+            {itemEpisode !== null && (
+              <Badge className="bg-cyan-600/20 text-cyan-200 border-cyan-500/40 text-[11px] px-2 py-0.5">
+                <Tv className="w-3 h-3 mr-1 inline" />
+                {itemSeason !== null
+                  ? `S${String(itemSeason).padStart(2, '0')}E${String(itemEpisode).padStart(2, '0')}`
+                  : t('wishlistPage.indexerResults.episodeBadge', { episode: itemEpisode })}
+              </Badge>
+            )}
 
-          {target.quality ? (
-            <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-xs">
-              {target.quality}
-            </Badge>
-          ) : null}
+            {target.quality ? (
+              <Badge variant="outline" className="border-cyan-500/40 text-cyan-300 text-[11px] px-2 py-0.5">
+                {target.quality}
+              </Badge>
+            ) : null}
 
-          {target.language ? (
-            <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 text-xs">
-              {target.language}
-            </Badge>
-          ) : null}
+            {target.language ? (
+              <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 text-[11px] px-2 py-0.5">
+                {target.language}
+              </Badge>
+            ) : null}
 
-          {target.sizeHuman ? (
-            <Badge variant="outline" className="border-white/30 text-white/80 text-xs">
-              {target.sizeHuman}
-            </Badge>
-          ) : null}
+            {target.sizeHuman ? (
+              <Badge variant="outline" className="border-white/30 text-white/80 text-[11px] px-2 py-0.5">
+                {target.sizeHuman}
+              </Badge>
+            ) : null}
 
-          {target.pubDate ? (
-            <Badge variant="outline" className="border-blue-500/40 text-blue-300 text-xs">
-              <Calendar className="w-3 h-3 mr-1 inline" />
-              {new Date(target.pubDate).toLocaleDateString(locale)}
-            </Badge>
-          ) : null}
+            {target.pubDate ? (
+              <Badge variant="outline" className="border-blue-500/40 text-blue-300 text-[11px] px-2 py-0.5">
+                <Calendar className="w-3 h-3 mr-1 inline" />
+                {new Date(target.pubDate).toLocaleDateString(locale)}
+              </Badge>
+            ) : null}
 
-          {Number.isFinite(target.seeders || Number.NaN) && (target.seeders || 0) >= 0 ? (
-            <Badge variant="outline" className="border-lime-500/40 text-lime-300 text-xs">
-              {t('wishlistPage.indexerResults.seeders', { count: target.seeders || 0 })}
-            </Badge>
-          ) : null}
+            {Number.isFinite(target.seeders || Number.NaN) && (target.seeders || 0) >= 0 ? (
+              <Badge variant="outline" className="border-lime-500/40 text-lime-300 text-[11px] px-2 py-0.5">
+                {t('wishlistPage.indexerResults.seeders', { count: target.seeders || 0 })}
+              </Badge>
+            ) : null}
 
-          {Number.isFinite(target.leechers || Number.NaN) && (target.leechers || 0) >= 0 ? (
-            <Badge variant="outline" className="border-orange-500/40 text-orange-300 text-xs">
-              {t('wishlistPage.indexerResults.peers', { count: target.leechers || 0 })}
-            </Badge>
-          ) : null}
+            {Number.isFinite(target.leechers || Number.NaN) && (target.leechers || 0) >= 0 ? (
+              <Badge variant="outline" className="border-orange-500/40 text-orange-300 text-[11px] px-2 py-0.5">
+                {t('wishlistPage.indexerResults.peers', { count: target.leechers || 0 })}
+              </Badge>
+            ) : null}
+          </div>
         </div>
       </div>
     );
@@ -285,7 +292,10 @@ export function WishListCard({
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="outline" className="border-cyan-500/40 text-cyan-200 bg-cyan-950/30">
-                  {t('wishlistPage.indexerResults.count', { count: targets.length })}
+                  {targets.length}{' '}
+                  {targets.length > 1
+                    ? t('wishlistPage.indexerResults.title')
+                    : '1 résultat'}
                 </Badge>
 
                 {/* Group mode toggle for series */}
@@ -341,7 +351,7 @@ export function WishListCard({
 
             {/* Render Series Sections or Movie List */}
             {type === 'series' ? (
-              <div className="space-y-3 pt-1">
+              <div className="space-y-2.5 pt-1">
                 {seriesSections.map((section) => {
                   const isCollapsed = Boolean(collapsedSections[section.id]);
                   return (
@@ -355,7 +365,7 @@ export function WishListCard({
                           e.stopPropagation();
                           toggleSectionCollapse(section.id);
                         }}
-                        className="w-full flex items-center justify-between p-3 bg-white/5 hover:bg-white/10 text-left transition-colors cursor-pointer select-none"
+                        className="w-full flex items-center justify-between p-2.5 px-3 bg-white/5 hover:bg-white/10 text-left transition-colors cursor-pointer select-none"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           {section.iconType === 'season' && (
@@ -396,7 +406,7 @@ export function WishListCard({
                       </button>
 
                       {!isCollapsed && (
-                        <div className="p-3 space-y-2.5 border-t border-white/10 bg-slate-950/20">
+                        <div className="p-2.5 space-y-2 border-t border-white/10 bg-slate-950/20">
                           {section.items.map((item, idx) =>
                             renderTargetItem(item, idx),
                           )}
@@ -407,7 +417,7 @@ export function WishListCard({
                 })}
               </div>
             ) : (
-              <div className="space-y-2.5 pt-1">
+              <div className="space-y-2 pt-1">
                 {targets.map((target, idx) => renderTargetItem(target, idx))}
               </div>
             )}
