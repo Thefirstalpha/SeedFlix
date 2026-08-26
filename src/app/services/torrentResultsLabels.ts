@@ -38,5 +38,23 @@ export function buildTorrentResultsLabels(
     next: t(`${basePaginationKey}.next`),
     sortByDateAria: 'Sort by date',
     sortBySizeAria: 'Sort by size',
+    groupBy: t(`${baseIndexerKey}.groupBy`),
+    groupBySeason: t(`${baseIndexerKey}.groupBySeason`),
+    groupByEpisode: t(`${baseIndexerKey}.groupByEpisode`),
+    seasonSection: (season: number) => t(`${baseIndexerKey}.seasonSection`, { season }),
+    seasonPackSection: t(`${baseIndexerKey}.seasonPackSection`),
+    seasonPackItem: (season: number) => t(`${baseIndexerKey}.seasonPackItem`, { season }),
+    episodeSection: (season: number, episode: number) =>
+      t(`${baseIndexerKey}.episodeSection`, { season, episode }),
+    singleEpisodeSection: (episode: number) =>
+      t(`${baseIndexerKey}.singleEpisodeSection`, { episode }),
+    completeSeriesSection: t(`${baseIndexerKey}.completeSeriesSection`),
+    unclassifiedSection: t(`${baseIndexerKey}.unclassifiedSection`),
+    resultsCount: (count: number) =>
+      count > 1
+        ? t(`${baseIndexerKey}.resultsCountPlural`, { count })
+        : t(`${baseIndexerKey}.resultsCount`, { count }),
+    packBadge: t(`${baseIndexerKey}.packBadge`),
+    episodeBadge: (episode: number) => t(`${baseIndexerKey}.episodeBadge`, { episode }),
   };
 }

@@ -73,25 +73,63 @@ export function extractLanguage(title: string): string | null {
 
 export function extractSeasonNumber(title: string): number | null {
   const normalized = String(title || '').toLowerCase();
-  const seasonMatch = new RegExp(/(?:^|[^a-z0-9])s(\d{1,3})(?=e\d{1,4}|[^a-z0-9]|$)/).exec(
+
+  // 1. Check explicit "saison X" or "season X"
+  const textSeasonMatch = new RegExp(/(?:saison|season)[\s._-]?(\d{1,3})(?=[^a-z0-9]|$)/).exec(
     normalized,
   );
+  if (textSeasonMatch?.[1]) {
+    return Number(textSeasonMatch[1]);
+  }
+
+  // 2. Check "S01", "S01E05", "S1"
+  const seasonMatch = new RegExp(
+    /(?:^|[^a-z0-9])s(\d{1,3})(?=e\d{1,4}|[\s._-]e\d{1,4}|[^a-z0-9]|$)/,
+  ).exec(normalized);
   if (seasonMatch?.[1]) {
     return Number(seasonMatch[1]);
   }
+
+  // 3. Check "1x05" (e.g. season 1, episode 5)
+  const crossMatch = new RegExp(/(?:^|[^a-z0-9])(\d{1,2})x\d{1,4}(?=[^a-z0-9]|$)/).exec(normalized);
+  if (crossMatch?.[1]) {
+    return Number(crossMatch[1]);
+  }
+
   return null;
 }
 
 export function extractEpisodeNumber(title: string): number | null {
   const normalized = String(title || '').toLowerCase();
-  const compactMatch = new RegExp(/(?:^|[^a-z0-9])s\d{1,3}e(\d{1,4})(?=[^a-z0-9]|$)/).exec(
+
+  // 1. Check "S01E05" or "S01.E05"
+  const compactMatch = new RegExp(/(?:^|[^a-z0-9])s\d{1,3}[\s._-]?e(\d{1,4})(?=[^a-z0-9]|$)/).exec(
     normalized,
   );
-  const episodeMatch =
-    compactMatch || new RegExp(/(?:^|[^a-z0-9])e(\d{1,4})(?=[^a-z0-9]|$)/).exec(normalized);
+  if (compactMatch?.[1]) {
+    return Number(compactMatch[1]);
+  }
+
+  // 2. Check "1x05"
+  const crossMatch = new RegExp(/(?:^|[^a-z0-9])\d{1,2}x(\d{1,4})(?=[^a-z0-9]|$)/).exec(normalized);
+  if (crossMatch?.[1]) {
+    return Number(crossMatch[1]);
+  }
+
+  // 3. Check "Episode 5", "Épisode 5", "Ep.5", "Ep 05"
+  const textEpisodeMatch = new RegExp(
+    /(?:^|[^a-z0-9])(?:episode|épisode|ep)[\s._-]?(\d{1,4})(?=[^a-z0-9]|$)/,
+  ).exec(normalized);
+  if (textEpisodeMatch?.[1]) {
+    return Number(textEpisodeMatch[1]);
+  }
+
+  // 4. Check single "E05"
+  const episodeMatch = new RegExp(/(?:^|[^a-z0-9])e(\d{1,4})(?=[^a-z0-9]|$)/).exec(normalized);
   if (episodeMatch?.[1]) {
     return Number(episodeMatch[1]);
   }
+
   return null;
 }
 
@@ -186,7 +224,12 @@ async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesRe
     const link = block?.link;
     const guidMatch = block.guid;
     const pubDateMatch = block?.pubDate;
-    const attributes = block['torznab:attr'].reduce(
+    const rawAttrs = Array.isArray(block?.['torznab:attr'])
+      ? block['torznab:attr']
+      : block?.['torznab:attr']
+        ? [block['torznab:attr']]
+        : [];
+    const attributes = rawAttrs.reduce(
       (acc: Record<string, any>, item: { name: string; value: any }) => {
         if (item?.name) acc[item.name] = item.value;
         return acc;
