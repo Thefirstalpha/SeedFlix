@@ -92,12 +92,18 @@ describe('indexer module', () => {
       expect(extractSeasonNumber('Series.Name.S02.1080p')).toBe(2);
       expect(extractSeasonNumber('Series.Name.S01E05.1080p')).toBe(1);
       expect(extractSeasonNumber('Series.Name.S10.MULTI')).toBe(10);
+      expect(extractSeasonNumber('Series.Name.Saison.1.FRENCH.1080p')).toBe(1);
+      expect(extractSeasonNumber('Series.Name.Season.03.Complete')).toBe(3);
+      expect(extractSeasonNumber('Series.Name.2x04.HDTV')).toBe(2);
       expect(extractSeasonNumber('Movie.Name.2024')).toBeNull();
     });
 
     it('should extract episode number from release title', () => {
       expect(extractEpisodeNumber('Series.Name.S01E08.1080p')).toBe(8);
       expect(extractEpisodeNumber('Series.Name.E12.720p')).toBe(12);
+      expect(extractEpisodeNumber('Series.Name.Saison.1.Episode.05.FRENCH')).toBe(5);
+      expect(extractEpisodeNumber('Series.Name.Ep.03.720p')).toBe(3);
+      expect(extractEpisodeNumber('Series.Name.1x07.HDTV')).toBe(7);
       expect(extractEpisodeNumber('Series.Name.S02.Complete')).toBeNull();
     });
   });

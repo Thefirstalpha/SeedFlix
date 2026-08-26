@@ -1,12 +1,12 @@
-import { Calendar, Download, Loader2 } from 'lucide-react';
-import { Badge } from './ui/badge';
+import { useState } from 'react';
+import { IndexerMovieResult, IndexerSeriesResult } from '../../../common/indexer';
+import { useI18n } from '../i18n/LanguageProvider';
+import { SeriesGroupMode } from '../services/indexerGrouping';
+import { addTorrentToClient } from '../services/torrentService';
+import { IndexerResultsList } from './IndexerResultsList';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
-import { addTorrentToClient } from '../services/torrentService';
-import { IndexerMovieResult, IndexerSeriesResult } from '../../../common/indexer';
-import { useEffect, useState } from 'react';
-import { useI18n } from '../i18n/LanguageProvider';
 
 export interface TorrentReleaseItem {
   title: string;
@@ -48,6 +48,19 @@ export type TorrentResultsLabels = {
   next: string;
   sortByDateAria: string;
   sortBySizeAria: string;
+  groupBy?: string;
+  groupBySeason?: string;
+  groupByEpisode?: string;
+  seasonSection?: (season: number) => string;
+  seasonPackSection?: string;
+  seasonPackItem?: (season: number) => string;
+  episodeSection?: (season: number, episode: number) => string;
+  singleEpisodeSection?: (episode: number) => string;
+  completeSeriesSection?: string;
+  unclassifiedSection?: string;
+  resultsCount?: (count: number) => string;
+  packBadge?: string;
+  episodeBadge?: (episode: number) => string;
 };
 
 export interface FilterOption {
@@ -57,6 +70,8 @@ export interface FilterOption {
   sortBy: 'size' | 'date';
   sortOrder: 'asc' | 'desc';
 }
+
+export type { SeriesGroupMode };
 
 interface TorrentResultsPanelProps {
   title: string;
@@ -89,20 +104,16 @@ export function TorrentResultsPanel({
   locale,
   labels,
 }: TorrentResultsPanelProps) {
-
   const { t } = useI18n();
   const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
   const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
   const [torrentError, setTorrentError] = useState<string | null>(null);
 
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
-
-
   const handleAddTorrent = async (target: IndexerSeriesResult | IndexerMovieResult) => {
     setTorrentStatus(null);
     setTorrentError(null);
+    const link = target.downloadUrl || target.link || target.guid;
+    setAddingTorrentLink(link);
 
     try {
       const response = await addTorrentToClient(target.guid, type);
@@ -120,21 +131,9 @@ export function TorrentResultsPanel({
     }
   };
 
-
-  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE);
-  const paginatedResults = filteredResults.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE,
-  );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter]);
-
-
   return (
     <Card className="bg-white/5 border-white/10">
-      <CardContent className="p-6 space-y-4">
+      <CardContent className="p-4 sm:p-6 space-y-4">
         <div>
           <h3 className="text-xl font-semibold text-white">{title}</h3>
           {description ? <p className="text-sm text-white/60 mt-1">{description}</p> : null}
@@ -230,7 +229,12 @@ export function TorrentResultsPanel({
             </ToggleGroup>
             <Button
               size="sm"
-              onClick={() => onFilterChange({ ...filter, sortOrder: filter.sortOrder === 'desc' ? 'asc' : 'desc' })}
+              onClick={() =>
+                onFilterChange({
+                  ...filter,
+                  sortOrder: filter.sortOrder === 'desc' ? 'asc' : 'desc',
+                })
+              }
               className="h-9 px-3 border border-white/20 text-white/80 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all"
             >
               {filter.sortOrder === 'desc' ? '↓' : '↑'}
@@ -249,116 +253,16 @@ export function TorrentResultsPanel({
           <p className="text-sm text-white/60">{labels.empty}</p>
         ) : null}
 
-        {filteredResults.length > 0 ? (
-          <div className="space-y-4">
-            <div className="space-y-3">
-              {paginatedResults.map((item, index) => {
-                const torrentLink = item.downloadUrl || item.link;
-                return (
-                  <div
-                    key={item.guid || item.link || `${item.title}_${index}`}
-                    className="rounded-lg border border-white/10 bg-slate-900/40 p-3 space-y-2"
-                  >
-                    <p className="text-white font-medium line-clamp-2 break-all">{item.title}</p>
-
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <Button
-                        size="sm"
-                        onClick={async () => await handleAddTorrent(item)}
-                        disabled={addingTorrentLink === torrentLink}
-                        className="bg-cyan-600 hover:bg-cyan-700 text-white w-full sm:w-auto"
-                      >
-                        {addingTorrentLink === torrentLink ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            {labels.adding}
-                          </>
-                        ) : (
-                          <>
-                            <Download className="w-4 h-4 mr-2" />
-                            {labels.addToClient}
-                          </>
-                        )}
-                      </Button>
-
-                      {item.quality ? (
-                        <Badge variant="outline" className="border-cyan-500/40 text-cyan-300">
-                          {labels.qualityBadge(item.quality)}
-                        </Badge>
-                      ) : null}
-
-                      {item.language ? (
-                        <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
-                          {labels.languageBadge(item.language)}
-                        </Badge>
-                      ) : null}
-
-                      {item.sizeHuman ? (
-                        <Badge variant="outline" className="border-white/30 text-white/80">
-                          {labels.sizeBadge(item.sizeHuman)}
-                        </Badge>
-                      ) : null}
-
-                      {item.pubDate ? (
-                        <Badge variant="outline" className="border-blue-500/40 text-blue-300">
-                          <Calendar className="w-3 h-3 mr-1 inline" />
-                          {new Date(item.pubDate).toLocaleDateString(locale)}
-                        </Badge>
-                      ) : null}
-
-                      {Number.isFinite(item.seeders || Number.NaN) && (item.seeders || 0) >= 0 ? (
-                        <Badge variant="outline" className="border-lime-500/40 text-lime-300">
-                          {labels.seeders(item.seeders || 0)}
-                        </Badge>
-                      ) : null}
-
-                      {Number.isFinite(item.leechers || Number.NaN) && (item.leechers || 0) >= 0 ? (
-                        <Badge variant="outline" className="border-orange-500/40 text-orange-300">
-                          {labels.peers(item.leechers || 0)}
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center justify-center gap-2 flex-wrap pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
-                disabled={currentPage === 1}
-              >
-                {labels.previous}
-              </Button>
-
-              <span className="text-sm text-white/80">
-                {labels.current(currentPage, totalPages)}
-              </span>
-
-              <select
-                value={currentPage}
-                onChange={(event) => setCurrentPage(Number(event.target.value))}
-                className="bg-slate-900 border border-white/20 text-white rounded-md px-2 py-1 text-sm"
-              >
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <option key={page} value={page}>
-                    {labels.page(page)}
-                  </option>
-                ))}
-              </select>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages))}
-                disabled={currentPage === totalPages}
-              >
-                {labels.next}
-              </Button>
-            </div>
-          </div>
+        {!isReleaseLoading && !releaseError && filteredResults.length > 0 ? (
+          <IndexerResultsList
+            items={filteredResults}
+            type={type}
+            locale={locale}
+            addingTorrentLink={addingTorrentLink}
+            onAddTorrent={handleAddTorrent}
+            showPagination={type === 'movie'}
+            labels={labels}
+          />
         ) : null}
       </CardContent>
     </Card>

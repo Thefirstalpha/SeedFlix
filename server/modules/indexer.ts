@@ -1,5 +1,6 @@
 import { IndexerMovieResult, IndexerSeriesResult } from '../../common/indexer';
 import { IndexerSettings } from '../../common/settings';
+import { WishListItem } from '../../common/wishlist';
 import { getUsers } from './auth';
 import { readStore, runInTransaction } from './db';
 import { ErrorCode } from './errors';
@@ -72,25 +73,63 @@ export function extractLanguage(title: string): string | null {
 
 export function extractSeasonNumber(title: string): number | null {
   const normalized = String(title || '').toLowerCase();
-  const seasonMatch = new RegExp(/(?:^|[^a-z0-9])s(\d{1,3})(?=e\d{1,4}|[^a-z0-9]|$)/).exec(
+
+  // 1. Check explicit "saison X" or "season X"
+  const textSeasonMatch = new RegExp(/(?:saison|season)[\s._-]?(\d{1,3})(?=[^a-z0-9]|$)/).exec(
     normalized,
   );
+  if (textSeasonMatch?.[1]) {
+    return Number(textSeasonMatch[1]);
+  }
+
+  // 2. Check "S01", "S01E05", "S1"
+  const seasonMatch = new RegExp(
+    /(?:^|[^a-z0-9])s(\d{1,3})(?=e\d{1,4}|[\s._-]e\d{1,4}|[^a-z0-9]|$)/,
+  ).exec(normalized);
   if (seasonMatch?.[1]) {
     return Number(seasonMatch[1]);
   }
+
+  // 3. Check "1x05" (e.g. season 1, episode 5)
+  const crossMatch = new RegExp(/(?:^|[^a-z0-9])(\d{1,2})x\d{1,4}(?=[^a-z0-9]|$)/).exec(normalized);
+  if (crossMatch?.[1]) {
+    return Number(crossMatch[1]);
+  }
+
   return null;
 }
 
 export function extractEpisodeNumber(title: string): number | null {
   const normalized = String(title || '').toLowerCase();
-  const compactMatch = new RegExp(/(?:^|[^a-z0-9])s\d{1,3}e(\d{1,4})(?=[^a-z0-9]|$)/).exec(
+
+  // 1. Check "S01E05" or "S01.E05"
+  const compactMatch = new RegExp(/(?:^|[^a-z0-9])s\d{1,3}[\s._-]?e(\d{1,4})(?=[^a-z0-9]|$)/).exec(
     normalized,
   );
-  const episodeMatch =
-    compactMatch || new RegExp(/(?:^|[^a-z0-9])e(\d{1,4})(?=[^a-z0-9]|$)/).exec(normalized);
+  if (compactMatch?.[1]) {
+    return Number(compactMatch[1]);
+  }
+
+  // 2. Check "1x05"
+  const crossMatch = new RegExp(/(?:^|[^a-z0-9])\d{1,2}x(\d{1,4})(?=[^a-z0-9]|$)/).exec(normalized);
+  if (crossMatch?.[1]) {
+    return Number(crossMatch[1]);
+  }
+
+  // 3. Check "Episode 5", "Épisode 5", "Ep.5", "Ep 05"
+  const textEpisodeMatch = new RegExp(
+    /(?:^|[^a-z0-9])(?:episode|épisode|ep)[\s._-]?(\d{1,4})(?=[^a-z0-9]|$)/,
+  ).exec(normalized);
+  if (textEpisodeMatch?.[1]) {
+    return Number(textEpisodeMatch[1]);
+  }
+
+  // 4. Check single "E05"
+  const episodeMatch = new RegExp(/(?:^|[^a-z0-9])e(\d{1,4})(?=[^a-z0-9]|$)/).exec(normalized);
   if (episodeMatch?.[1]) {
     return Number(episodeMatch[1]);
   }
+
   return null;
 }
 
@@ -149,7 +188,7 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
     );
 
     results.push({
-      title: typeof title === 'string' ? title : '',
+      title: String(title ?? ''),
       link: typeof link === 'string' ? link : '',
       guid: guidMatch,
       pubDate: typeof pubDateMatch === 'string' ? pubDateMatch : undefined,
@@ -185,7 +224,12 @@ async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesRe
     const link = block?.link;
     const guidMatch = block.guid;
     const pubDateMatch = block?.pubDate;
-    const attributes = block['torznab:attr'].reduce(
+    const rawAttrs = Array.isArray(block?.['torznab:attr'])
+      ? block['torznab:attr']
+      : block?.['torznab:attr']
+        ? [block['torznab:attr']]
+        : [];
+    const attributes = rawAttrs.reduce(
       (acc: Record<string, any>, item: { name: string; value: any }) => {
         if (item?.name) acc[item.name] = item.value;
         return acc;
@@ -339,38 +383,51 @@ export async function rejectAllIndexerResultsByGuids(
   }
 }
 
+async function extractWishlistItemsFromIndexerResults(
+  wishlist: WishListItem[],
+  indexerMovies: IndexerMovieResult[],
+  indexerSeries: IndexerSeriesResult[],
+): Promise<{ movies: IndexerMovieResult[]; series: IndexerSeriesResult[] }> {
+  const moviesFounds: IndexerMovieResult[] = [];
+  const seriesFounds: IndexerSeriesResult[] = [];
+  for (const item of wishlist) {
+    if (item.type === 'movie') {
+      const founds = indexerMovies.filter((m) => String(m.tmdbId) === String(item.tmdb));
+      if (founds.length > 0) {
+        moviesFounds.push(...founds);
+      }
+    } else if (item.type === 'series') {
+      const founds = indexerSeries.filter(
+        (s) =>
+          String(s.tmdbId) === String(item.tmdb) &&
+          (item.all_seasons === true ||
+            (item.seasons?.[s.seasonNumber || 1] !== undefined &&
+              (item.seasons[s.seasonNumber || 1].all_episodes === true ||
+                (s.episodeNumber !== undefined &&
+                  item.seasons[s.seasonNumber || 1].episodes.includes(s.episodeNumber || 1))))),
+      );
+      if (founds.length > 0) {
+        seriesFounds.push(...founds);
+      }
+    }
+  }
+  return { movies: moviesFounds, series: seriesFounds };
+}
+
 // Automated job to search wishlist items in the indexer and update their status
 export async function processWishlistIndexer() {
   const users = getUsers();
   for (const user of users) {
     try {
-      console.log(`Processing wishlist indexer for user ${user.username}`);
       const wishlist = await getWishlist(user.id);
+      if (wishlist.length === 0) {
+        continue;
+      }
+      console.log(`Processing wishlist indexer for user ${user.username}`);
       const lastMovies = await getLastMovies(user.id);
       const lastSeries = await getLastSeries(user.id);
-      const moviesFounds: IndexerMovieResult[] = [];
-      const seriesFounds: IndexerSeriesResult[] = [];
-      for (const item of wishlist) {
-        if (item.type === 'movie') {
-          const founds = lastMovies.filter((m) => String(m.tmdbId) === String(item.tmdb));
-          if (founds.length > 0) {
-            moviesFounds.push(...founds);
-          }
-        } else if (item.type === 'series') {
-          const founds = lastSeries.filter(
-            (s) =>
-              String(s.tmdbId) === String(item.tmdb) &&
-              (item.all_seasons === true ||
-                (item.seasons?.[s.seasonNumber || 1] !== undefined &&
-                  (item.seasons[s.seasonNumber || 1].all_episodes === true ||
-                    (s.episodeNumber !== undefined &&
-                      item.seasons[s.seasonNumber || 1].episodes.includes(s.episodeNumber || 1))))),
-          );
-          if (founds.length > 0) {
-            seriesFounds.push(...founds);
-          }
-        }
-      }
+      const { movies: moviesFounds, series: seriesFounds } =
+        await extractWishlistItemsFromIndexerResults(wishlist, lastMovies, lastSeries);
 
       if (moviesFounds.length > 0 || seriesFounds.length > 0) {
         console.log(

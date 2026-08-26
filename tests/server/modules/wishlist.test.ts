@@ -1,7 +1,12 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, initDB, writeStore } from '../../../server/modules/db';
 import * as tmdbModule from '../../../server/modules/tmdb';
-import { addToWishlist, deleteWishlist, getWishlist } from '../../../server/modules/wishlist';
+import {
+  addToWishlist,
+  deleteWishlist,
+  deleteWishlistItems,
+  getWishlist,
+} from '../../../server/modules/wishlist';
 
 // Mock TMDB proxy to avoid real network calls
 vi.mock('../../../server/modules/tmdb', async (importOriginal) => {
@@ -426,6 +431,50 @@ describe('wishlist module', () => {
       const wishlist = await getWishlist(1);
       expect(wishlist).toHaveLength(1);
       expect(Object.keys(wishlist[0].seasons)).toEqual(['2']);
+    });
+  });
+
+  describe('deleteWishlistItems', () => {
+    const sampleMovie = {
+      id: 550,
+      title: 'Fight Club',
+      original_title: 'Fight Club',
+      release_date: '1999-10-15',
+      genres: [{ id: 18, name: 'Drama' }],
+      vote_average: 8.433,
+      poster_path: '/poster.jpg',
+    };
+
+    const sampleSeries = {
+      id: 1399,
+      name: 'Game of Thrones',
+      original_name: 'Game of Thrones',
+      first_air_date: '2011-04-17',
+      genres: [{ id: 10765, name: 'Sci-Fi & Fantasy' }],
+      vote_average: 8.455,
+      poster_path: '/poster2.jpg',
+    };
+
+    it('should batch delete multiple items in a single transaction', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleMovie);
+      await addToWishlist(1, 550, 'movie');
+
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series');
+
+      expect(await getWishlist(1)).toHaveLength(2);
+
+      await deleteWishlistItems(1, [
+        { tmdbId: 550, type: 'movie' },
+        { tmdbId: 1399, type: 'series' },
+      ]);
+
+      expect(await getWishlist(1)).toHaveLength(0);
+    });
+
+    it('should handle empty or null items array gracefully', async () => {
+      await deleteWishlistItems(1, []);
+      expect(await getWishlist(1)).toEqual([]);
     });
   });
 });

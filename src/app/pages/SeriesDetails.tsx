@@ -678,7 +678,6 @@ export function SeriesDetails() {
 
           <TorrentResultsPanel
             title={t('seriesDetails.indexer.title')}
-            description={t('seriesDetails.indexer.description')}
             type="series"
             filter={filter}
             onFilterChange={setFilter}

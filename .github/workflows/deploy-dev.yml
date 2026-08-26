@@ -1,0 +1,49 @@
+name: Update dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      ssh_command:
+        description: 'Commande SSH à exécuter sur le serveur'
+        required: false
+        default: 'cd /opt/seedflix && docker compose pull && docker compose up -d'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-dev-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-push-docker:
+    name: Build & Push Docker image (dev)
+    uses: ./.github/workflows/release-dockerhub.yml
+    with:
+      branch: ${{ github.ref_name }}
+    secrets: inherit
+
+  deploy-ssh:
+    name: Deploy on Server via SSH
+    runs-on: ubuntu-latest
+    needs: [build-and-push-docker]
+    steps:
+      - name: Execute deployment commands via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEV_SSH_HOST }}
+          username: ${{ secrets.DEV_SSH_USER }}
+          key: ${{ secrets.DEV_SSH_KEY }}
+          port: 22
+          envs: BRANCH
+          script: |
+            ${{ secrets.DEV_SSH_COMMAND }}
+        env:
+          BRANCH: ${{ github.ref_name }}
+
+      - name: Publish deployment summary
+        if: always()
+        run: |
+          echo "### 🚀 Déploiement Dev terminé" >> $GITHUB_STEP_SUMMARY
+

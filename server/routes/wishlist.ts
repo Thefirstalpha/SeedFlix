@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { authentication } from '../modules/auth';
-import { addToWishlist, deleteWishlist, getWishlist } from '../modules/wishlist';
+import {
+  addToWishlist,
+  deleteWishlist,
+  deleteWishlistItems,
+  getWishlist,
+} from '../modules/wishlist';
 
 const router = Router();
 
@@ -23,9 +28,8 @@ router.delete('/wishlist', async (req, res) => {
   res.json({ ok: true });
 });
 router.delete('/wishlists', async (req, res) => {
-  for (const item of req.body.items) {
-    const { tmdbId, type, season, episode } = item;
-    await deleteWishlist(req.user.id, tmdbId, type, season, episode);
+  if (Array.isArray(req.body.items)) {
+    await deleteWishlistItems(req.user.id, req.body.items);
   }
   res.json({ ok: true });
 });

@@ -8,7 +8,9 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     fileParallelism: false,
     env: {
-      SEEDFLIX_DATA_DIR: path.resolve(__dirname, 'data/test'),
+      NODE_ENV: 'test',
+      VITEST: 'true',
+      SEEDFLIX_TEST_DATA_DIR: path.resolve(__dirname, 'data/test'),
     },
     coverage: {
       provider: 'v8',
