@@ -185,11 +185,11 @@ export function IndexerResultsList({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 w-full min-w-0">
       {/* Header bar with count badge, group toggle, and optional Reject All button */}
-      <div className="flex items-center justify-between gap-2.5 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="outline" className="border-cyan-500/40 text-cyan-200 bg-cyan-950/30 text-xs px-2 py-0.5">
+      <div className="flex items-center justify-between gap-2.5 flex-wrap min-w-0">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <Badge variant="outline" className="border-cyan-500/40 text-cyan-200 bg-cyan-950/30 text-xs px-2 py-0.5 shrink-0">
             {items.length} {items.length > 1 ? t('wishlistPage.indexerResults.title') : '1 résultat'}
           </Badge>
 
@@ -202,27 +202,27 @@ export function IndexerResultsList({
                   setSeriesGroupMode(val);
                 }
               }}
-              className="border border-white/20 rounded-md bg-slate-900/40"
+              className="border border-white/20 rounded-md bg-slate-900/40 shrink-0"
             >
               <ToggleGroupItem
                 value="season"
                 className="text-xs px-2 py-1 data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
               >
-                <Layers className="w-3 h-3 mr-1 inline" />
-                <span className="hidden xs:inline">
+                <Layers className="w-3 h-3 mr-1 inline shrink-0" />
+                <span className="hidden sm:inline">
                   {labels?.groupBySeason || t('seriesDetails.indexer.groupBySeason')}
                 </span>
-                <span className="xs:hidden">Saisons</span>
+                <span className="sm:hidden">Saisons</span>
               </ToggleGroupItem>
               <ToggleGroupItem
                 value="episode"
                 className="text-xs px-2 py-1 data-[state=on]:bg-cyan-600 data-[state=on]:text-white hover:bg-white/10 data-[state=off]:text-white/60 data-[state=off]:hover:text-white/80"
               >
-                <Tv className="w-3 h-3 mr-1 inline" />
-                <span className="hidden xs:inline">
+                <Tv className="w-3 h-3 mr-1 inline shrink-0" />
+                <span className="hidden sm:inline">
                   {labels?.groupByEpisode || t('seriesDetails.indexer.groupByEpisode')}
                 </span>
-                <span className="xs:hidden">Épisodes</span>
+                <span className="sm:hidden">Épisodes</span>
               </ToggleGroupItem>
             </ToggleGroup>
           )}
@@ -260,13 +260,13 @@ export function IndexerResultsList({
 
       {/* Series Sectioned Display */}
       {type === 'series' ? (
-        <div className="space-y-2 pt-1">
+        <div className="space-y-2 pt-1 w-full min-w-0">
           {seriesSections.map((section) => {
             const isCollapsed = Boolean(collapsedSections[section.id]);
             return (
               <div
                 key={section.id}
-                className="rounded-lg border border-white/15 bg-white/[0.02] overflow-hidden transition-all"
+                className="rounded-lg border border-white/15 bg-white/[0.02] overflow-hidden transition-all w-full min-w-0"
               >
                 <button
                   type="button"
@@ -274,9 +274,9 @@ export function IndexerResultsList({
                     e.stopPropagation();
                     toggleSectionCollapse(section.id);
                   }}
-                  className="w-full flex items-center justify-between p-2 sm:p-2.5 px-3 bg-white/5 hover:bg-white/10 text-left transition-colors cursor-pointer select-none"
+                  className="w-full flex items-center justify-between p-2 sm:p-2.5 px-3 bg-white/5 hover:bg-white/10 text-left transition-colors cursor-pointer select-none min-w-0 gap-2"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                     {section.iconType === 'season' && (
                       <Layers className="w-4 h-4 text-cyan-400 shrink-0" />
                     )}
@@ -292,7 +292,7 @@ export function IndexerResultsList({
                     {section.iconType === 'other' && (
                       <Tv className="w-4 h-4 text-white/60 shrink-0" />
                     )}
-                    <span className="text-xs sm:text-sm font-semibold text-white truncate">
+                    <span className="text-xs sm:text-sm font-semibold text-white truncate min-w-0 flex-1">
                       {section.title}
                     </span>
                   </div>
@@ -307,15 +307,15 @@ export function IndexerResultsList({
                       </Badge>
                     )}
                     {isCollapsed ? (
-                      <ChevronRight className="w-3.5 h-3.5 text-white/60" />
+                      <ChevronRight className="w-3.5 h-3.5 text-white/60 shrink-0" />
                     ) : (
-                      <ChevronDown className="w-3.5 h-3.5 text-white/60" />
+                      <ChevronDown className="w-3.5 h-3.5 text-white/60 shrink-0" />
                     )}
                   </div>
                 </button>
 
                 {!isCollapsed && (
-                  <div className="p-2 sm:p-2.5 space-y-1.5 border-t border-white/10 bg-slate-950/20">
+                  <div className="p-2 sm:p-2.5 space-y-1.5 border-t border-white/10 bg-slate-950/20 w-full min-w-0">
                     {section.items.map((item, idx) => renderItem(item, idx))}
                   </div>
                 )}
@@ -325,8 +325,8 @@ export function IndexerResultsList({
         </div>
       ) : (
         /* Movie List / Paginated Display */
-        <div className="space-y-2 pt-1">
-          <div className="space-y-1.5">
+        <div className="space-y-2 pt-1 w-full min-w-0">
+          <div className="space-y-1.5 w-full min-w-0">
             {paginatedItems.map((item, idx) => renderItem(item, idx))}
           </div>
 

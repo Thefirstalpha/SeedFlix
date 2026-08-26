@@ -132,23 +132,23 @@ export function TorrentResultsPanel({
   };
 
   return (
-    <Card className="bg-white/5 border-white/10">
-      <CardContent className="p-4 sm:p-6 space-y-4">
+    <Card className="bg-white/5 border-white/10 w-full min-w-0 overflow-hidden">
+      <CardContent className="p-4 sm:p-6 space-y-4 min-w-0">
         <div>
           <h3 className="text-xl font-semibold text-white">{title}</h3>
           {description ? <p className="text-sm text-white/60 mt-1">{description}</p> : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4 min-w-0">
           {availableReleaseSeasons ? (
             <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-              <label className="text-sm text-white/70 whitespace-nowrap font-medium">
+              <label className="text-sm text-white/70 whitespace-nowrap font-medium shrink-0">
                 {labels.season}
               </label>
               <select
                 value={filter.season || 'all'}
                 onChange={(event) => onFilterChange({ ...filter, season: event.target.value })}
-                className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
+                className="w-full sm:w-auto max-w-full min-w-0 bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
               >
                 <option value="all">{labels.all}</option>
                 {availableReleaseSeasons.map((season) => (
@@ -161,13 +161,13 @@ export function TorrentResultsPanel({
           ) : null}
 
           <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-            <label className="text-sm text-white/70 font-medium whitespace-nowrap">
+            <label className="text-sm text-white/70 font-medium whitespace-nowrap shrink-0">
               {labels.quality}
             </label>
             <select
               value={filter.quality || 'all'}
               onChange={(event) => onFilterChange({ ...filter, quality: event.target.value })}
-              className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
+              className="w-full sm:w-auto max-w-full min-w-0 bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
             >
               <option value="all">{labels.all}</option>
               {QUALITY_OPTIONS.map((quality) => (
@@ -183,13 +183,13 @@ export function TorrentResultsPanel({
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
-            <label className="text-sm text-white/70 font-medium whitespace-nowrap">
+            <label className="text-sm text-white/70 font-medium whitespace-nowrap shrink-0">
               {labels.language}
             </label>
             <select
               value={filter.language || 'all'}
               onChange={(event) => onFilterChange({ ...filter, language: event.target.value })}
-              className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
+              className="w-full sm:w-auto max-w-full min-w-0 bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm"
             >
               <option value="all">{labels.all}</option>
               {availableReleaseLanguages.map((itemLanguage) => (
@@ -200,8 +200,8 @@ export function TorrentResultsPanel({
             </select>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-            <span className="text-sm text-white/70 font-medium">{labels.sort}</span>
+          <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto min-w-0 flex-wrap">
+            <span className="text-sm text-white/70 font-medium shrink-0">{labels.sort}</span>
             <ToggleGroup
               type="single"
               value={filter.sortBy}
@@ -210,7 +210,7 @@ export function TorrentResultsPanel({
                   onFilterChange({ ...filter, sortBy: value as 'size' | 'date' });
                 }
               }}
-              className="border border-white/20 rounded-md bg-slate-900/30"
+              className="border border-white/20 rounded-md bg-slate-900/30 shrink-0"
             >
               <ToggleGroupItem
                 value="date"
@@ -235,7 +235,7 @@ export function TorrentResultsPanel({
                   sortOrder: filter.sortOrder === 'desc' ? 'asc' : 'desc',
                 })
               }
-              className="h-9 px-3 border border-white/20 text-white/80 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all"
+              className="h-9 px-3 border border-white/20 text-white/80 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all shrink-0"
             >
               {filter.sortOrder === 'desc' ? '↓' : '↑'}
             </Button>

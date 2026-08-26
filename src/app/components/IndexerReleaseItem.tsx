@@ -50,7 +50,7 @@ export function IndexerReleaseItem({
 
   return (
     <div
-      className="h-[60px] min-h-[60px] max-h-[60px] px-2.5 sm:px-3 py-1.5 rounded-lg border border-white/10 bg-slate-900/50 hover:bg-slate-900/80 transition-colors flex items-center justify-between gap-2.5 sm:gap-3"
+      className="h-[60px] min-h-[60px] max-h-[60px] px-2.5 sm:px-3 py-1.5 rounded-lg border border-white/10 bg-slate-900/50 hover:bg-slate-900/80 transition-colors flex items-center justify-between gap-2 sm:gap-3 w-full min-w-0 max-w-full overflow-hidden"
       onClick={(e) => e.stopPropagation()}
       role="presentation"
       onKeyDown={(e) => {
@@ -65,7 +65,7 @@ export function IndexerReleaseItem({
           {item.title}
         </p>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 whitespace-nowrap">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 whitespace-nowrap min-w-0 max-w-full">
           {isPack && (
             <Badge className="bg-purple-600/20 text-purple-300 border-purple-500/40 text-[11px] px-1.5 py-0.5 whitespace-nowrap shrink-0 flex items-center">
               <FolderArchive className="w-3 h-3 mr-1 inline shrink-0" />
