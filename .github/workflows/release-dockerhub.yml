@@ -5,6 +5,13 @@ on:
     types:
       - published
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: false
+        type: string
+        default: 'dev'
 
 permissions:
   contents: read
@@ -65,9 +72,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.ref }}
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
