@@ -459,7 +459,6 @@ export interface I18nMessages {
     };
     indexer: {
       title: string;
-      description: string;
       quality: string;
       language: string;
       all: string;
