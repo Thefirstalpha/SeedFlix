@@ -71,7 +71,6 @@ jobs:
     name: Build and Push Docker image (dev)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: github.event_name == 'workflow_dispatch'
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
     steps:
       - name: Checkout
