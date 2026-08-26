@@ -129,6 +129,49 @@ describe('indexerGrouping', () => {
     expect(sections[5].id).toBe('unclassified');
   });
 
+  it('handles invalid, zero and negative season/episode values', () => {
+    expect(getItemSeason({ title: 't', link: 'l', seasonNumber: 0 })).toBeNull();
+    expect(getItemSeason({ title: 't', link: 'l', seasonNumber: -1 })).toBeNull();
+    expect(getItemSeason({ title: 't', link: 'l', seasonNumber: NaN })).toBeNull();
+    expect(getItemSeason({ title: 't', link: 'l', seasonNumber: undefined })).toBeNull();
+    expect(getItemEpisode({ title: 't', link: 'l', episodeNumber: 0 })).toBeNull();
+    expect(getItemEpisode({ title: 't', link: 'l', episodeNumber: -5 })).toBeNull();
+    expect(getItemEpisode({ title: 't', link: 'l', episodeNumber: undefined })).toBeNull();
+  });
+
+  it('handles default fallback labels when optional labels are omitted', () => {
+    const singleItem: IndexerSeriesResult[] = [
+      { title: 'Test.S01E02', link: 'l', seasonNumber: 1, episodeNumber: 2 },
+      { title: 'Test.Complete.Series', link: 'l', seasonNumber: null, episodeNumber: null },
+      { title: 'Unknown', link: 'l', seasonNumber: null, episodeNumber: null },
+    ];
+    const sectionsSeason = buildSeriesSections({
+      items: singleItem,
+      mode: 'season',
+      labels: {},
+    });
+
+    expect(sectionsSeason[0].title).toBe('Saison 1');
+    expect(sectionsSeason[0].badge).toBe('1 version');
+    expect(sectionsSeason[1].title).toBe('Intégrale / Multi-saisons');
+    expect(sectionsSeason[2].title).toBe('Autres / Non classé');
+
+    const singleEpItem: IndexerSeriesResult[] = [
+      { title: 'Standalone.E03', link: 'l', seasonNumber: null, episodeNumber: 3 },
+      { title: 'Test.S02.Pack', link: 'l', seasonNumber: 2, episodeNumber: null },
+    ];
+    const sectionsEpisode = buildSeriesSections({
+      items: singleEpItem,
+      mode: 'episode',
+      labels: {},
+    });
+
+    expect(sectionsEpisode[0].id).toBe('ep-single-3');
+    expect(sectionsEpisode[0].title).toBe('Épisode 3');
+    expect(sectionsEpisode[1].id).toBe('pack-season-2');
+    expect(sectionsEpisode[1].title).toBe('Pack Saison 2');
+  });
+
   it('returns empty array when items is empty', () => {
     const sections = buildSeriesSections({
       items: [],
