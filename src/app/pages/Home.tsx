@@ -780,7 +780,7 @@ export function Home() {
 
           {filtersOpen && (
             <div className="absolute left-0 right-0 z-20 mt-2 rounded-xl border border-white/10 bg-slate-950/95 backdrop-blur-md p-4 shadow-2xl space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="space-y-1.5">
                   <label htmlFor="home-filter-genre" className="text-xs font-medium text-white/60">
                     {t('home.genreLabel')}
@@ -1144,7 +1144,7 @@ export function Home() {
             <section className="space-y-4">
               {filteredMultiItems.length > 0 ? (
                 viewMode === 'card' ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                     {filteredMultiItems.map((item) =>
                       item.type === 'movie' ? (
                         <MovieCard key={`movie-${item.data.id}`} movie={item.data} />
@@ -1183,7 +1183,7 @@ export function Home() {
               <h4 className="text-xl font-semibold text-white">{t('home.movies')}</h4>
               {filteredMovies.length > 0 ? (
                 viewMode === 'card' ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                     {filteredMovies.map((movie) => (
                       <MovieCard key={movie.id} movie={movie} />
                     ))}
@@ -1206,7 +1206,7 @@ export function Home() {
               <h4 className="text-xl font-semibold text-white">{t('home.series')}</h4>
               {filteredSeries.length > 0 ? (
                 viewMode === 'card' ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                     {filteredSeries.map((show) => (
                       <SeriesCard key={show.id} series={show} />
                     ))}
