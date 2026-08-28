@@ -402,7 +402,7 @@ export function SeriesDetails() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-3 gap-8 justify-items-center lg:justify-items-stretch">
+      <div className="grid lg:grid-cols-3 gap-8">
         <div
           className={`lg:col-span-1 max-w-[280px] sm:max-w-sm lg:max-w-none mx-auto lg:mx-0 w-full ${series.backdrop ? 'hidden lg:block' : ''}`}
         >
@@ -415,7 +415,7 @@ export function SeriesDetails() {
           </Card>
         </div>
 
-        <div className={`lg:col-span-2 space-y-6 ${series.backdrop ? 'lg:pt-4' : ''}`}>
+        <div className={`lg:col-span-2 space-y-6 w-full min-w-0 ${series.backdrop ? 'lg:pt-4' : ''}`}>
           <div>
             {series.backdrop ? (
               <div className="lg:hidden mb-3">
@@ -461,8 +461,8 @@ export function SeriesDetails() {
           {/* Trailers */}
           <TrailersSection trailers={trailersList} mediaTitle={series.title} type="series" />
 
-          <Card className="bg-white/5 border-white/10">
-            <CardContent className="p-6 space-y-3">
+          <Card className="bg-white/5 border-white/10 w-full min-w-0 overflow-hidden">
+            <CardContent className="p-4 sm:p-6 space-y-3 min-w-0">
               <h3 className="text-xl font-semibold text-white">
                 {t('seriesDetails.creatorsAndNetworks')}
               </h3>
@@ -485,8 +485,8 @@ export function SeriesDetails() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/5 border-white/10">
-            <CardContent className="p-6 space-y-4">
+          <Card className="bg-white/5 border-white/10 w-full min-w-0 overflow-hidden">
+            <CardContent className="p-4 sm:p-6 space-y-4 min-w-0">
               <div className="flex items-center gap-2">
                 <Clapperboard className="w-5 h-5 text-cyan-300" />
                 <h3 className="text-xl font-semibold text-white">
@@ -497,15 +497,15 @@ export function SeriesDetails() {
               {availableSeasons.length > 0 ? (
                 <>
                   {/* Season selector + season wishlist button */}
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <label htmlFor="season-select" className="text-white/80">
+                  <div className="flex items-center gap-3 flex-wrap min-w-0">
+                    <label htmlFor="season-select" className="text-white/80 shrink-0">
                       {t('seriesDetails.season')}
                     </label>
                     <select
                       id="season-select"
                       value={selectedSeason ?? ''}
                       onChange={(event) => setSelectedSeason(Number(event.target.value))}
-                      className="max-w-full bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2"
+                      className="w-full sm:w-auto max-w-full min-w-0 bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm truncate"
                     >
                       {availableSeasons.map((season) => (
                         <option key={season.id} value={season.seasonNumber}>
@@ -524,13 +524,13 @@ export function SeriesDetails() {
                         size="sm"
                         disabled={wishlistStatus?.all_seasons}
                         onClick={handleSeasonWishlist}
-                        className={
+                        className={`shrink-0 ${
                           isSeasonCoveredBySeries
                             ? 'bg-white/5 text-white/40 border border-white/10 cursor-not-allowed'
                             : isSeasonInWishlist(selectedSeason)
                               ? 'bg-cyan-600 hover:bg-cyan-700 text-white'
                               : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-                        }
+                        }`}
                       >
                         <Heart
                           className={`w-4 h-4 mr-1 ${isSeasonInWishlist(selectedSeason)
@@ -557,8 +557,8 @@ export function SeriesDetails() {
                   )}
                   
                   {(!isLoadingEpisodes && episodes.length > 0) ? (
-                    <ScrollArea className="h-[500px] w-full rounded-lg border border-white/10">
-                      <div className="space-y-3 p-4">
+                    <ScrollArea className="h-[500px] w-full rounded-lg border border-white/10 min-w-0">
+                      <div className="space-y-3 p-3 sm:p-4 min-w-0">
                         {episodes.map((episode) => {
                           const coveredByParent = wishlistStatus && (wishlistStatus?.all_seasons ||
                             (selectedSeason !== null &&
@@ -572,9 +572,9 @@ export function SeriesDetails() {
                           return (
                             <div
                               key={episode.id}
-                              className="rounded-lg border border-white/10 bg-white/5 p-4"
+                              className="rounded-lg border border-white/10 bg-white/5 p-3 sm:p-4 min-w-0"
                             >
-                              <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-start justify-between gap-3 sm:gap-4 min-w-0">
                                 <div className="flex-1 min-w-0">
                                   <button
                                     type="button"
@@ -586,7 +586,7 @@ export function SeriesDetails() {
                                       : ''
                                       }`}
                                   >
-                                    <p className="text-white font-semibold">
+                                    <p className="text-white font-semibold break-words">
                                       {t('seriesDetails.episodeNumber', {
                                         number: episode.episodeNumber,
                                       })}
@@ -594,7 +594,7 @@ export function SeriesDetails() {
                                         (episode.name ? `: ${episode.name}` : '')}
                                     </p>
                                   </button>
-                                  <p className="text-white/60 text-sm mt-0.5">
+                                  <p className="text-white/60 text-sm mt-0.5 truncate">
                                     {episode.airDate || t('seriesDetails.unknownDate')}
                                     {episode.runtime ? ` · ${episode.runtime} min` : ''}
                                   </p>

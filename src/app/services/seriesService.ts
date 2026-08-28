@@ -353,7 +353,7 @@ export async function getSeriesSeasonEpisodes(
 export async function searchSeriesReleases({
   tmdbId,
   season,
-  limit = 12
+  limit = 100
 }: {
   tmdbId: number | string;
   season?: string | number;

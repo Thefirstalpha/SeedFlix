@@ -246,7 +246,7 @@ export function MovieDetails() {
       )}
 
       {/* Movie Header */}
-      <div className="grid lg:grid-cols-3 gap-8 justify-items-center lg:justify-items-stretch">
+      <div className="grid lg:grid-cols-3 gap-8">
         {/* Poster */}
         <div
           className={`lg:col-span-1 max-w-[280px] sm:max-w-sm lg:max-w-none mx-auto lg:mx-0 w-full ${movie.backdrop ? 'hidden lg:block' : ''}`}
@@ -261,7 +261,7 @@ export function MovieDetails() {
         </div>
 
         {/* Details */}
-        <div className={`lg:col-span-2 space-y-6 ${movie.backdrop ? 'lg:pt-4' : ''}`}>
+        <div className={`lg:col-span-2 space-y-6 w-full min-w-0 ${movie.backdrop ? 'lg:pt-4' : ''}`}>
           <div>
             {movie.backdrop ? (
               <div className="lg:hidden">
@@ -316,8 +316,8 @@ export function MovieDetails() {
           <TrailersSection trailers={trailersList} mediaTitle={movie.title} type="movie" />
 
           {/* Director */}
-          <Card className="bg-white/5 border-white/10">
-            <CardContent className="p-6">
+          <Card className="bg-white/5 border-white/10 w-full min-w-0 overflow-hidden">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-4">
                 <User className="w-5 h-5 text-purple-400" />
                 <h3 className="text-xl font-semibold text-white">{t('movieDetails.director')}</h3>
@@ -328,8 +328,8 @@ export function MovieDetails() {
 
           {/* Cast */}
           {movie.actors.length > 0 && (
-            <Card className="bg-white/5 border-white/10">
-              <CardContent className="p-6">
+            <Card className="bg-white/5 border-white/10 w-full min-w-0 overflow-hidden">
+              <CardContent className="p-4 sm:p-6">
                 <h3 className="text-xl font-semibold text-white mb-4">{t('movieDetails.cast')}</h3>
                 <div className="flex flex-wrap gap-2">
                   {movie.actors.map((actor, index) => (

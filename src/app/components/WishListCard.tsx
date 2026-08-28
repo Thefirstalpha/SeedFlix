@@ -54,15 +54,15 @@ export function WishListCard({
   const groupKey = targets[0]?.tmdbId ?? type;
 
   return (
-    <Card className="border-white/10 bg-white/5 transition-all" id={`wishlist-target-${groupKey}`}>
-      <CardContent className="p-4 space-y-4">
-        <div className="flex items-start gap-4">
-          <img src={poster} alt={title} className="w-16 rounded object-cover aspect-[2/3]" />
+    <Card className="border-white/10 bg-white/5 transition-all w-full min-w-0 overflow-hidden" id={`wishlist-target-${groupKey}`}>
+      <CardContent className="p-4 space-y-4 min-w-0">
+        <div className="flex items-start gap-4 min-w-0">
+          <img src={poster} alt={title} className="w-16 rounded object-cover aspect-[2/3] shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-white font-semibold text-lg hover:text-cyan-300 transition-colors">
+            <p className="text-white font-semibold text-lg hover:text-cyan-300 transition-colors truncate">
               {title}
             </p>
-            <div className="flex items-center gap-3 text-white/60 text-sm mt-1">
+            <div className="flex items-center gap-3 text-white/60 text-sm mt-1 flex-wrap">
               <span className="flex items-center gap-1">
                 <Calendar className="w-4 h-4" />
                 {year}
@@ -89,7 +89,7 @@ export function WishListCard({
 
         {targets.length > 0 ? (
           <div
-            className="pt-2 border-t border-white/10"
+            className="pt-2 border-t border-white/10 w-full min-w-0"
             onClick={(event) => event.stopPropagation()}
             role="presentation"
             onKeyDown={(event) => {
