@@ -91,7 +91,7 @@ export function IndexerResultsList({
   const toggleSectionCollapse = (sectionId: string) => {
     setCollapsedSections((prev) => ({
       ...prev,
-      [sectionId]: !prev[sectionId],
+      [sectionId]: !(prev[sectionId] ?? true),
     }));
   };
 
@@ -262,7 +262,7 @@ export function IndexerResultsList({
       {type === 'series' ? (
         <div className="space-y-2 pt-1 w-full min-w-0">
           {seriesSections.map((section) => {
-            const isCollapsed = Boolean(collapsedSections[section.id]);
+            const isCollapsed = Boolean(collapsedSections[section.id] ?? true);
             return (
               <div
                 key={section.id}
