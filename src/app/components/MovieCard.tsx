@@ -11,7 +11,7 @@ interface MovieCardProps {
 export function MovieCard({ movie }: Readonly<MovieCardProps>) {
   return (
     <Link to={`/movie/${movie.id}`}>
-      <Card className="overflow-hidden bg-white/5 border-white/10 hover:bg-white/10 transition-all hover:scale-105 group cursor-pointer">
+      <Card className="overflow-hidden bg-white/5 border-white/10 hover:bg-white/10 transition-all hover:scale-105 group cursor-pointer gap-0">
         <div className="aspect-[2/3] overflow-hidden bg-gradient-to-br from-purple-900/20 to-slate-900/20">
           <img
             src={movie.poster}
