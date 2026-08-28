@@ -83,6 +83,26 @@ describe('Route: /api/tmdb', () => {
       expect(res.body.results[0].title).toBe('Search Movie');
     });
 
+    it('should search multi via /api/tmdb/multi/search', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce({
+        page: 1,
+        results: [
+          { id: 1, media_type: 'movie', title: 'Batman Movie' },
+          { id: 2, media_type: 'tv', name: 'Batman Series' },
+        ],
+      });
+      const userCookie = createSessionCookie(1);
+
+      const res = await request(app)
+        .get('/api/tmdb/multi/search?query=Batman')
+        .set('Cookie', userCookie);
+
+      expect(res.status).toBe(200);
+      expect(res.body.results).toHaveLength(2);
+      expect(res.body.results[0].title).toBe('Batman Movie');
+      expect(res.body.results[1].name).toBe('Batman Series');
+    });
+
     it('should fetch genres via /api/tmdb/movie/genres', async () => {
       mockedProxyTmdb.mockResolvedValueOnce({ genres: [{ id: 28, name: 'Action' }] });
       const userCookie = createSessionCookie(1);

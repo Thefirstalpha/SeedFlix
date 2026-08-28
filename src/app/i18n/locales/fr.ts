@@ -250,6 +250,10 @@ const fr : I18nMessages = {
     popularSeries: 'Séries populaires',
     noMoviesMatch: 'Aucun film ne correspond.',
     noSeriesMatch: 'Aucune série ne correspond.',
+    viewModeCard: 'Affichage cartes',
+    viewModeList: 'Affichage liste',
+    movieBadge: 'Film',
+    seriesBadge: 'Série',
     languages: {
       french: 'Français',
       english: 'Anglais',

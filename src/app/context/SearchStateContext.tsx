@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { Movie } from '../types/movie';
 import type { Series } from '../types/series';
+import type { MultiSearchResultItem } from '../services/tmdbService';
 
 interface SearchState {
   query: string;
@@ -8,12 +9,16 @@ interface SearchState {
   activeSearchQuery: string;
   popularCacheKey: string;
   contentFilter: 'all' | 'movie' | 'series';
+  viewMode: 'card' | 'list';
   genreFilter: string;
   languageFilter: string;
   yearFrom: string;
   yearTo: string;
   minRating: string;
   filtersOpen: boolean;
+
+  // Mixed multi search results
+  searchMultiItems: MultiSearchResultItem[];
 
   // Movie state
   movieGenres: Array<{ id: number; name: string }>;
@@ -55,12 +60,15 @@ const DEFAULT_SEARCH_STATE: SearchState = {
   activeSearchQuery: '',
   popularCacheKey: '',
   contentFilter: 'all',
+  viewMode: 'card',
   genreFilter: 'all',
   languageFilter: 'all',
   yearFrom: '',
   yearTo: '',
   minRating: '0',
   filtersOpen: false,
+
+  searchMultiItems: [],
 
   movieGenres: [],
   recommendedMovies: [],

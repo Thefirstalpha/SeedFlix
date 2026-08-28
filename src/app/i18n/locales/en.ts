@@ -249,6 +249,10 @@ const en: I18nMessages = {
     popularSeries: 'Popular series',
     noMoviesMatch: 'No movies match.',
     noSeriesMatch: 'No series match.',
+    viewModeCard: 'Card view',
+    viewModeList: 'List view',
+    movieBadge: 'Movie',
+    seriesBadge: 'Series',
     languages: {
       french: 'French',
       english: 'English',

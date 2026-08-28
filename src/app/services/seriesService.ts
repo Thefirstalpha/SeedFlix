@@ -73,7 +73,7 @@ function mapTmdbLanguage(code: string | undefined) {
   return TMDB_LANGUAGE_MAP[normalized] || normalized.toUpperCase();
 }
 
-function convertTMDBToSeries(tmdbSeries: TMDBSeries): Series {
+export function convertTMDBToSeries(tmdbSeries: TMDBSeries): Series {
   const year = tmdbSeries.first_air_date ? new Date(tmdbSeries.first_air_date).getFullYear() : 0;
   const genre =
     tmdbSeries.genre_ids && tmdbSeries.genre_ids.length > 0
@@ -88,6 +88,7 @@ function convertTMDBToSeries(tmdbSeries: TMDBSeries): Series {
     language: mapTmdbLanguage(tmdbSeries.original_language),
     genre,
     poster: getTmdbImageUrl(tmdbSeries.poster_path),
+    plot: tmdbSeries.overview || 'Aucun synopsis disponible.',
   };
 }
 

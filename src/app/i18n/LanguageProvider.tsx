@@ -349,6 +349,10 @@ export interface I18nMessages {
     popularSeries: string;
     noMoviesMatch: string;
     noSeriesMatch: string;
+    viewModeCard: string;
+    viewModeList: string;
+    movieBadge: string;
+    seriesBadge: string;
     languages: {
       french: string;
       english: string;

@@ -35,7 +35,7 @@ describe('tmdb module', () => {
       expect(tvReq.path).toBe('/tv/1399');
     });
 
-    it('should build search requests for movie and series', () => {
+    it('should build search requests for movie, series, and multi', () => {
       const searchMovie = buildSearchRequest(TmdbType.movie, { query: 'Inception', page: 2 });
       expect(searchMovie.path).toBe('/search/movie');
       expect(searchMovie.query.query).toBe('Inception');
@@ -44,6 +44,11 @@ describe('tmdb module', () => {
       const searchSeries = buildSearchRequest(TmdbType.series, { query: 'Breaking Bad' });
       expect(searchSeries.path).toBe('/search/tv');
       expect(searchSeries.query.query).toBe('Breaking Bad');
+
+      const searchMulti = buildSearchRequest('multi', { query: 'Batman', page: 1, language: 'fr-FR' });
+      expect(searchMulti.path).toBe('/search/multi');
+      expect(searchMulti.query.query).toBe('Batman');
+      expect(searchMulti.query.language).toBe('fr-FR');
     });
 
     it('should build genres and videos requests', () => {

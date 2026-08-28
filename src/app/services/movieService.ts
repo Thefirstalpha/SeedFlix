@@ -74,7 +74,7 @@ function mapTmdbLanguage(code: string | undefined) {
 }
 
 // Convertir un film TMDB en notre format Movie
-function convertTMDBToMovie(tmdbMovie: TMDBMovie): Movie {
+export function convertTMDBToMovie(tmdbMovie: TMDBMovie): Movie {
   const year = tmdbMovie.release_date ? new Date(tmdbMovie.release_date).getFullYear() : 0;
   const genre =
     tmdbMovie.genre_ids && tmdbMovie.genre_ids.length > 0

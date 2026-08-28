@@ -1,4 +1,23 @@
+import { getTmdbLanguageParam } from '../config/tmdb';
+import type { Movie } from '../types/movie';
+import type { Series } from '../types/series';
+import { convertTMDBToMovie } from './movieService';
+import { convertTMDBToSeries } from './seriesService';
+
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
+export type MultiSearchResultItem =
+  | { type: 'movie'; data: Movie }
+  | { type: 'series'; data: Series };
+
+export interface MultiSearchPageResult {
+  items: MultiSearchResultItem[];
+  movies: Movie[];
+  series: Series[];
+  page: number;
+  totalPages: number;
+  totalResults: number;
+}
 
 export type TmdbVideo = {
     id: string;
@@ -95,4 +114,71 @@ export async function getTmdbVideos(
         throw new Error('Failed to fetch TMDB videos');
     }
     return response.json();
+}
+
+export async function searchMultiPage(
+    query: string,
+    page = 1,
+    uiLanguage = 'fr',
+): Promise<MultiSearchPageResult> {
+    const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+
+    if (!query.trim()) {
+        return {
+            items: [],
+            movies: [],
+            series: [],
+            page: 1,
+            totalPages: 1,
+            totalResults: 0,
+        };
+    }
+
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/tmdb/multi/search?language=${encodeURIComponent(tmdbLanguage)}&query=${encodeURIComponent(
+                query,
+            )}&page=${page}`,
+        );
+
+        if (!response.ok) {
+            throw new Error('Failed to search multi');
+        }
+
+        const data = await response.json();
+        const items: MultiSearchResultItem[] = [];
+        const movies: Movie[] = [];
+        const series: Series[] = [];
+
+        for (const result of data.results || []) {
+            if (result.media_type === 'movie') {
+                const movie = convertTMDBToMovie(result);
+                movies.push(movie);
+                items.push({ type: 'movie', data: movie });
+            } else if (result.media_type === 'tv') {
+                const show = convertTMDBToSeries(result);
+                series.push(show);
+                items.push({ type: 'series', data: show });
+            }
+        }
+
+        return {
+            items,
+            movies,
+            series,
+            page: data.page || 1,
+            totalPages: data.total_pages || 1,
+            totalResults: data.total_results || 0,
+        };
+    } catch (error) {
+        console.error('Error searching multi:', error);
+        return {
+            items: [],
+            movies: [],
+            series: [],
+            page,
+            totalPages: 1,
+            totalResults: 0,
+        };
+    }
 }

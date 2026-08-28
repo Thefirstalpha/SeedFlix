@@ -6,6 +6,7 @@ export interface Series {
   language?: string;
   genre: string;
   poster: string;
+  plot?: string;
 }
 
 export interface SeriesSeason {

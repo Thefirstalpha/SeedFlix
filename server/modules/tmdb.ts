@@ -150,8 +150,16 @@ export function buildSeasonRequest(id: number, seasonNumber: number, query: Reco
   };
 }
 
-export function buildSearchRequest(mediaType: TmdbType, query: Record<string, any>) {
-  const apiPath = mediaType === 'movie' ? '/search/movie' : '/search/tv';
+export function buildSearchRequest(mediaType: TmdbType | 'multi', query: Record<string, any>) {
+  let apiPath: string;
+  if (mediaType === 'multi') {
+    apiPath = '/search/multi';
+  } else if (mediaType === TmdbType.movie) {
+    apiPath = '/search/movie';
+  } else {
+    apiPath = '/search/tv';
+  }
+
   return {
     path: apiPath,
     query: {
