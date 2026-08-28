@@ -16,7 +16,7 @@ export function SeriesListItem({ series, showTypeBadge }: Readonly<SeriesListIte
   return (
     <Link to={`/series/${series.id}`} className="block group">
       <Card className="overflow-hidden bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer">
-        <CardContent className="p-3 sm:p-4 flex gap-4 items-start">
+        <CardContent className="p-3 sm:p-4 flex gap-4 items-start [&:last-child]:pb-3 [&:last-child]:sm:pb-4">
           <div className="w-16 sm:w-20 md:w-24 aspect-[2/3] overflow-hidden rounded-lg bg-gradient-to-br from-cyan-900/20 to-slate-900/20 shrink-0">
             <img
               src={series.poster}
