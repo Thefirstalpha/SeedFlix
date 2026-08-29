@@ -212,7 +212,45 @@ describe('Route: /api/ftp', () => {
       .set('Cookie', cookie);
 
     expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toContain('attachment');
     expect(res.body.toString()).toBe('file-content');
+  });
+
+  it('should stream video media via GET /api/ftp/stream with video/mp4 MIME type', async () => {
+    const { user } = createUser('ftpUserStream');
+    const cookie = createSessionCookie(user.id);
+    mockedGetFileSize.mockResolvedValueOnce(Buffer.byteLength('video-binary'));
+    mockedDownloadToStream.mockImplementation(async (uid, p, res) => {
+      res.write('video-binary');
+      res.end();
+    });
+
+    const res = await request(app)
+      .get('/api/ftp/stream?path=/movies/video.mp4')
+      .set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('video/mp4');
+    expect(res.headers['content-disposition']).toContain('inline');
+    expect(res.headers['accept-ranges']).toBe('bytes');
+  });
+
+  it('should support inline download via GET /api/ftp/download?inline=true', async () => {
+    const { user } = createUser('ftpUserInline');
+    const cookie = createSessionCookie(user.id);
+    mockedGetFileSize.mockResolvedValueOnce(Buffer.byteLength('image-binary'));
+    mockedDownloadToStream.mockImplementation(async (uid, p, res) => {
+      res.write('image-binary');
+      res.end();
+    });
+
+    const res = await request(app)
+      .get('/api/ftp/download?path=/photos/picture.jpg&inline=true')
+      .set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('image/jpeg');
+    expect(res.headers['content-disposition']).toContain('inline');
   });
 
   it('should upload file stream via POST /api/ftp/upload', async () => {

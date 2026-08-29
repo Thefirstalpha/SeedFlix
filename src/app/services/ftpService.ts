@@ -115,6 +115,21 @@ export function getDownloadUrl(path: string): string {
     return `/api/ftp/download?path=${encodeURIComponent(path)}`;
 }
 
+export function getStreamUrl(path: string): string {
+    return `/api/ftp/stream?path=${encodeURIComponent(path)}`;
+}
+
+export type FtpMediaType = 'video' | 'audio' | 'image' | 'text' | null;
+
+export function getFtpMediaType(filename: string): FtpMediaType {
+    const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+    if (['mp4', 'mkv', 'webm', 'ogv', 'mov', 'm4v', 'avi'].includes(ext)) return 'video';
+    if (['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'].includes(ext)) return 'audio';
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return 'image';
+    if (['txt', 'log', 'json', 'srt', 'vtt', 'nfo', 'md'].includes(ext)) return 'text';
+    return null;
+}
+
 export async function uploadFile(remotePath: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -144,4 +159,5 @@ export async function getFileInfo(path: string): Promise<{ size: number | null; 
     if (!res.ok) throw new Error('Erreur récupération info fichier FTP');
     return await res.json();
 }
+
 

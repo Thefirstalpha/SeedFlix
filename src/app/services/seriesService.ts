@@ -1,5 +1,10 @@
-import { IndexerSeriesResponse } from '../../../common/indexer';
-import { API_BASE_URL, getTmdbImageUrl, getTmdbLanguageParam } from '../config/tmdb';
+import type { IndexerSeriesResponse } from '../../../common/indexer';
+import {
+  API_BASE_URL,
+  getTmdbImageUrl,
+  getTmdbLanguageParam,
+  mapTmdbLanguage,
+} from '../config/tmdb';
 import type {
   Series,
   SeriesDetails,
@@ -48,30 +53,6 @@ const TV_GENRE_MAP: { [key: number]: string } = {
   10768: 'Guerre & Politique',
   37: 'Western',
 };
-
-const TMDB_LANGUAGE_MAP: Record<string, string> = {
-  fr: 'Francais',
-  en: 'Anglais',
-  ja: 'Japonais',
-  ko: 'Coreen',
-  es: 'Espagnol',
-  it: 'Italien',
-  de: 'Allemand',
-  pt: 'Portugais',
-  ru: 'Russe',
-  zh: 'Chinois',
-};
-
-function mapTmdbLanguage(code: string | undefined) {
-  const normalized = String(code || '')
-    .toLowerCase()
-    .trim();
-  if (!normalized) {
-    return 'Inconnu';
-  }
-
-  return TMDB_LANGUAGE_MAP[normalized] || normalized.toUpperCase();
-}
 
 export function convertTMDBToSeries(tmdbSeries: TMDBSeries): Series {
   const year = tmdbSeries.first_air_date ? new Date(tmdbSeries.first_air_date).getFullYear() : 0;

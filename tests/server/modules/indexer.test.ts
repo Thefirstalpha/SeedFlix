@@ -43,6 +43,12 @@ vi.mock('../../../server/modules/tmdb', async (importOriginal) => {
   };
 });
 
+vi.mock('../../../server/modules/transmission', () => {
+  return {
+    startDownload: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
 describe('indexer module', () => {
   let userId: number;
   const sampleSettings: IndexerSettings = {
@@ -355,6 +361,51 @@ describe('indexer module', () => {
 
       const notifs = getNotifications(user.id);
       expect(notifs.notifications.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should automatically start download when autoDownload is enabled for user', async () => {
+      const user = createUser('userAutoDl').user;
+      user.settings.indexer = { ...sampleSettings, autoDownload: true };
+      updateUser(user);
+
+      writeStore('wishlist', user.id, [
+        {
+          tmdb: 550,
+          type: 'movie',
+          title: 'Fight Club',
+          original_title: 'Fight Club',
+          releaseDate: '1999-10-15',
+          addedAt: '2024-01-01',
+        },
+      ]);
+
+      vi.mocked(torznabModule.rssTorznab).mockResolvedValueOnce({
+        rss: {
+          channel: {
+            item: [
+              {
+                title: 'Fight.Club.1999.1080p.MULTI',
+                link: 'https://link-fc',
+                guid: 'guid-fc-auto',
+                'torznab:attr': [{ name: 'tmdbid', value: '550' }, { name: 'size', value: '1000' }],
+              },
+            ],
+          },
+        },
+      } as any);
+
+      const transmissionModule = await import('../../../server/modules/transmission');
+
+      await processWishlistIndexer();
+
+      expect(transmissionModule.startDownload).toHaveBeenCalledWith(
+        user.id,
+        'guid-fc-auto',
+        'movie',
+      );
+
+      const notifs = getNotifications(user.id);
+      expect(notifs.notifications.some((n) => n.title.includes('automatique'))).toBe(true);
     });
 
     it('should update indexer process when pullAuto setting changes', () => {

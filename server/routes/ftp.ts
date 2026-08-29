@@ -185,7 +185,63 @@ router.post('/ftp/move', async (req, res) => {
   }
 });
 
-// ─── Transfert ────────────────────────────────────────────────────────────────
+const MIME_TYPES: Record<string, string> = {
+  mp4: 'video/mp4',
+  m4v: 'video/mp4',
+  webm: 'video/webm',
+  ogv: 'video/ogg',
+  mkv: 'video/x-matroska',
+  avi: 'video/x-msvideo',
+  mov: 'video/quicktime',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  flac: 'audio/flac',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  txt: 'text/plain; charset=utf-8',
+  srt: 'text/plain; charset=utf-8',
+  vtt: 'text/vtt; charset=utf-8',
+  json: 'application/json',
+  pdf: 'application/pdf',
+};
+
+function getMimeType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  return MIME_TYPES[ext] || 'application/octet-stream';
+}
+
+// ─── Transfert & Streaming ───────────────────────────────────────────────────
+
+router.get('/ftp/stream', async (req, res) => {
+  const path = String(req.query.path || '').trim();
+  if (!path) {
+    res.status(400).json({ error: 'path requis' });
+    return;
+  }
+  const filename = path.split('/').pop() || 'file';
+  const mimeType = getMimeType(filename);
+  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
+  res.setHeader('Content-Type', mimeType);
+  res.setHeader('Accept-Ranges', 'bytes');
+  try {
+    const size = await getFileSize(req.user.id, path);
+    res.setHeader('Content-Length', size);
+  } catch {
+    // taille non disponible, on continue sans header
+  }
+  try {
+    await downloadToStream(req.user.id, path, res);
+  } catch (err: any) {
+    if (!res.headersSent) res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 router.get('/ftp/download', async (req, res) => {
   const path = String(req.query.path || '').trim();
@@ -194,8 +250,13 @@ router.get('/ftp/download', async (req, res) => {
     return;
   }
   const filename = path.split('/').pop() || 'file';
-  res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-  res.setHeader('Content-Type', 'application/octet-stream');
+  const isInline = String(req.query.inline || '').toLowerCase() === 'true';
+  const mimeType = isInline ? getMimeType(filename) : 'application/octet-stream';
+  res.setHeader(
+    'Content-Disposition',
+    `${isInline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(filename)}"`,
+  );
+  res.setHeader('Content-Type', mimeType);
   try {
     const size = await getFileSize(req.user.id, path);
     res.setHeader('Content-Length', size);

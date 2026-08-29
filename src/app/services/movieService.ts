@@ -1,5 +1,10 @@
-import { IndexerMovieResponse } from '../../../common/indexer';
-import { API_BASE_URL, getTmdbImageUrl, getTmdbLanguageParam } from '../config/tmdb';
+import type { IndexerMovieResponse } from '../../../common/indexer';
+import {
+  API_BASE_URL,
+  getTmdbImageUrl,
+  getTmdbLanguageParam,
+  mapTmdbLanguage,
+} from '../config/tmdb';
 import type { Movie, TMDBMovie, TMDBMovieDetails, TMDBSearchResponse } from '../types/movie';
 import { TMDB_GENRES } from '../types/movie';
 
@@ -15,8 +20,6 @@ export interface GenreItem {
   name: string;
 }
 
-
-
 export interface DiscoverFilters {
   genreId?: number;
   yearFrom?: number;
@@ -26,52 +29,7 @@ export interface DiscoverFilters {
 }
 
 const MOCK_PAGE_SIZE = 8;
-
-const GENRE_MAP: { [key: number]: string } = {
-  28: 'Action',
-  12: 'Aventure',
-  16: 'Animation',
-  35: 'Comédie',
-  80: 'Crime',
-  99: 'Documentaire',
-  18: 'Drame',
-  10751: 'Familial',
-  14: 'Fantastique',
-  36: 'Histoire',
-  27: 'Horreur',
-  10402: 'Musique',
-  9648: 'Mystère',
-  10749: 'Romance',
-  878: 'Science-Fiction',
-  10770: 'Téléfilm',
-  53: 'Thriller',
-  10752: 'Guerre',
-  37: 'Western',
-};
-
-const TMDB_LANGUAGE_MAP: Record<string, string> = {
-  fr: 'Francais',
-  en: 'Anglais',
-  ja: 'Japonais',
-  ko: 'Coreen',
-  es: 'Espagnol',
-  it: 'Italien',
-  de: 'Allemand',
-  pt: 'Portugais',
-  ru: 'Russe',
-  zh: 'Chinois',
-};
-
-function mapTmdbLanguage(code: string | undefined) {
-  const normalized = String(code || '')
-    .toLowerCase()
-    .trim();
-  if (!normalized) {
-    return 'Inconnu';
-  }
-
-  return TMDB_LANGUAGE_MAP[normalized] || normalized.toUpperCase();
-}
+const GENRE_MAP = TMDB_GENRES;
 
 // Convertir un film TMDB en notre format Movie
 export function convertTMDBToMovie(tmdbMovie: TMDBMovie): Movie {

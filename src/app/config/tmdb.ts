@@ -38,3 +38,24 @@ export function getTmdbImageUrl(path: string | null, size: string = TMDB_POSTER_
   }
   return `${TMDB_IMAGE_BASE_URL}/${size}${path}`;
 }
+
+export const TMDB_LANGUAGE_MAP: Record<string, string> = {
+  fr: 'Français',
+  en: 'Anglais',
+  ja: 'Japonais',
+  ko: 'Coréen',
+  es: 'Espagnol',
+  it: 'Italien',
+  de: 'Allemand',
+  pt: 'Portugais',
+  ru: 'Russe',
+  zh: 'Chinois',
+  hi: 'Hindi',
+};
+
+export function mapTmdbLanguage(langCode?: string): string {
+  if (!langCode) return '';
+  const key = langCode.toLowerCase().split('-')[0];
+  return TMDB_LANGUAGE_MAP[key] || langCode.toUpperCase();
+}
+

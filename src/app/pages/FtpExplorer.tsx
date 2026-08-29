@@ -14,6 +14,7 @@ import {
     Music,
     MoveRight,
     Pencil,
+    Play,
     RefreshCw,
     Trash2,
     Upload,
@@ -26,10 +27,12 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '../components/ui/button';
+import { FtpMediaViewer } from '../components/FtpMediaViewer';
 import { useAuth } from '../context/AuthContext';
 import {
     deleteBatch,
     getDownloadUrl,
+    getFtpMediaType,
     getStorageUsage,
     listDirectory,
     makeDirectory,
@@ -298,6 +301,9 @@ export function FtpExplorer() {
 
     // Modal déplacement
     const [showMoveDialog, setShowMoveDialog] = useState(false);
+
+    // Modal lecteur multimédia
+    const [activeMedia, setActiveMedia] = useState<{ path: string; name: string; size?: number } | null>(null);
 
     // Tri colonnes
     const [sortCol, setSortCol] = useState<'name' | 'size'>('name');
@@ -592,6 +598,16 @@ export function FtpExplorer() {
 
     return (
         <div className="space-y-4">
+            {/* Modal lecteur multimédia */}
+            {activeMedia && (
+                <FtpMediaViewer
+                    filePath={activeMedia.path}
+                    fileName={activeMedia.name}
+                    fileSize={activeMedia.size}
+                    onClose={() => setActiveMedia(null)}
+                />
+            )}
+
             {/* Modal déplacement */}
             {showMoveDialog && (
                 <MoveDialog
@@ -863,6 +879,15 @@ export function FtpExplorer() {
                                                 className="text-sm text-white truncate hover:text-cyan-300 transition-colors text-left">
                                                 {item.name}
                                             </button>
+                                        ) : getFtpMediaType(item.name) ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveMedia({ path: fullPath, name: item.name, size: item.size })}
+                                                className="text-sm text-white/90 hover:text-cyan-300 transition-colors text-left truncate cursor-pointer font-medium"
+                                                title="Cliquer pour ouvrir l'aperçu"
+                                            >
+                                                {item.name}
+                                            </button>
                                         ) : (
                                             <span className="text-sm text-white/80 truncate">{item.name}</span>
                                         )}
@@ -874,8 +899,18 @@ export function FtpExplorer() {
                                     </span>
 
                                     {/* Actions */}
-                                    <div className="flex items-center gap-1 w-20 justify-end">
+                                    <div className="flex items-center gap-1 w-24 justify-end">
                                         <>
+                                            {!item.isDirectory && getFtpMediaType(item.name) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveMedia({ path: fullPath, name: item.name, size: item.size })}
+                                                    className="p-1 rounded text-white/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:!text-purple-300 hover:bg-white/10 transition-colors"
+                                                    title="Lire / Aperçu"
+                                                >
+                                                    <Play className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
                                             {!item.isDirectory && (
                                                 <a href={getDownloadUrl(fullPath)} download={item.name}
                                                     className="p-1 rounded text-white/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:!text-cyan-300 hover:bg-white/10 transition-colors"

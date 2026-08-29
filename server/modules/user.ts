@@ -63,6 +63,7 @@ export const getUser = (id: number): User | null => {
               languages: Array.isArray(user.settings.indexer?.languages)
                 ? user.settings.indexer.languages.map(String)
                 : [],
+              autoDownload: Boolean(user.settings.indexer?.autoDownload),
             },
       transmission:
         user.settings?.transmission === null

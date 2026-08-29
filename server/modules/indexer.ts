@@ -463,6 +463,35 @@ export async function processWishlistIndexer() {
             writeStore('indexer-series-result', user.id, [...seriesResult, ...remainingSeries]);
           }
 
+          // Auto-Download (Auto-Grab) si activé pour l'utilisateur
+          const autoDownloadEnabled = Boolean(user.settings?.indexer?.autoDownload);
+          const autoDownloadedMovieGuids = new Set<string>();
+          const autoDownloadedSeriesGuids = new Set<string>();
+
+          if (autoDownloadEnabled) {
+            const { startDownload } = await import('./transmission');
+            for (const movie of remainingMovies) {
+              if (movie.guid) {
+                try {
+                  await startDownload(user.id, movie.guid, 'movie');
+                  autoDownloadedMovieGuids.add(movie.guid);
+                } catch (dlErr) {
+                  console.log(`Auto-download failed for movie "${movie.title}": ${dlErr}`);
+                }
+              }
+            }
+            for (const series of remainingSeries) {
+              if (series.guid) {
+                try {
+                  await startDownload(user.id, series.guid, 'series');
+                  autoDownloadedSeriesGuids.add(series.guid);
+                } catch (dlErr) {
+                  console.log(`Auto-download failed for series "${series.title}": ${dlErr}`);
+                }
+              }
+            }
+          }
+
           // Notifications pour les nouveaux résultats
           const uniqueMovieTitles = [
             ...new Set(remainingMovies.map((m) => m.title || `Film #${m.tmdbId}`)),
@@ -472,37 +501,47 @@ export async function processWishlistIndexer() {
           ];
 
           if (uniqueMovieTitles.length === 1) {
+            const isAutoDl = autoDownloadedMovieGuids.has(remainingMovies[0].guid || '');
             addNotification(user.id, {
-              title: 'Film disponible',
+              title: isAutoDl ? 'Téléchargement automatique lancé' : 'Film disponible',
               message: uniqueMovieTitles[0],
-              type: 'search',
+              type: isAutoDl ? 'success' : 'search',
               data: { tmdbId: remainingMovies[0].tmdbId, type: 'movie' },
             });
           } else if (uniqueMovieTitles.length > 1) {
+            const autoDlCount = autoDownloadedMovieGuids.size;
             addNotification(user.id, {
-              title: `${uniqueMovieTitles.length} nouveaux films disponibles`,
+              title:
+                autoDlCount > 0
+                  ? `${autoDlCount} téléchargements automatiques de films lancés`
+                  : `${uniqueMovieTitles.length} nouveaux films disponibles`,
               message:
                 uniqueMovieTitles.slice(0, 3).join(', ') +
                 (uniqueMovieTitles.length > 3 ? `… (+${uniqueMovieTitles.length - 3})` : ''),
-              type: 'search',
+              type: autoDlCount > 0 ? 'success' : 'search',
               data: { count: uniqueMovieTitles.length, type: 'movie' },
             });
           }
 
           if (uniqueSeriesTitles.length === 1) {
+            const isAutoDl = autoDownloadedSeriesGuids.has(remainingSeries[0].guid || '');
             addNotification(user.id, {
-              title: 'Épisode disponible',
+              title: isAutoDl ? 'Téléchargement automatique lancé' : 'Épisode disponible',
               message: uniqueSeriesTitles[0],
-              type: 'search',
+              type: isAutoDl ? 'success' : 'search',
               data: { tmdbId: remainingSeries[0].tmdbId, type: 'series' },
             });
           } else if (uniqueSeriesTitles.length > 1) {
+            const autoDlCount = autoDownloadedSeriesGuids.size;
             addNotification(user.id, {
-              title: `${uniqueSeriesTitles.length} nouveaux épisodes disponibles`,
+              title:
+                autoDlCount > 0
+                  ? `${autoDlCount} téléchargements automatiques d'épisodes lancés`
+                  : `${uniqueSeriesTitles.length} nouveaux épisodes disponibles`,
               message:
                 uniqueSeriesTitles.slice(0, 3).join(', ') +
                 (uniqueSeriesTitles.length > 3 ? `… (+${uniqueSeriesTitles.length - 3})` : ''),
-              type: 'search',
+              type: autoDlCount > 0 ? 'success' : 'search',
               data: { count: uniqueSeriesTitles.length, type: 'series' },
             });
           }
