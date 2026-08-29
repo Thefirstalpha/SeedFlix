@@ -31,6 +31,260 @@ import { PersonFilmographyModal } from '../components/PersonFilmographyModal';
 
 const SERIES_QUALITY_FILTERS = new Set(['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv']);
 
+function getSeasonWishlistButtonLabel(
+  isSeasonCoveredBySeries: boolean,
+  isSeasonInWishlist: boolean,
+  t: (k: string) => string,
+): string {
+  if (isSeasonCoveredBySeries) return t('seriesDetails.coveredBySeries');
+  if (isSeasonInWishlist) return t('seriesDetails.removeSeason');
+  return t('seriesDetails.addSeason');
+}
+
+function getSeasonWishlistButtonClass(
+  isSeasonCoveredBySeries: boolean,
+  isSeasonInWishlist: boolean,
+): string {
+  if (isSeasonCoveredBySeries) {
+    return 'bg-white/5 text-white/40 border border-white/10 cursor-not-allowed';
+  }
+  if (isSeasonInWishlist) {
+    return 'bg-cyan-600 hover:bg-cyan-700 text-white';
+  }
+  return 'bg-white/10 hover:bg-white/20 text-white border border-white/20';
+}
+
+interface SeriesSeasonsAndEpisodesProps {
+  availableSeasons: SeriesDetailsModel['seasons'];
+  selectedSeason: number | null;
+  setSelectedSeason: (s: number) => void;
+  wishlistStatus: WishListItem | undefined;
+  isSeasonInWishlist: (s: number) => boolean;
+  isSeasonCoveredBySeries: boolean;
+  handleSeasonWishlist: () => void;
+  isLoadingEpisodes: boolean;
+  episodes: SeriesEpisode[];
+  spoilerModeEnabled: boolean;
+  revealedEpisodeIds: number[];
+  toggleEpisodeReveal: (id: number) => void;
+  isEpisodeDirectlyInWishlist: (season: number, ep: number) => boolean;
+  handleEpisodeWishlist: (ep: SeriesEpisode) => void;
+  t: (k: string, params?: Record<string, any>) => string;
+}
+
+function SeriesSeasonsAndEpisodes({
+  availableSeasons,
+  selectedSeason,
+  setSelectedSeason,
+  wishlistStatus,
+  isSeasonInWishlist,
+  isSeasonCoveredBySeries,
+  handleSeasonWishlist,
+  isLoadingEpisodes,
+  episodes,
+  spoilerModeEnabled,
+  revealedEpisodeIds,
+  toggleEpisodeReveal,
+  isEpisodeDirectlyInWishlist,
+  handleEpisodeWishlist,
+  t,
+}: Readonly<SeriesSeasonsAndEpisodesProps>) {
+  return (
+    <Card className="bg-white/5 border-white/10 w-full min-w-0 overflow-hidden">
+      <CardContent className="p-4 sm:p-6 space-y-4 min-w-0">
+        <div className="flex items-center gap-2">
+          <Clapperboard className="w-5 h-5 text-cyan-300" />
+          <h3 className="text-xl font-semibold text-white">
+            {t('seriesDetails.seasonsAndEpisodes')}
+          </h3>
+        </div>
+
+        {availableSeasons.length > 0 ? (
+          <>
+            {/* Season selector + season wishlist button */}
+            <div className="flex items-center gap-3 flex-wrap min-w-0">
+              <label htmlFor="season-select" className="text-white/80 shrink-0">
+                {t('seriesDetails.season')}
+              </label>
+              <select
+                id="season-select"
+                value={selectedSeason ?? ''}
+                onChange={(event) => setSelectedSeason(Number(event.target.value))}
+                className="w-full sm:w-auto max-w-full min-w-0 bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm truncate"
+              >
+                {availableSeasons.map((season) => (
+                  <option key={season.id} value={season.seasonNumber}>
+                    {t('seriesDetails.seasonWithName', {
+                      number: season.seasonNumber,
+                      name: season.name,
+                    })}
+                    {isSeasonInWishlist(season.seasonNumber) ? ' ♥' : ''}
+                  </option>
+                ))}
+              </select>
+
+              {/* Season-level wishlist button */}
+              {selectedSeason !== null && (
+                <Button
+                  size="sm"
+                  disabled={wishlistStatus?.all_seasons}
+                  onClick={handleSeasonWishlist}
+                  className={`shrink-0 ${getSeasonWishlistButtonClass(
+                    isSeasonCoveredBySeries,
+                    isSeasonInWishlist(selectedSeason),
+                  )}`}
+                >
+                  <Heart
+                    className={`w-4 h-4 mr-1 ${
+                      isSeasonInWishlist(selectedSeason) ? 'fill-current' : ''
+                    }`}
+                  />
+                  {getSeasonWishlistButtonLabel(
+                    isSeasonCoveredBySeries,
+                    isSeasonInWishlist(selectedSeason),
+                    t,
+                  )}
+                </Button>
+              )}
+            </div>
+
+            {/* Episodes list */}
+            {isLoadingEpisodes && (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={`episode-skeleton-${i}`}
+                    className="h-20 bg-white/5 rounded-lg animate-pulse"
+                  />
+                ))}
+              </div>
+            )}
+
+            {!isLoadingEpisodes && episodes.length > 0 ? (
+              <ScrollArea className="h-[500px] w-full rounded-lg border border-white/10 min-w-0">
+                <div className="space-y-3 p-3 sm:p-4 min-w-0">
+                  {episodes.map((episode) => {
+                    const coveredByParent =
+                      wishlistStatus &&
+                      (wishlistStatus?.all_seasons ||
+                        (selectedSeason !== null && isSeasonInWishlist(selectedSeason)));
+                    const directlyInWishlist =
+                      selectedSeason !== null &&
+                      isEpisodeDirectlyInWishlist(selectedSeason, episode.episodeNumber);
+                    const isEpisodeHidden =
+                      spoilerModeEnabled && !revealedEpisodeIds.includes(episode.id);
+
+                    return (
+                      <div
+                        key={episode.id}
+                        className="rounded-lg border border-white/10 bg-white/5 p-3 sm:p-4 min-w-0"
+                      >
+                        <div className="flex items-start justify-between gap-3 sm:gap-4 min-w-0">
+                          <div className="flex-1 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                spoilerModeEnabled && toggleEpisodeReveal(episode.id)
+                              }
+                              className={`w-full text-left rounded-md ${
+                                spoilerModeEnabled
+                                  ? 'transition-colors hover:bg-white/5 px-2 py-1 -mx-2 -my-1'
+                                  : ''
+                              }`}
+                            >
+                              <p className="text-white font-semibold break-words">
+                                {t('seriesDetails.episodeNumber', {
+                                  number: episode.episodeNumber,
+                                })}
+                                {!isEpisodeHidden &&
+                                  (episode.name ? `: ${episode.name}` : '')}
+                              </p>
+                            </button>
+                            <p className="text-white/60 text-sm mt-0.5 truncate">
+                              {episode.airDate || t('seriesDetails.unknownDate')}
+                              {episode.runtime ? ` · ${episode.runtime} min` : ''}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {episode.rating > 0 && (
+                              <span className="text-yellow-400 text-sm font-semibold">
+                                {episode.rating}/10
+                              </span>
+                            )}
+
+                            {coveredByParent ? (
+                              <Badge
+                                variant="outline"
+                                className="border-cyan-500/30 text-cyan-300 text-xs"
+                              >
+                                <Heart className="w-3 h-3 mr-1 fill-current" />
+                                {t('seriesDetails.covered')}
+                              </Badge>
+                            ) : (
+                              <button
+                                onClick={() => handleEpisodeWishlist(episode)}
+                                type="button"
+                                title={
+                                  directlyInWishlist
+                                    ? t('seriesDetails.removeEpisode')
+                                    : t('seriesDetails.addEpisode')
+                                }
+                                className="p-1.5 rounded-full hover:bg-white/10 transition-colors"
+                              >
+                                <Heart
+                                  className={`w-4 h-4 ${
+                                    directlyInWishlist
+                                      ? 'fill-cyan-400 text-cyan-400'
+                                      : 'text-white/50 hover:text-white'
+                                  }`}
+                                />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {isEpisodeHidden ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleEpisodeReveal(episode.id)}
+                            className="mt-3 block w-full rounded-md border border-dashed border-violet-400/30 bg-violet-500/5 p-1 text-left transition-colors hover:bg-violet-500/10"
+                          >
+                            <div className="relative space-y-1.5">
+                              <div className="h-2 w-1/3 rounded bg-white/10" />
+                              <div className="h-2 w-full rounded bg-white/10" />
+                              <div className="h-2 w-5/6 rounded bg-white/10" />
+                              <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold uppercase tracking-widest text-violet-200/70">
+                                Mode spoiler
+                              </span>
+                            </div>
+                          </button>
+                        ) : episode.overview ? (
+                          <p className="text-white/75 mt-3 text-sm leading-relaxed break-words">
+                            {episode.overview}
+                          </p>
+                        ) : spoilerModeEnabled ? (
+                          <p className="text-white/45 mt-3 text-sm">
+                            {t('seriesDetails.spoilers.noOverview')}
+                          </p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            ) : (
+              <p className="text-white/60">{t('seriesDetails.episodesUnavailable')}</p>
+            )}
+          </>
+        ) : (
+          <p className="text-white/60">{t('seriesDetails.noSeasonInfo')}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function SeriesDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -522,196 +776,23 @@ export function SeriesDetails() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/5 border-white/10 w-full min-w-0 overflow-hidden">
-            <CardContent className="p-4 sm:p-6 space-y-4 min-w-0">
-              <div className="flex items-center gap-2">
-                <Clapperboard className="w-5 h-5 text-cyan-300" />
-                <h3 className="text-xl font-semibold text-white">
-                  {t('seriesDetails.seasonsAndEpisodes')}
-                </h3>
-              </div>
-
-              {availableSeasons.length > 0 ? (
-                <>
-                  {/* Season selector + season wishlist button */}
-                  <div className="flex items-center gap-3 flex-wrap min-w-0">
-                    <label htmlFor="season-select" className="text-white/80 shrink-0">
-                      {t('seriesDetails.season')}
-                    </label>
-                    <select
-                      id="season-select"
-                      value={selectedSeason ?? ''}
-                      onChange={(event) => setSelectedSeason(Number(event.target.value))}
-                      className="w-full sm:w-auto max-w-full min-w-0 bg-slate-900 border border-white/20 text-white rounded-md px-3 py-2 text-sm truncate"
-                    >
-                      {availableSeasons.map((season) => (
-                        <option key={season.id} value={season.seasonNumber}>
-                          {t('seriesDetails.seasonWithName', {
-                            number: season.seasonNumber,
-                            name: season.name,
-                          })}
-                          {isSeasonInWishlist(season.seasonNumber) ? ' ♥' : ''}
-                        </option>
-                      ))}
-                    </select>
-
-                    {/* Season-level wishlist button */}
-                    {selectedSeason !== null && (
-                      <Button
-                        size="sm"
-                        disabled={wishlistStatus?.all_seasons}
-                        onClick={handleSeasonWishlist}
-                        className={`shrink-0 ${
-                          isSeasonCoveredBySeries
-                            ? 'bg-white/5 text-white/40 border border-white/10 cursor-not-allowed'
-                            : isSeasonInWishlist(selectedSeason)
-                              ? 'bg-cyan-600 hover:bg-cyan-700 text-white'
-                              : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-                        }`}
-                      >
-                        <Heart
-                          className={`w-4 h-4 mr-1 ${isSeasonInWishlist(selectedSeason)
-                            ? 'fill-current'
-                            : ''
-                            }`}
-                        />
-                        {isSeasonCoveredBySeries
-                          ? t('seriesDetails.coveredBySeries')
-                          : isSeasonInWishlist(selectedSeason)
-                            ? t('seriesDetails.removeSeason')
-                            : t('seriesDetails.addSeason')}
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Episodes list */}
-                  {isLoadingEpisodes && (
-                    <div className="space-y-3">
-                      {[...new Array(3)].map((_, i) => (
-                        <div key={i} className="h-20 bg-white/5 rounded-lg animate-pulse" />
-                      ))}
-                    </div>
-                  )}
-                  
-                  {(!isLoadingEpisodes && episodes.length > 0) ? (
-                    <ScrollArea className="h-[500px] w-full rounded-lg border border-white/10 min-w-0">
-                      <div className="space-y-3 p-3 sm:p-4 min-w-0">
-                        {episodes.map((episode) => {
-                          const coveredByParent = wishlistStatus && (wishlistStatus?.all_seasons ||
-                            (selectedSeason !== null &&
-                              isSeasonInWishlist(selectedSeason)));
-                          const directlyInWishlist =
-                            selectedSeason !== null &&
-                            isEpisodeDirectlyInWishlist(selectedSeason, episode.episodeNumber);
-                          const isEpisodeHidden =
-                            spoilerModeEnabled && !revealedEpisodeIds.includes(episode.id);
-
-                          return (
-                            <div
-                              key={episode.id}
-                              className="rounded-lg border border-white/10 bg-white/5 p-3 sm:p-4 min-w-0"
-                            >
-                              <div className="flex items-start justify-between gap-3 sm:gap-4 min-w-0">
-                                <div className="flex-1 min-w-0">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      spoilerModeEnabled && toggleEpisodeReveal(episode.id)
-                                    }
-                                    className={`w-full text-left rounded-md ${spoilerModeEnabled
-                                      ? 'transition-colors hover:bg-white/5 px-2 py-1 -mx-2 -my-1'
-                                      : ''
-                                      }`}
-                                  >
-                                    <p className="text-white font-semibold break-words">
-                                      {t('seriesDetails.episodeNumber', {
-                                        number: episode.episodeNumber,
-                                      })}
-                                      {!isEpisodeHidden &&
-                                        (episode.name ? `: ${episode.name}` : '')}
-                                    </p>
-                                  </button>
-                                  <p className="text-white/60 text-sm mt-0.5 truncate">
-                                    {episode.airDate || t('seriesDetails.unknownDate')}
-                                    {episode.runtime ? ` · ${episode.runtime} min` : ''}
-                                  </p>
-                                </div>
-
-                                <div className="flex items-center gap-2 shrink-0">
-                                  {episode.rating > 0 && (
-                                    <span className="text-yellow-400 text-sm font-semibold">
-                                      {episode.rating}/10
-                                    </span>
-                                  )}
-
-                                  {coveredByParent ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-cyan-500/30 text-cyan-300 text-xs"
-                                    >
-                                      <Heart className="w-3 h-3 mr-1 fill-current" />
-                                      {t('seriesDetails.covered')}
-                                    </Badge>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleEpisodeWishlist(episode)}
-                                      type="button"
-                                      title={
-                                        directlyInWishlist
-                                          ? t('seriesDetails.removeEpisode')
-                                          : t('seriesDetails.addEpisode')
-                                      }
-                                      className="p-1.5 rounded-full hover:bg-white/10 transition-colors"
-                                    >
-                                      <Heart
-                                        className={`w-4 h-4 ${directlyInWishlist
-                                          ? 'fill-cyan-400 text-cyan-400'
-                                          : 'text-white/50 hover:text-white'
-                                          }`}
-                                      />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-
-                              {isEpisodeHidden ? (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleEpisodeReveal(episode.id)}
-                                  className="mt-3 block w-full rounded-md border border-dashed border-violet-400/30 bg-violet-500/5 p-1 text-left transition-colors hover:bg-violet-500/10"
-                                >
-                                  <div className="relative space-y-1.5">
-                                    <div className="h-2 w-1/3 rounded bg-white/10" />
-                                    <div className="h-2 w-full rounded bg-white/10" />
-                                    <div className="h-2 w-5/6 rounded bg-white/10" />
-                                    <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold uppercase tracking-widest text-violet-200/70">
-                                      Mode spoiler
-                                    </span>
-                                  </div>
-                                </button>
-                              ) : episode.overview ? (
-                                <p className="text-white/75 mt-3 text-sm leading-relaxed break-words">
-                                  {episode.overview}
-                                </p>
-                              ) : spoilerModeEnabled ? (
-                                <p className="text-white/45 mt-3 text-sm">
-                                  {t('seriesDetails.spoilers.noOverview')}
-                                </p>
-                              ) : null}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </ScrollArea>
-                  ) : (
-                    <p className="text-white/60">{t('seriesDetails.episodesUnavailable')}</p>
-                  )}
-                </>
-              ) : (
-                <p className="text-white/60">{t('seriesDetails.noSeasonInfo')}</p>
-              )}
-            </CardContent>
-          </Card>
+          <SeriesSeasonsAndEpisodes
+            availableSeasons={availableSeasons}
+            selectedSeason={selectedSeason}
+            setSelectedSeason={setSelectedSeason}
+            wishlistStatus={wishlistStatus}
+            isSeasonInWishlist={isSeasonInWishlist}
+            isSeasonCoveredBySeries={Boolean(isSeasonCoveredBySeries)}
+            handleSeasonWishlist={handleSeasonWishlist}
+            isLoadingEpisodes={isLoadingEpisodes}
+            episodes={episodes}
+            spoilerModeEnabled={spoilerModeEnabled}
+            revealedEpisodeIds={revealedEpisodeIds}
+            toggleEpisodeReveal={toggleEpisodeReveal}
+            isEpisodeDirectlyInWishlist={isEpisodeDirectlyInWishlist}
+            handleEpisodeWishlist={handleEpisodeWishlist}
+            t={t}
+          />
 
           <TorrentResultsPanel
             title={t('seriesDetails.indexer.title')}

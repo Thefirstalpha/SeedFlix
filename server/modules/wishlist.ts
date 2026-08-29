@@ -15,6 +15,30 @@ export interface DeleteWishlistOptions {
   episode?: number;
 }
 
+function parseWishlistSeasons(rawSeasons: unknown): Record<number, WishListSeasonItem> {
+  const seasons: Record<number, WishListSeasonItem> = {};
+  if (!rawSeasons || typeof rawSeasons !== 'object') {
+    return seasons;
+  }
+  for (const [key, value] of Object.entries(rawSeasons)) {
+    const seasonNumber = Number(key);
+    if (Number.isNaN(seasonNumber) || typeof value !== 'object' || value === null) {
+      continue;
+    }
+    const seasonObj = value as Record<string, unknown>;
+    const all_episodes = Boolean(seasonObj.all_episodes);
+    const episodes = Array.isArray(seasonObj.episodes)
+      ? seasonObj.episodes.map(Number).filter((num: number) => !Number.isNaN(num))
+      : [];
+    seasons[seasonNumber] = {
+      season_number: seasonNumber,
+      all_episodes,
+      episodes,
+    };
+  }
+  return seasons;
+}
+
 /**
  * Normalise et valide un élément stocké brut en mémoire
  */
@@ -32,40 +56,20 @@ function parseWishlistItem(raw: unknown): WishListItem | null {
     type = 'series';
   }
 
-  const title = String(item.title || '');
-  const addedAt = String(item.addedAt || '');
-  const original_title = String(item.original_title || '');
-  const releaseDate = String(item.releaseDate || '');
+  const title = typeof item.title === 'string' ? item.title : '';
+  const addedAt = typeof item.addedAt === 'string' ? item.addedAt : '';
+  const original_title = typeof item.original_title === 'string' ? item.original_title : '';
+  const releaseDate = typeof item.releaseDate === 'string' ? item.releaseDate : '';
 
   if (Number.isNaN(tmdb) || !type || !title || !addedAt || !original_title) {
     return null;
   }
 
-  const genre = String(item.genre || '');
-  const rating = Number(item.rating || 0);
-  const poster_path =
-    item.poster_path !== undefined && item.poster_path !== null ? String(item.poster_path) : null;
+  const genre = typeof item.genre === 'string' ? item.genre : '';
+  const rating = typeof item.rating === 'number' ? item.rating : Number(item.rating) || 0;
+  const poster_path = typeof item.poster_path === 'string' ? item.poster_path : null;
   const all_seasons = Boolean(item.all_seasons);
-
-  const seasons: Record<number, WishListSeasonItem> = {};
-  if (item.seasons && typeof item.seasons === 'object') {
-    for (const [key, value] of Object.entries(item.seasons)) {
-      const seasonNumber = Number(key);
-      if (Number.isNaN(seasonNumber) || typeof value !== 'object' || value === null) {
-        continue;
-      }
-      const seasonObj = value as Record<string, unknown>;
-      const all_episodes = Boolean(seasonObj.all_episodes);
-      const episodes = Array.isArray(seasonObj.episodes)
-        ? seasonObj.episodes.map(Number).filter((num: number) => !Number.isNaN(num))
-        : [];
-      seasons[seasonNumber] = {
-        season_number: seasonNumber,
-        all_episodes,
-        episodes,
-      };
-    }
-  }
+  const seasons = parseWishlistSeasons(item.seasons);
 
   return {
     tmdb,
@@ -123,6 +127,24 @@ function applySeasonAndEpisode(
   }
 }
 
+function deleteSeriesEpisodeOrSeason(
+  item: WishListItem,
+  seasonNumber: number,
+  episodeNumber?: number,
+): void {
+  if (episodeNumber !== undefined) {
+    const season = item.seasons[seasonNumber];
+    if (season && !season.all_episodes) {
+      season.episodes = season.episodes.filter((ep) => ep !== episodeNumber);
+      if (season.episodes.length === 0) {
+        delete item.seasons[seasonNumber];
+      }
+    }
+  } else {
+    delete item.seasons[seasonNumber];
+  }
+}
+
 /**
  * Applique la suppression d'un élément ou sous-élément de la wishlist
  */
@@ -130,25 +152,12 @@ function processDeletion(wishlist: WishListItem[], target: DeleteWishlistOptions
   const seasonNumber = target.seasonNumber ?? target.season;
   const episodeNumber = target.episodeNumber ?? target.episode;
 
-  if (target.type === 'series' && (seasonNumber !== undefined || episodeNumber !== undefined)) {
+  if (target.type === 'series' && seasonNumber !== undefined) {
     const item = wishlist.find((i) => i.tmdb === target.tmdbId && i.type === 'series');
     if (item) {
-      if (seasonNumber !== undefined) {
-        if (episodeNumber !== undefined) {
-          const season = item.seasons[seasonNumber];
-          if (season && !season.all_episodes) {
-            season.episodes = season.episodes.filter((ep) => ep !== episodeNumber);
-            if (season.episodes.length === 0) {
-              delete item.seasons[seasonNumber];
-            }
-          }
-        } else {
-          delete item.seasons[seasonNumber];
-        }
-
-        if (item.seasons && Object.keys(item.seasons).length === 0) {
-          return wishlist.filter((i) => !(i.tmdb === target.tmdbId && i.type === 'series'));
-        }
+      deleteSeriesEpisodeOrSeason(item, seasonNumber, episodeNumber);
+      if (item.seasons && Object.keys(item.seasons).length === 0) {
+        return wishlist.filter((i) => !(i.tmdb === target.tmdbId && i.type === 'series'));
       }
     }
     return wishlist;
@@ -181,6 +190,22 @@ export async function getWishlist(userId: number): Promise<WishListItem[]> {
   return getWishlistSync(userId);
 }
 
+function createWishlistItemFromTmdb(results: any, type: 'movie' | 'series'): WishListItem {
+  return {
+    tmdb: results.id,
+    type,
+    title: type === 'movie' ? results.title : results.name,
+    releaseDate: (type === 'movie' ? results.release_date : results.first_air_date) || '',
+    genre: results.genres?.[0]?.name || '',
+    rating: Number(results.vote_average) || 0,
+    addedAt: new Date().toISOString(),
+    poster_path: results.poster_path !== undefined ? results.poster_path : null,
+    original_title: (type === 'movie' ? results.original_title : results.original_name) || '',
+    all_seasons: false,
+    seasons: {},
+  };
+}
+
 export async function addToWishlist(
   userId: number,
   tmdbId: number,
@@ -205,29 +230,13 @@ export async function addToWishlist(
       (existing: WishListItem) => existing.tmdb === tmdbId && existing.type === type,
     );
 
-    if (item) {
-      if (type === 'series') {
-        applySeasonAndEpisode(item, seasonNumber, episodeNumber);
-      }
-    } else {
-      item = {
-        tmdb: results.id,
-        type,
-        title: type === 'movie' ? results.title : results.name,
-        releaseDate: (type === 'movie' ? results.release_date : results.first_air_date) || '',
-        genre: results.genres && results.genres.length > 0 ? results.genres[0].name : '',
-        rating: Number(results.vote_average) || 0,
-        addedAt: new Date().toISOString(),
-        poster_path: results.poster_path !== undefined ? results.poster_path : null,
-        original_title: (type === 'movie' ? results.original_title : results.original_name) || '',
-        all_seasons: false,
-        seasons: {},
-      };
-
-      if (type === 'series') {
-        applySeasonAndEpisode(item, seasonNumber, episodeNumber);
-      }
+    if (!item) {
+      item = createWishlistItemFromTmdb(results, type);
       wishlist.push(item);
+    }
+
+    if (type === 'series') {
+      applySeasonAndEpisode(item, seasonNumber, episodeNumber);
     }
 
     writeStore(DB_NAMESPACE, userId, wishlist);

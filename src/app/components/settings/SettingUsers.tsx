@@ -74,7 +74,7 @@ export function SettingUsers() {
         return () => window.clearTimeout(openTimer);
     }, [createdUserCredentials, isCreateUserOpen, isCreatedUserModalOpen, resetPasswordTargetId]);
 
-    const handleCreateUser = async (event: React.FormEvent) => {
+    const handleCreateUser = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setUsersMessage(null);
         setUsersError(null);

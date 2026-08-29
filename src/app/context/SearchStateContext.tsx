@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import type { Movie } from '../types/movie';
 import type { Series } from '../types/series';
 import type { MultiSearchResultItem } from '../services/tmdbService';
@@ -106,7 +106,7 @@ const SEARCH_PREFERENCES_KEY = 'seedflix_search_preferences';
 
 const SearchStateContext = createContext<SearchStateContextValue | undefined>(undefined);
 
-export function SearchStateProvider({ children }: { children: ReactNode }) {
+export function SearchStateProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [state, setState] = useState<SearchState>(DEFAULT_SEARCH_STATE);
 
   // Load preferences from localStorage on mount
@@ -167,19 +167,22 @@ export function SearchStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const resetSearchState = () => {
+  const resetSearchState = useCallback(() => {
     setState(DEFAULT_SEARCH_STATE);
     localStorage.removeItem(SEARCH_PREFERENCES_KEY);
-  };
+  }, []);
+
+  const contextValue = useMemo<SearchStateContextValue>(
+    () => ({
+      state,
+      updateSearchState,
+      resetSearchState,
+    }),
+    [state, updateSearchState, resetSearchState],
+  );
 
   return (
-    <SearchStateContext.Provider
-      value={{
-        state,
-        updateSearchState,
-        resetSearchState,
-      }}
-    >
+    <SearchStateContext.Provider value={contextValue}>
       {children}
     </SearchStateContext.Provider>
   );

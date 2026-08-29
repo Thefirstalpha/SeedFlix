@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { IndexerMovieResult, IndexerSeriesResult } from '../../../common/indexer';
 import { useI18n } from '../i18n/LanguageProvider';
-import { SeriesGroupMode } from '../services/indexerGrouping';
 import { addTorrentToClient } from '../services/torrentService';
 import { IndexerResultsList } from './IndexerResultsList';
 import { Button } from './ui/button';
@@ -71,7 +70,7 @@ export interface FilterOption {
   sortOrder: 'asc' | 'desc';
 }
 
-export type { SeriesGroupMode };
+export type { SeriesGroupMode } from '../services/indexerGrouping';
 
 interface TorrentResultsPanelProps {
   title: string;
@@ -90,6 +89,12 @@ interface TorrentResultsPanelProps {
 
 const QUALITY_OPTIONS = ['2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv'];
 
+function formatQualityOptionLabel(quality: string): string {
+  if (quality === 'bluray') return 'BluRay';
+  if (quality === 'webdl') return 'WEB-DL';
+  return quality.toUpperCase();
+}
+
 export function TorrentResultsPanel({
   title,
   description,
@@ -103,7 +108,7 @@ export function TorrentResultsPanel({
   filteredResults,
   locale,
   labels,
-}: TorrentResultsPanelProps) {
+}: Readonly<TorrentResultsPanelProps>) {
   const { t } = useI18n();
   const [addingTorrentLink, setAddingTorrentLink] = useState<string | null>(null);
   const [torrentStatus, setTorrentStatus] = useState<string | null>(null);
@@ -172,11 +177,7 @@ export function TorrentResultsPanel({
               <option value="all">{labels.all}</option>
               {QUALITY_OPTIONS.map((quality) => (
                 <option key={quality} value={quality}>
-                  {quality === 'bluray'
-                    ? 'BluRay'
-                    : quality === 'webdl'
-                      ? 'WEB-DL'
-                      : quality.toUpperCase()}
+                  {formatQualityOptionLabel(quality)}
                 </option>
               ))}
             </select>

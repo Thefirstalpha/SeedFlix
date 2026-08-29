@@ -159,6 +159,17 @@ export async function configureIndexer(userId: number, settings: IndexerSettings
   });
 }
 
+function normalizeTorznabAttrs(block: any): Array<{ name: string; value: any }> {
+  const attr = block?.['torznab:attr'];
+  if (Array.isArray(attr)) {
+    return attr;
+  }
+  if (attr) {
+    return [attr];
+  }
+  return [];
+}
+
 async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResult[]> {
   if (!xmlBody.rss?.channel) {
     throw new ErrorCode('Invalid Indexer response format');
@@ -173,11 +184,7 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
     const link = block?.link;
     const guidMatch = block.guid;
     const pubDateMatch = block?.pubDate;
-    const rawAttrs = Array.isArray(block?.['torznab:attr'])
-      ? block['torznab:attr']
-      : block?.['torznab:attr']
-        ? [block['torznab:attr']]
-        : [];
+    const rawAttrs = normalizeTorznabAttrs(block);
     const attributes = rawAttrs.reduce(
       (acc: Record<string, any>, item: { name: string; value: any }) => {
         if (item?.name) acc[item.name] = item.value;
@@ -223,11 +230,7 @@ async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesRe
     const link = block?.link;
     const guidMatch = block.guid;
     const pubDateMatch = block?.pubDate;
-    const rawAttrs = Array.isArray(block?.['torznab:attr'])
-      ? block['torznab:attr']
-      : block?.['torznab:attr']
-        ? [block['torznab:attr']]
-        : [];
+    const rawAttrs = normalizeTorznabAttrs(block);
     const attributes = rawAttrs.reduce(
       (acc: Record<string, any>, item: { name: string; value: any }) => {
         if (item?.name) acc[item.name] = item.value;

@@ -12,6 +12,25 @@ export interface TrailersSectionProps {
   type?: 'movie' | 'series';
 }
 
+function getTrailerLanguageLabel(
+  trailer: TmdbVideo,
+  langFrLabel: string,
+  langEnLabel: string,
+): { label: string; isFr: boolean; isEn: boolean } {
+  const isFr = trailer.iso_639_1?.toLowerCase() === 'fr';
+  const isEn = trailer.iso_639_1?.toLowerCase() === 'en';
+  let label = (trailer.iso_639_1 || '').toUpperCase();
+  if (isFr) label = langFrLabel;
+  else if (isEn) label = langEnLabel;
+  return { label, isFr, isEn };
+}
+
+function getTrailerBadgeClass(isFr: boolean, isEn: boolean): string {
+  if (isFr) return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+  if (isEn) return 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+  return 'bg-white/10 text-white/70 border-white/20';
+}
+
 export function TrailersSection({
   trailers,
   mediaTitle,
@@ -61,13 +80,11 @@ export function TrailersSection({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full min-w-0">
             {trailers.map((trailer) => {
-              const isFr = trailer.iso_639_1?.toLowerCase() === 'fr';
-              const isEn = trailer.iso_639_1?.toLowerCase() === 'en';
-              const langLabel = isFr
-                ? langFrLabel
-                : isEn
-                ? langEnLabel
-                : (trailer.iso_639_1 || '').toUpperCase();
+              const { label: langLabel, isFr, isEn } = getTrailerLanguageLabel(
+                trailer,
+                langFrLabel,
+                langEnLabel,
+              );
 
               return (
                 <button
@@ -94,13 +111,10 @@ export function TrailersSection({
 
                   <Badge
                     variant="outline"
-                    className={`shrink-0 text-xs font-semibold whitespace-nowrap ml-2 ${
-                      isFr
-                        ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                        : isEn
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                        : 'bg-white/10 text-white/70 border-white/20'
-                    }`}
+                    className={`shrink-0 text-xs font-semibold whitespace-nowrap ml-2 ${getTrailerBadgeClass(
+                      isFr,
+                      isEn,
+                    )}`}
                   >
                     {langLabel}
                   </Badge>

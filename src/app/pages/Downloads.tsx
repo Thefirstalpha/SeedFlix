@@ -407,6 +407,150 @@ function sortDownloads(downloads: TorrentDownloadItem[], sortKey: SortKey, sortD
   });
 }
 
+interface DownloadsFilterToolbarProps {
+  filter: {
+    showActive: boolean;
+    showCompleted: boolean;
+    showAllTorrents: boolean;
+  };
+  setFilter: React.Dispatch<React.SetStateAction<{
+    showActive: boolean;
+    showCompleted: boolean;
+    showAllTorrents: boolean;
+  }>>;
+  sortKey: SortKey;
+  setSortKey: (key: SortKey) => void;
+  sortDir: 'asc' | 'desc';
+  setSortDir: React.Dispatch<React.SetStateAction<'asc' | 'desc'>>;
+  t: (key: string, params?: Record<string, any>) => string;
+}
+
+function DownloadsFilterToolbar({
+  filter,
+  setFilter,
+  sortKey,
+  setSortKey,
+  sortDir,
+  setSortDir,
+  t,
+}: Readonly<DownloadsFilterToolbarProps>) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+      <div className="flex items-center gap-2 text-sm font-semibold text-white/80">
+        <SlidersHorizontal className="w-4 h-4" />
+        {t('downloads.filters.label')}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          onClick={() => setFilter((prev) => ({ ...prev, showActive: !prev.showActive }))}
+          className={
+            filter.showActive
+              ? 'bg-cyan-500/60 hover:bg-cyan-500/70 text-white gap-1'
+              : 'bg-white/10 text-white hover:bg-white/20'
+          }
+        >
+          {filter.showActive ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+          {t('downloads.filters.active')}
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => setFilter((prev) => ({ ...prev, showCompleted: !prev.showCompleted }))}
+          className={
+            filter.showCompleted
+              ? 'bg-emerald-500/60 hover:bg-emerald-500/70 text-white gap-1'
+              : 'bg-white/10 text-white hover:bg-white/20'
+          }
+        >
+          {filter.showCompleted ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+          {t('downloads.filters.completed')}
+        </Button>
+        <div className="w-px h-6 bg-white/20 mx-1" />
+        <Button
+          size="sm"
+          onClick={() => setFilter((prev) => ({ ...prev, showAllTorrents: !prev.showAllTorrents }))}
+          className={
+            filter.showAllTorrents
+              ? 'bg-violet-500/60 hover:bg-violet-500/70 text-white gap-1'
+              : 'bg-white/10 text-white hover:bg-white/20'
+          }
+        >
+          {filter.showAllTorrents ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+          {t('downloads.filters.allTorrents')}
+        </Button>
+        <div className="w-px h-6 bg-white/20 mx-1" />
+        <span className="text-xs text-white/50">{t('downloads.sort.label')}</span>
+        <select
+          value={sortKey}
+          onChange={(event) => setSortKey(event.target.value as SortKey)}
+          className="h-8 rounded-md border border-white/20 bg-slate-900 px-2 text-sm text-white"
+        >
+          <option value="addedDate">{t('downloads.sort.addedDate')}</option>
+          <option value="name">{t('downloads.sort.name')}</option>
+          <option value="progress">{t('downloads.sort.progress')}</option>
+          <option value="rateDownload">{t('downloads.sort.rateDownload')}</option>
+          <option value="totalSize">{t('downloads.sort.totalSize')}</option>
+          <option value="uploadRatio">{t('downloads.sort.uploadRatio')}</option>
+          <option value="uploadEfficiency">{t('downloads.sort.uploadEfficiency')}</option>
+        </select>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+          title={sortDir === 'asc' ? t('downloads.sort.ascending') : t('downloads.sort.descending')}
+          className="h-8 w-8 p-0 border-white/20 bg-white/5 text-white hover:bg-white/10"
+        >
+          {sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function DownloadsDeleteModal({
+  pendingDeleteWithData,
+  onCancel,
+  onConfirm,
+  t,
+}: Readonly<{
+  pendingDeleteWithData: TorrentDownloadItem;
+  onCancel: () => void;
+  onConfirm: () => void;
+  t: (key: string, params?: Record<string, any>) => string;
+}>) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-xl border border-red-500/30 bg-slate-900 shadow-2xl overflow-hidden">
+        <div className="flex items-start justify-between px-5 py-4 border-b border-white/10">
+          <div>
+            <p className="text-base font-semibold text-white">{t('downloads.confirmDeleteWithData.title')}</p>
+            <p className="text-xs text-white/50 mt-1 truncate max-w-[260px]" title={pendingDeleteWithData.name}>
+              {pendingDeleteWithData.name}
+            </p>
+          </div>
+          <button type="button" onClick={onCancel} className="text-white/40 hover:text-white p-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="px-5 py-4">
+          <p className="text-sm text-white/70">{t('downloads.confirmDeleteWithData.description')}</p>
+        </div>
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/10 bg-white/5">
+          <Button size="sm" variant="ghost" onClick={onCancel}
+            className="text-white/50 hover:text-white h-8">
+            {t('downloads.confirmDeleteWithData.cancel')}
+          </Button>
+          <Button size="sm" onClick={onConfirm}
+            className="bg-red-600 hover:bg-red-700 text-white h-8">
+            <FolderX className="w-3.5 h-3.5 mr-1.5" />
+            {t('downloads.confirmDeleteWithData.confirm')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Downloads() {
   const { t, language } = useI18n();
   const { downloads: realtimeDownloads, stats: realtimeStats, isConnected } = useRealtime();
@@ -614,35 +758,12 @@ export function Downloads() {
   return (
     <div className="space-y-6">
       {pendingDeleteWithData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-xl border border-red-500/30 bg-slate-900 shadow-2xl overflow-hidden">
-            <div className="flex items-start justify-between px-5 py-4 border-b border-white/10">
-              <div>
-                <p className="text-base font-semibold text-white">{t('downloads.confirmDeleteWithData.title')}</p>
-                <p className="text-xs text-white/50 mt-1 truncate max-w-[260px]" title={pendingDeleteWithData.name}>
-                  {pendingDeleteWithData.name}
-                </p>
-              </div>
-              <button type="button" onClick={() => setPendingDeleteWithData(null)} className="text-white/40 hover:text-white p-1">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="px-5 py-4">
-              <p className="text-sm text-white/70">{t('downloads.confirmDeleteWithData.description')}</p>
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/10 bg-white/5">
-              <Button size="sm" variant="ghost" onClick={() => setPendingDeleteWithData(null)}
-                className="text-white/50 hover:text-white h-8">
-                {t('downloads.confirmDeleteWithData.cancel')}
-              </Button>
-              <Button size="sm" onClick={() => void confirmDeleteWithData()}
-                className="bg-red-600 hover:bg-red-700 text-white h-8">
-                <FolderX className="w-3.5 h-3.5 mr-1.5" />
-                {t('downloads.confirmDeleteWithData.confirm')}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <DownloadsDeleteModal
+          pendingDeleteWithData={pendingDeleteWithData}
+          onCancel={() => setPendingDeleteWithData(null)}
+          onConfirm={() => void confirmDeleteWithData()}
+          t={t}
+        />
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -685,75 +806,15 @@ export function Downloads() {
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
       {!isLoading && !error ? (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-white/80">
-            <SlidersHorizontal className="w-4 h-4" />
-            {t('downloads.filters.label')}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              onClick={() => setFilter((prev) => ({ ...prev, showActive: !prev.showActive }))}
-              className={
-                filter.showActive
-                  ? 'bg-cyan-500/60 hover:bg-cyan-500/70 text-white gap-1'
-                  : 'bg-white/10 text-white hover:bg-white/20'
-              }
-            >
-              {filter.showActive ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-              {t('downloads.filters.active')}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setFilter((prev) => ({ ...prev, showCompleted: !prev.showCompleted }))}
-              className={
-                filter.showCompleted
-                  ? 'bg-emerald-500/60 hover:bg-emerald-500/70 text-white gap-1'
-                  : 'bg-white/10 text-white hover:bg-white/20'
-              }
-            >
-              {filter.showCompleted ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-              {t('downloads.filters.completed')}
-            </Button>
-            <div className="w-px h-6 bg-white/20 mx-1" />
-            <Button
-              size="sm"
-              onClick={() => setFilter((prev) => ({ ...prev, showAllTorrents: !prev.showAllTorrents }))}
-              className={
-                filter.showAllTorrents
-                  ? 'bg-violet-500/60 hover:bg-violet-500/70 text-white gap-1'
-                  : 'bg-white/10 text-white hover:bg-white/20'
-              }
-            >
-              {filter.showAllTorrents ? <Check className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-              {t('downloads.filters.allTorrents')}
-            </Button>
-            <div className="w-px h-6 bg-white/20 mx-1" />
-            <span className="text-xs text-white/50">{t('downloads.sort.label')}</span>
-            <select
-              value={sortKey}
-              onChange={(event) => setSortKey(event.target.value as SortKey)}
-              className="h-8 rounded-md border border-white/20 bg-slate-900 px-2 text-sm text-white"
-            >
-              <option value="addedDate">{t('downloads.sort.addedDate')}</option>
-              <option value="name">{t('downloads.sort.name')}</option>
-              <option value="progress">{t('downloads.sort.progress')}</option>
-              <option value="rateDownload">{t('downloads.sort.rateDownload')}</option>
-              <option value="totalSize">{t('downloads.sort.totalSize')}</option>
-              <option value="uploadRatio">{t('downloads.sort.uploadRatio')}</option>
-              <option value="uploadEfficiency">{t('downloads.sort.uploadEfficiency')}</option>
-            </select>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-              title={sortDir === 'asc' ? t('downloads.sort.ascending') : t('downloads.sort.descending')}
-              className="h-8 w-8 p-0 border-white/20 bg-white/5 text-white hover:bg-white/10"
-            >
-              {sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </Button>
-          </div>
-        </div>
+        <DownloadsFilterToolbar
+          filter={filter}
+          setFilter={setFilter}
+          sortKey={sortKey}
+          setSortKey={setSortKey}
+          sortDir={sortDir}
+          setSortDir={setSortDir}
+          t={t}
+        />
       ) : null}
 
       <div className="space-y-3">

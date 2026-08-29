@@ -220,7 +220,7 @@ function getMimeType(filename: string): string {
 // ─── Transfert & Streaming ───────────────────────────────────────────────────
 
 router.get('/ftp/stream', async (req, res) => {
-  const path = String(req.query.path || '').trim();
+  const path = typeof req.query.path === 'string' ? req.query.path.trim() : '';
   if (!path) {
     res.status(400).json({ error: 'path requis' });
     return;
@@ -244,13 +244,14 @@ router.get('/ftp/stream', async (req, res) => {
 });
 
 router.get('/ftp/download', async (req, res) => {
-  const path = String(req.query.path || '').trim();
+  const path = typeof req.query.path === 'string' ? req.query.path.trim() : '';
   if (!path) {
     res.status(400).json({ error: 'path requis' });
     return;
   }
   const filename = path.split('/').pop() || 'file';
-  const isInline = String(req.query.inline || '').toLowerCase() === 'true';
+  const isInline =
+    typeof req.query.inline === 'string' && req.query.inline.toLowerCase() === 'true';
   const mimeType = isInline ? getMimeType(filename) : 'application/octet-stream';
   res.setHeader(
     'Content-Disposition',
@@ -271,7 +272,9 @@ router.get('/ftp/download', async (req, res) => {
 });
 
 router.post('/ftp/upload', async (req, res) => {
-  const path = String(req.query.path || req.body?.path || '').trim();
+  const pathQuery = typeof req.query.path === 'string' ? req.query.path.trim() : '';
+  const pathBody = typeof req.body?.path === 'string' ? req.body.path.trim() : '';
+  const path = pathQuery || pathBody;
   if (!path) {
     res.status(400).json({ error: 'path requis' });
     return;
@@ -296,7 +299,7 @@ router.get('/ftp/storage', async (req, res) => {
 });
 
 router.get('/ftp/info', async (req, res) => {
-  const path = String(req.query.path || '').trim();
+  const path = typeof req.query.path === 'string' ? req.query.path.trim() : '';
   if (!path) {
     res.status(400).json({ error: 'path requis' });
     return;

@@ -29,9 +29,10 @@ const transmissionStatusLabels: Record<number, string> = {
 };
 
 function normalizeTorrentHash(value: unknown): string {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase();
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().toLowerCase();
 }
 
 function toManagedTorrentEntry(input: Record<string, unknown>): ManagedTorrentEntry | null {

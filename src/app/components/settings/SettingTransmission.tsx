@@ -1,4 +1,4 @@
-import { SubmitEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
@@ -10,7 +10,12 @@ import { Switch } from "../ui/switch";
 
 
 
-export function SettingTransmission({ setup, onComplete }: { setup: boolean; onComplete?: (() => void) }) {
+interface SettingTransmissionProps {
+  setup: boolean;
+  onComplete?: () => void;
+}
+
+export function SettingTransmission({ setup, onComplete }: Readonly<SettingTransmissionProps>) {
     const { t } = useI18n();
     const [torrentUrl, setTorrentUrl] = useState('');
     const [torrentPort, setTorrentPort] = useState<number | null>(null);
@@ -23,7 +28,7 @@ export function SettingTransmission({ setup, onComplete }: { setup: boolean; onC
     const [isTorrentSaving, setIsTorrentSaving] = useState(false);
 
 
-    const handleTorrentSave = async (event: SubmitEvent) => {
+    const handleTorrentSave = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setTorrentError(null);
         setIsTorrentSaving(true);

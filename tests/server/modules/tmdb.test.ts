@@ -12,7 +12,7 @@ import {
   proxyTmdb,
   TmdbType,
 } from '../../../server/modules/tmdb';
-import { updateGlobalConfig } from '../../../server/modules/setting';
+import { readGlobalConfig, updateGlobalConfig } from '../../../server/modules/setting';
 
 describe('tmdb module', () => {
   beforeAll(() => {
@@ -91,6 +91,7 @@ describe('tmdb module', () => {
       vi.stubGlobal('fetch', fetchSpy);
 
       await configureTmdbApiKey('valid-api-key-123');
+      expect(readGlobalConfig().tmdbApiKey).toBe('valid-api-key-123');
     });
 
     it('should proxy request to TMDB API via fetch with Bearer token', async () => {

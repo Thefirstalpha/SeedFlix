@@ -63,7 +63,7 @@ function interpolate(template: string, vars?: Record<string, string | number>): 
     return template;
   }
 
-  return template.replace(/\{\{(.*?)\}\}/g, (_match, token) => {
+  return template.replace(/\{\{([^}]+)\}\}/g, (_match, token) => {
     const key = String(token || '').trim();
     return key in vars ? String(vars[key]) : '';
   });

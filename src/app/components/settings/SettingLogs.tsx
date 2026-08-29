@@ -54,7 +54,7 @@ export function SettingLogs() {
       // Only update state if logs actually changed to avoid unnecessary re-renders
       const hasChanged =
         currentPrev.length !== newLogs.length ||
-        (newLogs.length > 0 && currentPrev[currentPrev.length - 1] !== newLogs[newLogs.length - 1]);
+        (newLogs.length > 0 && currentPrev.at(-1) !== newLogs.at(-1));
 
       if (hasChanged) {
         prevLogsRef.current = newLogs;
@@ -115,6 +115,25 @@ export function SettingLogs() {
       return true;
     });
   }, [logs, selectedLevel, searchQuery]);
+
+  // Level counts for badge pills
+  const levelCounts = useMemo(() => {
+    const counts: Record<FilterLevel, number> = {
+      ALL: logs.length,
+      HTTP: 0,
+      INFO: 0,
+      WARN: 0,
+      ERROR: 0,
+      LOG: 0,
+    };
+    for (const log of logs) {
+      const level = extractLogLevel(log);
+      if (level && level in counts) {
+        counts[level]++;
+      }
+    }
+    return counts;
+  }, [logs]);
 
   // Auto-scroll when logs update if autoScroll is enabled
   useEffect(() => {
@@ -209,7 +228,7 @@ export function SettingLogs() {
             <CardDescription className="text-white/60 mt-1">
               {filteredLogs.length === logs.length
                 ? t('settings.logs.linesCount', { count: logs.length })
-                : `${filteredLogs.length} / ${logs.length} ${t('settings.logs.linesCount', { count: logs.length }).replace(/^[0-9]+\s*/, '')}`}
+                : `${filteredLogs.length} / ${logs.length} ${t('settings.logs.linesCount', { count: logs.length }).replace(/^\d+\s*/, '')}`}
             </CardDescription>
           </div>
 
@@ -255,18 +274,30 @@ export function SettingLogs() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={handleCopyLogs}
+              onClick={scrollToBottom}
+              className="border-white/15 text-xs h-8 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+              title={t('settings.logs.jumpToBottom')}
+            >
+              <ArrowDownToLine className="h-3.5 w-3.5 mr-1" />
+              {t('settings.logs.jumpToBottom')}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleCopyLogs()}
               disabled={filteredLogs.length === 0}
-              className="border-white/15 bg-transparent text-white/80 hover:bg-white/10 hover:text-white text-xs h-8"
+              className="border-white/15 text-xs h-8 bg-transparent text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-40"
             >
               {copied ? (
                 <>
-                  <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-400" />
+                  <Check className="h-3.5 w-3.5 mr-1 text-emerald-400" />
                   {t('settings.logs.copied')}
                 </>
               ) : (
                 <>
-                  <Copy className="h-3.5 w-3.5 mr-1.5" />
+                  <Copy className="h-3.5 w-3.5 mr-1" />
                   {t('settings.logs.copy')}
                 </>
               )}
@@ -277,11 +308,9 @@ export function SettingLogs() {
               variant="outline"
               size="sm"
               onClick={handleClearView}
-              disabled={logs.length === 0}
-              className="border-white/15 bg-transparent text-white/80 hover:bg-white/10 hover:text-white text-xs h-8"
-              title={t('settings.logs.clear')}
+              className="border-white/15 text-xs h-8 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
             >
-              <Trash2 className="h-3.5 w-3.5 mr-1.5 text-red-400" />
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
               {t('settings.logs.clear')}
             </Button>
 
@@ -299,7 +328,7 @@ export function SettingLogs() {
           </div>
         </div>
 
-        {/* Search and Level Filter Row */}
+        {/* Filter Toolbar */}
         <div className="mt-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
@@ -321,20 +350,27 @@ export function SettingLogs() {
             )}
           </div>
 
-          {/* Level selector pills */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            {LOG_LEVELS.map((level) => (
-              <button
-                key={level}
-                type="button"
-                onClick={() => setSelectedLevel(level)}
-                className={`text-xs px-2.5 py-1 rounded-md border font-mono font-medium transition-all ${getLevelBadgeClass(
-                  level,
-                )}`}
-              >
-                {level === 'ALL' ? t('settings.logs.allLevels') : level}
-              </button>
-            ))}
+            {LOG_LEVELS.map((level) => {
+              const count = levelCounts[level] || 0;
+              return (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setSelectedLevel(level)}
+                  className={`text-xs px-2.5 py-1 rounded-md border font-mono font-medium transition-all ${getLevelBadgeClass(
+                    level,
+                  )}`}
+                >
+                  <span>{level === 'ALL' ? t('settings.logs.allLevels') : level}</span>
+                  <span
+                    className="ml-1 text-[10px] px-1 py-0.2 rounded-full bg-black/30 text-white/80"
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </CardHeader>
@@ -350,7 +386,7 @@ export function SettingLogs() {
               <span className="text-[11px] font-mono text-white/40 ml-2">server-output.log</span>
             </div>
             <div className="text-[11px] font-mono text-white/40">
-              {filteredLogs.length} {t('settings.logs.linesCount', { count: filteredLogs.length }).replace(/^[0-9]+\s*/, '')}
+              {filteredLogs.length} {t('settings.logs.linesCount', { count: filteredLogs.length }).replace(/^\d+\s*/, '')}
             </div>
           </div>
 

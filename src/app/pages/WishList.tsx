@@ -19,6 +19,35 @@ import { WishListItem } from '../../../common/wishlist';
 import { IndexerMovieResult, IndexerSeriesResult } from '../../../common/indexer';
 
 
+function formatGroupedSeries(seriesItems: WishListItem[]) {
+  return seriesItems
+    .map((item) => {
+      const seasonEntries = Object.entries(item.seasons)
+        .map(([key, s]) => ({ seasonNumber: Number(key), all_episodes: s.all_episodes, episodes: s.episodes }))
+        .sort((a, b) => a.seasonNumber - b.seasonNumber);
+      const seasonsAllEpisodes = seasonEntries.filter((s) => s.all_episodes);
+      const episodeEntries = seasonEntries
+        .flatMap((s) => s.episodes.map((ep) => ({ seasonNumber: s.seasonNumber, episodeNumber: ep })))
+        .sort((a, b) =>
+          a.seasonNumber !== b.seasonNumber
+            ? a.seasonNumber - b.seasonNumber
+            : a.episodeNumber - b.episodeNumber,
+        );
+      return {
+        tmdb: item.tmdb,
+        title: item.title,
+        poster_path: item.poster_path ?? '',
+        genre: item.genre,
+        rating: item.rating,
+        all_seasons: item.all_seasons,
+        releaseDate: item.releaseDate,
+        seasons: seasonsAllEpisodes,
+        episodes: episodeEntries,
+      };
+    })
+    .sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+}
+
 export function WishList() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -82,7 +111,6 @@ export function WishList() {
     setSelectedMovieIds([]);
     setSelectedSeriesIds([]);
   };
-
 
   const loadIndexerResults = async () => {
     try {
@@ -159,30 +187,7 @@ export function WishList() {
     setIsSeriesSelectionMode(false);
   };
 
-  const groupedSeries = seriesItems.map((item) => {
-    const seasonEntries = Object.entries(item.seasons)
-      .map(([key, s]) => ({ seasonNumber: Number(key), all_episodes: s.all_episodes, episodes: s.episodes }))
-      .sort((a, b) => a.seasonNumber - b.seasonNumber);
-    const seasonsAllEpisodes = seasonEntries.filter((s) => s.all_episodes);
-    const episodeEntries = seasonEntries
-      .flatMap((s) => s.episodes.map((ep) => ({ seasonNumber: s.seasonNumber, episodeNumber: ep })))
-      .sort((a, b) =>
-        a.seasonNumber !== b.seasonNumber
-          ? a.seasonNumber - b.seasonNumber
-          : a.episodeNumber - b.episodeNumber,
-      );
-    return {
-      tmdb: item.tmdb,
-      title: item.title,
-      poster_path: item.poster_path ?? '',
-      genre: item.genre,
-      rating: item.rating,
-      all_seasons: item.all_seasons,
-      releaseDate: item.releaseDate,
-      seasons: seasonsAllEpisodes,
-      episodes: episodeEntries,
-    };
-  }).sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+  const groupedSeries = formatGroupedSeries(seriesItems);
 
   const uniqueSeriesCount = groupedSeries.length;
   const movieCountLabel = t(
@@ -354,14 +359,6 @@ export function WishList() {
                         navigate(`/movie/${movie.tmdb}`);
                       }
                     }}
-                    tabIndex={isSelectionMode ? -1 : 0}
-                    role="button"
-                    onKeyDown={(e) => {
-                      if (!isSelectionMode && (e.key === 'Enter' || e.key === ' ')) {
-                        e.preventDefault();
-                        navigate(`/movie/${movie.tmdb}`);
-                      }
-                    }}
                   >
                     <WishListCard
                       poster={movie.poster_path ?? ''}
@@ -380,12 +377,6 @@ export function WishList() {
                         <div
                           className="mb-2"
                           onClick={(e) => e.stopPropagation()}
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.stopPropagation();
-                            }
-                          }}
                         >
                           <Checkbox
                             checked={selectedMovieIds.includes(movie.tmdb)}
@@ -483,14 +474,6 @@ export function WishList() {
                         navigate(`/series/${group.tmdb}`);
                       }
                     }}
-                    tabIndex={isSeriesSelectionMode ? -1 : 0}
-                    role="button"
-                    onKeyDown={(e) => {
-                      if (!isSeriesSelectionMode && (e.key === 'Enter' || e.key === ' ')) {
-                        e.preventDefault();
-                        navigate(`/series/${group.tmdb}`);
-                      }
-                    }}
                   >
                     <WishListCard
                       poster={group.poster_path}
@@ -509,13 +492,6 @@ export function WishList() {
                         <div
                           className="mb-2"
                           onClick={(event) => event.stopPropagation()}
-                          tabIndex={0}
-                          role="presentation"
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.stopPropagation();
-                            }
-                          }}
                         >
                           <label className="inline-flex items-center gap-2 text-sm text-white/80">
                             <Checkbox

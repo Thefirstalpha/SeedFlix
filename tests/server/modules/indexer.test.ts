@@ -412,10 +412,10 @@ describe('indexer module', () => {
 
     it('should update indexer process when pullAuto setting changes', () => {
       updateGlobalConfig({ pullAuto: true });
-      updateIndexerProcess();
+      expect(() => updateIndexerProcess()).not.toThrow();
 
       updateGlobalConfig({ pullAuto: false });
-      updateIndexerProcess();
+      expect(() => updateIndexerProcess()).not.toThrow();
     });
   });
 });

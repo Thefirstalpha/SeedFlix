@@ -29,6 +29,21 @@ function emitUnreadNotificationsUpdated(count: number) {
   );
 }
 
+function getNotificationTypeLabel(type: string, t: (key: string) => string): string {
+  switch (type) {
+    case 'success':
+      return t('notificationsPage.types.success');
+    case 'error':
+      return t('notificationsPage.types.error');
+    case 'warning':
+      return t('notificationsPage.types.warning');
+    case 'search':
+      return t('notificationsPage.types.search');
+    default:
+      return t('notificationsPage.types.info');
+  }
+}
+
 export default function Notifications() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -98,20 +113,33 @@ export default function Notifications() {
 
   const spoilerModeEnabled = Boolean(user?.settings.spoilerMode || false);
 
-  const getNotificationMessage = (notification: Notification) =>
-    getSafeNotificationMessage(
+  const getNotificationMessage = (notification: Notification) => {
+    const mediaType =
+      notification.data && typeof notification.data.mediaType === 'string'
+        ? notification.data.mediaType
+        : undefined;
+    return getSafeNotificationMessage(
       String(notification.message || ''),
       spoilerModeEnabled,
-      notification.data?.mediaType,
+      mediaType,
     );
+  };
 
   const handleNotificationClick = (notification: Notification) => {
     if (!isIndexerSuggestion(notification)) {
       return;
     }
     
-    const tmdbId = String(notification.data?.tmdbId ?? '').trim();
-    const type = String(notification.data?.type ?? '').trim();
+    const tmdbId =
+      notification.data && typeof notification.data.tmdbId === 'number'
+        ? String(notification.data.tmdbId)
+        : typeof notification.data?.tmdbId === 'string'
+          ? notification.data.tmdbId.trim()
+          : '';
+    const type =
+      notification.data && typeof notification.data.type === 'string'
+        ? notification.data.type.trim()
+        : '';
     if (!tmdbId || !type) {
       navigate('/wishlist');
       return;
@@ -253,15 +281,7 @@ export default function Notifications() {
                     <Badge className={getTypeBadgeColor(notif.type)}>
                       {getTypeIcon(notif.type)}
                       <span className="ml-1 text-xs">
-                        {notif.type === 'success'
-                          ? t('notificationsPage.types.success')
-                          : notif.type === 'error'
-                            ? t('notificationsPage.types.error')
-                            : notif.type === 'warning'
-                              ? t('notificationsPage.types.warning')
-                              : notif.type === 'search'
-                                ? t('notificationsPage.types.search')
-                                : t('notificationsPage.types.info')}
+                        {getNotificationTypeLabel(notif.type, t)}
                       </span>
                     </Badge>
                     {!notif.isRead && (

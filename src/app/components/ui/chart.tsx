@@ -40,15 +40,18 @@ function ChartContainer({
   children,
   config,
   ...props
-}: React.ComponentProps<'div'> & {
-  config: ChartConfig;
-  children: React.ComponentProps<typeof RechartsPrimitive.ResponsiveContainer>['children'];
-}) {
+}: Readonly<
+  React.ComponentProps<'div'> & {
+    config: ChartConfig;
+    children: React.ComponentProps<typeof RechartsPrimitive.ResponsiveContainer>['children'];
+  }
+>) {
   const uniqueId = React.useId();
   const chartId = `chart-${id || uniqueId.replaceAll(':', '')}`;
+  const contextValue = React.useMemo(() => ({ config }), [config]);
 
   return (
-    <ChartContext.Provider value={{ config }}>
+    <ChartContext.Provider value={contextValue}>
       <div
         data-slot="chart"
         data-chart={chartId}

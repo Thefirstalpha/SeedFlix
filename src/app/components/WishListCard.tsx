@@ -91,12 +91,6 @@ export function WishListCard({
           <div
             className="pt-2 border-t border-white/10 w-full min-w-0"
             onClick={(event) => event.stopPropagation()}
-            role="presentation"
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.stopPropagation();
-              }
-            }}
           >
             <IndexerResultsList
               items={targets}
