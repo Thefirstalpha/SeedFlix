@@ -52,7 +52,8 @@ export default [
 				localStorage: "readonly",
 				Response: "readonly",
 				EventSource: "readonly",
-				MessageEvent: "readonly"
+				MessageEvent: "readonly",
+				NodeJS: "readonly"
 			}
 		},
 		plugins: {

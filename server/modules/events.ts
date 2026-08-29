@@ -158,4 +158,3 @@ export async function emitDownloads(
     /* Transmission inaccessible */
   }
 }
-

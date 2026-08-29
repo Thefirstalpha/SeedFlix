@@ -52,4 +52,3 @@ router.get('/events', async (req, res) => {
 });
 
 export { router };
-
