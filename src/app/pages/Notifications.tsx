@@ -19,6 +19,8 @@ import { useI18n } from '../i18n/LanguageProvider';
 import * as notificationService from '../services/notificationService';
 import { Notification } from '../../../common/notification';
 
+import { getSafeNotificationMessage } from '../utils/notificationSpoiler';
+
 function emitUnreadNotificationsUpdated(count: number) {
   window.dispatchEvent(
     new CustomEvent('seedflix:notifications-updated', {
@@ -96,16 +98,12 @@ export default function Notifications() {
 
   const spoilerModeEnabled = Boolean(user?.settings.spoilerMode || false);
 
-  const maskEpisodeLabel = (value: string) =>
-    value.replace(/(S\d{1,2}E\d{1,2})(?:\s*[-–]\s*[^:\n]+)?/i, '$1');
-
-  const getNotificationMessage = (notification: Notification) => {
-    if (!spoilerModeEnabled || String(notification.data?.mediaType || '') !== 'episode') {
-      return notification.message;
-    }
-
-    return maskEpisodeLabel(String(notification.message || ''));
-  };
+  const getNotificationMessage = (notification: Notification) =>
+    getSafeNotificationMessage(
+      String(notification.message || ''),
+      spoilerModeEnabled,
+      notification.data?.mediaType,
+    );
 
   const handleNotificationClick = (notification: Notification) => {
     if (!isIndexerSuggestion(notification)) {

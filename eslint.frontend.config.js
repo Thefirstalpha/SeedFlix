@@ -50,7 +50,9 @@ export default [
 				MouseEvent: "readonly",
 				KeyboardEvent: "readonly",
 				localStorage: "readonly",
-				Response: "readonly"
+				Response: "readonly",
+				EventSource: "readonly",
+				MessageEvent: "readonly"
 			}
 		},
 		plugins: {

@@ -31,6 +31,8 @@ import {
 } from '../services/torrentService';
 import { TorrentDownloadItem, TorrentStatsResponse } from '../../../common/torrent';
 
+import { useRealtime } from '../context/RealtimeContext';
+
 function formatRate(bytesPerSec: number) {
   if (!Number.isFinite(bytesPerSec) || bytesPerSec <= 0) {
     return '0 B/s';
@@ -374,6 +376,7 @@ function sortDownloads(downloads: TorrentDownloadItem[], sortKey: SortKey, sortD
 
 export function Downloads() {
   const { t } = useI18n();
+  const { downloads: realtimeDownloads, stats: realtimeStats, isConnected } = useRealtime();
   const [downloads, setDownloads] = useState<TorrentDownloadItem[]>([]);
   const [stats, setStats] = useState<TorrentStatsResponse | null>(null);
   const [filter, setFilter] = useState<{
@@ -392,11 +395,11 @@ export function Downloads() {
   const [error, setError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
-  // Keep a ref to the current source filter value for polling
+  // Keep a ref to the current source filter value
   const showAllTorrentsRef = useRef(filter.showAllTorrents);
-  // Track last action time to avoid race conditions with polling
+  // Track last action time to avoid race conditions with updates
   const lastActionTimeRef = useRef<number>(0);
-  const ACTION_COOLDOWN_MS = 2000; // 2 seconds after an action, polling won't update state
+  const ACTION_COOLDOWN_MS = 2000;
 
   useEffect(() => {
     showAllTorrentsRef.current = filter.showAllTorrents;
@@ -410,10 +413,8 @@ export function Downloads() {
   const loadDownloads = async (includeAll: boolean = false, force: boolean = false) => {
     try {
       const response = await getTorrentDownloads(includeAll);
-      // Check if we're in action cooldown; if so, don't update state from polling
       const timeSinceLastAction = Date.now() - lastActionTimeRef.current;
       if (!force && timeSinceLastAction < ACTION_COOLDOWN_MS) {
-        // Still in cooldown, ignore this polling update
         return;
       }
       setDownloads(response.torrents);
@@ -437,19 +438,37 @@ export function Downloads() {
     }
   };
 
+  // Sync with Realtime SSE stream
+  useEffect(() => {
+    if (realtimeDownloads && (realtimeDownloads.length > 0 || isConnected)) {
+      const timeSinceLastAction = Date.now() - lastActionTimeRef.current;
+      if (timeSinceLastAction >= ACTION_COOLDOWN_MS) {
+        setDownloads(realtimeDownloads);
+        setIsLoading(false);
+      }
+    }
+  }, [realtimeDownloads, isConnected]);
+
+  useEffect(() => {
+    if (realtimeStats) {
+      setStats(realtimeStats);
+    }
+  }, [realtimeStats]);
+
   useEffect(() => {
     setIsLoading(true);
-    void loadDownloads(showAllTorrentsRef.current);
+    void loadDownloads(showAllTorrentsRef.current, true);
     void loadStats();
 
-    // Refresh downloads and stats every 5 seconds
-    const interval = setInterval(() => {
-      void loadDownloads(showAllTorrentsRef.current);
-      void loadStats();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
+    // Fallback slow poll (30s) ONLY if SSE is disconnected
+    if (!isConnected) {
+      const interval = setInterval(() => {
+        void loadDownloads(showAllTorrentsRef.current);
+        void loadStats();
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isConnected]);
 
   // Silent refresh when source filter changes (no loading state)
   useEffect(() => {

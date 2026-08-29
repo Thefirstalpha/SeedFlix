@@ -464,7 +464,8 @@ export async function processWishlistIndexer() {
           }
 
           // Auto-Download (Auto-Grab) si activé pour l'utilisateur
-          const autoDownloadEnabled = Boolean(user.settings?.indexer?.autoDownload);
+          const indexerSettings = getIndexerSettings(user.id);
+          const autoDownloadEnabled = Boolean(indexerSettings?.autoDownload);
           const autoDownloadedMovieGuids = new Set<string>();
           const autoDownloadedSeriesGuids = new Set<string>();
 

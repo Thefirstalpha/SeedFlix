@@ -1,59 +1,22 @@
 import { Download, HardDrive, Heart, LogOut, Settings, User, Bell, Menu } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router';
-import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/LanguageProvider';
 import { Button } from './ui/button';
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { useSearchState } from '../context/SearchStateContext';
-import { getUserStatusBar } from '../services/authService';
-import { Notification } from '../../../common/notification';
+import { useRealtime } from '../context/RealtimeContext';
 
 type UnreadNotificationsEvent = CustomEvent<{ count: number }>;
-
-function showNotificationToast(type: Notification['type'], title: string, description: string) {
-  switch (type) {
-    case 'success':
-      toast.success(title, { description });
-      break;
-    case 'error':
-      toast.error(title, { description });
-      break;
-    case 'warning':
-      toast.warning(title, { description });
-      break;
-    default:
-      toast.info(title, { description });
-      break;
-  }
-}
-
-function maskEpisodeLabel(value: string) {
-  return String(value || '').replace(/(S\d{1,2}E\d{1,2})(?:\s*[-–]\s*[^:\n]+)?/i, '$1');
-}
-
-function getSafeNotificationMessage(
-  message: string,
-  spoilerModeEnabled: boolean,
-  mediaType?: unknown,
-) {
-  if (!spoilerModeEnabled || String(mediaType || '') !== 'episode') {
-    return message;
-  }
-
-  return maskEpisodeLabel(message);
-}
 
 export function Root() {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useI18n();
   const currentYear = new Date().getFullYear();
-  const [wishlistCount, setWishlistCount] = useState(0);
-  const [downloadsCount, setDownloadsCount] = useState(0);
+  const { statusBar } = useRealtime();
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
-  const hasHydratedUnreadRef = useRef(false);
   const previousUnreadCountRef = useRef(0);
   const { resetSearchState } = useSearchState();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -64,70 +27,21 @@ export function Root() {
     isAuthenticated,
     logout
   } = useAuth();
-  const spoilerModeEnabled = Boolean(user?.settings.spoilerMode);
   const isSetupPage = location.pathname === '/setup';
   const isLoginPage = location.pathname === '/login';
   const shouldShowHeader = !isLoginPage && !isSetupPage;
   const hasPendingSetup = user?.flags?.mustSetup;
   const canShowNavigationActions = isAuthenticated && !isSetupPage && !hasPendingSetup;
 
+  const downloadsCount = canShowNavigationActions ? (statusBar?.downloads ?? 0) : 0;
+  const wishlistCount = canShowNavigationActions ? (statusBar?.wishlist ?? 0) : 0;
+
   useEffect(() => {
-    if (!isAuthenticated || isSetupPage || hasPendingSetup) {
-      setDownloadsCount(0);
-      setWishlistCount(0);
-      setUnreadNotificationsCount(0);
-      return;
+    if (statusBar) {
+      setUnreadNotificationsCount(statusBar.notifications || 0);
+      previousUnreadCountRef.current = statusBar.notifications || 0;
     }
-
-    const loadUserStatusBar = async () => {
-      try {
-        const response = await getUserStatusBar();
-        const nextUnread = response.notifications || 0;
-        const previousUnread = previousUnreadCountRef.current;
-
-        setDownloadsCount(response.downloads || 0);
-        setWishlistCount(response.wishlist || 0);
-        setUnreadNotificationsCount(nextUnread);
-
-        // Toast si nouvelles notifications
-        if (hasHydratedUnreadRef.current && nextUnread > previousUnread && location.pathname !== '/notifications') {
-          const delta = nextUnread - previousUnread;
-          const latest = response.latestNotification;
-          if (latest) {
-            const toastTitle = delta > 1 ? `${delta} nouvelles notifications` : latest.title;
-            const safeMsg = getSafeNotificationMessage(latest.message, spoilerModeEnabled);
-            const toastDesc = delta > 1 ? `${safeMsg} (et ${delta - 1} autre${delta - 1 > 1 ? 's' : ''})` : safeMsg;
-            showNotificationToast(latest.type as any, toastTitle, toastDesc);
-          } else {
-            toast.info(delta > 1 ? `${delta} nouvelles notifications` : '1 nouvelle notification');
-          }
-        }
-
-        hasHydratedUnreadRef.current = true;
-        previousUnreadCountRef.current = nextUnread;
-        window.dispatchEvent(new CustomEvent('seedflix:notifications-updated', { detail: { count: nextUnread } }));
-      } catch {
-        setDownloadsCount(0);
-        setWishlistCount(0);
-        setUnreadNotificationsCount(0);
-      }
-    };
-
-    void loadUserStatusBar();
-    const interval = setInterval(() => {
-      void loadUserStatusBar();
-    }, 7000);
-
-    window.addEventListener('seedflix:wishlist-refresh-request', loadUserStatusBar);
-    window.addEventListener('seedflix:notifications-refresh-request', loadUserStatusBar);
-
-
-    return () => {
-      window.removeEventListener('seedflix:wishlist-refresh-request', loadUserStatusBar);
-      window.removeEventListener('seedflix:notifications-refresh-request', loadUserStatusBar);
-      clearInterval(interval);
-    };
-  }, [isAuthenticated, isSetupPage, hasPendingSetup, location.pathname]);
+  }, [statusBar]);
 
   useEffect(() => {
     const handleUnreadUpdate = (event: Event) => {

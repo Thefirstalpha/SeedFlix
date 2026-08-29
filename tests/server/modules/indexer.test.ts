@@ -43,8 +43,10 @@ vi.mock('../../../server/modules/tmdb', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../server/modules/transmission', () => {
+vi.mock('../../../server/modules/transmission', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../server/modules/transmission')>();
   return {
+    ...actual,
     startDownload: vi.fn().mockResolvedValue(undefined),
   };
 });

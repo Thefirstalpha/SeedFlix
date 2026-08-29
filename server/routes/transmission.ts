@@ -12,6 +12,8 @@ import {
 import { TransmissionSettings } from '../../common/settings';
 import { TorrentDownloadsResponse, TorrentStatsResponse } from '../../common/torrent';
 
+import { emitDownloads, emitStatusBar } from '../modules/events';
+
 const router = Router();
 router.use(authentication);
 
@@ -39,6 +41,8 @@ router.post('/transmission/configure', async (req, res) => {
     seriesFolder: String(req.body?.seriesFolder || '/').trim(),
   };
   await configureTransmission(req.user.id, setting);
+  void emitStatusBar(req.user.id);
+  void emitDownloads(req.user.id);
   res.status(200).json({ message: 'Transmission settings configured successfully' });
 });
 
@@ -60,12 +64,16 @@ router.get('/transmission/stats', async (req, res) => {
 router.post('/transmission/resume/:id', async (req, res) => {
   const id = Number(req.params.id);
   await performTransmissionAction('torrent-start', req.user.id, id);
+  void emitDownloads(req.user.id);
+  void emitStatusBar(req.user.id);
   res.status(200).json({ status: 'ok' });
 });
 
 router.post('/transmission/pause/:id', async (req, res) => {
   const id = Number(req.params.id);
   await performTransmissionAction('torrent-stop', req.user.id, id);
+  void emitDownloads(req.user.id);
+  void emitStatusBar(req.user.id);
   res.status(200).json({ status: 'ok' });
 });
 
@@ -75,6 +83,8 @@ router.post('/transmission/delete/:id', async (req, res) => {
   await performTransmissionAction('torrent-remove', req.user.id, id, {
     'delete-local-data': deleteData,
   });
+  void emitDownloads(req.user.id);
+  void emitStatusBar(req.user.id);
   res.status(200).json({ status: 'ok' });
 });
 
@@ -91,6 +101,8 @@ router.post('/transmission/unmanage', async (req, res) => {
     return;
   }
 
+  void emitDownloads(req.user.id);
+  void emitStatusBar(req.user.id);
   res.status(200).json({ ok: true, message: 'Torrent unmanaged successfully' });
 });
 
@@ -99,6 +111,8 @@ router.post('/transmission/add', async (req, res) => {
   const mediaType = String(req.body?.mediaType || '').trim();
   const guid = String(req.body?.guid || '').trim();
   await startDownload(req.user.id, guid, mediaType);
+  void emitDownloads(req.user.id);
+  void emitStatusBar(req.user.id);
   res.status(200).json({ status: 'ok' });
 });
 

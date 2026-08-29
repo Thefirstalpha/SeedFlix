@@ -1,6 +1,7 @@
 import { WishListItem, WishListSeasonItem } from '../../common/wishlist';
 import { readStore, runInTransaction } from './db';
 import { buildDetailsRequest, proxyTmdb, TmdbType } from './tmdb';
+import { emitStatusBar } from './events';
 
 const DB_NAMESPACE = 'wishlist';
 
@@ -230,6 +231,7 @@ export async function addToWishlist(
 
     writeStore(DB_NAMESPACE, userId, wishlist);
   });
+  void emitStatusBar(userId);
 }
 
 export async function deleteWishlist(
@@ -249,6 +251,7 @@ export async function deleteWishlist(
     });
     writeStore(DB_NAMESPACE, userId, wishlist);
   });
+  void emitStatusBar(userId);
 }
 
 export async function deleteWishlistItems(userId: number, items: DeleteWishlistOptions[]) {
@@ -263,4 +266,5 @@ export async function deleteWishlistItems(userId: number, items: DeleteWishlistO
     }
     writeStore(DB_NAMESPACE, userId, wishlist);
   });
+  void emitStatusBar(userId);
 }
