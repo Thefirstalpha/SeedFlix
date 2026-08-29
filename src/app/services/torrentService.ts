@@ -23,7 +23,8 @@ async function parseJson<T>(response: Response): Promise<T> {
 
 export async function addTorrentToClient(
   guid: string,
-  mediaType: 'movie' | 'series' = 'movie'
+  mediaType: 'movie' | 'series' = 'movie',
+  options?: { tmdbId?: number; seasonNumber?: number; episodeNumber?: number },
 ) {
   const response = await fetch(`${API_BASE_URL}/transmission/add`, {
     method: 'POST',
@@ -31,7 +32,7 @@ export async function addTorrentToClient(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ guid, mediaType }),
+    body: JSON.stringify({ guid, mediaType, ...options }),
   });
 
   return parseJson<TorrentAddResponse>(response);

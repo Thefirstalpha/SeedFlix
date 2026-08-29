@@ -238,13 +238,16 @@ export function WishList() {
     const key = `${target.guid}:add`;
     setActionKey(key);
     try {
-      await addTorrentToClient(target.guid, type);
-      // Blacklister après ajout (best effort)
-      try {
-        await rejectIndexerResult(target.guid ?? '');
-      } catch {
-        // silent
-      }
+      const tmdbId = target.tmdbId ? Number(target.tmdbId) : target.matchedWishlist?.tmdbId;
+      const seasonNumber = 'seasonNumber' in target ? target.seasonNumber ?? target.matchedWishlist?.seasonNumber : target.matchedWishlist?.seasonNumber;
+      const episodeNumber = 'episodeNumber' in target ? target.episodeNumber ?? target.matchedWishlist?.episodeNumber : target.matchedWishlist?.episodeNumber;
+
+      await addTorrentToClient(target.guid, type, {
+        tmdbId,
+        seasonNumber: seasonNumber !== null && seasonNumber !== undefined ? Number(seasonNumber) : undefined,
+        episodeNumber: episodeNumber !== null && episodeNumber !== undefined ? Number(episodeNumber) : undefined,
+      });
+
       await Promise.allSettled([loadIndexerResults(), loadWishlist()]);
     } catch (error) {
       console.error('Error adding torrent from wishlist:', error);

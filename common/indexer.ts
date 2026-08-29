@@ -10,6 +10,15 @@ export interface IndexerSeriesResponse {
 }
 
 
+export interface WishlistMatchInfo {
+  tmdbId: number;
+  type: 'movie' | 'series';
+  seasonNumber?: number;
+  episodeNumber?: number;
+  isEntireSeason?: boolean;
+  isAllSeasons?: boolean;
+}
+
 export interface IndexerMovieResult {
   title: string;
   link: string;
@@ -24,6 +33,7 @@ export interface IndexerMovieResult {
   quality?: string | null;
   language?: string | null;
   categories?: string[];
+  matchedWishlist?: WishlistMatchInfo;
 }
 
 
@@ -44,4 +54,5 @@ export interface IndexerSeriesResult {
   attributes?: Record<string, string>;
   seasonNumber?: number | null;
   episodeNumber?: number | null;
+  matchedWishlist?: WishlistMatchInfo;
 }

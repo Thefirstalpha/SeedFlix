@@ -410,7 +410,12 @@ async function fetchTorrentMetainfo(torrentUrl: string) {
   }
 }
 
-export async function startDownload(userId: number, guid: string, mediaType: string) {
+export async function startDownload(
+  userId: number,
+  guid: string,
+  mediaType: string,
+  options?: { tmdbId?: number; seasonNumber?: number; episodeNumber?: number },
+) {
   const settings = getTransmissionSettings(userId);
   if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
   const downloadDir = mediaType === 'movie' ? settings.moviesFolder : settings.seriesFolder;
@@ -442,6 +447,19 @@ export async function startDownload(userId: number, guid: string, mediaType: str
   const addedHash = normalizeTorrentHash(added?.hashString);
   if (addedHash) {
     registerManagedTorrent(userId, addedHash, url.toString(), String(added?.name || ''));
+  }
+
+  // Consume/cleanup wishlist and indexer results
+  try {
+    const { consumeWishlistItemForDownload } = await import('./wishlist');
+    await consumeWishlistItemForDownload(
+      userId,
+      guid,
+      mediaType === 'movie' ? 'movie' : 'series',
+      options,
+    );
+  } catch (consumeErr) {
+    console.error('Error consuming wishlist item on download:', consumeErr);
   }
 }
 

@@ -389,28 +389,144 @@ async function extractWishlistItemsFromIndexerResults(
 ): Promise<{ movies: IndexerMovieResult[]; series: IndexerSeriesResult[] }> {
   const moviesFounds: IndexerMovieResult[] = [];
   const seriesFounds: IndexerSeriesResult[] = [];
+
   for (const item of wishlist) {
     if (item.type === 'movie') {
       const founds = indexerMovies.filter((m) => String(m.tmdbId) === String(item.tmdb));
-      if (founds.length > 0) {
-        moviesFounds.push(...founds);
+      for (const found of founds) {
+        moviesFounds.push({
+          ...found,
+          matchedWishlist: {
+            tmdbId: item.tmdb,
+            type: 'movie',
+          },
+        });
       }
     } else if (item.type === 'series') {
-      const founds = indexerSeries.filter(
-        (s) =>
-          String(s.tmdbId) === String(item.tmdb) &&
-          (item.all_seasons === true ||
-            (item.seasons?.[s.seasonNumber || 1] !== undefined &&
-              (item.seasons[s.seasonNumber || 1].all_episodes === true ||
-                (s.episodeNumber !== undefined &&
-                  item.seasons[s.seasonNumber || 1].episodes.includes(s.episodeNumber || 1))))),
-      );
-      if (founds.length > 0) {
-        seriesFounds.push(...founds);
+      const founds = indexerSeries.filter((s) => {
+        if (String(s.tmdbId) !== String(item.tmdb)) return false;
+        if (item.all_seasons === true) return true;
+        const targetSeason = s.seasonNumber || 1;
+        const seasonConfig = item.seasons?.[targetSeason];
+        if (!seasonConfig) return false;
+        if (seasonConfig.all_episodes === true) return true;
+        return (
+          s.episodeNumber !== undefined &&
+          s.episodeNumber !== null &&
+          seasonConfig.episodes.includes(s.episodeNumber)
+        );
+      });
+
+      for (const found of founds) {
+        const isEntireSeason = !found.episodeNumber && Boolean(found.seasonNumber);
+        const isAllSeasons = !found.seasonNumber && !found.episodeNumber;
+        seriesFounds.push({
+          ...found,
+          matchedWishlist: {
+            tmdbId: item.tmdb,
+            type: 'series',
+            seasonNumber: found.seasonNumber ?? undefined,
+            episodeNumber: found.episodeNumber ?? undefined,
+            isEntireSeason,
+            isAllSeasons,
+          },
+        });
       }
     }
   }
   return { movies: moviesFounds, series: seriesFounds };
+}
+
+export function purgeIndexerResultsForMedia(
+  userId: number,
+  tmdbId: number,
+  type: 'movie' | 'series',
+  seasonNumber?: number,
+  episodeNumber?: number,
+  downloadedGuid?: string,
+): void {
+  runInTransaction(({ writeStore }) => {
+    const moviesResult = (readStore('indexer-movie-result', userId) || []) as IndexerMovieResult[];
+    const seriesResult = (readStore('indexer-series-result', userId) ||
+      []) as IndexerSeriesResult[];
+    const blacklist = (readStore('indexer-blacklist', userId) || []) as string[];
+
+    const newBlacklist = new Set(blacklist);
+
+    if (downloadedGuid) {
+      newBlacklist.add(`${type}:${tmdbId}:${downloadedGuid}`);
+    }
+
+    if (type === 'movie') {
+      const remainingMovies: IndexerMovieResult[] = [];
+      for (const m of moviesResult) {
+        if (Number(m.tmdbId) === tmdbId || m.guid === downloadedGuid) {
+          if (m.guid) newBlacklist.add(`movie:${tmdbId}:${m.guid}`);
+        } else {
+          remainingMovies.push(m);
+        }
+      }
+      writeStore('indexer-movie-result', userId, remainingMovies);
+    } else {
+      const remainingSeries: IndexerSeriesResult[] = [];
+      for (const s of seriesResult) {
+        const matchesTmdb = Number(s.tmdbId) === tmdbId;
+        const matchesSeason = seasonNumber === undefined || s.seasonNumber === seasonNumber;
+        const matchesEpisode = episodeNumber === undefined || s.episodeNumber === episodeNumber;
+        const isDownloaded = s.guid === downloadedGuid;
+
+        if (isDownloaded || (matchesTmdb && matchesSeason && matchesEpisode)) {
+          if (s.guid) newBlacklist.add(`series:${tmdbId}:${s.guid}`);
+        } else {
+          remainingSeries.push(s);
+        }
+      }
+      writeStore('indexer-series-result', userId, remainingSeries);
+    }
+
+    writeStore('indexer-blacklist', userId, Array.from(newBlacklist));
+  });
+}
+
+export function resetIndexerStateForMedia(
+  userId: number,
+  tmdbId: number,
+  type?: 'movie' | 'series',
+  seasonNumber?: number,
+  episodeNumber?: number,
+): void {
+  runInTransaction(({ writeStore }) => {
+    const moviesResult = (readStore('indexer-movie-result', userId) || []) as IndexerMovieResult[];
+    const seriesResult = (readStore('indexer-series-result', userId) ||
+      []) as IndexerSeriesResult[];
+    const blacklist = (readStore('indexer-blacklist', userId) || []) as string[];
+
+    if (!type || type === 'movie') {
+      const remainingMovies = moviesResult.filter((m) => Number(m.tmdbId) !== tmdbId);
+      writeStore('indexer-movie-result', userId, remainingMovies);
+    }
+
+    if (!type || type === 'series') {
+      const remainingSeries = seriesResult.filter((s) => {
+        if (Number(s.tmdbId) !== tmdbId) return true;
+        if (seasonNumber !== undefined && s.seasonNumber !== seasonNumber) return true;
+        if (episodeNumber !== undefined && s.episodeNumber !== episodeNumber) return true;
+        return false;
+      });
+      writeStore('indexer-series-result', userId, remainingSeries);
+    }
+
+    // Reset blacklist entries for this media so future searches can find them again
+    const prefixMovie = `movie:${tmdbId}:`;
+    const prefixSeries = `series:${tmdbId}:`;
+    const filteredBlacklist = blacklist.filter((entry) => {
+      if ((!type || type === 'movie') && entry.startsWith(prefixMovie)) return false;
+      if ((!type || type === 'series') && entry.startsWith(prefixSeries)) return false;
+      return true;
+    });
+
+    writeStore('indexer-blacklist', userId, filteredBlacklist);
+  });
 }
 
 // Automated job to search wishlist items in the indexer and update their status

@@ -150,7 +150,17 @@ router.post('/transmission/unmanage', async (req, res) => {
 router.post('/transmission/add', async (req, res) => {
   const mediaType = String(req.body?.mediaType || '').trim();
   const guid = String(req.body?.guid || '').trim();
-  await startDownload(req.user.id, guid, mediaType);
+  const tmdbId = req.body?.tmdbId ? Number(req.body.tmdbId) : undefined;
+  const seasonNumber =
+    req.body?.seasonNumber !== undefined && req.body?.seasonNumber !== null
+      ? Number(req.body.seasonNumber)
+      : undefined;
+  const episodeNumber =
+    req.body?.episodeNumber !== undefined && req.body?.episodeNumber !== null
+      ? Number(req.body.episodeNumber)
+      : undefined;
+
+  await startDownload(req.user.id, guid, mediaType, { tmdbId, seasonNumber, episodeNumber });
   void emitDownloads(req.user.id);
   void emitStatusBar(req.user.id);
   res.status(200).json({ status: 'ok' });

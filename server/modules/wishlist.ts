@@ -2,6 +2,7 @@ import { WishListItem, WishListSeasonItem } from '../../common/wishlist';
 import { readStore, runInTransaction } from './db';
 import { buildDetailsRequest, proxyTmdb, TmdbType } from './tmdb';
 import { emitStatusBar } from './events';
+import { purgeIndexerResultsForMedia, resetIndexerStateForMedia } from './indexer';
 
 const DB_NAMESPACE = 'wishlist';
 
@@ -234,6 +235,167 @@ export async function addToWishlist(
   void emitStatusBar(userId);
 }
 
+async function fetchSeriesSeasonInfo(
+  tmdbId: number,
+): Promise<{ seasons: Array<{ season_number: number; episode_count: number }> } | null> {
+  try {
+    const request = buildDetailsRequest(TmdbType.series, tmdbId, {});
+    const data = await proxyTmdb(request.path, request.query);
+    if (!data?.seasons || !Array.isArray(data.seasons)) return null;
+    return {
+      seasons: data.seasons.map((s: any) => ({
+        season_number: Number(s.season_number || 0),
+        episode_count: Number(s.episode_count || 0),
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function consumeWishlistItemForDownload(
+  userId: number,
+  guid: string,
+  mediaType: 'movie' | 'series',
+  options?: { tmdbId?: number; seasonNumber?: number; episodeNumber?: number },
+): Promise<void> {
+  // 1. Chercher dans les résultats indexer existants pour extraire le tmdbId et la saison/épisode si non fournis
+  const moviesResult = (readStore('indexer-movie-result', userId) || []) as Array<any>;
+  const seriesResult = (readStore('indexer-series-result', userId) || []) as Array<any>;
+
+  let tmdbId = options?.tmdbId;
+  let seasonNumber = options?.seasonNumber;
+  let episodeNumber = options?.episodeNumber;
+
+  const matchedMovie = moviesResult.find((m) => m.guid === guid);
+  const matchedSeries = seriesResult.find((s) => s.guid === guid);
+
+  if (matchedMovie) {
+    tmdbId = Number(matchedMovie.tmdbId || matchedMovie.matchedWishlist?.tmdbId || tmdbId);
+  } else if (matchedSeries) {
+    tmdbId = Number(matchedSeries.tmdbId || matchedSeries.matchedWishlist?.tmdbId || tmdbId);
+    seasonNumber =
+      matchedSeries.seasonNumber ?? matchedSeries.matchedWishlist?.seasonNumber ?? seasonNumber;
+    episodeNumber =
+      matchedSeries.episodeNumber ?? matchedSeries.matchedWishlist?.episodeNumber ?? episodeNumber;
+  }
+
+  if (!tmdbId || Number.isNaN(tmdbId)) {
+    // Si pas de tmdbId, on purge quand même le guid de l'index
+    if (guid) {
+      purgeIndexerResultsForMedia(userId, 0, mediaType, seasonNumber, episodeNumber, guid);
+    }
+    return;
+  }
+
+  // 2. Mettre à jour la wishlist de façon atomique
+  let seriesInfo: { seasons: Array<{ season_number: number; episode_count: number }> } | null =
+    null;
+  if (mediaType === 'series') {
+    seriesInfo = await fetchSeriesSeasonInfo(tmdbId);
+  }
+
+  runInTransaction(({ writeStore }) => {
+    let wishlist = getWishlistSync(userId);
+
+    if (mediaType === 'movie') {
+      wishlist = wishlist.filter((i) => !(i.tmdb === tmdbId && i.type === 'movie'));
+    } else {
+      const item = wishlist.find((i) => i.tmdb === tmdbId && i.type === 'series');
+      if (item) {
+        if (seasonNumber !== undefined && episodeNumber !== undefined) {
+          // Cas 1 : Téléchargement d'un épisode spécifique S{seasonNumber}E{episodeNumber}
+          if (item.all_seasons === true) {
+            item.all_seasons = false;
+            item.seasons = {};
+            const availableSeasons = seriesInfo?.seasons || [];
+            for (const s of availableSeasons) {
+              if (s.season_number <= 0) continue;
+              if (s.season_number === seasonNumber) {
+                const totalEps = s.episode_count || 10;
+                const remaining = Array.from({ length: totalEps }, (_, idx) => idx + 1).filter(
+                  (ep) => ep !== episodeNumber,
+                );
+                if (remaining.length > 0) {
+                  item.seasons[s.season_number] = {
+                    season_number: s.season_number,
+                    all_episodes: false,
+                    episodes: remaining,
+                  };
+                }
+              } else {
+                item.seasons[s.season_number] = {
+                  season_number: s.season_number,
+                  all_episodes: true,
+                  episodes: [],
+                };
+              }
+            }
+          } else {
+            const season = item.seasons?.[seasonNumber];
+            if (season) {
+              if (season.all_episodes) {
+                const seasonMeta = seriesInfo?.seasons.find(
+                  (s) => s.season_number === seasonNumber,
+                );
+                const totalEps = seasonMeta?.episode_count || 10;
+                const remaining = Array.from({ length: totalEps }, (_, idx) => idx + 1).filter(
+                  (ep) => ep !== episodeNumber,
+                );
+                if (remaining.length > 0) {
+                  season.all_episodes = false;
+                  season.episodes = remaining;
+                } else {
+                  delete item.seasons[seasonNumber];
+                }
+              } else {
+                season.episodes = season.episodes.filter((ep) => ep !== episodeNumber);
+                if (season.episodes.length === 0) {
+                  delete item.seasons[seasonNumber];
+                }
+              }
+            }
+          }
+
+          if (Object.keys(item.seasons || {}).length === 0) {
+            wishlist = wishlist.filter((i) => !(i.tmdb === tmdbId && i.type === 'series'));
+          }
+        } else if (seasonNumber !== undefined) {
+          // Cas 2 : Téléchargement d'un pack saison entier S{seasonNumber}
+          if (item.all_seasons === true) {
+            item.all_seasons = false;
+            item.seasons = {};
+            const availableSeasons = seriesInfo?.seasons || [];
+            for (const s of availableSeasons) {
+              if (s.season_number <= 0 || s.season_number === seasonNumber) continue;
+              item.seasons[s.season_number] = {
+                season_number: s.season_number,
+                all_episodes: true,
+                episodes: [],
+              };
+            }
+          } else if (item.seasons?.[seasonNumber]) {
+            delete item.seasons[seasonNumber];
+          }
+
+          if (Object.keys(item.seasons || {}).length === 0) {
+            wishlist = wishlist.filter((i) => !(i.tmdb === tmdbId && i.type === 'series'));
+          }
+        } else {
+          // Cas 3 : Téléchargement de la série complète
+          wishlist = wishlist.filter((i) => !(i.tmdb === tmdbId && i.type === 'series'));
+        }
+      }
+    }
+
+    writeStore(DB_NAMESPACE, userId, wishlist);
+  });
+
+  // 3. Purger les résultats indexer et blacklister la release téléchargée
+  purgeIndexerResultsForMedia(userId, tmdbId, mediaType, seasonNumber, episodeNumber, guid);
+  void emitStatusBar(userId);
+}
+
 export async function deleteWishlist(
   userId: number,
   tmdbId: number,
@@ -251,6 +413,15 @@ export async function deleteWishlist(
     });
     writeStore(DB_NAMESPACE, userId, wishlist);
   });
+
+  // Réinitialise également l'état des résultats indexer et de la blacklist pour ce média
+  resetIndexerStateForMedia(
+    userId,
+    tmdbId,
+    type === 'movie' ? 'movie' : type === 'series' ? 'series' : undefined,
+    seasonNumber,
+    episodeNumber,
+  );
   void emitStatusBar(userId);
 }
 
@@ -266,5 +437,15 @@ export async function deleteWishlistItems(userId: number, items: DeleteWishlistO
     }
     writeStore(DB_NAMESPACE, userId, wishlist);
   });
+
+  for (const item of items) {
+    resetIndexerStateForMedia(
+      userId,
+      item.tmdbId,
+      item.type === 'movie' ? 'movie' : item.type === 'series' ? 'series' : undefined,
+      item.seasonNumber ?? item.season,
+      item.episodeNumber ?? item.episode,
+    );
+  }
   void emitStatusBar(userId);
 }

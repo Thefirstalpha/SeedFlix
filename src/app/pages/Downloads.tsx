@@ -261,7 +261,7 @@ function DownloadCard({
               className="h-7 px-2 text-xs border bg-amber-600/40 hover:bg-amber-600/60 text-amber-200 border-amber-500/30">
               {actionInProgress === `pause-${item.id}`
                 ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <><Pause className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">{t('downloads.pause')}</span></>}
+                : <><Pause className="w-3 h-3 md:mr-1" /><span className="hidden md:inline">{t('downloads.pause')}</span></>}
             </Button>
           )}
           {!completed && isPaused && (
@@ -271,7 +271,7 @@ function DownloadCard({
               className="h-7 px-2 text-xs border bg-cyan-600/40 hover:bg-cyan-600/60 text-cyan-200 border-cyan-500/30">
               {actionInProgress === `resume-${item.id}`
                 ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <><Play className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">{t('downloads.resume')}</span></>}
+                : <><Play className="w-3 h-3 md:mr-1" /><span className="hidden md:inline">{t('downloads.resume')}</span></>}
             </Button>
           )}
           <Button size="sm" onClick={() => handleDelete(item.id)}
@@ -287,19 +287,19 @@ function DownloadCard({
               }`}>
             {actionInProgress === `delete-${item.id}`
               ? <Loader2 className="w-3 h-3 animate-spin" />
-              : <><Trash2 className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">{t('downloads.remove')}</span></>}
+              : <><Trash2 className="w-3 h-3 md:mr-1" /><span className="hidden md:inline">{t('downloads.remove')}</span></>}
           </Button>
           <Button size="sm" onClick={() => onRequestDeleteWithData(item)}
             disabled={actionInProgress === `delete-${item.id}`}
             title={t('downloads.removeWithData')}
             className="h-7 px-2 text-xs border bg-red-950/40 hover:bg-red-950/60 text-red-300 border-red-500/20">
-            <FolderX className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">{t('downloads.removeWithData')}</span>
+            <FolderX className="w-3 h-3 md:mr-1" /><span className="hidden md:inline">{t('downloads.removeWithData')}</span>
           </Button>
           <Button size="sm" variant="outline"
             onClick={() => onRequestFiles(item)}
             title="Inspecter et sélectionner les fichiers"
             className="h-7 px-2 text-xs border-purple-500/30 bg-purple-900/20 text-purple-200 hover:bg-purple-900/40 hover:text-white">
-            <FolderTree className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">Fichiers</span>
+            <FolderTree className="w-3 h-3 md:mr-1" /><span className="hidden md:inline">Fichiers</span>
           </Button>
           {!completed && (
             <div className="flex items-center gap-0.5 border border-white/10 rounded-md bg-white/5 p-0.5" title="Priorité dans la file">
@@ -322,8 +322,8 @@ function DownloadCard({
             title="Détails"
             className="h-7 px-2 text-xs border-white/20 bg-white/5 text-white/60 hover:bg-white/10">
             {showRawDetails
-              ? <><ChevronUp className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">Détails</span></>
-              : <><ChevronDown className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">Détails</span></>}
+              ? <><ChevronUp className="w-3 h-3 md:mr-1" /><span className="hidden md:inline">Détails</span></>
+              : <><ChevronDown className="w-3 h-3 md:mr-1" /><span className="hidden md:inline">Détails</span></>}
           </Button>
           {item.managedBySeedflix && (
             <Button size="sm" onClick={() => handleUnmanage(item.hashString || '')}
@@ -332,7 +332,7 @@ function DownloadCard({
               className="h-7 px-2 text-xs border bg-slate-600/30 hover:bg-slate-600/50 text-slate-300 border-slate-500/20">
               {actionInProgress === `unmanage-${item.hashString}`
                 ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <><Unlink className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">{t('downloads.dontTrack')}</span></>}
+                : <><Unlink className="w-3 h-3 md:mr-1" /><span className="hidden md:inline">{t('downloads.dontTrack')}</span></>}
             </Button>
           )}
         </div>
