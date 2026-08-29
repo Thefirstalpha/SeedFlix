@@ -150,6 +150,43 @@ describe('Route: /api/tmdb', () => {
       expect(res.status).toBe(200);
       expect(res.body.season_number).toBe(1);
     });
+
+    it('should fetch recommendations via /api/tmdb/:type/recommendations/:id', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce({ page: 1, results: [{ id: 680, title: 'Pulp Fiction' }] });
+      const userCookie = createSessionCookie(1);
+
+      const res = await request(app)
+        .get('/api/tmdb/movie/recommendations/550')
+        .set('Cookie', userCookie);
+
+      expect(res.status).toBe(200);
+      expect(res.body.results).toHaveLength(1);
+      expect(res.body.results[0].title).toBe('Pulp Fiction');
+    });
+
+    it('should fetch collection details via /api/tmdb/collection/:id', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce({ id: 10, name: 'Star Wars Collection', parts: [] });
+      const userCookie = createSessionCookie(1);
+
+      const res = await request(app)
+        .get('/api/tmdb/collection/10')
+        .set('Cookie', userCookie);
+
+      expect(res.status).toBe(200);
+      expect(res.body.name).toBe('Star Wars Collection');
+    });
+
+    it('should fetch person credits via /api/tmdb/person/:id', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce({ id: 287, name: 'Brad Pitt', combined_credits: { cast: [] } });
+      const userCookie = createSessionCookie(1);
+
+      const res = await request(app)
+        .get('/api/tmdb/person/287')
+        .set('Cookie', userCookie);
+
+      expect(res.status).toBe(200);
+      expect(res.body.name).toBe('Brad Pitt');
+    });
   });
 });
 

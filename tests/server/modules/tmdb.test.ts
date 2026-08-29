@@ -1,15 +1,20 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initDB, resetDatabase } from '../../../server/modules/db';
+import * as tmdbModule from '../../../server/modules/tmdb';
 import {
+  buildCollectionRequest,
   buildDetailsRequest,
   buildGenresRequest,
+  buildPersonRequest,
   buildPopularRequest,
+  buildRecommendationsRequest,
   buildSearchRequest,
   buildSeasonRequest,
   buildVideosRequest,
   configureTmdbApiKey,
   getTmdbDetails,
   proxyTmdb,
+  transformTmdbDetails,
   TmdbType,
 } from '../../../server/modules/tmdb';
 import { readGlobalConfig, updateGlobalConfig } from '../../../server/modules/setting';
@@ -63,6 +68,31 @@ describe('tmdb module', () => {
       const seasonReq = buildSeasonRequest(1399, 2, { language: 'en-US' });
       expect(seasonReq.path).toBe('/tv/1399/season/2');
       expect(seasonReq.query.language).toBe('en-US');
+    });
+
+    it('should build recommendations request', () => {
+      const { buildRecommendationsRequest } = tmdbModule;
+      const recMovie = buildRecommendationsRequest(TmdbType.movie, 550, { page: 2, language: 'en-US' });
+      expect(recMovie.path).toBe('/movie/550/recommendations');
+      expect(recMovie.query.page).toBe(2);
+      expect(recMovie.query.language).toBe('en-US');
+
+      const recDefault = buildRecommendationsRequest(TmdbType.series, 1399, {});
+      expect(recDefault.path).toBe('/tv/1399/recommendations');
+      expect(recDefault.query.page).toBe(1);
+      expect(recDefault.query.language).toBe('fr-FR');
+    });
+
+    it('should build collection and person requests', () => {
+      const { buildCollectionRequest, buildPersonRequest } = tmdbModule;
+      const colReq = buildCollectionRequest(10, { language: 'fr-FR' });
+      expect(colReq.path).toBe('/collection/10');
+      expect(colReq.query.language).toBe('fr-FR');
+
+      const personReq = buildPersonRequest(287, {});
+      expect(personReq.path).toBe('/person/287');
+      expect(personReq.query.language).toBe('fr-FR');
+      expect(personReq.query.append_to_response).toBe('combined_credits');
     });
 
     it('should route popular vs discover depending on active filters in buildPopularRequest', () => {
@@ -142,6 +172,59 @@ describe('tmdb module', () => {
       expect(details.genres).toEqual(['Drama', 'Thriller']);
       expect(details.runtime).toBe(139);
       expect(details.posterPath).toBe('/poster.jpg');
+    });
+
+    it('should get and normalize series TMDB details with getTmdbDetails', async () => {
+      updateGlobalConfig({ tmdbApiKey: 'mock-key' });
+
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: 1399,
+          name: 'Game of Thrones',
+          original_name: 'Game of Thrones',
+          overview: 'Seven noble families fight for control...',
+          first_air_date: '2011-04-17',
+          vote_average: 8.4,
+          vote_count: 21000,
+          genres: [{ id: 10765, name: 'Sci-Fi & Fantasy' }],
+          poster_path: '/got.jpg',
+          backdrop_path: '/got-bg.jpg',
+          original_language: 'en',
+          number_of_seasons: 8,
+          number_of_episodes: 73,
+        }),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const details = await getTmdbDetails(1399, 'series', 'en-US');
+      expect(details.id).toBe(1399);
+      expect(details.type).toBe('series');
+      expect(details.title).toBe('Game of Thrones');
+      expect(details.year).toBe(2011);
+      expect(details.numberOfSeasons).toBe(8);
+      expect(details.numberOfEpisodes).toBe(73);
+      expect(details.originalLanguage).toBe('en');
+    });
+
+    it('should handle missing dates, genres and ratings gracefully in transformTmdbDetails', () => {
+      const { transformTmdbDetails } = tmdbModule;
+      const normalized = transformTmdbDetails(
+        {
+          id: 100,
+          title: 'Movie Without Meta',
+          genres: null,
+          vote_average: 'invalid',
+        },
+        'movie',
+      );
+
+      expect(normalized.year).toBe(0);
+      expect(normalized.rating).toBe(0);
+      expect(normalized.genres).toEqual([]);
+      expect(normalized.posterPath).toBeNull();
+      expect(normalized.backdropPath).toBeNull();
     });
 
     it('should throw error when getTmdbDetails receives item without id', async () => {

@@ -235,9 +235,31 @@ describe('Route: /api/ftp', () => {
     expect(res.headers['accept-ranges']).toBe('bytes');
   });
 
-  it('should support inline download via GET /api/ftp/download?inline=true', async () => {
+  it('should handle /api/ftp/stream error when path is missing or download fails', async () => {
+    const { user } = createUser('ftpUserStreamErr');
+    const cookie = createSessionCookie(user.id);
+
+    const resMissing = await request(app).get('/api/ftp/stream').set('Cookie', cookie);
+    expect(resMissing.status).toBe(400);
+
+    mockedGetFileSize.mockRejectedValueOnce(new Error('Cannot determine size'));
+    mockedDownloadToStream.mockRejectedValueOnce(new Error('Stream failed'));
+
+    const resFail = await request(app).get('/api/ftp/stream?path=/fail.mp4').set('Cookie', cookie);
+    expect(resFail.status).toBe(500);
+    const parsed = typeof resFail.body === 'object' && resFail.body !== null && 'ok' in resFail.body
+      ? resFail.body
+      : JSON.parse(resFail.body?.toString?.() || resFail.text || '{}');
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('should support inline download via GET /api/ftp/download?inline=true and handle missing path', async () => {
     const { user } = createUser('ftpUserInline');
     const cookie = createSessionCookie(user.id);
+
+    const resMissing = await request(app).get('/api/ftp/download').set('Cookie', cookie);
+    expect(resMissing.status).toBe(400);
+
     mockedGetFileSize.mockResolvedValueOnce(Buffer.byteLength('image-binary'));
     mockedDownloadToStream.mockImplementation(async (uid, p, res) => {
       res.write('image-binary');
@@ -253,9 +275,13 @@ describe('Route: /api/ftp', () => {
     expect(res.headers['content-disposition']).toContain('inline');
   });
 
-  it('should upload file stream via POST /api/ftp/upload', async () => {
+  it('should upload file stream via POST /api/ftp/upload and handle missing path', async () => {
     const { user } = createUser('ftpUserUpload');
     const cookie = createSessionCookie(user.id);
+
+    const resMissing = await request(app).post('/api/ftp/upload').set('Cookie', cookie);
+    expect(resMissing.status).toBe(400);
+
     mockedUploadFromStream.mockResolvedValueOnce(undefined);
 
     const res = await request(app)
@@ -267,9 +293,13 @@ describe('Route: /api/ftp', () => {
     expect(res.body.ok).toBe(true);
   });
 
-  it('should get file info via GET /api/ftp/info', async () => {
+  it('should get file info via GET /api/ftp/info and handle missing path', async () => {
     const { user } = createUser('ftpUserInfo');
     const cookie = createSessionCookie(user.id);
+
+    const resMissing = await request(app).get('/api/ftp/info').set('Cookie', cookie);
+    expect(resMissing.status).toBe(400);
+
     mockedGetFileSize.mockResolvedValueOnce(2048);
     mockedGetLastModified.mockResolvedValueOnce(new Date('2024-01-01'));
 

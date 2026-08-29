@@ -633,6 +633,65 @@ describe('wishlist module', () => {
       expect(wishlist).toHaveLength(1);
       expect(Object.keys(wishlist[0].seasons)).toEqual(['2']);
     });
+
+    it('should split all_seasons series into remaining seasons when a season pack is downloaded', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series');
+
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+
+      await consumeWishlistItemForDownload(1, 'guid-s01-pack', 'series', {
+        tmdbId: 1399,
+        seasonNumber: 1,
+      });
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist).toHaveLength(1);
+      expect(wishlist[0].all_seasons).toBe(false);
+      expect(Object.keys(wishlist[0].seasons)).toEqual(['2']);
+      expect(wishlist[0].seasons[2].all_episodes).toBe(true);
+    });
+
+    it('should remove entire series when full series download is consumed without season/episode', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series');
+
+      await consumeWishlistItemForDownload(1, 'guid-full-series', 'series', {
+        tmdbId: 1399,
+      });
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist).toHaveLength(0);
+    });
+
+    it('should split single season with all_episodes into remaining episode list when single episode downloaded', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 1);
+
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+
+      await consumeWishlistItemForDownload(1, 'guid-s01e01', 'series', {
+        tmdbId: 1399,
+        seasonNumber: 1,
+        episodeNumber: 1,
+      });
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist).toHaveLength(1);
+      expect(wishlist[0].seasons[1].all_episodes).toBe(false);
+      expect(wishlist[0].seasons[1].episodes).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    });
+
+    it('should purge indexer results when guid is given without matching tmdbId', async () => {
+      writeStore('indexer-movie-result', 1, [
+        { tmdbId: '999', guid: 'guid-unknown', title: 'Unknown Movie' } as any,
+      ]);
+
+      await consumeWishlistItemForDownload(1, 'guid-unknown', 'movie');
+
+      const movies = readStore('indexer-movie-result', 1) as any[];
+      expect(movies.find((m) => m.guid === 'guid-unknown')).toBeUndefined();
+    });
   });
 });
 

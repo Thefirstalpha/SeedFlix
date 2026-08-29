@@ -410,12 +410,118 @@ describe('indexer module', () => {
       expect(notifs.notifications.some((n) => n.title.includes('automatique'))).toBe(true);
     });
 
+    it('should handle multiple releases and auto-download failures in processWishlistIndexer', async () => {
+      const user = createUser('userMultiReleases').user;
+      user.settings.indexer = { ...sampleSettings, autoDownload: true };
+      updateUser(user);
+
+      writeStore('wishlist', user.id, [
+        { tmdb: 550, type: 'movie', title: 'Fight Club', original_title: 'Fight Club', releaseDate: '1999', addedAt: '2024-01-01' },
+        { tmdb: 680, type: 'movie', title: 'Pulp Fiction', original_title: 'Pulp Fiction', releaseDate: '1994', addedAt: '2024-01-01' },
+        { tmdb: 1399, type: 'series', title: 'Game of Thrones', original_title: 'Game of Thrones', releaseDate: '2011', addedAt: '2024-01-01', all_seasons: true },
+      ]);
+
+      vi.mocked(torznabModule.rssTorznab).mockImplementation(async (settings, type) => {
+        if (type === 'movie') {
+          return {
+            rss: {
+              channel: {
+                item: [
+                  { title: 'Fight.Club.1999.1080p.MULTI', link: 'l1', guid: 'g-fc', 'torznab:attr': [{ name: 'tmdbid', value: '550' }, { name: 'size', value: '100' }] },
+                  { title: 'Pulp.Fiction.1994.1080p.MULTI', link: 'l2', guid: 'g-pf', 'torznab:attr': [{ name: 'tmdbid', value: '680' }, { name: 'size', value: '100' }] },
+                ],
+              },
+            },
+          } as any;
+        } else {
+          return {
+            rss: {
+              channel: {
+                item: [
+                  { title: 'Game.of.Thrones.S01E01.1080p.MULTI', link: 'l3', guid: 'g-got-1', 'torznab:attr': [{ name: 'tmdbid', value: '1399' }, { name: 'size', value: '100' }] },
+                  { title: 'Game.of.Thrones.S01E02.1080p.MULTI', link: 'l4', guid: 'g-got-2', 'torznab:attr': [{ name: 'tmdbid', value: '1399' }, { name: 'size', value: '100' }] },
+                ],
+              },
+            },
+          } as any;
+        }
+      });
+
+      const transmissionModule = await import('../../../server/modules/transmission');
+      vi.mocked(transmissionModule.startDownload).mockRejectedValueOnce(new Error('Transmission disk full'));
+
+      await processWishlistIndexer();
+
+      const notifs = getNotifications(user.id);
+      expect(notifs.notifications.length).toBeGreaterThanOrEqual(2);
+    });
+
     it('should update indexer process when pullAuto setting changes', () => {
       updateGlobalConfig({ pullAuto: true });
       expect(() => updateIndexerProcess()).not.toThrow();
 
       updateGlobalConfig({ pullAuto: false });
       expect(() => updateIndexerProcess()).not.toThrow();
+    });
+  });
+
+  describe('purgeIndexerResultsForMedia & resetIndexerStateForMedia', () => {
+    it('should purge results and add to blacklist for movie and series', async () => {
+      const { purgeIndexerResultsForMedia } = await import('../../../server/modules/indexer');
+
+      writeStore('indexer-movie-result', userId, [
+        { tmdbId: '550', guid: 'g-movie', title: 'Fight Club' } as any,
+      ]);
+      writeStore('indexer-series-result', userId, [
+        { tmdbId: '1399', guid: 'g-series-s1e1', title: 'GoT S1E1', seasonNumber: 1, episodeNumber: 1 } as any,
+        { tmdbId: '1399', guid: 'g-series-s2e1', title: 'GoT S2E1', seasonNumber: 2, episodeNumber: 1 } as any,
+      ]);
+
+      purgeIndexerResultsForMedia(userId, 550, 'movie', undefined, undefined, 'g-movie');
+      purgeIndexerResultsForMedia(userId, 1399, 'series', 1, 1, 'g-series-s1e1');
+
+      const remainingMovies = await getMoviesIndexerResult(userId);
+      const remainingSeries = await getSeriesIndexerResult(userId);
+
+      expect(remainingMovies).toHaveLength(0);
+      expect(remainingSeries).toHaveLength(1);
+      expect(remainingSeries[0].seasonNumber).toBe(2);
+    });
+
+    it('should reset indexer state and clean blacklist entries with resetIndexerStateForMedia', async () => {
+      const { resetIndexerStateForMedia } = await import('../../../server/modules/indexer');
+
+      writeStore('indexer-movie-result', userId, [
+        { tmdbId: '550', guid: 'g1', title: 'Fight Club' } as any,
+        { tmdbId: '680', guid: 'g2', title: 'Pulp Fiction' } as any,
+      ]);
+      writeStore('indexer-series-result', userId, [
+        { tmdbId: '1399', guid: 'g3', title: 'GoT S1E1', seasonNumber: 1, episodeNumber: 1 } as any,
+        { tmdbId: '1399', guid: 'g4', title: 'GoT S2E1', seasonNumber: 2, episodeNumber: 1 } as any,
+      ]);
+      writeStore('indexer-blacklist', userId, [
+        'movie:550:g1',
+        'movie:680:g2',
+        'series:1399:g3',
+        'series:1399:g4',
+      ]);
+
+      // Reset movie 550
+      resetIndexerStateForMedia(userId, 550, 'movie');
+      let movies = await getMoviesIndexerResult(userId);
+      expect(movies.find((m) => Number(m.tmdbId) === 550)).toBeUndefined();
+      expect(movies.find((m) => Number(m.tmdbId) === 680)).toBeDefined();
+
+      // Reset series 1399 season 1
+      resetIndexerStateForMedia(userId, 1399, 'series', 1, 1);
+      let series = await getSeriesIndexerResult(userId);
+      expect(series.find((s) => s.seasonNumber === 1)).toBeUndefined();
+      expect(series.find((s) => s.seasonNumber === 2)).toBeDefined();
+
+      // Reset without type
+      resetIndexerStateForMedia(userId, 680);
+      movies = await getMoviesIndexerResult(userId);
+      expect(movies).toHaveLength(0);
     });
   });
 });
