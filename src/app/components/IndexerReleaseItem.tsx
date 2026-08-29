@@ -145,7 +145,6 @@ export function IndexerReleaseItem({
   return (
     <div
       className="h-[60px] min-h-[60px] max-h-[60px] px-2.5 sm:px-3 py-1.5 rounded-lg border border-white/10 bg-slate-900/50 hover:bg-slate-900/80 transition-colors flex items-center justify-between gap-2 sm:gap-3 w-full min-w-0 max-w-full overflow-hidden"
-      onClick={(e) => e.stopPropagation()}
     >
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-1 overflow-hidden">
         <p

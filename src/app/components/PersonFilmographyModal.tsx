@@ -82,11 +82,22 @@ export function PersonFilmographyModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in-50 duration-200"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+      }}
+      role="dialog"
+      aria-modal="true"
+      tabIndex={-1}
     >
       <div
         className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-slate-900 border border-white/15 rounded-2xl shadow-2xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10 shrink-0 bg-slate-900/90">

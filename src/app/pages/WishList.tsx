@@ -349,6 +349,8 @@ export function WishList() {
                 return (
                   <div
                     key={movie.tmdb}
+                    role={isSelectionMode ? undefined : 'button'}
+                    tabIndex={isSelectionMode ? undefined : 0}
                     className={
                       isSelectionMode
                         ? undefined
@@ -356,6 +358,12 @@ export function WishList() {
                     }
                     onClick={() => {
                       if (!isSelectionMode) {
+                        navigate(`/movie/${movie.tmdb}`);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (!isSelectionMode && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
                         navigate(`/movie/${movie.tmdb}`);
                       }
                     }}
@@ -376,7 +384,6 @@ export function WishList() {
                       {isSelectionMode && (
                         <div
                           className="mb-2"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           <Checkbox
                             checked={selectedMovieIds.includes(movie.tmdb)}
@@ -464,6 +471,8 @@ export function WishList() {
                 return (
                   <div
                     key={group.tmdb}
+                    role={isSeriesSelectionMode ? undefined : 'button'}
+                    tabIndex={isSeriesSelectionMode ? undefined : 0}
                     className={
                       isSeriesSelectionMode
                         ? undefined
@@ -471,6 +480,12 @@ export function WishList() {
                     }
                     onClick={() => {
                       if (!isSeriesSelectionMode) {
+                        navigate(`/series/${group.tmdb}`);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (!isSeriesSelectionMode && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
                         navigate(`/series/${group.tmdb}`);
                       }
                     }}
@@ -491,7 +506,6 @@ export function WishList() {
                       {isSeriesSelectionMode && (
                         <div
                           className="mb-2"
-                          onClick={(event) => event.stopPropagation()}
                         >
                           <label className="inline-flex items-center gap-2 text-sm text-white/80">
                             <Checkbox

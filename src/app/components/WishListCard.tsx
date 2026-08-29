@@ -90,7 +90,6 @@ export function WishListCard({
         {targets.length > 0 ? (
           <div
             className="pt-2 border-t border-white/10 w-full min-w-0"
-            onClick={(event) => event.stopPropagation()}
           >
             <IndexerResultsList
               items={targets}

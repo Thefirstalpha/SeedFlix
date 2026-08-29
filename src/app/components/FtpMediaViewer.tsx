@@ -47,13 +47,22 @@ export function FtpMediaViewer({ filePath, fileName, fileSize, onClose }: Readon
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-6"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          onClose();
+        }
+      }}
       role="dialog"
       aria-modal="true"
+      tabIndex={-1}
     >
       <div
         className="relative flex flex-col w-full max-w-5xl max-h-[92vh] rounded-xl border border-white/20 bg-slate-950 shadow-2xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-slate-900/80 gap-3">
