@@ -433,7 +433,7 @@ export async function startDownload(
   userId: number,
   guid: string,
   mediaType: string,
-  options?: { tmdbId?: number; seasonNumber?: number; episodeNumber?: number },
+  options?: { tmdbId?: number | null; seasonNumber?: number | null; episodeNumber?: number | null },
 ) {
   const settings = getTransmissionSettings(userId);
   if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);

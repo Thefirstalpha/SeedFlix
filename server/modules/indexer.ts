@@ -716,8 +716,8 @@ export async function processWishlistIndexer() {
             try {
               await startDownload(user.id, series.guid, 'series', {
                 tmdbId: series.tmdbId ? Number(series.tmdbId) : undefined,
-                seasonNumber: series.seasonNumber,
-                episodeNumber: series.episodeNumber,
+                seasonNumber: series.seasonNumber ?? undefined,
+                episodeNumber: series.episodeNumber ?? undefined,
               });
               autoDownloadedSeriesGuids.add(series.guid);
             } catch (dlErr) {

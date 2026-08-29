@@ -411,7 +411,7 @@ export async function consumeWishlistItemForDownload(
   userId: number,
   guid: string,
   mediaType: 'movie' | 'series',
-  options?: { tmdbId?: number; seasonNumber?: number; episodeNumber?: number },
+  options?: { tmdbId?: number | null; seasonNumber?: number | null; episodeNumber?: number | null },
 ): Promise<void> {
   // 1. Chercher dans les résultats indexer existants pour extraire le tmdbId et la saison/épisode si non fournis
   const moviesResult = (readStore('indexer-movie-result', userId) || []) as Array<any>;
