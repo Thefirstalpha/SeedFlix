@@ -114,6 +114,7 @@ export function WishListCard({
             <div
               className="shrink-0 flex items-center gap-2 pl-2"
               onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
             >
               <label
                 title={
