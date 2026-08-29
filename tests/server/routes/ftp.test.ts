@@ -247,10 +247,7 @@ describe('Route: /api/ftp', () => {
 
     const resFail = await request(app).get('/api/ftp/stream?path=/fail.mp4').set('Cookie', cookie);
     expect(resFail.status).toBe(500);
-    const parsed = typeof resFail.body === 'object' && resFail.body !== null && 'ok' in resFail.body
-      ? resFail.body
-      : JSON.parse(resFail.body?.toString?.() || resFail.text || '{}');
-    expect(parsed.ok).toBe(false);
+    expect(JSON.parse(resFail.text).ok).toBe(false);
   });
 
   it('should support inline download via GET /api/ftp/download?inline=true and handle missing path', async () => {
