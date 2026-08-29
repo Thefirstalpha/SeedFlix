@@ -1,11 +1,13 @@
-import { ArrowLeft, Star, Calendar, Clock, User, Heart } from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
-import { useParams, Link, useNavigate } from 'react-router';
+import { ArrowLeft, Calendar, Clock, Star, User } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
+import { toast } from 'sonner';
 import { FilterOption, TorrentResultsPanel } from '../components/TorrentResultsPanel';
 import { TrailersSection } from '../components/TrailersSection';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
+import { WishlistButtons, WishlistMode } from '../components/WishlistDropdown';
 import { useI18n } from '../i18n/LanguageProvider';
 import { normalizeIndexerLanguage, normalizeQuality } from '../services/indexerNormalization';
 import {
@@ -13,7 +15,12 @@ import {
   searchMovieReleases,
 } from '../services/movieService';
 import { buildTorrentResultsLabels } from '../services/torrentResultsLabels';
-import { addToWishlist, removeFromWishlist, isInWishlist } from '../services/wishlistService';
+import {
+  addToWishlist,
+  removeFromWishlist,
+  getWishlistItem,
+  updateWishlistAutoGrab,
+} from '../services/wishlistService';
 import type { Movie } from '../types/movie';
 import { IndexerMovieResult } from '../../../common/indexer';
 import { getTmdbVideos, extractTrailers, TmdbVideo } from '../services/tmdbService';
@@ -33,6 +40,7 @@ export function MovieDetails() {
   const [movie, setMovie] = useState<Movie | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [inWishlist, setInWishlist] = useState(false);
+  const [isAutoGrab, setIsAutoGrab] = useState(false);
   const [releaseResults, setReleaseResults] = useState<IndexerMovieResult[]>([]);
   const [isReleaseLoading, setIsReleaseLoading] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
@@ -94,7 +102,9 @@ export function MovieDetails() {
       const movieData = await getMovieById(movieId, language);
       setMovie(movieData);
       if (movieData) {
-        setInWishlist(await isInWishlist(movieData.id));
+        const wishlistItem = await getWishlistItem(movieData.id, 'movie');
+        setInWishlist(Boolean(wishlistItem));
+        setIsAutoGrab(Boolean(wishlistItem?.autoGrab));
       } else {
         setReleaseResults([]);
       }
@@ -121,23 +131,44 @@ export function MovieDetails() {
     }
   };
 
+  const wishlistMode: WishlistMode = !inWishlist ? 'none' : isAutoGrab ? 'autograb' : 'classic';
 
-
-  const toggleWishlist = async () => {
+  const handleToggleClassic = async () => {
     if (!movie) return;
-
     if (inWishlist) {
-      await removeFromWishlist(movie.id);
       setInWishlist(false);
+      setIsAutoGrab(false);
+      await removeFromWishlist(movie.id);
+      toast.info(`"${movie.title}" retiré des favoris`);
     } else {
-      await addToWishlist(movie.id);
       setInWishlist(true);
+      setIsAutoGrab(false);
+      await addToWishlist(movie.id, false);
+      toast.success(`"${movie.title}" ajouté aux favoris`);
     }
-
     window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
     window.dispatchEvent(new CustomEvent('seedflix:notifications-refresh-request'));
   };
 
+  const handleToggleAutoGrab = async () => {
+    if (!movie) return;
+    if (isAutoGrab) {
+      setIsAutoGrab(false);
+      await updateWishlistAutoGrab(movie.id, 'movie', false);
+      toast.info(`Auto-Grab désactivé pour "${movie.title}"`);
+    } else {
+      setInWishlist(true);
+      setIsAutoGrab(true);
+      if (!inWishlist) {
+        await addToWishlist(movie.id, true);
+      } else {
+        await updateWishlistAutoGrab(movie.id, 'movie', true);
+      }
+      toast.success(`"${movie.title}" ajouté en Auto-Grab (Téléchargement auto)`);
+    }
+    window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
+    window.dispatchEvent(new CustomEvent('seedflix:notifications-refresh-request'));
+  };
 
   useEffect(() => {
     if (movie) {
@@ -210,17 +241,12 @@ export function MovieDetails() {
           {t('movieDetails.back')}
         </Button>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <Button
-            onClick={toggleWishlist}
-            className={`${inWishlist
-              ? 'bg-purple-600 hover:bg-purple-700 text-white'
-              : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-              }`}
-          >
-            <Heart className={`w-5 h-5 mr-2 ${inWishlist ? 'fill-current' : ''}`} />
-            {inWishlist ? t('movieDetails.removeFromWishlist') : t('movieDetails.addToWishlist')}
-          </Button>
+        <div className="flex items-center gap-2">
+          <WishlistButtons
+            mode={wishlistMode}
+            onToggleClassic={handleToggleClassic}
+            onToggleAutoGrab={handleToggleAutoGrab}
+          />
         </div>
       </div>
 
@@ -402,17 +428,12 @@ export function MovieDetails() {
             labels={torrentPanelLabels}
           />
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={toggleWishlist}
-              className={`w-full sm:w-auto ${inWishlist
-                ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-                }`}
-            >
-              <Heart className={`w-5 h-5 mr-2 ${inWishlist ? 'fill-current' : ''}`} />
-              {inWishlist ? t('movieDetails.removeFromWishlist') : t('movieDetails.addToWishlist')}
-            </Button>
+          <div className="flex items-center gap-2">
+            <WishlistButtons
+              mode={wishlistMode}
+              onToggleClassic={handleToggleClassic}
+              onToggleAutoGrab={handleToggleAutoGrab}
+            />
           </div>
 
           {/* Similar and Recommended Movies */}

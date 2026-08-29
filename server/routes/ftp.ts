@@ -50,8 +50,7 @@ router.post('/ftp/configure', async (req, res) => {
   }
 
   const authRequired = Boolean(req.body?.authRequired || false);
-  const incomingPassword =
-    req.body?.password !== undefined ? String(req.body.password).trim() : '';
+  const incomingPassword = req.body?.password !== undefined ? String(req.body.password).trim() : '';
   const password =
     authRequired &&
     (!incomingPassword || incomingPassword === '***********' || incomingPassword.includes('•'))

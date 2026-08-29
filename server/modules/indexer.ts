@@ -477,6 +477,7 @@ export async function extractWishlistItemsFromIndexerResults(
           matchedWishlist: {
             tmdbId: item.tmdb,
             type: 'movie',
+            autoGrab: Boolean(item.autoGrab),
           },
         });
       }
@@ -499,6 +500,27 @@ export async function extractWishlistItemsFromIndexerResults(
       for (const found of founds) {
         const isEntireSeason = !found.episodeNumber && Boolean(found.seasonNumber);
         const isAllSeasons = !found.seasonNumber && !found.episodeNumber;
+        const targetSeason = found.seasonNumber || 1;
+        const seasonConfig = item.seasons?.[targetSeason];
+
+        let isAutoGrab = false;
+        if (item.all_seasons) {
+          isAutoGrab = Boolean(item.autoGrab);
+        } else if (seasonConfig) {
+          if (found.episodeNumber !== undefined && found.episodeNumber !== null) {
+            isAutoGrab = Boolean(
+              seasonConfig.autoGrab ||
+              seasonConfig.autoGrabEpisodes?.includes(found.episodeNumber) ||
+              item.autoGrab,
+            );
+          } else {
+            // Pack saison complet
+            isAutoGrab = Boolean(seasonConfig.autoGrab || item.autoGrab);
+          }
+        } else {
+          isAutoGrab = Boolean(item.autoGrab);
+        }
+
         seriesFounds.push({
           ...found,
           matchedWishlist: {
@@ -508,6 +530,7 @@ export async function extractWishlistItemsFromIndexerResults(
             episodeNumber: found.episodeNumber ?? undefined,
             isEntireSeason,
             isAllSeasons,
+            autoGrab: isAutoGrab,
           },
         });
       }
@@ -642,8 +665,10 @@ export async function processWishlistIndexer() {
           const blacklist = (readStore('indexer-blacklist', user.id) || []) as string[];
 
           // Read current indexer results to avoid notifying about the same release multiple times if it stays in the last results for a while
-          const moviesResult = (readStore('indexer-movie-result', user.id) || []) as IndexerMovieResult[];
-          const seriesResult = (readStore('indexer-series-result', user.id) || []) as IndexerSeriesResult[];
+          const moviesResult = (readStore('indexer-movie-result', user.id) ||
+            []) as IndexerMovieResult[];
+          const seriesResult = (readStore('indexer-series-result', user.id) ||
+            []) as IndexerSeriesResult[];
 
           // Create keys for found movies and series to compare with blacklist and current results
           const moviesKey = new Set(moviesResult.map((m) => `movie:${m.tmdbId}:${m.guid}`));
@@ -669,96 +694,93 @@ export async function processWishlistIndexer() {
           }
         });
 
-        // Auto-Download (Auto-Grab) si activé pour l'utilisateur
-        const autoDownloadEnabled = Boolean(indexerSettings?.autoDownload);
+        // Auto-Download (Auto-Grab) pour les favoris ayant l'option activée
         const autoDownloadedMovieGuids = new Set<string>();
         const autoDownloadedSeriesGuids = new Set<string>();
 
-        if (autoDownloadEnabled) {
-          const { startDownload } = await import('./transmission');
-          for (const movie of remainingMovies) {
-            if (movie.guid) {
-              try {
-                await startDownload(user.id, movie.guid, 'movie', {
-                  tmdbId: movie.tmdbId ? Number(movie.tmdbId) : undefined,
-                });
-                autoDownloadedMovieGuids.add(movie.guid);
-              } catch (dlErr) {
-                console.log(`Auto-download failed for movie "${movie.title}": ${dlErr}`);
-              }
+        const { startDownload } = await import('./transmission');
+        for (const movie of remainingMovies) {
+          if (movie.guid && movie.matchedWishlist?.autoGrab) {
+            try {
+              await startDownload(user.id, movie.guid, 'movie', {
+                tmdbId: movie.tmdbId ? Number(movie.tmdbId) : undefined,
+              });
+              autoDownloadedMovieGuids.add(movie.guid);
+            } catch (dlErr) {
+              console.log(`Auto-download failed for movie "${movie.title}": ${dlErr}`);
             }
           }
-          for (const series of remainingSeries) {
-            if (series.guid) {
-              try {
-                await startDownload(user.id, series.guid, 'series', {
-                  tmdbId: series.tmdbId ? Number(series.tmdbId) : undefined,
-                  seasonNumber: series.seasonNumber,
-                  episodeNumber: series.episodeNumber,
-                });
-                autoDownloadedSeriesGuids.add(series.guid);
-              } catch (dlErr) {
-                console.log(`Auto-download failed for series "${series.title}": ${dlErr}`);
-              }
+        }
+        for (const series of remainingSeries) {
+          if (series.guid && series.matchedWishlist?.autoGrab) {
+            try {
+              await startDownload(user.id, series.guid, 'series', {
+                tmdbId: series.tmdbId ? Number(series.tmdbId) : undefined,
+                seasonNumber: series.seasonNumber,
+                episodeNumber: series.episodeNumber,
+              });
+              autoDownloadedSeriesGuids.add(series.guid);
+            } catch (dlErr) {
+              console.log(`Auto-download failed for series "${series.title}": ${dlErr}`);
             }
           }
         }
 
-          // Notifications pour les nouveaux résultats
-          const uniqueMovieTitles = [
-            ...new Set(remainingMovies.map((m) => m.title || `Film #${m.tmdbId}`)),
-          ];
-          const uniqueSeriesTitles = [
-            ...new Set(remainingSeries.map((s) => s.title || `Série #${s.tmdbId}`)),
-          ];
+        // Notifications pour les nouveaux résultats
+        const uniqueMovieTitles = [
+          ...new Set(remainingMovies.map((m) => m.title || `Film #${m.tmdbId}`)),
+        ];
+        const uniqueSeriesTitles = [
+          ...new Set(remainingSeries.map((s) => s.title || `Série #${s.tmdbId}`)),
+        ];
 
-          if (uniqueMovieTitles.length === 1) {
-            const isAutoDl = autoDownloadedMovieGuids.has(remainingMovies[0].guid || '');
-            addNotification(user.id, {
-              title: isAutoDl ? 'Téléchargement automatique lancé' : 'Film disponible',
-              message: uniqueMovieTitles[0],
-              type: isAutoDl ? 'success' : 'search',
-              data: { tmdbId: remainingMovies[0].tmdbId, type: 'movie' },
-            });
-          } else if (uniqueMovieTitles.length > 1) {
-            const autoDlCount = autoDownloadedMovieGuids.size;
-            addNotification(user.id, {
-              title:
-                autoDlCount > 0
-                  ? `${autoDlCount} téléchargements automatiques de films lancés`
-                  : `${uniqueMovieTitles.length} nouveaux films disponibles`,
-              message:
-                uniqueMovieTitles.slice(0, 3).join(', ') +
-                (uniqueMovieTitles.length > 3 ? `… (+${uniqueMovieTitles.length - 3})` : ''),
-              type: autoDlCount > 0 ? 'success' : 'search',
-              data: { count: uniqueMovieTitles.length, type: 'movie' },
-            });
-          }
-
-          if (uniqueSeriesTitles.length === 1) {
-            const isAutoDl = autoDownloadedSeriesGuids.has(remainingSeries[0].guid || '');
-            addNotification(user.id, {
-              title: isAutoDl ? 'Téléchargement automatique lancé' : 'Épisode disponible',
-              message: uniqueSeriesTitles[0],
-              type: isAutoDl ? 'success' : 'search',
-              data: { tmdbId: remainingSeries[0].tmdbId, type: 'series' },
-            });
-          } else if (uniqueSeriesTitles.length > 1) {
-            const autoDlCount = autoDownloadedSeriesGuids.size;
-            addNotification(user.id, {
-              title:
-                autoDlCount > 0
-                  ? `${autoDlCount} téléchargements automatiques d'épisodes lancés`
-                  : `${uniqueSeriesTitles.length} nouveaux épisodes disponibles`,
-              message:
-                uniqueSeriesTitles.slice(0, 3).join(', ') +
-                (uniqueSeriesTitles.length > 3 ? `… (+${uniqueSeriesTitles.length - 3})` : ''),
-              type: autoDlCount > 0 ? 'success' : 'search',
-              data: { count: uniqueSeriesTitles.length, type: 'series' },
-            });
-          }
+        if (uniqueMovieTitles.length === 1) {
+          const isAutoDl = autoDownloadedMovieGuids.has(remainingMovies[0].guid || '');
+          addNotification(user.id, {
+            title: isAutoDl ? 'Téléchargement automatique lancé' : 'Film disponible',
+            message: uniqueMovieTitles[0],
+            type: isAutoDl ? 'success' : 'search',
+            data: { tmdbId: remainingMovies[0].tmdbId, type: 'movie' },
+          });
+        } else if (uniqueMovieTitles.length > 1) {
+          const autoDlCount = autoDownloadedMovieGuids.size;
+          addNotification(user.id, {
+            title:
+              autoDlCount > 0
+                ? `${autoDlCount} téléchargements automatiques de films lancés`
+                : `${uniqueMovieTitles.length} nouveaux films disponibles`,
+            message:
+              uniqueMovieTitles.slice(0, 3).join(', ') +
+              (uniqueMovieTitles.length > 3 ? `… (+${uniqueMovieTitles.length - 3})` : ''),
+            type: autoDlCount > 0 ? 'success' : 'search',
+            data: { count: uniqueMovieTitles.length, type: 'movie' },
+          });
         }
-      } catch (error) {
+
+        if (uniqueSeriesTitles.length === 1) {
+          const isAutoDl = autoDownloadedSeriesGuids.has(remainingSeries[0].guid || '');
+          addNotification(user.id, {
+            title: isAutoDl ? 'Téléchargement automatique lancé' : 'Épisode disponible',
+            message: uniqueSeriesTitles[0],
+            type: isAutoDl ? 'success' : 'search',
+            data: { tmdbId: remainingSeries[0].tmdbId, type: 'series' },
+          });
+        } else if (uniqueSeriesTitles.length > 1) {
+          const autoDlCount = autoDownloadedSeriesGuids.size;
+          addNotification(user.id, {
+            title:
+              autoDlCount > 0
+                ? `${autoDlCount} téléchargements automatiques d'épisodes lancés`
+                : `${uniqueSeriesTitles.length} nouveaux épisodes disponibles`,
+            message:
+              uniqueSeriesTitles.slice(0, 3).join(', ') +
+              (uniqueSeriesTitles.length > 3 ? `… (+${uniqueSeriesTitles.length - 3})` : ''),
+            type: autoDlCount > 0 ? 'success' : 'search',
+            data: { count: uniqueSeriesTitles.length, type: 'series' },
+          });
+        }
+      }
+    } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.log(`Error processing wishlist indexer for user ${user.username}: ${message}`);
     }

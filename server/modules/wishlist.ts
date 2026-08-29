@@ -30,11 +30,20 @@ function parseWishlistSeasons(rawSeasons: unknown): Record<number, WishListSeaso
     const episodes = Array.isArray(seasonObj.episodes)
       ? seasonObj.episodes.map(Number).filter((num: number) => !Number.isNaN(num))
       : [];
-    seasons[seasonNumber] = {
+    const seasonItem: WishListSeasonItem = {
       season_number: seasonNumber,
       all_episodes,
       episodes,
     };
+    if (seasonObj.autoGrab !== undefined) {
+      seasonItem.autoGrab = Boolean(seasonObj.autoGrab);
+    }
+    if (Array.isArray(seasonObj.autoGrabEpisodes)) {
+      seasonItem.autoGrabEpisodes = seasonObj.autoGrabEpisodes
+        .map(Number)
+        .filter((num: number) => !Number.isNaN(num));
+    }
+    seasons[seasonNumber] = seasonItem;
   }
   return seasons;
 }
@@ -70,6 +79,7 @@ function parseWishlistItem(raw: unknown): WishListItem | null {
   const poster_path = typeof item.poster_path === 'string' ? item.poster_path : null;
   const all_seasons = Boolean(item.all_seasons);
   const seasons = parseWishlistSeasons(item.seasons);
+  const autoGrab = Boolean(item.autoGrab);
 
   return {
     tmdb,
@@ -83,6 +93,7 @@ function parseWishlistItem(raw: unknown): WishListItem | null {
     original_title,
     all_seasons,
     seasons,
+    autoGrab,
   };
 }
 
@@ -93,10 +104,14 @@ function applySeasonAndEpisode(
   item: WishListItem,
   seasonNumber?: number,
   episodeNumber?: number,
+  autoGrab?: boolean,
 ): void {
   if (seasonNumber === undefined) {
     item.all_seasons = true;
     item.seasons = {};
+    if (autoGrab !== undefined) {
+      item.autoGrab = Boolean(autoGrab);
+    }
     return;
   }
 
@@ -106,24 +121,52 @@ function applySeasonAndEpisode(
   }
 
   if (episodeNumber === undefined) {
-    item.seasons[seasonNumber] = {
+    const seasonItem: WishListSeasonItem = {
       season_number: seasonNumber,
       all_episodes: true,
       episodes: [],
     };
+    if (autoGrab !== undefined) {
+      seasonItem.autoGrab = Boolean(autoGrab);
+    }
+    item.seasons[seasonNumber] = seasonItem;
     return;
   }
 
   const existingSeason = item.seasons[seasonNumber];
   if (!existingSeason) {
-    item.seasons[seasonNumber] = {
+    const seasonItem: WishListSeasonItem = {
       season_number: seasonNumber,
       all_episodes: false,
       episodes: [episodeNumber],
     };
-  } else if (!existingSeason.all_episodes && !existingSeason.episodes.includes(episodeNumber)) {
-    existingSeason.episodes.push(episodeNumber);
-    existingSeason.episodes.sort((a, b) => a - b);
+    if (autoGrab !== undefined) {
+      seasonItem.autoGrab = false;
+      seasonItem.autoGrabEpisodes = autoGrab ? [episodeNumber] : [];
+    }
+    item.seasons[seasonNumber] = seasonItem;
+  } else if (!existingSeason.all_episodes) {
+    if (!existingSeason.episodes.includes(episodeNumber)) {
+      existingSeason.episodes.push(episodeNumber);
+      existingSeason.episodes.sort((a, b) => a - b);
+    }
+    if (autoGrab !== undefined) {
+      if (!existingSeason.autoGrabEpisodes) {
+        existingSeason.autoGrabEpisodes = [];
+      }
+      if (autoGrab) {
+        if (!existingSeason.autoGrabEpisodes.includes(episodeNumber)) {
+          existingSeason.autoGrabEpisodes.push(episodeNumber);
+          existingSeason.autoGrabEpisodes.sort((a, b) => a - b);
+        }
+      } else {
+        existingSeason.autoGrabEpisodes = existingSeason.autoGrabEpisodes.filter(
+          (ep) => ep !== episodeNumber,
+        );
+      }
+    }
+  } else if (existingSeason.all_episodes && autoGrab !== undefined) {
+    existingSeason.autoGrab = Boolean(autoGrab);
   }
 }
 
@@ -190,7 +233,11 @@ export async function getWishlist(userId: number): Promise<WishListItem[]> {
   return getWishlistSync(userId);
 }
 
-function createWishlistItemFromTmdb(results: any, type: 'movie' | 'series'): WishListItem {
+function createWishlistItemFromTmdb(
+  results: any,
+  type: 'movie' | 'series',
+  autoGrab?: boolean,
+): WishListItem {
   return {
     tmdb: results.id,
     type,
@@ -203,6 +250,7 @@ function createWishlistItemFromTmdb(results: any, type: 'movie' | 'series'): Wis
     original_title: (type === 'movie' ? results.original_title : results.original_name) || '',
     all_seasons: false,
     seasons: {},
+    autoGrab: Boolean(autoGrab),
   };
 }
 
@@ -212,6 +260,7 @@ export async function addToWishlist(
   type: 'movie' | 'series',
   seasonNumber?: number,
   episodeNumber?: number,
+  autoGrab?: boolean,
 ) {
   const request = buildDetailsRequest(
     type === 'movie' ? TmdbType.movie : TmdbType.series,
@@ -231,17 +280,78 @@ export async function addToWishlist(
     );
 
     if (!item) {
-      item = createWishlistItemFromTmdb(results, type);
+      item = createWishlistItemFromTmdb(results, type, autoGrab);
       wishlist.push(item);
+    } else if (autoGrab !== undefined && seasonNumber === undefined) {
+      item.autoGrab = Boolean(autoGrab);
     }
 
     if (type === 'series') {
-      applySeasonAndEpisode(item, seasonNumber, episodeNumber);
+      applySeasonAndEpisode(item, seasonNumber, episodeNumber, autoGrab);
     }
 
     writeStore(DB_NAMESPACE, userId, wishlist);
   });
   void emitStatusBar(userId);
+}
+
+export function updateWishlistAutoGrab(
+  userId: number,
+  tmdbId: number,
+  type: 'movie' | 'series',
+  autoGrab: boolean,
+  seasonNumber?: number,
+  episodeNumber?: number,
+): boolean {
+  let updated = false;
+  runInTransaction(({ writeStore }) => {
+    const wishlist = getWishlistSync(userId);
+    const item = wishlist.find((i) => i.tmdb === tmdbId && i.type === type);
+    if (item) {
+      if (type === 'series' && seasonNumber !== undefined) {
+        if (episodeNumber !== undefined) {
+          const season = item.seasons[seasonNumber];
+          if (season) {
+            if (!season.autoGrabEpisodes) season.autoGrabEpisodes = [];
+            if (autoGrab) {
+              if (!season.autoGrabEpisodes.includes(episodeNumber)) {
+                season.autoGrabEpisodes.push(episodeNumber);
+              }
+            } else {
+              season.autoGrabEpisodes = season.autoGrabEpisodes.filter(
+                (ep) => ep !== episodeNumber,
+              );
+            }
+            updated = true;
+          }
+        } else {
+          const season = item.seasons[seasonNumber];
+          if (season) {
+            season.autoGrab = Boolean(autoGrab);
+            updated = true;
+          }
+        }
+      } else {
+        item.autoGrab = Boolean(autoGrab);
+        if (type === 'series' && item.seasons) {
+          for (const s of Object.values(item.seasons)) {
+            s.autoGrab = Boolean(autoGrab);
+            if (!autoGrab) {
+              s.autoGrabEpisodes = [];
+            }
+          }
+        }
+        updated = true;
+      }
+      if (updated) {
+        writeStore(DB_NAMESPACE, userId, wishlist);
+      }
+    }
+  });
+  if (updated) {
+    void emitStatusBar(userId);
+  }
+  return updated;
 }
 
 async function fetchSeriesSeasonInfo(

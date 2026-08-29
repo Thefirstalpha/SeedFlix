@@ -1,7 +1,6 @@
 import { Client, FileInfo } from 'basic-ftp';
 import { Readable, Writable } from 'node:stream';
 import { FtpSettings } from '../../common/settings';
-import { runInTransaction } from './db';
 import { getUser, updateUser } from './user';
 
 // ─── Configuration ───────────────────────────────────────────────────────────

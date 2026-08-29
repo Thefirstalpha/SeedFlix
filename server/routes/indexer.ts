@@ -34,9 +34,7 @@ router.post('/indexer/configure', async (req, res) => {
   const currentSettings = getIndexerSettings(req.user.id);
   const incomingToken = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
   const token =
-    incomingToken && !incomingToken.includes('•')
-      ? incomingToken
-      : currentSettings?.token || '';
+    incomingToken && !incomingToken.includes('•') ? incomingToken : currentSettings?.token || '';
 
   const setting: IndexerSettings = {
     url: String(req.body?.url || '').trim(),

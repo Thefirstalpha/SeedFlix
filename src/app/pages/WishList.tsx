@@ -14,7 +14,11 @@ import {
   rejectIndexerResult,
 } from '../services/indexerResultService';
 import { addTorrentToClient } from '../services/torrentService';
-import { getWishlist, removeMultipleFromWishlist } from '../services/wishlistService';
+import {
+  getWishlist,
+  removeMultipleFromWishlist,
+  updateWishlistAutoGrab,
+} from '../services/wishlistService';
 import { WishListItem } from '../../../common/wishlist';
 import { IndexerMovieResult, IndexerSeriesResult } from '../../../common/indexer';
 
@@ -43,6 +47,7 @@ function formatGroupedSeries(seriesItems: WishListItem[]) {
         releaseDate: item.releaseDate,
         seasons: seasonsAllEpisodes,
         episodes: episodeEntries,
+        autoGrab: item.autoGrab,
       };
     })
     .sort((a, b) => a.title.localeCompare(b.title, 'fr'));
@@ -261,6 +266,23 @@ export function WishList() {
     }
   };
 
+  const handleToggleAutoGrab = async (
+    tmdbId: number,
+    type: 'movie' | 'series',
+    autoGrab: boolean,
+  ) => {
+    // Optimistic update
+    setWishlist((prev) =>
+      prev.map((item) => {
+        if (item.tmdb === tmdbId && item.type === type) {
+          return { ...item, autoGrab };
+        }
+        return item;
+      }),
+    );
+    await updateWishlistAutoGrab(tmdbId, type, autoGrab);
+  };
+
   
 
   return (
@@ -374,6 +396,8 @@ export function WishList() {
                       year={movieYear}
                       rating={movie.rating ?? 0}
                       genre={movie.genre ?? ''}
+                      autoGrab={movie.autoGrab}
+                      onToggleAutoGrab={(val) => handleToggleAutoGrab(movie.tmdb, 'movie', val)}
                       targets={movieTargets}
                       type="movie"
                       actionKey={actionKey}
@@ -496,6 +520,8 @@ export function WishList() {
                       year={year}
                       genre={group.genre}
                       rating={group.rating}
+                      autoGrab={group.autoGrab}
+                      onToggleAutoGrab={(val) => handleToggleAutoGrab(group.tmdb, 'series', val)}
                       targets={groupTargets}
                       type="series"
                       actionKey={actionKey}

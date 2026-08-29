@@ -1,12 +1,14 @@
 import { ArrowLeft, Calendar, Clapperboard, Heart, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { toast } from 'sonner';
 import { TorrentResultsPanel, FilterOption } from '../components/TorrentResultsPanel';
 import { TrailersSection } from '../components/TrailersSection';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { ScrollArea } from '../components/ui/scroll-area';
+import { WishlistButtons, WishlistMode } from '../components/WishlistDropdown';
 import { useAuth } from '../context/AuthContext';
 import { useI18n } from '../i18n/LanguageProvider';
 import { normalizeIndexerLanguage, normalizeQuality } from '../services/indexerNormalization';
@@ -20,6 +22,7 @@ import {
   getSeriesWishlistStatus,
   removeFromWishlist,
 } from '../services/seriesWishlistService';
+import { updateWishlistAutoGrab } from '../services/wishlistService';
 import { getTmdbVideos, extractTrailers, TmdbVideo } from '../services/tmdbService';
 import { buildTorrentResultsLabels } from '../services/torrentResultsLabels';
 import type { SeriesDetails as SeriesDetailsModel, SeriesEpisode } from '../types/series';
@@ -31,27 +34,29 @@ import { PersonFilmographyModal } from '../components/PersonFilmographyModal';
 
 const SERIES_QUALITY_FILTERS = new Set(['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv']);
 
-function getSeasonWishlistButtonLabel(
-  isSeasonCoveredBySeries: boolean,
-  isSeasonInWishlist: boolean,
-  t: (k: string) => string,
-): string {
-  if (isSeasonCoveredBySeries) return t('seriesDetails.coveredBySeries');
-  if (isSeasonInWishlist) return t('seriesDetails.removeSeason');
-  return t('seriesDetails.addSeason');
+function getSeasonWishlistMode(
+  wishlistStatus: WishListItem | undefined,
+  seasonNumber: number | null,
+): WishlistMode {
+  if (!wishlistStatus || seasonNumber === null) return 'none';
+  const season = wishlistStatus.seasons?.[seasonNumber];
+  if (!season || !season.all_episodes) return 'none';
+  return season.autoGrab ? 'autograb' : 'classic';
 }
 
-function getSeasonWishlistButtonClass(
-  isSeasonCoveredBySeries: boolean,
-  isSeasonInWishlist: boolean,
-): string {
-  if (isSeasonCoveredBySeries) {
-    return 'bg-white/5 text-white/40 border border-white/10 cursor-not-allowed';
-  }
-  if (isSeasonInWishlist) {
-    return 'bg-cyan-600 hover:bg-cyan-700 text-white';
-  }
-  return 'bg-white/10 hover:bg-white/20 text-white border border-white/20';
+function getEpisodeWishlistMode(
+  wishlistStatus: WishListItem | undefined,
+  seasonNumber: number | null,
+  episodeNumber: number,
+): WishlistMode {
+  if (!wishlistStatus || seasonNumber === null) return 'none';
+  const season = wishlistStatus.seasons?.[seasonNumber];
+  if (!season || season.all_episodes) return 'none';
+  if (!season.episodes?.includes(episodeNumber)) return 'none';
+  const isAutoGrab = Boolean(
+    season.autoGrab || season.autoGrabEpisodes?.includes(episodeNumber),
+  );
+  return isAutoGrab ? 'autograb' : 'classic';
 }
 
 interface SeriesSeasonsAndEpisodesProps {
@@ -59,16 +64,14 @@ interface SeriesSeasonsAndEpisodesProps {
   selectedSeason: number | null;
   setSelectedSeason: (s: number) => void;
   wishlistStatus: WishListItem | undefined;
-  isSeasonInWishlist: (s: number) => boolean;
   isSeasonCoveredBySeries: boolean;
-  handleSeasonWishlist: () => void;
+  handleSelectSeasonMode: (season: number, mode: WishlistMode) => void;
   isLoadingEpisodes: boolean;
   episodes: SeriesEpisode[];
   spoilerModeEnabled: boolean;
   revealedEpisodeIds: number[];
   toggleEpisodeReveal: (id: number) => void;
-  isEpisodeDirectlyInWishlist: (season: number, ep: number) => boolean;
-  handleEpisodeWishlist: (ep: SeriesEpisode) => void;
+  handleSelectEpisodeMode: (season: number, ep: number, mode: WishlistMode) => void;
   t: (k: string, params?: Record<string, any>) => string;
 }
 
@@ -77,16 +80,14 @@ function SeriesSeasonsAndEpisodes({
   selectedSeason,
   setSelectedSeason,
   wishlistStatus,
-  isSeasonInWishlist,
   isSeasonCoveredBySeries,
-  handleSeasonWishlist,
+  handleSelectSeasonMode,
   isLoadingEpisodes,
   episodes,
   spoilerModeEnabled,
   revealedEpisodeIds,
   toggleEpisodeReveal,
-  isEpisodeDirectlyInWishlist,
-  handleEpisodeWishlist,
+  handleSelectEpisodeMode,
   t,
 }: Readonly<SeriesSeasonsAndEpisodesProps>) {
   return (
@@ -101,7 +102,7 @@ function SeriesSeasonsAndEpisodes({
 
         {availableSeasons.length > 0 ? (
           <>
-            {/* Season selector + season wishlist button */}
+            {/* Season selector + season wishlist dropdown */}
             <div className="flex items-center gap-3 flex-wrap min-w-0">
               <label htmlFor="season-select" className="text-white/80 shrink-0">
                 {t('seriesDetails.season')}
@@ -118,33 +119,40 @@ function SeriesSeasonsAndEpisodes({
                       number: season.seasonNumber,
                       name: season.name,
                     })}
-                    {isSeasonInWishlist(season.seasonNumber) ? ' ♥' : ''}
                   </option>
                 ))}
               </select>
 
-              {/* Season-level wishlist button */}
+              {/* Season-level wishlist buttons */}
               {selectedSeason !== null && (
-                <Button
-                  size="sm"
-                  disabled={wishlistStatus?.all_seasons}
-                  onClick={handleSeasonWishlist}
-                  className={`shrink-0 ${getSeasonWishlistButtonClass(
-                    isSeasonCoveredBySeries,
-                    isSeasonInWishlist(selectedSeason),
-                  )}`}
-                >
-                  <Heart
-                    className={`w-4 h-4 mr-1 ${
-                      isSeasonInWishlist(selectedSeason) ? 'fill-current' : ''
-                    }`}
+                isSeasonCoveredBySeries ? (
+                  <Badge
+                    variant="outline"
+                    className="border-cyan-500/30 text-cyan-300 text-xs py-1 px-2.5 h-8 flex items-center"
+                  >
+                    <Heart className="w-3.5 h-3.5 mr-1.5 fill-current" />
+                    {t('seriesDetails.coveredBySeries')}
+                  </Badge>
+                ) : (
+                  <WishlistButtons
+                    mode={getSeasonWishlistMode(wishlistStatus, selectedSeason)}
+                    size="sm"
+                    onToggleClassic={() => {
+                      const currentMode = getSeasonWishlistMode(wishlistStatus, selectedSeason);
+                      handleSelectSeasonMode(
+                        selectedSeason,
+                        currentMode !== 'none' ? 'none' : 'classic',
+                      );
+                    }}
+                    onToggleAutoGrab={() => {
+                      const currentMode = getSeasonWishlistMode(wishlistStatus, selectedSeason);
+                      handleSelectSeasonMode(
+                        selectedSeason,
+                        currentMode === 'autograb' ? 'classic' : 'autograb',
+                      );
+                    }}
                   />
-                  {getSeasonWishlistButtonLabel(
-                    isSeasonCoveredBySeries,
-                    isSeasonInWishlist(selectedSeason),
-                    t,
-                  )}
-                </Button>
+                )
               )}
             </div>
 
@@ -167,10 +175,8 @@ function SeriesSeasonsAndEpisodes({
                     const coveredByParent =
                       wishlistStatus &&
                       (wishlistStatus?.all_seasons ||
-                        (selectedSeason !== null && isSeasonInWishlist(selectedSeason)));
-                    const directlyInWishlist =
-                      selectedSeason !== null &&
-                      isEpisodeDirectlyInWishlist(selectedSeason, episode.episodeNumber);
+                        (selectedSeason !== null &&
+                          wishlistStatus?.seasons?.[selectedSeason]?.all_episodes));
                     const isEpisodeHidden =
                       spoilerModeEnabled && !revealedEpisodeIds.includes(episode.id);
 
@@ -222,24 +228,40 @@ function SeriesSeasonsAndEpisodes({
                                 {t('seriesDetails.covered')}
                               </Badge>
                             ) : (
-                              <button
-                                onClick={() => handleEpisodeWishlist(episode)}
-                                type="button"
-                                title={
-                                  directlyInWishlist
-                                    ? t('seriesDetails.removeEpisode')
-                                    : t('seriesDetails.addEpisode')
-                                }
-                                className="p-1.5 rounded-full hover:bg-white/10 transition-colors"
-                              >
-                                <Heart
-                                  className={`w-4 h-4 ${
-                                    directlyInWishlist
-                                      ? 'fill-cyan-400 text-cyan-400'
-                                      : 'text-white/50 hover:text-white'
-                                  }`}
-                                />
-                              </button>
+                              <WishlistButtons
+                                mode={getEpisodeWishlistMode(
+                                  wishlistStatus,
+                                  selectedSeason,
+                                  episode.episodeNumber,
+                                )}
+                                size="icon"
+                                onToggleClassic={() => {
+                                  if (selectedSeason === null) return;
+                                  const currentMode = getEpisodeWishlistMode(
+                                    wishlistStatus,
+                                    selectedSeason,
+                                    episode.episodeNumber,
+                                  );
+                                  handleSelectEpisodeMode(
+                                    selectedSeason,
+                                    episode.episodeNumber,
+                                    currentMode !== 'none' ? 'none' : 'classic',
+                                  );
+                                }}
+                                onToggleAutoGrab={() => {
+                                  if (selectedSeason === null) return;
+                                  const currentMode = getEpisodeWishlistMode(
+                                    wishlistStatus,
+                                    selectedSeason,
+                                    episode.episodeNumber,
+                                  );
+                                  handleSelectEpisodeMode(
+                                    selectedSeason,
+                                    episode.episodeNumber,
+                                    currentMode === 'autograb' ? 'classic' : 'autograb',
+                                  );
+                                }}
+                              />
                             )}
                           </div>
                         </div>
@@ -502,44 +524,121 @@ export function SeriesDetails() {
   // ── Wishlist helpers ────────────────────────────────────────────────────────
   const isSeasonCoveredBySeries = wishlistStatus?.all_seasons;
 
-  const isSeasonInWishlist = (seasonNumber: number) =>
-    wishlistStatus && (wishlistStatus.all_seasons || (wishlistStatus.seasons?.[seasonNumber]?.all_episodes));
-
-  const isEpisodeDirectlyInWishlist = (seasonNumber: number, episodeNumber: number) =>
-    wishlistStatus?.seasons?.[seasonNumber]?.episodes?.includes(episodeNumber);
-
   // ── Wishlist actions ────────────────────────────────────────────────────────
+  const isSeriesInWishlist = Boolean(
+    wishlistStatus &&
+      (wishlistStatus.all_seasons || Object.keys(wishlistStatus.seasons || {}).length > 0),
+  );
+  const isSeriesAutoGrab = Boolean(
+    wishlistStatus &&
+      (wishlistStatus.autoGrab ||
+        Object.values(wishlistStatus.seasons || {}).some(
+          (s) => s.autoGrab || (s.autoGrabEpisodes && s.autoGrabEpisodes.length > 0),
+        )),
+  );
 
-  const handleSeriesWishlist = async () => {
+  const seriesWishlistMode: WishlistMode = !isSeriesInWishlist
+    ? 'none'
+    : isSeriesAutoGrab
+      ? 'autograb'
+      : 'classic';
+
+  const handleSelectSeriesMode = async (mode: WishlistMode) => {
     if (!series) return;
-    if (wishlistStatus?.all_seasons) {
+    if (mode === 'none') {
+      setWishlistStatus(undefined);
       await removeFromWishlist(series.id);
+      toast.info(`"${series.title}" retiré des favoris`);
     } else {
-      await addToWishlist(series.id);
+      const autoGrab = mode === 'autograb';
+      if (!isSeriesInWishlist) {
+        await addToWishlist(series.id, undefined, undefined, autoGrab);
+        toast.success(
+          autoGrab
+            ? `"${series.title}" ajouté en Auto-Grab (Téléchargement auto)`
+            : `"${series.title}" ajouté aux favoris`,
+        );
+      } else {
+        await updateWishlistAutoGrab(series.id, 'series', autoGrab);
+        toast.success(
+          autoGrab
+            ? `Passé en mode Auto-Grab pour "${series.title}"`
+            : `Auto-Grab désactivé pour "${series.title}"`,
+        );
+      }
     }
     await refreshStatus();
     window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
     window.dispatchEvent(new CustomEvent('seedflix:notifications-refresh-request'));
   };
 
-  const handleSeasonWishlist = async () => {
-    if (!series || selectedSeason === null) return;
-    if (isSeasonInWishlist(selectedSeason)) {
-      await removeFromWishlist(series.id, selectedSeason);
+  const handleSelectSeasonMode = async (seasonNumber: number, mode: WishlistMode) => {
+    if (!series) return;
+    if (mode === 'none') {
+      await removeFromWishlist(series.id, seasonNumber);
+      toast.info(`Saison ${seasonNumber} retirée des favoris`);
     } else {
-      await addToWishlist(series.id, selectedSeason);
+      const autoGrab = mode === 'autograb';
+      const seasonItem = wishlistStatus?.seasons?.[seasonNumber];
+      if (!seasonItem || !seasonItem.all_episodes) {
+        await addToWishlist(series.id, seasonNumber, undefined, autoGrab);
+        toast.success(
+          autoGrab
+            ? `Saison ${seasonNumber} ajoutée en Auto-Grab`
+            : `Saison ${seasonNumber} ajoutée aux favoris`,
+        );
+      } else {
+        await updateWishlistAutoGrab(series.id, 'series', autoGrab, seasonNumber);
+        toast.success(
+          autoGrab
+            ? `Saison ${seasonNumber} passée en mode Auto-Grab`
+            : `Auto-Grab désactivé pour la saison ${seasonNumber}`,
+        );
+      }
     }
     await refreshStatus();
     window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
     window.dispatchEvent(new CustomEvent('seedflix:notifications-refresh-request'));
   };
 
-  const handleEpisodeWishlist = async (episode: SeriesEpisode) => {
-    if (!series || selectedSeason === null) return;
-    if (isEpisodeDirectlyInWishlist(selectedSeason, episode.episodeNumber)) {
-      await removeFromWishlist(series.id, selectedSeason, episode.episodeNumber);
+  const handleSelectEpisodeMode = async (
+    seasonNumber: number,
+    episodeNumber: number,
+    mode: WishlistMode,
+  ) => {
+    if (!series) return;
+    if (mode === 'none') {
+      await removeFromWishlist(series.id, seasonNumber, episodeNumber);
+      toast.info(`Épisode S${seasonNumber}E${episodeNumber} retiré des favoris`);
     } else {
-      await addToWishlist(series.id, selectedSeason, episode.episodeNumber);
+      const autoGrab = mode === 'autograb';
+      const seasonConfig = wishlistStatus?.seasons?.[seasonNumber];
+      const inEpList = Boolean(
+        seasonConfig &&
+          !seasonConfig.all_episodes &&
+          seasonConfig.episodes?.includes(episodeNumber),
+      );
+      if (!inEpList) {
+        await addToWishlist(series.id, seasonNumber, episodeNumber, autoGrab);
+        toast.success(
+          autoGrab
+            ? `Épisode S${seasonNumber}E${episodeNumber} ajouté en Auto-Grab`
+            : `Épisode S${seasonNumber}E${episodeNumber} ajouté aux favoris`,
+        );
+      } else {
+        await updateWishlistAutoGrab(
+          series.id,
+          'series',
+          autoGrab,
+          seasonNumber,
+          episodeNumber,
+        );
+        toast.success(
+          autoGrab
+            ? `Épisode S${seasonNumber}E${episodeNumber} passé en mode Auto-Grab`
+            : `Auto-Grab désactivé pour l'épisode S${seasonNumber}E${episodeNumber}`,
+        );
+      }
     }
     await refreshStatus();
     window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
@@ -615,25 +714,21 @@ export function SeriesDetails() {
           {t('seriesDetails.back')}
         </Button>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <Button
-            onClick={handleSeriesWishlist}
-            className={
-              wishlistStatus?.all_seasons
-                ? 'bg-cyan-600 hover:bg-cyan-700 text-white'
-                : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+        <div className="flex items-center gap-2">
+          <WishlistButtons
+            mode={seriesWishlistMode}
+            onToggleClassic={() =>
+              handleSelectSeriesMode(
+                seriesWishlistMode !== 'none' ? 'none' : 'classic',
+              )
             }
-          >
-            <Heart
-              className={`w-5 h-5 mr-2 ${wishlistStatus?.all_seasons ? 'fill-current' : ''}`}
-            />
-            {wishlistStatus?.all_seasons
-              ? t('seriesDetails.removeSeries')
-              : t('seriesDetails.addSeries')}
-          </Button>
+            onToggleAutoGrab={() =>
+              handleSelectSeriesMode(
+              )
+            }
+          />
         </div>
       </div>
-
       {series.backdrop && (
         <div className="relative mb-20 lg:mb-0">
           <div className="relative w-full h-44 sm:h-56 md:h-80 lg:h-96 rounded-lg overflow-hidden">
@@ -781,16 +876,14 @@ export function SeriesDetails() {
             selectedSeason={selectedSeason}
             setSelectedSeason={setSelectedSeason}
             wishlistStatus={wishlistStatus}
-            isSeasonInWishlist={isSeasonInWishlist}
             isSeasonCoveredBySeries={Boolean(isSeasonCoveredBySeries)}
-            handleSeasonWishlist={handleSeasonWishlist}
+            handleSelectSeasonMode={handleSelectSeasonMode}
             isLoadingEpisodes={isLoadingEpisodes}
             episodes={episodes}
             spoilerModeEnabled={spoilerModeEnabled}
             revealedEpisodeIds={revealedEpisodeIds}
             toggleEpisodeReveal={toggleEpisodeReveal}
-            isEpisodeDirectlyInWishlist={isEpisodeDirectlyInWishlist}
-            handleEpisodeWishlist={handleEpisodeWishlist}
+            handleSelectEpisodeMode={handleSelectEpisodeMode}
             t={t}
           />
 

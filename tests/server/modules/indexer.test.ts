@@ -401,9 +401,9 @@ describe('indexer module', () => {
       expect(notifs.notifications.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('should automatically start download when autoDownload is enabled for user', async () => {
+    it('should automatically start download when item has autoGrab enabled', async () => {
       const user = createUser('userAutoDl').user;
-      user.settings.indexer = { ...sampleSettings, autoDownload: true };
+      user.settings.indexer = { ...sampleSettings };
       updateUser(user);
 
       writeStore('wishlist', user.id, [
@@ -414,6 +414,7 @@ describe('indexer module', () => {
           original_title: 'Fight Club',
           releaseDate: '1999-10-15',
           addedAt: '2024-01-01',
+          autoGrab: true,
         },
       ]);
 
@@ -447,9 +448,56 @@ describe('indexer module', () => {
       expect(notifs.notifications.some((n) => n.title.includes('automatique'))).toBe(true);
     });
 
+    it('should NOT automatically start download when item has autoGrab false (classic favorite)', async () => {
+      const user = createUser('userClassicDl').user;
+      user.settings.indexer = { ...sampleSettings };
+      updateUser(user);
+
+      writeStore('wishlist', user.id, [
+        {
+          tmdb: 550,
+          type: 'movie',
+          title: 'Fight Club',
+          original_title: 'Fight Club',
+          releaseDate: '1999-10-15',
+          addedAt: '2024-01-01',
+          autoGrab: false,
+        },
+      ]);
+
+      vi.mocked(torznabModule.rssTorznab).mockResolvedValue({
+        rss: {
+          channel: {
+            item: [
+              {
+                title: 'Fight.Club.1999.1080p.MULTI',
+                link: 'https://link-fc',
+                guid: 'guid-fc-classic',
+                'torznab:attr': [{ name: 'tmdbid', value: '550' }, { name: 'size', value: '1000' }],
+              },
+            ],
+          },
+        },
+      } as any);
+
+      const transmissionModule = await import('../../../server/modules/transmission');
+      vi.mocked(transmissionModule.startDownload).mockClear();
+
+      await processWishlistIndexer();
+
+      expect(transmissionModule.startDownload).not.toHaveBeenCalled();
+
+      const notifs = getNotifications(user.id);
+      expect(notifs.notifications.some((n) => n.title.includes('Film disponible'))).toBe(true);
+
+      const movieResults = await getMoviesIndexerResult(user.id);
+      expect(movieResults).toHaveLength(1);
+      expect(movieResults[0].guid).toBe('guid-fc-classic');
+    });
+
     it('should remove wishlist item and blacklist release when auto-download occurs to prevent loops', async () => {
       const user = createUser('userAutoDlWishlistRemoval').user;
-      user.settings.indexer = { ...sampleSettings, autoDownload: true };
+      user.settings.indexer = { ...sampleSettings };
       user.settings.transmission = {
         host: 'http://transmission.local',
         port: 9091,
@@ -462,7 +510,7 @@ describe('indexer module', () => {
       updateUser(user);
 
       writeStore('wishlist', user.id, [
-        { tmdb: 550, type: 'movie', title: 'Fight Club', original_title: 'Fight Club', releaseDate: '1999', addedAt: '2024-01-01' },
+        { tmdb: 550, type: 'movie', title: 'Fight Club', original_title: 'Fight Club', releaseDate: '1999', addedAt: '2024-01-01', autoGrab: true },
       ]);
 
       vi.mocked(torznabModule.rssTorznab).mockResolvedValue({
@@ -506,13 +554,13 @@ describe('indexer module', () => {
 
     it('should handle multiple releases and auto-download failures in processWishlistIndexer', async () => {
       const user = createUser('userMultiReleases').user;
-      user.settings.indexer = { ...sampleSettings, autoDownload: true };
+      user.settings.indexer = { ...sampleSettings };
       updateUser(user);
 
       writeStore('wishlist', user.id, [
-        { tmdb: 550, type: 'movie', title: 'Fight Club', original_title: 'Fight Club', releaseDate: '1999', addedAt: '2024-01-01' },
-        { tmdb: 680, type: 'movie', title: 'Pulp Fiction', original_title: 'Pulp Fiction', releaseDate: '1994', addedAt: '2024-01-01' },
-        { tmdb: 1399, type: 'series', title: 'Game of Thrones', original_title: 'Game of Thrones', releaseDate: '2011', addedAt: '2024-01-01', all_seasons: true },
+        { tmdb: 550, type: 'movie', title: 'Fight Club', original_title: 'Fight Club', releaseDate: '1999', addedAt: '2024-01-01', autoGrab: true },
+        { tmdb: 680, type: 'movie', title: 'Pulp Fiction', original_title: 'Pulp Fiction', releaseDate: '1994', addedAt: '2024-01-01', autoGrab: true },
+        { tmdb: 1399, type: 'series', title: 'Game of Thrones', original_title: 'Game of Thrones', releaseDate: '2011', addedAt: '2024-01-01', all_seasons: true, autoGrab: true },
       ]);
 
       vi.mocked(torznabModule.rssTorznab).mockImplementation(async (settings, type) => {

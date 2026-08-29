@@ -31,7 +31,7 @@ export async function getWishlist(): Promise<WishListItem[]> {
 }
 
 // Ajouter un film à la liste de souhaits
-export async function addToWishlist(tmdbId: number): Promise<void> {
+export async function addToWishlist(tmdbId: number, autoGrab?: boolean): Promise<void> {
   await fetch(`${API_BASE_URL}/wishlist`, {
     method: 'POST',
     credentials: 'include',
@@ -41,8 +41,38 @@ export async function addToWishlist(tmdbId: number): Promise<void> {
     body: JSON.stringify({
       type: 'movie',
       tmdbId: tmdbId,
+      autoGrab: Boolean(autoGrab),
     }),
   });
+}
+
+// Mettre à jour le statut Auto-Grab d'un élément
+export async function updateWishlistAutoGrab(
+  tmdbId: number,
+  type: 'movie' | 'series',
+  autoGrab: boolean,
+  season?: number,
+  episode?: number,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/wishlist/${tmdbId}/autograb`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type,
+        autoGrab,
+        season,
+        episode,
+      }),
+    });
+    window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 // Retirer un film de la liste de souhaits
@@ -82,11 +112,33 @@ export async function checkMediaInWishlist(id: number, type: 'movie' | 'series')
   }
 }
 
+// Récupérer les détails d'un élément de la liste de souhaits
+export async function getWishlistItem(id: number, type: 'movie' | 'series'): Promise<WishListItem | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/wishlist/${id}?type=${type}`, {
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return data.exists && data.content ? (data.content as WishListItem) : null;
+  } catch {
+    return null;
+  }
+}
+
 // Alias pour compatibilité
 export const isInWishlist = (movieId: number): Promise<boolean> => checkMediaInWishlist(movieId, 'movie');
 
 // Basculer l'état dans la liste de souhaits (ajout si absent, retrait si présent)
-export async function toggleWishlistMedia(id: number, type: 'movie' | 'series', currentlyInWishlist: boolean): Promise<boolean> {
+export async function toggleWishlistMedia(
+  id: number,
+  type: 'movie' | 'series',
+  currentlyInWishlist: boolean,
+  autoGrab?: boolean,
+): Promise<boolean> {
   if (currentlyInWishlist) {
     if (type === 'movie') {
       await removeFromWishlist(id);
@@ -102,13 +154,13 @@ export async function toggleWishlistMedia(id: number, type: 'movie' | 'series', 
     return false;
   } else {
     if (type === 'movie') {
-      await addToWishlist(id);
+      await addToWishlist(id, autoGrab);
     } else {
       await fetch(`${API_BASE_URL}/wishlist`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'series', tmdbId: id }),
+        body: JSON.stringify({ type: 'series', tmdbId: id, autoGrab: Boolean(autoGrab) }),
       });
     }
     window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));

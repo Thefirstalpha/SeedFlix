@@ -17,6 +17,7 @@ export interface WishlistMatchInfo {
   episodeNumber?: number;
   isEntireSeason?: boolean;
   isAllSeasons?: boolean;
+  autoGrab?: boolean;
 }
 
 export interface IndexerMovieResult {

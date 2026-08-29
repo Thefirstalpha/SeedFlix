@@ -7,6 +7,7 @@ import {
   deleteWishlist,
   deleteWishlistItems,
   getWishlist,
+  updateWishlistAutoGrab,
 } from '../../../server/modules/wishlist';
 import { readStore } from '../../../server/modules/db';
 
@@ -691,6 +692,90 @@ describe('wishlist module', () => {
 
       const movies = readStore('indexer-movie-result', 1) as any[];
       expect(movies.find((m) => m.guid === 'guid-unknown')).toBeUndefined();
+    });
+  });
+
+  describe('autoGrab support and updateWishlistAutoGrab', () => {
+    const sampleMovie = {
+      id: 550,
+      title: 'Fight Club',
+      original_title: 'Fight Club',
+      release_date: '1999-10-15',
+      genres: [{ id: 18, name: 'Drama' }],
+      vote_average: 8.4,
+      poster_path: '/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg',
+    };
+
+    it('should default autoGrab to false when not specified', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleMovie);
+      await addToWishlist(1, 550, 'movie');
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist[0].autoGrab).toBe(false);
+    });
+
+    it('should save autoGrab = true when specified during creation', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleMovie);
+      await addToWishlist(1, 550, 'movie', undefined, undefined, true);
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist[0].autoGrab).toBe(true);
+    });
+
+    it('should update autoGrab flag on an existing item with updateWishlistAutoGrab', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleMovie);
+      await addToWishlist(1, 550, 'movie', undefined, undefined, false);
+
+      const updated = updateWishlistAutoGrab(1, 550, 'movie', true);
+      expect(updated).toBe(true);
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist[0].autoGrab).toBe(true);
+
+      const toggledOff = updateWishlistAutoGrab(1, 550, 'movie', false);
+      expect(toggledOff).toBe(true);
+
+      const wishlistAfter = await getWishlist(1);
+      expect(wishlistAfter[0].autoGrab).toBe(false);
+    });
+
+    it('should support autoGrab per season and per episode', async () => {
+      const sampleSeries = {
+        id: 1399,
+        name: 'Game of Thrones',
+        original_name: 'Game of Thrones',
+        first_air_date: '2011-04-17',
+        genres: [{ id: 10765, name: 'Sci-Fi & Fantasy' }],
+        vote_average: 8.455,
+        poster_path: '/1XS1oqL89opfnbLl8WnZY1kv4Kd.jpg',
+      };
+
+      // Add season 1 with autoGrab = true
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 1, undefined, true);
+
+      // Add season 2 episode 3 with autoGrab = true
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 2, 3, true);
+
+      // Add season 2 episode 4 with autoGrab = false
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 2, 4, false);
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist).toHaveLength(1);
+      expect(wishlist[0].seasons[1].autoGrab).toBe(true);
+      expect(wishlist[0].seasons[2].autoGrabEpisodes).toContain(3);
+      expect(wishlist[0].seasons[2].autoGrabEpisodes).not.toContain(4);
+
+      // Toggle season 1 autoGrab to false
+      updateWishlistAutoGrab(1, 1399, 'series', false, 1);
+      // Toggle episode 4 autoGrab to true
+      updateWishlistAutoGrab(1, 1399, 'series', true, 2, 4);
+
+      const wishlistAfter = await getWishlist(1);
+      expect(wishlistAfter[0].seasons[1].autoGrab).toBe(false);
+      expect(wishlistAfter[0].seasons[2].autoGrabEpisodes).toContain(4);
     });
   });
 });

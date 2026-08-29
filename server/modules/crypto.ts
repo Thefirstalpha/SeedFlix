@@ -114,4 +114,3 @@ export function decryptSecret(cipherText: string | null | undefined): string | n
 export function _resetCachedKey(): void {
   cachedKey = null;
 }
-

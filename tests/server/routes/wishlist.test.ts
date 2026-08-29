@@ -140,5 +140,47 @@ describe('Route: /api/wishlist', () => {
     const listRes = await request(app).get('/api/wishlist').set('Cookie', cookie);
     expect(listRes.body).toHaveLength(0);
   });
+
+  it('should support autoGrab option on POST and update via PATCH /api/wishlist/:id/autograb', async () => {
+    mockedProxyTmdb.mockResolvedValueOnce(sampleMovie);
+    const { user } = createUser('userWLAutoGrab');
+    const cookie = createSessionCookie(user.id);
+
+    // Create with autoGrab = true
+    const addRes = await request(app)
+      .post('/api/wishlist')
+      .set('Cookie', cookie)
+      .send({ tmdbId: 550, type: 'movie', autoGrab: true });
+
+    expect(addRes.status).toBe(201);
+
+    const getRes = await request(app).get('/api/wishlist/550').set('Cookie', cookie);
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.content.autoGrab).toBe(true);
+
+    // Patch to autoGrab = false
+    const patchRes1 = await request(app)
+      .patch('/api/wishlist/550/autograb')
+      .set('Cookie', cookie)
+      .send({ type: 'movie', autoGrab: false });
+
+    expect(patchRes1.status).toBe(200);
+    expect(patchRes1.body.ok).toBe(true);
+
+    const getRes2 = await request(app).get('/api/wishlist/550').set('Cookie', cookie);
+    expect(getRes2.body.content.autoGrab).toBe(false);
+
+    // Patch back to autoGrab = true
+    const patchRes2 = await request(app)
+      .patch('/api/wishlist/550/autograb')
+      .set('Cookie', cookie)
+      .send({ type: 'movie', autoGrab: true });
+
+    expect(patchRes2.status).toBe(200);
+    expect(patchRes2.body.ok).toBe(true);
+
+    const getRes3 = await request(app).get('/api/wishlist/550').set('Cookie', cookie);
+    expect(getRes3.body.content.autoGrab).toBe(true);
+  });
 });
 
