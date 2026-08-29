@@ -39,6 +39,11 @@ startDownloadWatcher();
 const app: import('express').Express = express();
 app.disable('x-powered-by');
 
+app.use((_req, res, next) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+  next();
+});
+
 app.use(express.static(clientDistDir));
 app.use((req, res, next) => {
   if (req.path.startsWith('/api')) {
