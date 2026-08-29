@@ -69,6 +69,11 @@ describe('indexer module', () => {
       expect(extractQuality('Movie.Name.2024.2160p.mkv')).toBe('2160p');
       expect(extractQuality('Movie.Name.2024.720p.mkv')).toBe('720p');
       expect(extractQuality('Movie.Name.2024.SD.mkv')).toBe('480p');
+      expect(extractQuality('Movie Name 2024 1080p WEB-DL')).toBe('1080p');
+      expect(extractQuality('Movie Name (2024) [4K UHD]')).toBe('2160p');
+      expect(extractQuality('Movie Name 1080i HDTV')).toBe('1080p');
+      expect(extractQuality('Movie_Name_720p_x265')).toBe('720p');
+      expect(extractQuality('Movie.Name.576p.DVDRip')).toBe('480p');
       expect(extractQuality('Movie.Name.NoQuality')).toBeNull();
     });
 
@@ -77,6 +82,8 @@ describe('indexer module', () => {
       expect(extractSource('Movie.Name.2024.1080p.bluray.x264')).toBe('BluRay');
       expect(extractSource('Movie.Name.2024.1080p.webrip.x264')).toBe('WEBRip');
       expect(extractSource('Movie.Name.2024.hdtv.x264')).toBe('HDTV');
+      expect(extractSource('Movie Name 2024 REMUX 1080p')).toBe('BluRay');
+      expect(extractSource('Movie Name 2024 BDRip x264')).toBe('BDRip');
       expect(extractSource('Movie.NoSource')).toBeNull();
     });
 
@@ -85,6 +92,11 @@ describe('indexer module', () => {
       expect(extractLanguage('Movie.Name.2024.vff.1080p')).toBe('VFF');
       expect(extractLanguage('Movie.Name.2024.truefrench.1080p')).toBe('VFF');
       expect(extractLanguage('Movie.Name.2024.vostfr.1080p')).toBe('VOSTFR');
+      expect(extractLanguage('Movie Name 2024 TRUEFRENCH 1080p')).toBe('VFF');
+      expect(extractLanguage('Movie Name 2024 VFQ 1080p')).toBe('VFQ');
+      expect(extractLanguage('Movie Name 2024 SUBFRENCH 720p')).toBe('VOSTFR');
+      expect(extractLanguage('Movie Name 2024 FRENCH 1080p')).toBe('VF');
+      expect(extractLanguage('Movie Name 2024 VO 1080p')).toBe('VO');
       expect(extractLanguage('Movie.NoLanguage')).toBeNull();
     });
 

@@ -11,61 +11,59 @@ import { checkTorznabConnection, rssTorznab, searchTorznab } from './torznab';
 import { getUser } from './user';
 import { getWishlist } from './wishlist';
 
-// Enum of quality options
-const QUALITY_MAP: Record<string, string> = {
-  '.2160p.': '2160p',
-  '.1080p.': '1080p',
-  '.720p.': '720p',
-  '.480p.': '480p',
-  '.sd.': '480p',
-};
+const QUALITY_PATTERNS: Array<{ regex: RegExp; value: string }> = [
+  { regex: /(?:^|[\s._\-[\]()])(?:2160p|4k|uhd)(?:$|[\s._\-[\]()])/i, value: '2160p' },
+  { regex: /(?:^|[\s._\-[\]()])(?:1080p|1080i)(?:$|[\s._\-[\]()])/i, value: '1080p' },
+  { regex: /(?:^|[\s._\-[\]()])(?:720p)(?:$|[\s._\-[\]()])/i, value: '720p' },
+  { regex: /(?:^|[\s._\-[\]()])(?:480p|576p|sd)(?:$|[\s._\-[\]()])/i, value: '480p' },
+];
 
-const SOURCE_MAP: Record<string, string> = {
-  '.web-dl.': 'WEB',
-  '.webrip.': 'WEBRip',
-  '.hdrip.': 'HDRip',
-  '.bdrip.': 'BDRip',
-  '.dvdrip.': 'DVDRip',
-  '.hdtv.': 'HDTV',
-  '.sdtv.': 'SDTV',
-  '.bluray.': 'BluRay',
-  '.web.': 'WEB',
-};
+const SOURCE_PATTERNS: Array<{ regex: RegExp; value: string }> = [
+  { regex: /(?:^|[\s._\-[\]()])(?:web-?dl|web)(?:$|[\s._\-[\]()])/i, value: 'WEB' },
+  { regex: /(?:^|[\s._\-[\]()])(?:webrip)(?:$|[\s._\-[\]()])/i, value: 'WEBRip' },
+  { regex: /(?:^|[\s._\-[\]()])(?:hdrip)(?:$|[\s._\-[\]()])/i, value: 'HDRip' },
+  { regex: /(?:^|[\s._\-[\]()])(?:bdrip|brrip)(?:$|[\s._\-[\]()])/i, value: 'BDRip' },
+  { regex: /(?:^|[\s._\-[\]()])(?:dvdrip|dvd)(?:$|[\s._\-[\]()])/i, value: 'DVDRip' },
+  { regex: /(?:^|[\s._\-[\]()])(?:hdtv)(?:$|[\s._\-[\]()])/i, value: 'HDTV' },
+  { regex: /(?:^|[\s._\-[\]()])(?:sdtv)(?:$|[\s._\-[\]()])/i, value: 'SDTV' },
+  { regex: /(?:^|[\s._\-[\]()])(?:bluray|remux)(?:$|[\s._\-[\]()])/i, value: 'BluRay' },
+];
 
-const LANGUAGE_MAP: Record<string, string> = {
-  '.vff.': 'VFF',
-  '.vf2.': 'VF2',
-  '.vfq.': 'VFQ',
-  '.vostfr.': 'VOSTFR',
-  '.truefrench.': 'VFF',
-  '.multi.': 'MULTI',
-};
+const LANGUAGE_PATTERNS: Array<{ regex: RegExp; value: string }> = [
+  { regex: /(?:^|[\s._\-[\]()])(?:vostfr|subfrench)(?:$|[\s._\-[\]()])/i, value: 'VOSTFR' },
+  { regex: /(?:^|[\s._\-[\]()])(?:truefrench|vff)(?:$|[\s._\-[\]()])/i, value: 'VFF' },
+  { regex: /(?:^|[\s._\-[\]()])(?:vf2)(?:$|[\s._\-[\]()])/i, value: 'VF2' },
+  { regex: /(?:^|[\s._\-[\]()])(?:vfq)(?:$|[\s._\-[\]()])/i, value: 'VFQ' },
+  { regex: /(?:^|[\s._\-[\]()])(?:multi)(?:$|[\s._\-[\]()])/i, value: 'MULTI' },
+  { regex: /(?:^|[\s._\-[\]()])(?:french|vf)(?:$|[\s._\-[\]()])/i, value: 'VF' },
+  { regex: /(?:^|[\s._\-[\]()])(?:vo|eng|english)(?:$|[\s._\-[\]()])/i, value: 'VO' },
+];
 
 export function extractQuality(title: string): string | null {
-  const normalized = String(title || '').toLowerCase();
-  for (const option in QUALITY_MAP) {
-    if (normalized.includes(option.toLowerCase())) {
-      return QUALITY_MAP[option];
+  const normalized = String(title || '');
+  for (const { regex, value } of QUALITY_PATTERNS) {
+    if (regex.test(normalized)) {
+      return value;
     }
   }
   return null;
 }
 
 export function extractSource(title: string): string | null {
-  const normalized = String(title || '').toLowerCase();
-  for (const option in SOURCE_MAP) {
-    if (normalized.includes(option.toLowerCase())) {
-      return SOURCE_MAP[option];
+  const normalized = String(title || '');
+  for (const { regex, value } of SOURCE_PATTERNS) {
+    if (regex.test(normalized)) {
+      return value;
     }
   }
   return null;
 }
 
 export function extractLanguage(title: string): string | null {
-  const normalized = String(title || '').toLowerCase();
-  for (const option in LANGUAGE_MAP) {
-    if (normalized.includes(option.toLowerCase())) {
-      return LANGUAGE_MAP[option];
+  const normalized = String(title || '');
+  for (const { regex, value } of LANGUAGE_PATTERNS) {
+    if (regex.test(normalized)) {
+      return value;
     }
   }
   return null;

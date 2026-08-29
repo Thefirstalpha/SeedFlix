@@ -25,7 +25,7 @@ describe('wishlist module', () => {
   });
 
   beforeEach(() => {
-    db.prepare("DELETE FROM kv_store WHERE namespace = 'whishlist'").run();
+    db.prepare("DELETE FROM kv_store WHERE namespace IN ('wishlist', 'whishlist')").run();
     vi.clearAllMocks();
   });
 
@@ -382,6 +382,24 @@ describe('wishlist module', () => {
         all_episodes: false,
         episodes: [1, 2],
       });
+    });
+
+    it('should read from legacy whishlist namespace if wishlist is empty', async () => {
+      writeStore('whishlist', 1, [
+        {
+          tmdb: 300,
+          type: 'movie',
+          title: 'Legacy Movie',
+          original_title: 'Legacy Movie',
+          releaseDate: '2020-01-01',
+          addedAt: '2020-01-01T00:00:00.000Z',
+        },
+      ]);
+
+      const list = await getWishlist(1);
+      expect(list).toHaveLength(1);
+      expect(list[0].tmdb).toBe(300);
+      expect(list[0].title).toBe('Legacy Movie');
     });
   });
 

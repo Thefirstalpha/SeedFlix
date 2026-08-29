@@ -2,7 +2,7 @@ import { WishListItem, WishListSeasonItem } from '../../common/wishlist';
 import { readStore, runInTransaction } from './db';
 import { buildDetailsRequest, proxyTmdb, TmdbType } from './tmdb';
 
-const DB_NAMESPACE = 'whishlist';
+const DB_NAMESPACE = 'wishlist';
 
 export interface DeleteWishlistOptions {
   tmdbId: number;
@@ -161,7 +161,7 @@ function processDeletion(wishlist: WishListItem[], target: DeleteWishlistOptions
  * Récupère la wishlist de façon synchrone depuis la base
  */
 export function getWishlistSync(userId: number): WishListItem[] {
-  const rawList = readStore(DB_NAMESPACE, userId);
+  const rawList = readStore(DB_NAMESPACE, userId) ?? readStore('whishlist', userId);
   if (!rawList || !Array.isArray(rawList)) {
     return [];
   }
