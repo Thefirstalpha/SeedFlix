@@ -25,6 +25,7 @@ export default [
 				React: "readonly",
 				HTMLDivElement: "readonly",
 				HTMLInputElement: "readonly",
+				HTMLTextAreaElement: "readonly",
 				HTMLFormElement: "readonly",
 				HTMLButtonElement: "readonly",
 				HTMLSelectElement: "readonly",

@@ -141,6 +141,7 @@ export function getIndexerSettings(userId: number): IndexerSettings | null {
     token: raw.token !== undefined && raw.token !== null ? String(raw.token) : null,
     qualities: Array.isArray(raw.qualities) ? raw.qualities.map(String) : [],
     languages: Array.isArray(raw.languages) ? raw.languages.map(String) : [],
+    autoDownload: Boolean(raw.autoDownload),
   };
 }
 

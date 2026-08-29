@@ -110,18 +110,37 @@ describe('tmdb module', () => {
       expect(result).toEqual(mockResponse);
     });
 
-    it('should get TMDB details with getTmdbDetails', async () => {
+    it('should get and normalize TMDB details with getTmdbDetails', async () => {
       updateGlobalConfig({ tmdbApiKey: 'mock-key' });
 
       const fetchSpy = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ id: 550, title: 'Fight Club' }),
+        json: async () => ({
+          id: 550,
+          title: 'Fight Club',
+          original_title: 'Fight Club',
+          overview: 'An insomniac office worker...',
+          release_date: '1999-10-15',
+          vote_average: 8.433,
+          vote_count: 26000,
+          genres: [{ id: 18, name: 'Drama' }, { id: 53, name: 'Thriller' }],
+          poster_path: '/poster.jpg',
+          backdrop_path: '/backdrop.jpg',
+          runtime: 139,
+        }),
       });
       vi.stubGlobal('fetch', fetchSpy);
 
       const details = await getTmdbDetails(550, 'movie');
-      expect(details).toBeDefined();
+      expect(details.id).toBe(550);
+      expect(details.type).toBe('movie');
+      expect(details.title).toBe('Fight Club');
+      expect(details.year).toBe(1999);
+      expect(details.rating).toBe(8.4);
+      expect(details.genres).toEqual(['Drama', 'Thriller']);
+      expect(details.runtime).toBe(139);
+      expect(details.posterPath).toBe('/poster.jpg');
     });
 
     it('should throw error when getTmdbDetails receives item without id', async () => {

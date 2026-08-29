@@ -65,10 +65,10 @@ export async function removeMultipleFromWishlist(movieIds: number[]): Promise<vo
   });
 }
 
-// Vérifier si un film est dans la liste de souhaits
-export async function isInWishlist(movieId: number): Promise<boolean> {
+// Vérifier si un film ou une série est dans la liste de souhaits
+export async function checkMediaInWishlist(id: number, type: 'movie' | 'series'): Promise<boolean> {
   try {
-    const response = await fetch(`${API_BASE_URL}/wishlist/${movieId}`, {
+    const response = await fetch(`${API_BASE_URL}/wishlist/${id}?type=${type}`, {
       credentials: 'include',
     });
     if (!response.ok) {
@@ -79,6 +79,40 @@ export async function isInWishlist(movieId: number): Promise<boolean> {
     return Boolean(data.exists);
   } catch {
     return false;
+  }
+}
+
+// Alias pour compatibilité
+export const isInWishlist = (movieId: number): Promise<boolean> => checkMediaInWishlist(movieId, 'movie');
+
+// Basculer l'état dans la liste de souhaits (ajout si absent, retrait si présent)
+export async function toggleWishlistMedia(id: number, type: 'movie' | 'series', currentlyInWishlist: boolean): Promise<boolean> {
+  if (currentlyInWishlist) {
+    if (type === 'movie') {
+      await removeFromWishlist(id);
+    } else {
+      await fetch(`${API_BASE_URL}/wishlist`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'series', tmdbId: id }),
+      });
+    }
+    window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
+    return false;
+  } else {
+    if (type === 'movie') {
+      await addToWishlist(id);
+    } else {
+      await fetch(`${API_BASE_URL}/wishlist`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'series', tmdbId: id }),
+      });
+    }
+    window.dispatchEvent(new CustomEvent('seedflix:wishlist-refresh-request'));
+    return true;
   }
 }
 

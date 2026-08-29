@@ -381,7 +381,7 @@ describe('indexer module', () => {
         },
       ]);
 
-      vi.mocked(torznabModule.rssTorznab).mockResolvedValueOnce({
+      vi.mocked(torznabModule.rssTorznab).mockResolvedValue({
         rss: {
           channel: {
             item: [

@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import http from 'http';
 import request from 'supertest';
 import { initDB, resetDatabase } from '../../../server/modules/db';
 import { router as eventsRouter } from '../../../server/routes/events';
@@ -35,40 +36,43 @@ describe('Route & Module: SSE /api/events', () => {
     const { user } = createUser('sseUser1');
     const cookie = createSessionCookie(user.id);
 
-    const reqPromise = request(app)
-      .get('/api/events')
-      .set('Cookie', cookie)
-      .set('Accept', 'text/event-stream');
-
-    // Abort stream after short delay to complete test
-    const reqInstance = reqPromise.buffer(false);
-    const chunks: string[] = [];
-
     await new Promise<void>((resolve, reject) => {
-      reqInstance
-        .on('response', (res) => {
-          expect(res.status).toBe(200);
-          expect(res.headers['content-type']).toContain('text/event-stream');
-          expect(res.headers['cache-control']).toContain('no-cache');
-        })
-        .on('data', (chunk) => {
-          chunks.push(chunk.toString());
-          if (chunks.join('').includes('connected')) {
-            reqInstance.abort();
-            resolve();
-          }
-        })
-        .on('error', (err) => {
-          // aborted request error is expected
-          if ((err as any).code === 'ABORTED' || (err as any).message?.includes('aborted')) {
+      const server = app.listen(0, '127.0.0.1', () => {
+        const address = server.address() as any;
+        const port = address.port;
+
+        const req = http.get(
+          `http://127.0.0.1:${port}/api/events`,
+          {
+            headers: {
+              Cookie: cookie,
+              Accept: 'text/event-stream',
+            },
+          },
+          (res) => {
+            expect(res.statusCode).toBe(200);
+            expect(res.headers['content-type']).toContain('text/event-stream');
+            expect(res.headers['cache-control']).toContain('no-cache');
+
+            res.on('data', (chunk) => {
+              const text = chunk.toString();
+              if (text.includes('connected')) {
+                req.destroy();
+                server.close(() => resolve());
+              }
+            });
+          },
+        );
+
+        req.on('error', (err) => {
+          if ((err as any).code === 'ECONNRESET' || req.destroyed) {
             resolve();
           } else {
             reject(err);
           }
         });
+      });
     });
-
-    expect(chunks.join('')).toContain('connected');
   });
 
   it('should correctly register, emit to, and unregister clients in events module', () => {
