@@ -417,9 +417,9 @@ export async function consumeWishlistItemForDownload(
   const moviesResult = (readStore('indexer-movie-result', userId) || []) as Array<any>;
   const seriesResult = (readStore('indexer-series-result', userId) || []) as Array<any>;
 
-  let tmdbId = options?.tmdbId;
-  let seasonNumber = options?.seasonNumber;
-  let episodeNumber = options?.episodeNumber;
+  let tmdbId = options?.tmdbId ?? undefined;
+  let seasonNumber = options?.seasonNumber ?? undefined;
+  let episodeNumber = options?.episodeNumber ?? undefined;
 
   const matchedMovie = moviesResult.find((m) => m.guid === guid);
   const matchedSeries = seriesResult.find((s) => s.guid === guid);
@@ -429,9 +429,15 @@ export async function consumeWishlistItemForDownload(
   } else if (matchedSeries) {
     tmdbId = Number(matchedSeries.tmdbId || matchedSeries.matchedWishlist?.tmdbId || tmdbId);
     seasonNumber =
-      matchedSeries.seasonNumber ?? matchedSeries.matchedWishlist?.seasonNumber ?? seasonNumber;
+      matchedSeries.seasonNumber ??
+      matchedSeries.matchedWishlist?.seasonNumber ??
+      seasonNumber ??
+      undefined;
     episodeNumber =
-      matchedSeries.episodeNumber ?? matchedSeries.matchedWishlist?.episodeNumber ?? episodeNumber;
+      matchedSeries.episodeNumber ??
+      matchedSeries.matchedWishlist?.episodeNumber ??
+      episodeNumber ??
+      undefined;
   }
 
   if (!tmdbId || Number.isNaN(tmdbId)) {

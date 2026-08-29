@@ -21,8 +21,7 @@
     "test:backend": "vitest run tests/server",
     "test:backend:coverage": "vitest run tests/server --coverage",
     "test:watch": "vitest",
-    "check": "npm run lint && npm run test && npm run build && node --check server/index.ts"
-  },
+    "typecheck": "tsc --noEmit",
   "dependencies": {
     "@radix-ui/react-accordion": "1.2.3",
     "@radix-ui/react-alert-dialog": "1.1.6",

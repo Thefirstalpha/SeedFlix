@@ -314,7 +314,7 @@ export async function getDownloadsTransmission(
       ],
     },
   });
-  const data = await response.json();
+  const data: any = await response.json();
   const rawTorrents = Array.isArray(data?.arguments?.torrents) ? data.arguments.torrents : [];
   const managedHashes = new Set(getManagedTorrents(userId).map((entry) => entry.hash));
 
@@ -357,7 +357,7 @@ export async function getTransmissionStats(userId: number): Promise<TorrentStats
   const response = await executeTransmissionRpc(settings, {
     method: 'session-stats',
   });
-  const data = await response.json();
+  const data: any = await response.json();
   return {
     activeTorrentCount: Number(data?.arguments?.activeTorrentCount || 0),
     pausedTorrentCount: Number(data?.arguments?.pausedTorrentCount || 0),
@@ -384,7 +384,7 @@ export async function performTransmissionAction(
     },
   });
 
-  const data = await response.json().catch(() => null);
+  const data: any = await response.json().catch(() => null);
   if (!response.ok || data?.result !== 'success')
     throw new ErrorCode(messages.settings.transmission.actionFailed);
 }
@@ -457,7 +457,7 @@ export async function startDownload(
     },
   });
 
-  const data = await response.json().catch(() => null);
+  const data: any = await response.json().catch(() => null);
   if (!response.ok || data?.result !== 'success')
     throw new ErrorCode(messages.settings.transmission.actionFailed);
 
@@ -496,7 +496,7 @@ export async function getTurtleMode(userId: number): Promise<TransmissionSession
   const settings = getTransmissionSettings(userId);
   if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
   const response = await executeTransmissionRpc(settings, { method: 'session-get' });
-  const data = await response.json().catch(() => null);
+  const data: any = await response.json().catch(() => null);
   const args = data?.arguments || {};
   return {
     altSpeedEnabled: Boolean(args['alt-speed-enabled']),
@@ -518,7 +518,7 @@ export async function setTurtleMode(userId: number, enabled: boolean): Promise<b
       'alt-speed-enabled': Boolean(enabled),
     },
   });
-  const data = await response.json().catch(() => null);
+  const data: any = await response.json().catch(() => null);
   if (!response.ok || data?.result !== 'success') {
     throw new ErrorCode(messages.settings.transmission.actionFailed);
   }
@@ -547,7 +547,7 @@ export async function getTorrentFiles(
       fields: ['id', 'name', 'files', 'fileStats'],
     },
   });
-  const data = await response.json().catch(() => null);
+  const data: any = await response.json().catch(() => null);
   const torrent = data?.arguments?.torrents?.[0];
   if (!torrent) {
     throw new ErrorCode('Torrent introuvable');
@@ -583,7 +583,7 @@ export async function setTorrentFilesWanted(
     method: 'torrent-set',
     arguments: args,
   });
-  const data = await response.json().catch(() => null);
+  const data: any = await response.json().catch(() => null);
   if (!response.ok || data?.result !== 'success') {
     throw new ErrorCode(messages.settings.transmission.actionFailed);
   }
@@ -609,7 +609,7 @@ export async function moveTorrentQueue(
     method,
     arguments: { ids: [torrentId] },
   });
-  const data = await response.json().catch(() => null);
+  const data: any = await response.json().catch(() => null);
   if (!response.ok || data?.result !== 'success') {
     throw new ErrorCode(messages.settings.transmission.actionFailed);
   }

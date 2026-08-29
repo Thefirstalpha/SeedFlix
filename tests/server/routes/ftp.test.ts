@@ -227,8 +227,8 @@ describe('Route: /api/ftp', () => {
   it('should batch delete and batch move files via /api/ftp/delete-batch & /api/ftp/move', async () => {
     const { user } = createUser('ftpUser7');
     const cookie = createSessionCookie(user.id);
-    mockedRemoveBatch.mockResolvedValueOnce({ success: ['/a.txt'], failed: [] });
-    mockedMoveBatch.mockResolvedValueOnce({ success: ['/a.txt'], failed: [] });
+    mockedRemoveBatch.mockResolvedValueOnce({ failed: [] });
+    mockedMoveBatch.mockResolvedValueOnce({ failed: [] });
 
     const resDel = await request(app)
       .post('/api/ftp/delete-batch')
@@ -359,8 +359,6 @@ describe('Route: /api/ftp', () => {
     mockedGetStorage.mockResolvedValueOnce({
       used: 5000,
       limit: 10000,
-      available: 5000,
-      percentage: 50,
     });
 
     const res = await request(app).get('/api/ftp/storage').set('Cookie', cookie);

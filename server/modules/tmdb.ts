@@ -73,7 +73,7 @@ export const configureTmdbApiKey = async (apiKey: string) => {
   updateGlobalConfig({ tmdbApiKey: apiKey });
 };
 
-export const proxyTmdb = async (path: string, filters: Record<string, any>) => {
+export const proxyTmdb = async (path: string, filters: Record<string, any>): Promise<any> => {
   const apiKey = await getTmdbApiKey();
   if (!apiKey) throw new ErrorCode(messages.tmdb.apiKeyNotSet);
   const url = new URL(`${tmdbBaseUrl}${path}`);
