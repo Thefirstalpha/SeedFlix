@@ -25,6 +25,7 @@ export function WishlistButtons({
   className = '',
 }: Readonly<WishlistButtonsProps>) {
   const { t } = useI18n();
+  console.log('Wishlist mode:', mode);
 
   // Heart is active if the item is in wishlist (either in classic or autograb mode)
   const isFavorite = mode === 'classic' || mode === 'autograb';

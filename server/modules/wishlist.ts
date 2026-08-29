@@ -309,27 +309,62 @@ export function updateWishlistAutoGrab(
     const item = wishlist.find((i) => i.tmdb === tmdbId && i.type === type);
     if (item) {
       if (type === 'series' && seasonNumber !== undefined) {
+        if (!item.seasons) {
+          item.seasons = {};
+        }
         if (episodeNumber !== undefined) {
-          const season = item.seasons[seasonNumber];
-          if (season) {
-            if (!season.autoGrabEpisodes) season.autoGrabEpisodes = [];
+          let season = item.seasons[seasonNumber];
+          if (!season) {
+            season = {
+              season_number: seasonNumber,
+              all_episodes: false,
+              episodes: [episodeNumber],
+              autoGrab: false,
+              autoGrabEpisodes: autoGrab ? [episodeNumber] : [],
+            };
+            item.seasons[seasonNumber] = season;
+          } else {
+            if (!season.autoGrabEpisodes) {
+              season.autoGrabEpisodes = [];
+            }
             if (autoGrab) {
               if (!season.autoGrabEpisodes.includes(episodeNumber)) {
                 season.autoGrabEpisodes.push(episodeNumber);
+                season.autoGrabEpisodes.sort((a, b) => a - b);
+              }
+              if (!season.all_episodes && !season.episodes.includes(episodeNumber)) {
+                season.episodes.push(episodeNumber);
+                season.episodes.sort((a, b) => a - b);
               }
             } else {
               season.autoGrabEpisodes = season.autoGrabEpisodes.filter(
                 (ep) => ep !== episodeNumber,
               );
+              // If the season had autoGrab set to true, disable it at the season level so this episode is not auto-grabbed
+              if (season.autoGrab) {
+                season.autoGrab = false;
+              }
             }
-            updated = true;
           }
+          updated = true;
         } else {
-          const season = item.seasons[seasonNumber];
-          if (season) {
+          let season = item.seasons[seasonNumber];
+          if (!season) {
+            season = {
+              season_number: seasonNumber,
+              all_episodes: true,
+              episodes: [],
+              autoGrab: Boolean(autoGrab),
+              autoGrabEpisodes: [],
+            };
+            item.seasons[seasonNumber] = season;
+          } else {
             season.autoGrab = Boolean(autoGrab);
-            updated = true;
+            if (!autoGrab) {
+              season.autoGrabEpisodes = [];
+            }
           }
+          updated = true;
         }
       } else {
         item.autoGrab = Boolean(autoGrab);

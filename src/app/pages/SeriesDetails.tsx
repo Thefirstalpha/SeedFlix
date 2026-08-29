@@ -545,6 +545,7 @@ export function SeriesDetails() {
 
   const handleSelectSeriesMode = async (mode: WishlistMode) => {
     if (!series) return;
+    console.log('Selected series mode:', mode);
     if (mode === 'none') {
       setWishlistStatus(undefined);
       await removeFromWishlist(series.id);
@@ -580,7 +581,10 @@ export function SeriesDetails() {
     } else {
       const autoGrab = mode === 'autograb';
       const seasonItem = wishlistStatus?.seasons?.[seasonNumber];
-      if (!seasonItem || !seasonItem.all_episodes) {
+      const isSeasonInWishlist = Boolean(
+        wishlistStatus?.all_seasons || (seasonItem && seasonItem.all_episodes),
+      );
+      if (!isSeasonInWishlist) {
         await addToWishlist(series.id, seasonNumber, undefined, autoGrab);
         toast.success(
           autoGrab
@@ -613,12 +617,12 @@ export function SeriesDetails() {
     } else {
       const autoGrab = mode === 'autograb';
       const seasonConfig = wishlistStatus?.seasons?.[seasonNumber];
-      const inEpList = Boolean(
-        seasonConfig &&
-          !seasonConfig.all_episodes &&
-          seasonConfig.episodes?.includes(episodeNumber),
+      const isEpisodeInWishlist = Boolean(
+        wishlistStatus?.all_seasons ||
+          seasonConfig?.all_episodes ||
+          seasonConfig?.episodes?.includes(episodeNumber),
       );
-      if (!inEpList) {
+      if (!isEpisodeInWishlist) {
         await addToWishlist(series.id, seasonNumber, episodeNumber, autoGrab);
         toast.success(
           autoGrab
@@ -724,6 +728,7 @@ export function SeriesDetails() {
             }
             onToggleAutoGrab={() =>
               handleSelectSeriesMode(
+                seriesWishlistMode !== 'autograb' ? 'autograb' : 'classic',
               )
             }
           />
