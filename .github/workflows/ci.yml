@@ -43,9 +43,6 @@ jobs:
       - name: Backend syntax checks
         run: |
           set -euo pipefail
-          ./node_modules/.bin/tsc --noEmit --skipLibCheck --incremental false server/*.ts
-          ./node_modules/.bin/tsc --noEmit --skipLibCheck --incremental false server/**/*.ts
-          ./node_modules/.bin/tsc --noEmit --skipLibCheck --incremental false common/*.ts
           ./node_modules/.bin/tsc -p tsconfig.server.json --noEmit
 
       - name: Unit & Integration tests (backend) with coverage
