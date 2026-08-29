@@ -18,6 +18,10 @@ import type { Movie } from '../types/movie';
 import { IndexerMovieResult } from '../../../common/indexer';
 import { getTmdbVideos, extractTrailers, TmdbVideo } from '../services/tmdbService';
 
+import { CollectionSagaSection } from '../components/CollectionSagaSection';
+import { SimilarMediaSection } from '../components/SimilarMediaSection';
+import { PersonFilmographyModal } from '../components/PersonFilmographyModal';
+
 export type { TmdbVideo };
 export const extractMovieTrailers = extractTrailers;
 
@@ -33,6 +37,7 @@ export function MovieDetails() {
   const [isReleaseLoading, setIsReleaseLoading] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
   const [trailersList, setTrailersList] = useState<TmdbVideo[]>([]);
+  const [selectedPerson, setSelectedPerson] = useState<{ id: number; name: string } | null>(null);
   const [filter, setFilter] = useState<FilterOption>({ quality: 'all', language: 'all', season: 'all', sortBy: 'date', sortOrder: 'desc' });
 
   const filteredReleaseResults = useMemo(() => {
@@ -322,7 +327,23 @@ export function MovieDetails() {
                 <User className="w-5 h-5 text-purple-400" />
                 <h3 className="text-xl font-semibold text-white">{t('movieDetails.director')}</h3>
               </div>
-              <p className="text-white/80 text-lg break-words">{movie.director}</p>
+              <div className="flex flex-wrap gap-2">
+                {movie.directorsList && movie.directorsList.length > 0 ? (
+                  movie.directorsList.map((dir) => (
+                    <button
+                      key={dir.id}
+                      type="button"
+                      onClick={() => setSelectedPerson({ id: dir.id, name: dir.name })}
+                      className="px-3 py-1.5 rounded-lg border border-purple-500/30 bg-purple-900/20 text-purple-200 hover:bg-purple-900/40 hover:text-white transition-all text-sm font-medium flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <User className="w-3.5 h-3.5" />
+                      {dir.name}
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-white/80 text-lg break-words">{movie.director}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -332,21 +353,42 @@ export function MovieDetails() {
               <CardContent className="p-4 sm:p-6">
                 <h3 className="text-xl font-semibold text-white mb-4">{t('movieDetails.cast')}</h3>
                 <div className="flex flex-wrap gap-2">
-                  {movie.actors.map((actor, index) => (
-                    <Badge
-                      key={actor + index}
-                      variant="outline"
-                      className="max-w-full border-white/20 text-white bg-white/5 px-3 py-1 break-words"
-                    >
-                      {actor}
-                    </Badge>
-                  ))}
+                  {movie.castMembers && movie.castMembers.length > 0 ? (
+                    movie.castMembers.map((actor) => (
+                      <button
+                        key={actor.id}
+                        type="button"
+                        onClick={() => setSelectedPerson({ id: actor.id, name: actor.name })}
+                        className="border border-white/20 text-white bg-white/5 hover:bg-white/15 hover:border-white/40 px-3 py-1.5 rounded-lg text-xs sm:text-sm transition-all cursor-pointer flex flex-col items-start gap-0.5"
+                      >
+                        <span className="font-semibold text-white">{actor.name}</span>
+                        {actor.character && (
+                          <span className="text-[11px] text-white/50">{actor.character}</span>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    movie.actors.map((actor, index) => (
+                      <Badge
+                        key={actor + index}
+                        variant="outline"
+                        className="max-w-full border-white/20 text-white bg-white/5 px-3 py-1 break-words"
+                      >
+                        {actor}
+                      </Badge>
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
           )}
 
+          {/* Saga / Collection Section */}
+          {movie.collection?.id ? (
+            <CollectionSagaSection collectionId={movie.collection.id} currentMovieId={movie.id} />
+          ) : null}
 
+          {/* Torrents Search / Releases */}
           <TorrentResultsPanel
             title={t('movieDetails.indexer.title')}
             filter={filter}
@@ -372,8 +414,18 @@ export function MovieDetails() {
               {inWishlist ? t('movieDetails.removeFromWishlist') : t('movieDetails.addToWishlist')}
             </Button>
           </div>
+
+          {/* Similar and Recommended Movies */}
+          <SimilarMediaSection id={movie.id} type="movie" />
         </div>
       </div>
+
+      {/* Person Filmography Modal */}
+      <PersonFilmographyModal
+        personId={selectedPerson?.id || null}
+        personName={selectedPerson?.name}
+        onClose={() => setSelectedPerson(null)}
+      />
     </div>
   );
 }

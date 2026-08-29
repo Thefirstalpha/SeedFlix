@@ -106,3 +106,78 @@ export async function unmanageTorrent(hash: string) {
 
   return parseJson<{ ok: boolean; message: string }>(response);
 }
+
+export interface TurtleModeStats {
+  altSpeedEnabled: boolean;
+  altSpeedDown: number;
+  altSpeedUp: number;
+  speedLimitDownEnabled: boolean;
+  speedLimitDown: number;
+  speedLimitUpEnabled: boolean;
+  speedLimitUp: number;
+}
+
+export async function getTurtleMode(): Promise<TurtleModeStats> {
+  const response = await fetch(`${API_BASE_URL}/transmission/turtle`, {
+    credentials: 'include',
+  });
+  return parseJson<TurtleModeStats>(response);
+}
+
+export async function setTurtleMode(enabled: boolean): Promise<{ altSpeedEnabled: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/transmission/turtle`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ enabled }),
+  });
+  return parseJson<{ altSpeedEnabled: boolean }>(response);
+}
+
+export interface TorrentFileDetail {
+  index: number;
+  name: string;
+  bytesCompleted: number;
+  length: number;
+  wanted: boolean;
+  priority: number;
+}
+
+export async function getTorrentFiles(torrentId: number): Promise<TorrentFileDetail[]> {
+  const response = await fetch(`${API_BASE_URL}/transmission/torrent/${torrentId}/files`, {
+    credentials: 'include',
+  });
+  const data = await parseJson<{ files: TorrentFileDetail[] }>(response);
+  return data.files || [];
+}
+
+export async function setTorrentFilesWanted(
+  torrentId: number,
+  wanted: number[],
+  unwanted: number[],
+): Promise<void> {
+  await fetch(`${API_BASE_URL}/transmission/torrent/${torrentId}/files`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ wanted, unwanted }),
+  });
+}
+
+export async function moveTorrentQueue(
+  torrentId: number,
+  action: 'up' | 'down' | 'top' | 'bottom',
+): Promise<void> {
+  await fetch(`${API_BASE_URL}/transmission/torrent/${torrentId}/queue`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action }),
+  });
+}

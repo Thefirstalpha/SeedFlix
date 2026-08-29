@@ -267,6 +267,7 @@ const fr : I18nMessages = {
       chinese: 'Chinois',
       unknown: 'Inconnu',
     },
+    noResults: 'Aucun résultat trouvé.',
   },
   movieDetails: {
     notFoundTitle: 'Film non trouvé',

@@ -182,3 +182,112 @@ export async function searchMultiPage(
         };
     }
 }
+
+export interface TmdbCollectionPart {
+    id: number;
+    title: string;
+    original_title: string;
+    overview: string;
+    poster_path: string | null;
+    backdrop_path: string | null;
+    release_date: string;
+    vote_average: number;
+    vote_count: number;
+}
+
+export interface TmdbCollectionDetails {
+    id: number;
+    name: string;
+    overview: string;
+    poster_path: string | null;
+    backdrop_path: string | null;
+    parts: TmdbCollectionPart[];
+}
+
+export interface TmdbPersonCredit {
+    id: number;
+    media_type: 'movie' | 'tv';
+    title?: string;
+    name?: string;
+    poster_path: string | null;
+    vote_average: number;
+    character?: string;
+    job?: string;
+    release_date?: string;
+    first_air_date?: string;
+}
+
+export interface TmdbPersonDetails {
+    id: number;
+    name: string;
+    biography: string;
+    profile_path: string | null;
+    birthday: string | null;
+    place_of_birth: string | null;
+    known_for_department: string;
+    combined_credits?: {
+        cast: TmdbPersonCredit[];
+        crew: TmdbPersonCredit[];
+    };
+}
+
+export async function getMediaRecommendations(
+    id: number,
+    type: 'movie' | 'series',
+    uiLanguage = 'fr',
+): Promise<Array<Movie | Series>> {
+    const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/tmdb/${type}/recommendations/${id}?language=${encodeURIComponent(tmdbLanguage)}`,
+        );
+        if (!response.ok) return [];
+        const data = await response.json();
+        const results: Array<Movie | Series> = [];
+        for (const item of data.results || []) {
+            if (type === 'movie') {
+                results.push(convertTMDBToMovie(item));
+            } else {
+                results.push(convertTMDBToSeries(item));
+            }
+        }
+        return results;
+    } catch (error) {
+        console.error('Error fetching recommendations:', error);
+        return [];
+    }
+}
+
+export async function getMovieCollection(
+    collectionId: number,
+    uiLanguage = 'fr',
+): Promise<TmdbCollectionDetails | null> {
+    const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/tmdb/collection/${collectionId}?language=${encodeURIComponent(tmdbLanguage)}`,
+        );
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching collection:', error);
+        return null;
+    }
+}
+
+export async function getPersonDetails(
+    personId: number,
+    uiLanguage = 'fr',
+): Promise<TmdbPersonDetails | null> {
+    const tmdbLanguage = getTmdbLanguageParam(uiLanguage);
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/tmdb/person/${personId}?language=${encodeURIComponent(tmdbLanguage)}`,
+        );
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching person details:', error);
+        return null;
+    }
+}

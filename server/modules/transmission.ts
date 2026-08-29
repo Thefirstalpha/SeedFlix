@@ -444,3 +444,136 @@ export async function startDownload(userId: number, guid: string, mediaType: str
     registerManagedTorrent(userId, addedHash, url.toString(), String(added?.name || ''));
   }
 }
+
+export interface TransmissionSessionStats {
+  altSpeedEnabled: boolean;
+  altSpeedDown: number;
+  altSpeedUp: number;
+  speedLimitDownEnabled: boolean;
+  speedLimitDown: number;
+  speedLimitUpEnabled: boolean;
+  speedLimitUp: number;
+}
+
+export async function getTurtleMode(userId: number): Promise<TransmissionSessionStats> {
+  const settings = getTransmissionSettings(userId);
+  if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
+  const response = await executeTransmissionRpc(settings, { method: 'session-get' });
+  const data = await response.json().catch(() => null);
+  const args = data?.arguments || {};
+  return {
+    altSpeedEnabled: Boolean(args['alt-speed-enabled']),
+    altSpeedDown: Number(args['alt-speed-down'] || 0),
+    altSpeedUp: Number(args['alt-speed-up'] || 0),
+    speedLimitDownEnabled: Boolean(args['speed-limit-down-enabled']),
+    speedLimitDown: Number(args['speed-limit-down'] || 0),
+    speedLimitUpEnabled: Boolean(args['speed-limit-up-enabled']),
+    speedLimitUp: Number(args['speed-limit-up'] || 0),
+  };
+}
+
+export async function setTurtleMode(userId: number, enabled: boolean): Promise<boolean> {
+  const settings = getTransmissionSettings(userId);
+  if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
+  const response = await executeTransmissionRpc(settings, {
+    method: 'session-set',
+    arguments: {
+      'alt-speed-enabled': Boolean(enabled),
+    },
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || data?.result !== 'success') {
+    throw new ErrorCode(messages.settings.transmission.actionFailed);
+  }
+  return Boolean(enabled);
+}
+
+export interface TorrentFileDetail {
+  index: number;
+  name: string;
+  bytesCompleted: number;
+  length: number;
+  wanted: boolean;
+  priority: number;
+}
+
+export async function getTorrentFiles(
+  userId: number,
+  torrentId: number,
+): Promise<TorrentFileDetail[]> {
+  const settings = getTransmissionSettings(userId);
+  if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
+  const response = await executeTransmissionRpc(settings, {
+    method: 'torrent-get',
+    arguments: {
+      ids: [torrentId],
+      fields: ['id', 'name', 'files', 'fileStats'],
+    },
+  });
+  const data = await response.json().catch(() => null);
+  const torrent = data?.arguments?.torrents?.[0];
+  if (!torrent) {
+    throw new ErrorCode('Torrent introuvable');
+  }
+
+  const files = Array.isArray(torrent.files) ? torrent.files : [];
+  const fileStats = Array.isArray(torrent.fileStats) ? torrent.fileStats : [];
+
+  return files.map((file: any, index: number) => ({
+    index,
+    name: String(file.name || ''),
+    bytesCompleted: Number(file.bytesCompleted || 0),
+    length: Number(file.length || 0),
+    wanted: fileStats[index] ? Boolean(fileStats[index].wanted) : true,
+    priority: fileStats[index] ? Number(fileStats[index].priority || 0) : 0,
+  }));
+}
+
+export async function setTorrentFilesWanted(
+  userId: number,
+  torrentId: number,
+  wantedIndices: number[],
+  unwantedIndices: number[],
+): Promise<void> {
+  const settings = getTransmissionSettings(userId);
+  if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
+
+  const args: Record<string, any> = { ids: [torrentId] };
+  if (wantedIndices.length > 0) args['files-wanted'] = wantedIndices;
+  if (unwantedIndices.length > 0) args['files-unwanted'] = unwantedIndices;
+
+  const response = await executeTransmissionRpc(settings, {
+    method: 'torrent-set',
+    arguments: args,
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || data?.result !== 'success') {
+    throw new ErrorCode(messages.settings.transmission.actionFailed);
+  }
+}
+
+export async function moveTorrentQueue(
+  userId: number,
+  torrentId: number,
+  action: 'up' | 'down' | 'top' | 'bottom',
+): Promise<void> {
+  const settings = getTransmissionSettings(userId);
+  if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
+
+  const methodMap: Record<string, string> = {
+    up: 'queue-move-up',
+    down: 'queue-move-down',
+    top: 'queue-move-top',
+    bottom: 'queue-move-bottom',
+  };
+
+  const method = methodMap[action] || 'queue-move-up';
+  const response = await executeTransmissionRpc(settings, {
+    method,
+    arguments: { ids: [torrentId] },
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || data?.result !== 'success') {
+    throw new ErrorCode(messages.settings.transmission.actionFailed);
+  }
+}

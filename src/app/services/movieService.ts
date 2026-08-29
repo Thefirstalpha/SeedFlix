@@ -257,17 +257,27 @@ export async function getMovieById(id: number, uiLanguage = 'fr'): Promise<Movie
 
     const data: TMDBMovieDetails = await response.json();
 
-    // Extraire le réalisateur
-    const director =
-      data.credits?.crew.find((person) => person.job === 'Director')?.name || 'Non disponible';
+    // Extraire les réalisateurs
+    const directors =
+      data.credits?.crew
+        .filter((person) => person.job === 'Director')
+        .map((p) => ({ id: p.id, name: p.name, job: p.job, profile_path: p.profile_path })) || [];
+    const director = directors.length > 0 ? directors[0].name : 'Non disponible';
 
-    // Extraire les acteurs principaux (top 5)
-    const actors = data.credits?.cast.slice(0, 5).map((actor) => actor.name) || [];
+    // Extraire les acteurs principaux
+    const castMembers =
+      data.credits?.cast.slice(0, 15).map((actor) => ({
+        id: actor.id,
+        name: actor.name,
+        character: actor.character,
+        profile_path: actor.profile_path,
+      })) || [];
+    const actors = castMembers.slice(0, 8).map((actor) => actor.name);
 
     // Convertir la durée
-    const hours = Math.floor(data.runtime / 60);
-    const minutes = data.runtime % 60;
-    const duration = `${hours}h ${minutes}min`;
+    const hours = Math.floor((data.runtime || 0) / 60);
+    const minutes = (data.runtime || 0) % 60;
+    const duration = hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`;
 
     // Obtenir le genre principal
     const genre = data.genres && data.genres.length > 0 ? data.genres[0].name : 'Inconnu';
@@ -288,6 +298,9 @@ export async function getMovieById(id: number, uiLanguage = 'fr'): Promise<Movie
       duration,
       releaseDate: data.release_date,
       voteCount: data.vote_count,
+      collection: data.belongs_to_collection || null,
+      castMembers,
+      directorsList: directors,
     };
   } catch (error) {
     console.error('Error fetching movie details:', error);

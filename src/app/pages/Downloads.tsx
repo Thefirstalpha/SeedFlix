@@ -12,6 +12,9 @@ import {
   Link,
   Trash2,
   FolderX,
+  FolderTree,
+  ArrowUp,
+  ArrowDown,
   Unlink,
   X,
 } from 'lucide-react';
@@ -28,8 +31,12 @@ import {
   deleteTorrent,
   unmanageTorrent,
   getTorrentStats,
+  moveTorrentQueue,
 } from '../services/torrentService';
 import { TorrentDownloadItem, TorrentStatsResponse } from '../../../common/torrent';
+import { TurtleModeButton } from '../components/downloads/TurtleModeButton';
+import { TorrentFilesModal } from '../components/downloads/TorrentFilesModal';
+import { toast } from 'sonner';
 
 import { useRealtime } from '../context/RealtimeContext';
 
@@ -122,6 +129,8 @@ function DownloadCard({
   handleUnmanage,
   handleDelete,
   onRequestDeleteWithData,
+  onRequestFiles,
+  onMoveQueue,
 }: Readonly<{
   item: TorrentDownloadItem;
   t: any;
@@ -133,6 +142,8 @@ function DownloadCard({
   handleUnmanage: (hash: string) => void;
   handleDelete: (id: number) => void;
   onRequestDeleteWithData: (item: TorrentDownloadItem) => void;
+  onRequestFiles: (item: TorrentDownloadItem) => void;
+  onMoveQueue: (id: number, action: 'up' | 'down') => void;
 }>) {
   const completed = isComplete(item);
   const isStopped = item.status === 0;
@@ -285,6 +296,28 @@ function DownloadCard({
             <FolderX className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">{t('downloads.removeWithData')}</span>
           </Button>
           <Button size="sm" variant="outline"
+            onClick={() => onRequestFiles(item)}
+            title="Inspecter et sélectionner les fichiers"
+            className="h-7 px-2 text-xs border-purple-500/30 bg-purple-900/20 text-purple-200 hover:bg-purple-900/40 hover:text-white">
+            <FolderTree className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">Fichiers</span>
+          </Button>
+          {!completed && (
+            <div className="flex items-center gap-0.5 border border-white/10 rounded-md bg-white/5 p-0.5" title="Priorité dans la file">
+              <Button size="icon" variant="ghost"
+                onClick={() => onMoveQueue(item.id, 'up')}
+                title="Monter dans la file"
+                className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10 rounded">
+                <ArrowUp className="w-3 h-3" />
+              </Button>
+              <Button size="icon" variant="ghost"
+                onClick={() => onMoveQueue(item.id, 'down')}
+                title="Descendre dans la file"
+                className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10 rounded">
+                <ArrowDown className="w-3 h-3" />
+              </Button>
+            </div>
+          )}
+          <Button size="sm" variant="outline"
             onClick={() => setShowRawDetails((prev) => !prev)}
             title="Détails"
             className="h-7 px-2 text-xs border-white/20 bg-white/5 text-white/60 hover:bg-white/10">
@@ -375,7 +408,7 @@ function sortDownloads(downloads: TorrentDownloadItem[], sortKey: SortKey, sortD
 }
 
 export function Downloads() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { downloads: realtimeDownloads, stats: realtimeStats, isConnected } = useRealtime();
   const [downloads, setDownloads] = useState<TorrentDownloadItem[]>([]);
   const [stats, setStats] = useState<TorrentStatsResponse | null>(null);
@@ -389,6 +422,7 @@ export function Downloads() {
     showAllTorrents: false,
   });
   const [pendingDeleteWithData, setPendingDeleteWithData] = useState<TorrentDownloadItem | null>(null);
+  const [selectedTorrentForFiles, setSelectedTorrentForFiles] = useState<{ id: number; name: string } | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('addedDate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [isLoading, setIsLoading] = useState(true);
@@ -409,6 +443,20 @@ export function Downloads() {
   const isComplete = (item: TorrentDownloadItem) => item.leftUntilDone === 0 || item.isFinished;
   const isActiveDownload = (item: TorrentDownloadItem) =>
     !isComplete(item) && [3, 4].includes(item.status);
+
+  const handleMoveQueue = async (id: number, action: 'up' | 'down') => {
+    try {
+      await moveTorrentQueue(id, action);
+      toast.success(
+        language === 'fr'
+          ? 'Priorité de téléchargement modifiée'
+          : 'Download priority updated',
+      );
+      void loadDownloads(showAllTorrentsRef.current, true);
+    } catch {
+      toast.error('Erreur lors du changement de priorité');
+    }
+  };
 
   const loadDownloads = async (includeAll: boolean = false, force: boolean = false) => {
     try {
@@ -456,19 +504,16 @@ export function Downloads() {
   }, [realtimeStats]);
 
   useEffect(() => {
-    setIsLoading(true);
-    void loadDownloads(showAllTorrentsRef.current, true);
-    void loadStats();
+    loadDownloads(filter.showAllTorrents);
+    loadStats();
 
-    // Fallback slow poll (30s) ONLY if SSE is disconnected
-    if (!isConnected) {
-      const interval = setInterval(() => {
-        void loadDownloads(showAllTorrentsRef.current);
-        void loadStats();
-      }, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [isConnected]);
+    const interval = setInterval(() => {
+      loadDownloads(filter.showAllTorrents);
+      loadStats();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [filter.showAllTorrents]);
 
   // Silent refresh when source filter changes (no loading state)
   useEffect(() => {
@@ -496,7 +541,7 @@ export function Downloads() {
   const handlePause = async (id: number) => {
     setActionInProgress(`pause-${id}`);
     lastActionTimeRef.current = Date.now();
-    // Optimistic update: immediately mark as paused (status = 0)
+    // Optimistic update: immediately mark as stopped (status = 0)
     setDownloads((prev) => prev.map((item) => (item.id === id ? { ...item, status: 0 } : item)));
     try {
       await pauseTorrent(id);
@@ -600,27 +645,33 @@ export function Downloads() {
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <Download className="w-7 h-7 text-cyan-300" />
-        <div>
-          <h2 className="text-3xl font-bold text-white">{t('downloads.title')}</h2>
-          <p className="text-white/60">
-            {stats ? (
-              <>
-                <span>
-                  {t('downloads.totalCount', { total: stats.torrentCount })}
-                </span>
-                <span> • </span>
-                <span className="text-green-300">
-                  {t('downloads.uploadRate', { value: (stats.uploadSpeed / 1024 / 1024).toFixed(2) })}
-                </span>
-                <span> • </span>
-                <span className="text-red-300">
-                  {t('downloads.downloadRate', { value: (stats.downloadSpeed / 1024 / 1024).toFixed(2) })}
-                </span>
-              </>
-            ) : null}
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Download className="w-7 h-7 text-cyan-300 shrink-0" />
+          <div>
+            <h2 className="text-3xl font-bold text-white">{t('downloads.title')}</h2>
+            <p className="text-white/60">
+              {stats ? (
+                <>
+                  <span>
+                    {t('downloads.totalCount', { total: stats.torrentCount })}
+                  </span>
+                  <span> • </span>
+                  <span className="text-green-300">
+                    {t('downloads.uploadRate', { value: (stats.uploadSpeed / 1024 / 1024).toFixed(2) })}
+                  </span>
+                  <span> • </span>
+                  <span className="text-red-300">
+                    {t('downloads.downloadRate', { value: (stats.downloadSpeed / 1024 / 1024).toFixed(2) })}
+                  </span>
+                </>
+              ) : null}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <TurtleModeButton />
         </div>
       </div>
 
@@ -719,6 +770,8 @@ export function Downloads() {
             handleUnmanage={handleUnmanage}
             handleDelete={handleDelete}
             onRequestDeleteWithData={setPendingDeleteWithData}
+            onRequestFiles={(it) => setSelectedTorrentForFiles({ id: it.id, name: it.name })}
+            onMoveQueue={handleMoveQueue}
           />
         ))}
       </div>
@@ -730,6 +783,13 @@ export function Downloads() {
           </CardContent>
         </Card>
       ) : null}
+
+      {/* Torrent Files Inspection & Selection Modal */}
+      <TorrentFilesModal
+        torrentId={selectedTorrentForFiles?.id || null}
+        torrentName={selectedTorrentForFiles?.name}
+        onClose={() => setSelectedTorrentForFiles(null)}
+      />
     </div>
   );
 }

@@ -170,6 +170,39 @@ export function buildSearchRequest(mediaType: TmdbType | 'multi', query: Record<
   };
 }
 
+export function buildRecommendationsRequest(
+  mediaType: TmdbType,
+  id: number,
+  query: Record<string, any>,
+) {
+  return {
+    path: `/${mediaType}/${id}/recommendations`,
+    query: {
+      page: Number(query.page || 1),
+      language: String(query.language || 'fr-FR'),
+    },
+  };
+}
+
+export function buildCollectionRequest(id: number, query: Record<string, any>) {
+  return {
+    path: `/collection/${id}`,
+    query: {
+      language: String(query.language || 'fr-FR'),
+    },
+  };
+}
+
+export function buildPersonRequest(id: number, query: Record<string, any>) {
+  return {
+    path: `/person/${id}`,
+    query: {
+      language: String(query.language || 'fr-FR'),
+      append_to_response: 'combined_credits',
+    },
+  };
+}
+
 export interface NormalizedTmdbDetails {
   id: number;
   type: 'movie' | 'series';

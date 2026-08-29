@@ -93,6 +93,13 @@ function convertTMDBToSeriesDetails(tmdbSeries: TMDBSeriesDetails): SeriesDetail
     firstAirDate: tmdbSeries.first_air_date,
     status: tmdbSeries.status,
     creators: (tmdbSeries.created_by || []).map((creator) => creator.name),
+    creatorsList: (tmdbSeries.created_by || []).map((c) => ({ id: c.id, name: c.name, profile_path: null })),
+    castMembers: (tmdbSeries.credits?.cast || []).slice(0, 15).map((actor) => ({
+      id: actor.id,
+      name: actor.name,
+      character: actor.character,
+      profile_path: actor.profile_path,
+    })),
     networks: (tmdbSeries.networks || []).map((network) => network.name),
     seasons: (tmdbSeries.seasons || [])
       .filter((season) => season.season_number >= 0)

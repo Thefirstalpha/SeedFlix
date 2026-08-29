@@ -25,6 +25,8 @@ import { buildTorrentResultsLabels } from '../services/torrentResultsLabels';
 import type { SeriesDetails as SeriesDetailsModel, SeriesEpisode } from '../types/series';
 import { WishListItem } from '../../../common/wishlist';
 import { IndexerSeriesResult } from '../../../common/indexer';
+import { SimilarMediaSection } from '../components/SimilarMediaSection';
+import { PersonFilmographyModal } from '../components/PersonFilmographyModal';
 
 
 const SERIES_QUALITY_FILTERS = new Set(['all', '2160p', '1080p', '720p', '480p', 'bluray', 'webdl', 'hdtv']);
@@ -38,6 +40,7 @@ export function SeriesDetails() {
   const [episodes, setEpisodes] = useState<SeriesEpisode[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedPerson, setSelectedPerson] = useState<{ id: number; name: string } | null>(null);
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
   const [wishlistStatus, setWishlistStatus] = useState<WishListItem | undefined>(undefined);
   const [releaseResults, setReleaseResults] = useState<IndexerSeriesResult[]>([]);
@@ -462,16 +465,50 @@ export function SeriesDetails() {
           <TrailersSection trailers={trailersList} mediaTitle={series.title} type="series" />
 
           <Card className="bg-white/5 border-white/10 w-full min-w-0 overflow-hidden">
-            <CardContent className="p-4 sm:p-6 space-y-3 min-w-0">
+            <CardContent className="p-4 sm:p-6 space-y-4 min-w-0">
               <h3 className="text-xl font-semibold text-white">
                 {t('seriesDetails.creatorsAndNetworks')}
               </h3>
-              <p className="text-white/80 break-words">
-                <span className="text-white/60">{t('seriesDetails.creatorsLabel')} </span>
-                {series.creators.length > 0
-                  ? series.creators.join(', ')
-                  : t('seriesDetails.notAvailable')}
-              </p>
+
+              {series.creatorsList && series.creatorsList.length > 0 && (
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-white/60">{t('seriesDetails.creatorsLabel')}</span>
+                  <div className="flex flex-wrap gap-2">
+                    {series.creatorsList.map((creator) => (
+                      <button
+                        key={creator.id}
+                        type="button"
+                        onClick={() => setSelectedPerson({ id: creator.id, name: creator.name })}
+                        className="px-3 py-1 rounded-lg border border-cyan-500/30 bg-cyan-900/20 text-cyan-200 hover:bg-cyan-900/40 hover:text-white transition-all text-xs sm:text-sm font-medium flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {creator.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {series.castMembers && series.castMembers.length > 0 && (
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium text-white/60">{language === 'fr' ? 'Distribution' : 'Cast'}</span>
+                  <div className="flex flex-wrap gap-2">
+                    {series.castMembers.map((actor) => (
+                      <button
+                        key={actor.id}
+                        type="button"
+                        onClick={() => setSelectedPerson({ id: actor.id, name: actor.name })}
+                        className="border border-white/20 text-white bg-white/5 hover:bg-white/15 hover:border-white/40 px-3 py-1 rounded-lg text-xs sm:text-sm transition-all cursor-pointer flex flex-col items-start gap-0.5"
+                      >
+                        <span className="font-semibold text-white">{actor.name}</span>
+                        {actor.character && (
+                          <span className="text-[11px] text-white/50">{actor.character}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <p className="text-white/80 break-words">
                 <span className="text-white/60">{t('seriesDetails.networksLabel')} </span>
                 {series.networks.length > 0
@@ -689,9 +726,18 @@ export function SeriesDetails() {
             locale={language === 'fr' ? 'fr-FR' : 'en-US'}
             labels={torrentPanelLabels}
           />
+
+          {/* Similar & Recommended Series */}
+          <SimilarMediaSection id={series.id} type="series" />
         </div>
       </div>
 
+      {/* Person Filmography Modal */}
+      <PersonFilmographyModal
+        personId={selectedPerson?.id || null}
+        personName={selectedPerson?.name}
+        onClose={() => setSelectedPerson(null)}
+      />
     </div>
   );
 }

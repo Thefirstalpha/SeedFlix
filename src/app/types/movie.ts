@@ -32,6 +32,9 @@ export interface Movie {
   releaseDate?: string;
   voteCount?: number;
   torznab?: TorznabSearchData;
+  collection?: { id: number; name: string; poster_path?: string | null; backdrop_path?: string | null } | null;
+  castMembers?: Array<{ id: number; name: string; character: string; profile_path: string | null }>;
+  directorsList?: Array<{ id: number; name: string; job: string; profile_path: string | null }>;
 }
 
 // TMDB API Response Types
@@ -53,6 +56,7 @@ export interface TMDBMovie {
 export interface TMDBMovieDetails extends TMDBMovie {
   runtime: number;
   genres: { id: number; name: string }[];
+  belongs_to_collection?: { id: number; name: string; poster_path: string | null; backdrop_path: string | null } | null;
   credits?: {
     cast: { id: number; name: string; character: string; profile_path: string | null }[];
     crew: { id: number; name: string; job: string }[];

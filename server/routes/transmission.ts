@@ -3,9 +3,14 @@ import { authentication } from '../modules/auth';
 import {
   configureTransmission,
   getDownloadsTransmission,
+  getTorrentFiles,
   getTransmissionSettings,
   getTransmissionStats,
+  getTurtleMode,
+  moveTorrentQueue,
   performTransmissionAction,
+  setTorrentFilesWanted,
+  setTurtleMode,
   startDownload,
   unmanageTorrentForUser,
 } from '../modules/transmission';
@@ -59,6 +64,41 @@ router.get('/transmission/downloads', async (req, res) => {
 router.get('/transmission/stats', async (req, res) => {
   const stats: TorrentStatsResponse = await getTransmissionStats(req.user.id);
   res.status(200).json(stats);
+});
+
+router.get('/transmission/turtle', async (req, res) => {
+  const stats = await getTurtleMode(req.user.id);
+  res.status(200).json(stats);
+});
+
+router.post('/transmission/turtle', async (req, res) => {
+  const enabled = Boolean(req.body?.enabled);
+  const result = await setTurtleMode(req.user.id, enabled);
+  void emitDownloads(req.user.id);
+  res.status(200).json({ altSpeedEnabled: result });
+});
+
+router.get('/transmission/torrent/:id/files', async (req, res) => {
+  const id = Number(req.params.id);
+  const files = await getTorrentFiles(req.user.id, id);
+  res.status(200).json({ files });
+});
+
+router.post('/transmission/torrent/:id/files', async (req, res) => {
+  const id = Number(req.params.id);
+  const wanted = Array.isArray(req.body?.wanted) ? req.body.wanted.map(Number) : [];
+  const unwanted = Array.isArray(req.body?.unwanted) ? req.body.unwanted.map(Number) : [];
+  await setTorrentFilesWanted(req.user.id, id, wanted, unwanted);
+  void emitDownloads(req.user.id);
+  res.status(200).json({ ok: true });
+});
+
+router.post('/transmission/torrent/:id/queue', async (req, res) => {
+  const id = Number(req.params.id);
+  const action = String(req.body?.action || 'up') as 'up' | 'down' | 'top' | 'bottom';
+  await moveTorrentQueue(req.user.id, id, action);
+  void emitDownloads(req.user.id);
+  res.status(200).json({ ok: true });
 });
 
 router.post('/transmission/resume/:id', async (req, res) => {

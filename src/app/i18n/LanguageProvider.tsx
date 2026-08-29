@@ -366,6 +366,7 @@ export interface I18nMessages {
       chinese: string;
       unknown: string;
     };
+    noResults: string;
   };
   movieDetails: {
     notFoundTitle: string;
