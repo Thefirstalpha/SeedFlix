@@ -56,6 +56,39 @@ describe('Route: /api/indexer', () => {
     expect(res.status).toBe(200);
     expect(res.body.url).toBe('https://indexer.example.com');
     expect(res.body.token).toBeUndefined();
+    expect(res.body.hasToken).toBe(true);
+  });
+
+  it('should preserve existing token when not provided in POST /api/indexer/configure', async () => {
+    const { user } = createUser('indexerUserPreserve');
+    const cookie = createSessionCookie(user.id);
+    mockedGetSettings.mockReturnValueOnce({
+      url: 'https://indexer.example.com',
+      token: 'existing-secret-token',
+      qualities: ['1080p'],
+      languages: ['MULTI'],
+    } as any);
+    mockedConfigure.mockResolvedValueOnce(undefined);
+
+    const res = await request(app)
+      .post('/api/indexer/configure')
+      .set('Cookie', cookie)
+      .send({
+        url: 'https://indexer.example.com',
+        token: '',
+        qualities: ['2160p'],
+        languages: ['VFF'],
+      });
+
+    expect(res.status).toBe(200);
+    expect(mockedConfigure).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({
+        token: 'existing-secret-token',
+        qualities: ['2160p'],
+        languages: ['VFF'],
+      }),
+    );
   });
 
   it('should configure indexer via POST /api/indexer/configure', async () => {

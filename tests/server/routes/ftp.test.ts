@@ -77,6 +77,51 @@ describe('Route: /api/ftp', () => {
     expect(res.body.ok).toBe(true);
     expect(res.body.config.host).toBe('ftp.example.com');
     expect(res.body.config.password).toBeUndefined();
+    expect(res.body.config.hasPassword).toBe(true);
+  });
+
+  it('should preserve existing FTP password when authRequired is true and password is empty or placeholder', async () => {
+    const { user } = createUser('ftpUserPreserve');
+    const cookie = createSessionCookie(user.id);
+    mockedGetSettings.mockReturnValueOnce({
+      host: 'ftp.example.com',
+      port: 21,
+      secure: false,
+      authRequired: true,
+      username: 'ftpuser',
+      password: 'existingFtpPassword',
+      rootFolder: '/',
+      storageLimit: null,
+    });
+    mockedTestWithSettings.mockResolvedValueOnce({ ok: true });
+    mockedConfigure.mockResolvedValueOnce(undefined);
+
+    const res = await request(app)
+      .post('/api/ftp/configure')
+      .set('Cookie', cookie)
+      .send({
+        host: 'ftp.example.com',
+        port: 21,
+        authRequired: true,
+        username: 'ftpuser',
+        password: '',
+        rootFolder: '/new-root',
+      });
+
+    expect(res.status).toBe(200);
+    expect(mockedTestWithSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        password: 'existingFtpPassword',
+        rootFolder: '/new-root',
+      }),
+    );
+    expect(mockedConfigure).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({
+        password: 'existingFtpPassword',
+        rootFolder: '/new-root',
+      }),
+    );
   });
 
   it('should test and configure FTP settings', async () => {

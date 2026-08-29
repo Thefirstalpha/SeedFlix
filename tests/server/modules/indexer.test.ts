@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { db, initDB, resetDatabase, writeStore } from '../../../server/modules/db';
+import { db, initDB, readStore, resetDatabase, writeStore } from '../../../server/modules/db';
 import {
   configureIndexer,
   extractEpisodeNumber,
@@ -143,6 +143,40 @@ describe('indexer module', () => {
       const saved = getIndexerSettings(userId);
       expect(saved?.url).toBe(sampleSettings.url);
       expect(saved?.token).toBe(sampleSettings.token);
+    });
+
+    it('should preserve existing token when updating settings without re-providing token', async () => {
+      vi.mocked(torznabModule.checkTorznabConnection).mockResolvedValue({} as any);
+
+      await configureIndexer(userId, sampleSettings);
+
+      await configureIndexer(userId, {
+        url: 'https://indexer-updated.example.com',
+        token: '',
+        qualities: ['2160p'],
+        languages: ['VFF'],
+      });
+
+      const saved = getIndexerSettings(userId);
+      expect(saved?.url).toBe('https://indexer-updated.example.com');
+      expect(saved?.token).toBe('tok-123');
+      expect(saved?.qualities).toEqual(['2160p']);
+      expect(saved?.languages).toEqual(['VFF']);
+    });
+
+    it('should strictly reject 1080p and VOSTFR releases when 2160p and VFF are configured', () => {
+      const settings: IndexerSettings = {
+        url: 'https://indexer.example.com',
+        token: 'tok-123',
+        qualities: ['2160p'],
+        languages: ['VFF'],
+      };
+
+      expect(matchesIndexerFilters({ title: 'Movie.2024.1080p.VOSTFR.WEB-DL' } as any, settings)).toBe(false);
+      expect(matchesIndexerFilters({ title: 'Movie.2024.2160p.VOSTFR.WEB-DL' } as any, settings)).toBe(false);
+      expect(matchesIndexerFilters({ title: 'Movie.2024.1080p.VFF.WEB-DL' } as any, settings)).toBe(false);
+      expect(matchesIndexerFilters({ title: 'Movie.2024.2160p.VFF.WEB-DL' } as any, settings)).toBe(true);
+      expect(matchesIndexerFilters({ title: 'Movie.2024.4K.UHD.TRUEFRENCH' } as any, settings)).toBe(true);
     });
 
     it('should throw error when indexer connection check fails', async () => {
@@ -406,10 +440,68 @@ describe('indexer module', () => {
         user.id,
         'guid-fc-auto',
         'movie',
+        expect.objectContaining({ tmdbId: 550 }),
       );
 
       const notifs = getNotifications(user.id);
       expect(notifs.notifications.some((n) => n.title.includes('automatique'))).toBe(true);
+    });
+
+    it('should remove wishlist item and blacklist release when auto-download occurs to prevent loops', async () => {
+      const user = createUser('userAutoDlWishlistRemoval').user;
+      user.settings.indexer = { ...sampleSettings, autoDownload: true };
+      user.settings.transmission = {
+        host: 'http://transmission.local',
+        port: 9091,
+        authRequired: false,
+        username: '',
+        password: '',
+        moviesFolder: '/movies',
+        seriesFolder: '/series',
+      };
+      updateUser(user);
+
+      writeStore('wishlist', user.id, [
+        { tmdb: 550, type: 'movie', title: 'Fight Club', original_title: 'Fight Club', releaseDate: '1999', addedAt: '2024-01-01' },
+      ]);
+
+      vi.mocked(torznabModule.rssTorznab).mockResolvedValue({
+        rss: {
+          channel: {
+            item: [
+              {
+                title: 'Fight.Club.1999.1080p.MULTI',
+                link: 'https://link-fc',
+                guid: 'guid-fc-auto-1',
+                'torznab:attr': [{ name: 'tmdbid', value: '550' }, { name: 'size', value: '1000' }],
+              },
+            ],
+          },
+        },
+      } as any);
+
+      const transmissionModule = await import('../../../server/modules/transmission');
+      const { consumeWishlistItemForDownload } = await import('../../../server/modules/wishlist');
+      vi.mocked(transmissionModule.startDownload).mockImplementationOnce(async (uid, guid, type, opts) => {
+        await consumeWishlistItemForDownload(uid, guid, type as any, opts);
+      });
+
+      // Execute wishlist auto-download
+      await processWishlistIndexer();
+
+      // Wishlist item should be removed
+      const { getWishlistSync } = await import('../../../server/modules/wishlist');
+      const wishlistAfter = getWishlistSync(user.id);
+      expect(wishlistAfter).toHaveLength(0);
+
+      // Release must be blacklisted to prevent downloading again
+      const blacklist = (readStore('indexer-blacklist', user.id) || []) as string[];
+      expect(blacklist).toContain('movie:550:guid-fc-auto-1');
+
+      // Second run: no releases found because wishlist is empty
+      vi.mocked(torznabModule.rssTorznab).mockClear();
+      await processWishlistIndexer();
+      expect(torznabModule.rssTorznab).not.toHaveBeenCalled();
     });
 
     it('should handle multiple releases and auto-download failures in processWishlistIndexer', async () => {

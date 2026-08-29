@@ -67,6 +67,44 @@ describe('Route: /api/transmission', () => {
     expect(res.status).toBe(200);
     expect(res.body.host).toBe('http://transmission.local');
     expect(res.body.password).toBeUndefined();
+    expect(res.body.hasPassword).toBe(true);
+  });
+
+  it('should preserve existing password when authRequired is true and password is empty or placeholder', async () => {
+    const { user } = createUser('transUserPreserve');
+    const cookie = createSessionCookie(user.id);
+    mockedGetSettings.mockReturnValueOnce({
+      host: 'http://transmission.local',
+      port: 9091,
+      authRequired: true,
+      username: 'admin',
+      password: 'existingSecretPassword',
+      moviesFolder: '/movies',
+      seriesFolder: '/series',
+    } as any);
+    mockedConfigure.mockResolvedValueOnce(undefined);
+
+    const res = await request(app)
+      .post('/api/transmission/configure')
+      .set('Cookie', cookie)
+      .send({
+        host: 'http://transmission.local',
+        port: 9091,
+        authRequired: true,
+        username: 'admin',
+        password: '',
+        moviesFolder: '/new-movies',
+        seriesFolder: '/new-series',
+      });
+
+    expect(res.status).toBe(200);
+    expect(mockedConfigure).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({
+        password: 'existingSecretPassword',
+        moviesFolder: '/new-movies',
+      }),
+    );
   });
 
   it('should save transmission settings via POST /api/transmission/configure', async () => {

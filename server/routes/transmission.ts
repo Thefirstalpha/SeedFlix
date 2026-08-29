@@ -25,10 +25,13 @@ router.use(authentication);
 router.get('/transmission/configure', async (req, res) => {
   const userId = req.user.id;
   let transmissionSettings = getTransmissionSettings(userId);
+  const hasPassword = Boolean(
+    transmissionSettings?.password && transmissionSettings.password.trim().length > 0,
+  );
   if (transmissionSettings && 'password' in transmissionSettings) {
     delete transmissionSettings.password; // Do not send password to client
   }
-  res.status(200).json(transmissionSettings);
+  res.status(200).json({ ...(transmissionSettings || {}), hasPassword });
 });
 
 router.post('/transmission/configure', async (req, res) => {
@@ -36,12 +39,21 @@ router.post('/transmission/configure', async (req, res) => {
     res.status(400).json({ error: 'Request body is required' });
     return;
   }
+  const currentSettings = getTransmissionSettings(req.user.id);
+  const authRequired = Boolean(req.body?.authRequired || false);
+  const incomingPassword = typeof req.body?.password === 'string' ? req.body.password.trim() : '';
+  const password =
+    authRequired &&
+    (!incomingPassword || incomingPassword === '***********' || incomingPassword.includes('•'))
+      ? currentSettings?.password || ''
+      : incomingPassword;
+
   const setting: TransmissionSettings = {
     host: String(req.body?.host || '').trim(),
     port: Number(req.body?.port || 0),
-    authRequired: Boolean(req.body?.authRequired || false),
+    authRequired,
     username: String(req.body?.username || '').trim(),
-    password: String(req.body?.password || '').trim(),
+    password,
     moviesFolder: String(req.body?.moviesFolder || '/').trim(),
     seriesFolder: String(req.body?.seriesFolder || '/').trim(),
   };

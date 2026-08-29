@@ -16,6 +16,7 @@ export function SettingIndexer({ setup, onComplete }: Readonly<{ setup: boolean;
     const { t } = useI18n();
     const [indexerUrl, setIndexerUrl] = useState('');
     const [indexerToken, setIndexerToken] = useState('');
+    const [hasExistingToken, setHasExistingToken] = useState(false);
     const [indexerQualities, setIndexerQualities] = useState<string[]>(['all']);
     const [indexerLanguages, setIndexerLanguages] = useState<string[]>(['all']);
     const [indexerAutoDownload, setIndexerAutoDownload] = useState(false);
@@ -41,6 +42,10 @@ export function SettingIndexer({ setup, onComplete }: Readonly<{ setup: boolean;
         try {
             await configureIndexer(indexerSettings);
             setIndexerMessage(t('settings.messages.configurationSaved'));
+            if (indexerToken) {
+                setHasExistingToken(true);
+                setIndexerToken('');
+            }
             onComplete?.();
         } catch (submitError) {
             setIndexerError(
@@ -64,7 +69,8 @@ export function SettingIndexer({ setup, onComplete }: Readonly<{ setup: boolean;
             if (response.ok) {
                 const data = await response.json();
                 setIndexerUrl(data.url || '');
-                setIndexerToken(data.token || '');
+                setIndexerToken('');
+                setHasExistingToken(Boolean(data.hasToken || data.token));
                 setIndexerQualities(data.qualities || ['all']);
                 setIndexerLanguages(data.languages || ['all']);
                 setIndexerAutoDownload(Boolean(data.autoDownload));
@@ -99,7 +105,7 @@ export function SettingIndexer({ setup, onComplete }: Readonly<{ setup: boolean;
                             <Input
                                 id="indexer-token"
                                 type="password"
-                                placeholder="••••••••••••••••"
+                                placeholder={hasExistingToken ? "••••••••••••••••" : t('settings.api.indexer.token')}
                                 value={indexerToken}
                                 onChange={(e) => setIndexerToken(e.target.value)}
                                 className="bg-slate-900 border-white/10 text-white"

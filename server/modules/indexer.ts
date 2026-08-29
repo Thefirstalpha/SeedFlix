@@ -8,14 +8,14 @@ import { addNotification } from './notification';
 import { readGlobalConfig } from './setting';
 import { buildDetailsRequest, proxyTmdb, TmdbType } from './tmdb';
 import { checkTorznabConnection, rssTorznab, searchTorznab } from './torznab';
-import { getUser } from './user';
+import { getUser, updateUser } from './user';
 import { getWishlist } from './wishlist';
 
 const QUALITY_PATTERNS: Array<{ regex: RegExp; value: string }> = [
-  { regex: /(?:^|[\s._\-[\]()])(?:2160p|4k|uhd)(?:$|[\s._\-[\]()])/i, value: '2160p' },
-  { regex: /(?:^|[\s._\-[\]()])(?:1080p|1080i)(?:$|[\s._\-[\]()])/i, value: '1080p' },
-  { regex: /(?:^|[\s._\-[\]()])(?:720p)(?:$|[\s._\-[\]()])/i, value: '720p' },
-  { regex: /(?:^|[\s._\-[\]()])(?:480p|576p|sd)(?:$|[\s._\-[\]()])/i, value: '480p' },
+  { regex: /(?:^|[\s._\-[\]()])(?:2160p|2160|4k|uhd)(?:$|[\s._\-[\]()])/i, value: '2160p' },
+  { regex: /(?:^|[\s._\-[\]()])(?:1080p|1080i|1080)(?:$|[\s._\-[\]()])/i, value: '1080p' },
+  { regex: /(?:^|[\s._\-[\]()])(?:720p|720)(?:$|[\s._\-[\]()])/i, value: '720p' },
+  { regex: /(?:^|[\s._\-[\]()])(?:480p|480|576p|576|sd)(?:$|[\s._\-[\]()])/i, value: '480p' },
 ];
 
 const SOURCE_PATTERNS: Array<{ regex: RegExp; value: string }> = [
@@ -38,6 +38,30 @@ const LANGUAGE_PATTERNS: Array<{ regex: RegExp; value: string }> = [
   { regex: /(?:^|[\s._\-[\]()])(?:french|vf)(?:$|[\s._\-[\]()])/i, value: 'VF' },
   { regex: /(?:^|[\s._\-[\]()])(?:vo|eng|english)(?:$|[\s._\-[\]()])/i, value: 'VO' },
 ];
+
+export function normalizeQuality(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const val = String(raw).trim().toLowerCase();
+  if (['2160', '2160p', '4k', 'uhd'].includes(val)) return '2160p';
+  if (['1080', '1080p', '1080i'].includes(val)) return '1080p';
+  if (['720', '720p'].includes(val)) return '720p';
+  if (['480', '480p', '576', '576p', 'sd'].includes(val)) return '480p';
+  return extractQuality(val) || val;
+}
+
+export function normalizeLanguage(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const val = String(raw).trim();
+  const upper = val.toUpperCase();
+  if (['VOSTFR', 'SUBFRENCH'].includes(upper)) return 'VOSTFR';
+  if (['VFF', 'TRUEFRENCH'].includes(upper)) return 'VFF';
+  if (['VF2'].includes(upper)) return 'VF2';
+  if (['VFQ'].includes(upper)) return 'VFQ';
+  if (['MULTI'].includes(upper)) return 'MULTI';
+  if (['VF', 'FRENCH', 'FR'].includes(upper)) return 'VF';
+  if (['VO', 'ENG', 'ENGLISH', 'EN'].includes(upper)) return 'VO';
+  return extractLanguage(val) || upper;
+}
 
 export function extractQuality(title: string): string | null {
   const normalized = String(title || '');
@@ -146,17 +170,26 @@ export function getIndexerSettings(userId: number): IndexerSettings | null {
 }
 
 export async function configureIndexer(userId: number, settings: IndexerSettings) {
-  await checkTorznabConnection(settings).catch((error) => {
+  const currentSettings = getIndexerSettings(userId);
+  const effectiveToken =
+    settings.token && settings.token.trim() && !settings.token.includes('•')
+      ? settings.token.trim()
+      : currentSettings?.token || '';
+
+  const effectiveSettings: IndexerSettings = {
+    ...settings,
+    token: effectiveToken,
+  };
+
+  await checkTorznabConnection(effectiveSettings).catch((error) => {
     throw new ErrorCode(`Failed to connect to Indexer: ${error.message}`);
   });
-  return runInTransaction(async ({ writeStore }) => {
-    const user = getUser(userId);
-    if (!user) {
-      throw new Error('User not found');
-    }
-    user.settings.indexer = settings;
-    writeStore('user', userId, user);
-  });
+  const user = getUser(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  user.settings.indexer = effectiveSettings;
+  updateUser(user);
 }
 
 function normalizeTorznabAttrs(block: any): Array<{ name: string; value: any }> {
@@ -203,8 +236,8 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
       sizeHuman: attributes.size ? humanFileSize(Number(attributes.size)) : undefined,
       seeders: attributes.seeders ? Number(attributes.seeders) : undefined,
       leechers: attributes.leechers ? Number(attributes.leechers) : undefined,
-      quality: attributes.quality || extractQuality(title) || undefined,
-      language: attributes.language || extractLanguage(title) || undefined,
+      quality: extractQuality(title) || normalizeQuality(attributes.quality) || undefined,
+      language: extractLanguage(title) || normalizeLanguage(attributes.language) || undefined,
       categories: attributes.categories
         ? String(attributes.categories)
             .split(',')
@@ -249,8 +282,8 @@ async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesRe
       sizeHuman: attributes.size ? humanFileSize(Number(attributes.size)) : undefined,
       seeders: attributes.seeders ? Number(attributes.seeders) : undefined,
       leechers: attributes.leechers ? Number(attributes.leechers) : undefined,
-      quality: attributes.quality || extractQuality(title) || undefined,
-      language: attributes.language || extractLanguage(title) || undefined,
+      quality: extractQuality(title) || normalizeQuality(attributes.quality) || undefined,
+      language: extractLanguage(title) || normalizeLanguage(attributes.language) || undefined,
       categories: attributes.categories
         ? String(attributes.categories)
             .split(',')
@@ -393,12 +426,13 @@ export function matchesIndexerFilters(
 
   const qualities = settings.qualities;
   if (Array.isArray(qualities) && qualities.length > 0 && !qualities.includes('all')) {
-    const rawQuality = result.quality || extractQuality(result.title);
-    if (!rawQuality) {
+    const rawQuality = extractQuality(result.title) || result.quality;
+    const normalizedQuality = normalizeQuality(rawQuality);
+    if (!normalizedQuality) {
       return false;
     }
-    const normalizedQuality = rawQuality.toLowerCase();
-    const hasMatchingQuality = qualities.some((q) => q.toLowerCase() === normalizedQuality);
+    const targetQualities = qualities.map(normalizeQuality).filter(Boolean);
+    const hasMatchingQuality = targetQualities.includes(normalizedQuality);
     if (!hasMatchingQuality) {
       return false;
     }
@@ -406,12 +440,13 @@ export function matchesIndexerFilters(
 
   const languages = settings.languages;
   if (Array.isArray(languages) && languages.length > 0 && !languages.includes('all')) {
-    const rawLanguage = result.language || extractLanguage(result.title);
-    if (!rawLanguage) {
+    const rawLanguage = extractLanguage(result.title) || result.language;
+    const normalizedLanguage = normalizeLanguage(rawLanguage);
+    if (!normalizedLanguage) {
       return false;
     }
-    const normalizedLanguage = rawLanguage.toUpperCase();
-    const hasMatchingLanguage = languages.some((l) => l.toUpperCase() === normalizedLanguage);
+    const targetLanguages = languages.map(normalizeLanguage).filter(Boolean);
+    const hasMatchingLanguage = targetLanguages.includes(normalizedLanguage);
     if (!hasMatchingLanguage) {
       return false;
     }
@@ -599,25 +634,28 @@ export async function processWishlistIndexer() {
           `User ${user.username} has ${moviesFounds.length} movies and ${seriesFounds.length} series found in indexer`,
         );
 
-        await runInTransaction(async ({ writeStore }) => {
+        let remainingMovies: IndexerMovieResult[] = [];
+        let remainingSeries: IndexerSeriesResult[] = [];
+
+        runInTransaction(({ writeStore }) => {
           // Read blacklist of movies and series already notified or blacklisted by the user to avoid duplicates
-          const blacklist = readStore('indexer-blacklist', user.id) || [];
+          const blacklist = (readStore('indexer-blacklist', user.id) || []) as string[];
 
           // Read current indexer results to avoid notifying about the same release multiple times if it stays in the last results for a while
-          const moviesResult = await getMoviesIndexerResult(user.id);
-          const seriesResult = await getSeriesIndexerResult(user.id);
+          const moviesResult = (readStore('indexer-movie-result', user.id) || []) as IndexerMovieResult[];
+          const seriesResult = (readStore('indexer-series-result', user.id) || []) as IndexerSeriesResult[];
 
           // Create keys for found movies and series to compare with blacklist and current results
           const moviesKey = new Set(moviesResult.map((m) => `movie:${m.tmdbId}:${m.guid}`));
           const seriesKey = new Set(seriesResult.map((s) => `series:${s.tmdbId}:${s.guid}`));
 
           // Filter found movies and series to only keep those not in blacklist and not already in current results
-          const remainingMovies: IndexerMovieResult[] = moviesFounds.filter(
+          remainingMovies = moviesFounds.filter(
             (m) =>
               !blacklist.includes(`movie:${m.tmdbId}:${m.guid}`) &&
               !moviesKey.has(`movie:${m.tmdbId}:${m.guid}`),
           );
-          const remainingSeries: IndexerSeriesResult[] = seriesFounds.filter(
+          remainingSeries = seriesFounds.filter(
             (s) =>
               !blacklist.includes(`series:${s.tmdbId}:${s.guid}`) &&
               !seriesKey.has(`series:${s.tmdbId}:${s.guid}`),
@@ -629,36 +667,42 @@ export async function processWishlistIndexer() {
           if (remainingSeries.length > 0) {
             writeStore('indexer-series-result', user.id, [...seriesResult, ...remainingSeries]);
           }
+        });
 
-          // Auto-Download (Auto-Grab) si activé pour l'utilisateur
-          const indexerSettings = getIndexerSettings(user.id);
-          const autoDownloadEnabled = Boolean(indexerSettings?.autoDownload);
-          const autoDownloadedMovieGuids = new Set<string>();
-          const autoDownloadedSeriesGuids = new Set<string>();
+        // Auto-Download (Auto-Grab) si activé pour l'utilisateur
+        const autoDownloadEnabled = Boolean(indexerSettings?.autoDownload);
+        const autoDownloadedMovieGuids = new Set<string>();
+        const autoDownloadedSeriesGuids = new Set<string>();
 
-          if (autoDownloadEnabled) {
-            const { startDownload } = await import('./transmission');
-            for (const movie of remainingMovies) {
-              if (movie.guid) {
-                try {
-                  await startDownload(user.id, movie.guid, 'movie');
-                  autoDownloadedMovieGuids.add(movie.guid);
-                } catch (dlErr) {
-                  console.log(`Auto-download failed for movie "${movie.title}": ${dlErr}`);
-                }
-              }
-            }
-            for (const series of remainingSeries) {
-              if (series.guid) {
-                try {
-                  await startDownload(user.id, series.guid, 'series');
-                  autoDownloadedSeriesGuids.add(series.guid);
-                } catch (dlErr) {
-                  console.log(`Auto-download failed for series "${series.title}": ${dlErr}`);
-                }
+        if (autoDownloadEnabled) {
+          const { startDownload } = await import('./transmission');
+          for (const movie of remainingMovies) {
+            if (movie.guid) {
+              try {
+                await startDownload(user.id, movie.guid, 'movie', {
+                  tmdbId: movie.tmdbId ? Number(movie.tmdbId) : undefined,
+                });
+                autoDownloadedMovieGuids.add(movie.guid);
+              } catch (dlErr) {
+                console.log(`Auto-download failed for movie "${movie.title}": ${dlErr}`);
               }
             }
           }
+          for (const series of remainingSeries) {
+            if (series.guid) {
+              try {
+                await startDownload(user.id, series.guid, 'series', {
+                  tmdbId: series.tmdbId ? Number(series.tmdbId) : undefined,
+                  seasonNumber: series.seasonNumber,
+                  episodeNumber: series.episodeNumber,
+                });
+                autoDownloadedSeriesGuids.add(series.guid);
+              } catch (dlErr) {
+                console.log(`Auto-download failed for series "${series.title}": ${dlErr}`);
+              }
+            }
+          }
+        }
 
           // Notifications pour les nouveaux résultats
           const uniqueMovieTitles = [
@@ -713,9 +757,8 @@ export async function processWishlistIndexer() {
               data: { count: uniqueSeriesTitles.length, type: 'series' },
             });
           }
-        });
-      }
-    } catch (error) {
+        }
+      } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.log(`Error processing wishlist indexer for user ${user.username}: ${message}`);
     }

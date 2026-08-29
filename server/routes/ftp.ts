@@ -28,9 +28,10 @@ router.use(authentication);
 router.get('/ftp/config', (req, res) => {
   try {
     const settings = getFtpSettings(req.user.id);
+    const hasPassword = Boolean(settings.password && settings.password.trim().length > 0);
     // Ne pas exposer le mot de passe
     const { password: _pw, ...safe } = settings;
-    res.json({ ok: true, config: safe });
+    res.json({ ok: true, config: { ...safe, hasPassword } });
   } catch {
     res.json({ ok: true, config: null });
   }
@@ -41,15 +42,30 @@ router.post('/ftp/configure', async (req, res) => {
     res.status(400).json({ error: 'Request body is required' });
     return;
   }
+  let currentSettings: FtpSettings | null = null;
+  try {
+    currentSettings = getFtpSettings(req.user.id);
+  } catch {
+    // Not yet configured
+  }
+
+  const authRequired = Boolean(req.body?.authRequired || false);
+  const incomingPassword =
+    req.body?.password !== undefined ? String(req.body.password).trim() : '';
+  const password =
+    authRequired &&
+    (!incomingPassword || incomingPassword === '***********' || incomingPassword.includes('•'))
+      ? currentSettings?.password || ''
+      : incomingPassword;
+
   const setting: FtpSettings = {
     host: String(req.body?.host || '').trim(),
     port: Number(req.body?.port || 21),
     secure: Boolean(req.body?.secure || false),
-    authRequired: Boolean(req.body?.authRequired || false),
+    authRequired,
     username:
       req.body?.username !== undefined ? String(req.body?.username || '').trim() : undefined,
-    password:
-      req.body?.password !== undefined ? String(req.body?.password || '').trim() : undefined,
+    password: authRequired ? password : undefined,
     rootFolder: String(req.body?.rootFolder || '/').trim(),
     storageLimit: req.body?.storageLimit !== undefined ? Number(req.body?.storageLimit) : null,
   };

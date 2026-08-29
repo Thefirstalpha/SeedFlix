@@ -4,7 +4,7 @@ import { readStore, runInTransaction } from './db';
 import { ErrorCode } from './errors';
 import { messages } from './i18n';
 import { getIndexerSettings } from './indexer';
-import { getUser } from './user';
+import { getUser, updateUser } from './user';
 
 const transmissionRpcPath = '/transmission/rpc';
 const transmissionTimeoutMs = 8000;
@@ -28,7 +28,7 @@ const transmissionStatusLabels: Record<number, string> = {
   6: 'Seeding',
 };
 
-function normalizeTorrentHash(value: unknown): string {
+export function normalizeTorrentHash(value: unknown): string {
   if (typeof value !== 'string') {
     return '';
   }
@@ -83,7 +83,7 @@ function writeManagedTorrents(userId: number, entries: ManagedTorrentEntry[]) {
   });
 }
 
-function registerManagedTorrent(userId: number, hash: string, link: string, name: string) {
+export function registerManagedTorrent(userId: number, hash: string, link: string, name: string) {
   const normalizedHash = normalizeTorrentHash(hash);
   const normalizedLink = String(link ?? '').trim();
   if (!normalizedHash || !normalizedLink) {
@@ -148,11 +148,15 @@ export function markManagedTorrentCompleted(userId: number, hash: string): boole
   return updated;
 }
 
+export async function testTransmission(settings: TransmissionSettings) {
+  return await executeTransmissionRpc(settings, { method: 'session-get' });
+}
+
 async function postTransmissionRpc(
   url: URL,
   headers: Record<string, string>,
-  sessionId: string | undefined,
-  body: any,
+  sessionId?: string,
+  payload?: any,
 ) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), transmissionTimeoutMs);
@@ -161,12 +165,11 @@ async function postTransmissionRpc(
     return await fetch(url, {
       method: 'POST',
       headers: {
-        Accept: 'application/json',
         'Content-Type': 'application/json',
-        ...headers,
         ...(sessionId ? { 'X-Transmission-Session-Id': sessionId } : {}),
+        ...headers,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
   } finally {
@@ -191,7 +194,24 @@ export function getTransmissionSettings(userId: number): TransmissionSettings | 
 }
 
 export async function configureTransmission(userId: number, settings: TransmissionSettings) {
-  const response = await executeTransmissionRpc(settings, { method: 'session-get' });
+  const currentSettings = getTransmissionSettings(userId);
+  let effectivePassword = settings.password;
+  if (
+    settings.authRequired &&
+    (!settings.password ||
+      settings.password.trim() === '' ||
+      settings.password === '***********' ||
+      settings.password.includes('•'))
+  ) {
+    effectivePassword = currentSettings?.password || '';
+  }
+
+  const effectiveSettings: TransmissionSettings = {
+    ...settings,
+    password: effectivePassword,
+  };
+
+  const response = await executeTransmissionRpc(effectiveSettings, { method: 'session-get' });
   if (!response.ok) {
     if (response.status === 401) {
       throw new ErrorCode(messages.settings.transmission.authFailed);
@@ -199,14 +219,12 @@ export async function configureTransmission(userId: number, settings: Transmissi
       throw new ErrorCode(`${response.status} ${response.statusText}`);
     }
   }
-  return runInTransaction(async ({ writeStore }) => {
-    const user = getUser(userId);
-    if (!user) {
-      throw new Error('User not found');
-    }
-    user.settings.transmission = settings;
-    writeStore('user', userId, user);
-  });
+  const user = getUser(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  user.settings.transmission = effectiveSettings;
+  updateUser(user);
 }
 
 function createAuthHeaders(settings: TransmissionSettings): Record<string, string> {

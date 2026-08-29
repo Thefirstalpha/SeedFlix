@@ -22,6 +22,7 @@ export function SettingTransmission({ setup, onComplete }: Readonly<SettingTrans
     const [torrentAuthRequired, setTorrentAuthRequired] = useState(false);
     const [torrentUsername, setTorrentUsername] = useState('');
     const [torrentPassword, setTorrentPassword] = useState('');
+    const [hasExistingPassword, setHasExistingPassword] = useState(false);
     const [torrentMoviesFolder, setTorrentMoviesFolder] = useState('');
     const [torrentSeriesFolder, setTorrentSeriesFolder] = useState('');
     const [torrentError, setTorrentError] = useState<string | null>(null);
@@ -44,6 +45,10 @@ export function SettingTransmission({ setup, onComplete }: Readonly<SettingTrans
         };
         try {
             await configureTransmission(transmissionSettings);
+            if (torrentPassword) {
+                setHasExistingPassword(true);
+                setTorrentPassword('');
+            }
             onComplete?.();
         } catch (submitError) {
             setTorrentError(
@@ -64,13 +69,14 @@ export function SettingTransmission({ setup, onComplete }: Readonly<SettingTrans
             headers: { 'Content-Type': 'application/json' },
         }).then(async (response) => {
             if (response.ok) {
-                const data: TransmissionSettings = await response.json();
+                const data: any = await response.json();
                 if (data != null) {
                     setTorrentUrl(data.host || '');
                     setTorrentPort(data.port);
                     setTorrentAuthRequired(data.authRequired || false);
                     setTorrentUsername(data.username || '');
-                    setTorrentPassword(data.authRequired && data.username ? '***********' : '');
+                    setTorrentPassword('');
+                    setHasExistingPassword(Boolean(data.hasPassword || (data.authRequired && data.username)));
                     setTorrentMoviesFolder(data.moviesFolder || '');
                     setTorrentSeriesFolder(data.seriesFolder || '');
                 } else {
@@ -79,6 +85,7 @@ export function SettingTransmission({ setup, onComplete }: Readonly<SettingTrans
                     setTorrentAuthRequired(false);
                     setTorrentUsername('');
                     setTorrentPassword('');
+                    setHasExistingPassword(false);
                     setTorrentMoviesFolder('');
                     setTorrentSeriesFolder('');
                 }
@@ -145,6 +152,7 @@ export function SettingTransmission({ setup, onComplete }: Readonly<SettingTrans
                                     <Input
                                         id="setup-torrent-password"
                                         type="password"
+                                        placeholder={hasExistingPassword ? "••••••••••••••••" : t('setup.torrent.password')}
                                         value={torrentPassword}
                                         onChange={(event) => setTorrentPassword(event.target.value)}
                                         className="border-white/10 bg-slate-900 text-white"

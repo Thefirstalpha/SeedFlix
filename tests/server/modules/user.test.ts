@@ -47,6 +47,59 @@ describe('user module', () => {
     expect(updated?.settings.spoilerMode).toBe(true);
   });
 
+  it('should encrypt sensitive settings (token and passwords) in kv_store at rest', () => {
+    const { user: created } = createUser('dave');
+    created.settings.indexer = {
+      url: 'https://indexer.example.com',
+      token: 'secret-indexer-token-999',
+      qualities: ['2160p'],
+      languages: ['VFF'],
+      autoDownload: true,
+    };
+    created.settings.transmission = {
+      host: 'http://localhost',
+      port: 9091,
+      authRequired: true,
+      username: 'admin',
+      password: 'secret-transmission-password-888',
+      moviesFolder: '/movies',
+      seriesFolder: '/series',
+    };
+    created.settings.ftp = {
+      host: 'ftp.example.com',
+      port: 21,
+      secure: false,
+      authRequired: true,
+      username: 'ftpuser',
+      password: 'secret-ftp-password-777',
+      rootFolder: '/',
+      storageLimit: null,
+    };
+
+    updateUser(created);
+
+    // Verify raw SQLite row in kv_store contains encrypted string (starts with enc:v1:) and NOT plaintext
+    const rawRow = db
+      .prepare('SELECT value FROM kv_store WHERE namespace = ? AND user_id = ?')
+      .get('user', created.id) as any;
+    const rawData = JSON.parse(rawRow.value);
+
+    expect(rawData.settings.indexer.token).toMatch(/^enc:v1:/);
+    expect(rawData.settings.indexer.token).not.toContain('secret-indexer-token-999');
+
+    expect(rawData.settings.transmission.password).toMatch(/^enc:v1:/);
+    expect(rawData.settings.transmission.password).not.toContain('secret-transmission-password-888');
+
+    expect(rawData.settings.ftp.password).toMatch(/^enc:v1:/);
+    expect(rawData.settings.ftp.password).not.toContain('secret-ftp-password-777');
+
+    // Verify getUser decrypts them seamlessly
+    const loaded = getUser(created.id);
+    expect(loaded?.settings.indexer?.token).toBe('secret-indexer-token-999');
+    expect(loaded?.settings.transmission?.password).toBe('secret-transmission-password-888');
+    expect(loaded?.settings.ftp?.password).toBe('secret-ftp-password-777');
+  });
+
   it('should delete a user and remove associated auth and settings', () => {
     const { user: created } = createUser('eve');
     deleteUser(created.id);
