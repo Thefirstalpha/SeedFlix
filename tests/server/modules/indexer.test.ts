@@ -7,9 +7,11 @@ import {
   extractQuality,
   extractSeasonNumber,
   extractSource,
+  extractWishlistItemsFromIndexerResults,
   getIndexerSettings,
   getMoviesIndexerResult,
   getSeriesIndexerResult,
+  matchesIndexerFilters,
   processWishlistIndexer,
   rejectAllIndexerResultsByGuids,
   rejectIndexerResultByGuid,
@@ -454,6 +456,73 @@ describe('indexer module', () => {
 
       const notifs = getNotifications(user.id);
       expect(notifs.notifications.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should filter releases during wishlist processing based on user quality and language preferences', async () => {
+      const user = createUser('userQualityLangFilter').user;
+      user.settings.indexer = {
+        url: 'https://indexer.example.com',
+        token: 'tok-123',
+        qualities: ['1080p'],
+        languages: ['VFF'],
+      };
+      updateUser(user);
+
+      writeStore('wishlist', user.id, [
+        { tmdb: 550, type: 'movie', title: 'Fight Club', original_title: 'Fight Club', releaseDate: '1999', addedAt: '2024-01-01' },
+      ]);
+
+      // Release 1: 720p VFF (rejected due to quality)
+      // Release 2: 1080p MULTI (rejected due to language)
+      // Release 3: 1080p VFF (accepted)
+      vi.mocked(torznabModule.rssTorznab).mockResolvedValue({
+        rss: {
+          channel: {
+            item: [
+              { title: 'Fight.Club.1999.720p.VFF', link: 'l1', guid: 'g-720-vff', 'torznab:attr': [{ name: 'tmdbid', value: '550' }] },
+              { title: 'Fight.Club.1999.1080p.MULTI', link: 'l2', guid: 'g-1080-multi', 'torznab:attr': [{ name: 'tmdbid', value: '550' }] },
+              { title: 'Fight.Club.1999.1080p.VFF', link: 'l3', guid: 'g-1080-vff', 'torznab:attr': [{ name: 'tmdbid', value: '550' }] },
+            ],
+          },
+        },
+      } as any);
+
+      await processWishlistIndexer();
+
+      const movieResults = await getMoviesIndexerResult(user.id);
+      expect(movieResults).toHaveLength(1);
+      expect(movieResults[0].guid).toBe('g-1080-vff');
+    });
+
+    it('should allow all qualities and languages if "all" or empty is specified in settings', async () => {
+      const user = createUser('userAllFilter').user;
+      user.settings.indexer = {
+        url: 'https://indexer.example.com',
+        token: 'tok-123',
+        qualities: ['all'],
+        languages: [],
+      };
+      updateUser(user);
+
+      writeStore('wishlist', user.id, [
+        { tmdb: 550, type: 'movie', title: 'Fight Club', original_title: 'Fight Club', releaseDate: '1999', addedAt: '2024-01-01' },
+      ]);
+
+      vi.mocked(torznabModule.rssTorznab).mockResolvedValue({
+        rss: {
+          channel: {
+            item: [
+              { title: 'Fight.Club.1999.720p.VO', link: 'l1', guid: 'g-720-vo', 'torznab:attr': [{ name: 'tmdbid', value: '550' }] },
+            ],
+          },
+        },
+      } as any);
+
+      await processWishlistIndexer();
+
+      const movieResults = await getMoviesIndexerResult(user.id);
+      expect(movieResults).toHaveLength(1);
+      expect(movieResults[0].guid).toBe('g-720-vo');
     });
 
     it('should update indexer process when pullAuto setting changes', () => {

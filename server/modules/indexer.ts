@@ -385,17 +385,57 @@ export async function rejectAllIndexerResultsByGuids(
   }
 }
 
-async function extractWishlistItemsFromIndexerResults(
+export function matchesIndexerFilters(
+  result: IndexerMovieResult | IndexerSeriesResult,
+  settings?: IndexerSettings | null,
+): boolean {
+  if (!settings) return true;
+
+  const qualities = settings.qualities;
+  if (Array.isArray(qualities) && qualities.length > 0 && !qualities.includes('all')) {
+    const rawQuality = result.quality || extractQuality(result.title);
+    if (!rawQuality) {
+      return false;
+    }
+    const normalizedQuality = rawQuality.toLowerCase();
+    const hasMatchingQuality = qualities.some((q) => q.toLowerCase() === normalizedQuality);
+    if (!hasMatchingQuality) {
+      return false;
+    }
+  }
+
+  const languages = settings.languages;
+  if (Array.isArray(languages) && languages.length > 0 && !languages.includes('all')) {
+    const rawLanguage = result.language || extractLanguage(result.title);
+    if (!rawLanguage) {
+      return false;
+    }
+    const normalizedLanguage = rawLanguage.toUpperCase();
+    const hasMatchingLanguage = languages.some((l) => l.toUpperCase() === normalizedLanguage);
+    if (!hasMatchingLanguage) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export async function extractWishlistItemsFromIndexerResults(
   wishlist: WishListItem[],
   indexerMovies: IndexerMovieResult[],
   indexerSeries: IndexerSeriesResult[],
+  settings?: IndexerSettings | null,
 ): Promise<{ movies: IndexerMovieResult[]; series: IndexerSeriesResult[] }> {
   const moviesFounds: IndexerMovieResult[] = [];
   const seriesFounds: IndexerSeriesResult[] = [];
 
   for (const item of wishlist) {
     if (item.type === 'movie') {
-      const founds = indexerMovies.filter((m) => String(m.tmdbId) === String(item.tmdb));
+      const founds = indexerMovies.filter((m) => {
+        if (String(m.tmdbId) !== String(item.tmdb)) return false;
+        if (!matchesIndexerFilters(m, settings)) return false;
+        return true;
+      });
       for (const found of founds) {
         moviesFounds.push({
           ...found,
@@ -408,6 +448,7 @@ async function extractWishlistItemsFromIndexerResults(
     } else if (item.type === 'series') {
       const founds = indexerSeries.filter((s) => {
         if (String(s.tmdbId) !== String(item.tmdb)) return false;
+        if (!matchesIndexerFilters(s, settings)) return false;
         if (item.all_seasons === true) return true;
         const targetSeason = s.seasonNumber || 1;
         const seasonConfig = item.seasons?.[targetSeason];
@@ -542,10 +583,16 @@ export async function processWishlistIndexer() {
         continue;
       }
       console.log(`Processing wishlist indexer for user ${user.username}`);
+      const indexerSettings = getIndexerSettings(user.id);
       const lastMovies = await getLastMovies(user.id);
       const lastSeries = await getLastSeries(user.id);
       const { movies: moviesFounds, series: seriesFounds } =
-        await extractWishlistItemsFromIndexerResults(wishlist, lastMovies, lastSeries);
+        await extractWishlistItemsFromIndexerResults(
+          wishlist,
+          lastMovies,
+          lastSeries,
+          indexerSettings,
+        );
 
       if (moviesFounds.length > 0 || seriesFounds.length > 0) {
         console.log(

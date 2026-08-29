@@ -35,6 +35,7 @@ router.post('/indexer/configure', async (req, res) => {
     token: String(req.body?.token || '').trim(),
     qualities: Array.isArray(req.body?.qualities) ? req.body.qualities.map(String) : [],
     languages: Array.isArray(req.body?.languages) ? req.body.languages.map(String) : [],
+    autoDownload: Boolean(req.body?.autoDownload),
   };
   await configureIndexer(req.user.id, setting);
   res.status(200).json({ message: 'Indexer settings configured successfully' });
