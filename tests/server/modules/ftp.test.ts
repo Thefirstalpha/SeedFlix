@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, initDB, resetDatabase } from '../../../server/modules/db';
 import {
   configureFtp,
+  downloadToStream,
   getFileSize,
   getFtpSettings,
   getLastModified,
@@ -153,6 +154,14 @@ describe('ftp module', () => {
       const storage = await getStorageUsage(userId);
       expect(storage.limit).toBe(50 * 1024 * 1024 * 1024);
       expect(storage.used).toBeDefined();
+    });
+
+    it('should download to stream with startAt and maxBytes', async () => {
+      const { PassThrough } = await import('node:stream');
+      const pass = new PassThrough();
+      await expect(
+        downloadToStream(userId, '/downloads/movie.mkv', pass, 1024, 2048),
+      ).resolves.not.toThrow();
     });
   });
 });

@@ -119,11 +119,31 @@ export function getStreamUrl(path: string): string {
     return `/api/ftp/stream?path=${encodeURIComponent(path)}`;
 }
 
+export function getTranscodeUrl(path: string, options?: { startTime?: number; force?: boolean }): string {
+    const params = new URLSearchParams({ path });
+    if (options?.startTime && options.startTime > 0) {
+        params.set('startTime', String(options.startTime));
+    }
+    if (options?.force) {
+        params.set('force', 'true');
+    }
+    return `/api/ftp/transcode?${params.toString()}`;
+}
+
+export function getM3uPlaylistUrl(path: string): string {
+    return `/api/ftp/playlist.m3u?path=${encodeURIComponent(path)}`;
+}
+
 export type FtpMediaType = 'video' | 'audio' | 'image' | 'text' | null;
+
+export function isDirectPlayableVideo(filename: string): boolean {
+    const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+    return ['mp4', 'webm', 'm4v'].includes(ext);
+}
 
 export function getFtpMediaType(filename: string): FtpMediaType {
     const ext = filename.split('.').pop()?.toLowerCase() ?? '';
-    if (['mp4', 'mkv', 'webm', 'ogv', 'mov', 'm4v', 'avi'].includes(ext)) return 'video';
+    if (['mp4', 'mkv', 'webm', 'ogv', 'mov', 'm4v', 'avi', 'ts'].includes(ext)) return 'video';
     if (['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'].includes(ext)) return 'audio';
     if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return 'image';
     if (['txt', 'log', 'json', 'srt', 'vtt', 'nfo', 'md'].includes(ext)) return 'text';
