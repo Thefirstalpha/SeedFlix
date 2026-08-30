@@ -234,7 +234,7 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
     results.push({
       title: String(title ?? ''),
       link: typeof link === 'string' ? link : '',
-      guid: typeof guidMatch === 'string' ? guidMatch : guidMatch ? String(guidMatch) : undefined,
+      guid: String(guidMatch),
       pubDate: typeof pubDateMatch === 'string' ? pubDateMatch : undefined,
       tmdbId: attributes.tmdbid || undefined,
       size: attributes.size ? Number(attributes.size) : undefined,
@@ -285,7 +285,7 @@ async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesRe
     results.push({
       title: typeof title === 'string' ? title : '',
       link: typeof link === 'string' ? link : '',
-      guid: typeof guidMatch === 'string' ? guidMatch : guidMatch ? String(guidMatch) : undefined,
+      guid: String(guidMatch),
       pubDate: typeof pubDateMatch === 'string' ? pubDateMatch : undefined,
       tmdbId: attributes.tmdbid || undefined,
       size: attributes.size ? Number(attributes.size) : undefined,
