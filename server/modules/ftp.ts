@@ -1,20 +1,17 @@
 import { Client, FileInfo } from 'basic-ftp';
 import { Readable, Writable } from 'node:stream';
 import { FtpSettings } from '../../common/settings';
-import { runInTransaction } from './db';
-import { getUser } from './user';
+import { getUser, updateUser } from './user';
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
 export async function configureFtp(userId: number, settings: FtpSettings) {
-  return runInTransaction(async ({ writeStore }) => {
-    const user = getUser(userId);
-    if (!user) {
-      throw new Error('User not found');
-    }
-    user.settings.ftp = settings;
-    writeStore('user', userId, user);
-  });
+  const user = getUser(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  user.settings.ftp = settings;
+  updateUser(user);
 }
 
 export function getFtpSettings(userId: number): FtpSettings {

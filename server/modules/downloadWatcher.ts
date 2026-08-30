@@ -6,6 +6,7 @@
  */
 import { db } from './db';
 import { addNotification } from './notification';
+import { emitDownloads, emitStatusBar } from './events';
 import {
   getDownloadsTransmission,
   getManagedTorrents,
@@ -68,6 +69,9 @@ async function pollUser(userId: number): Promise<void> {
       console.log(`[DownloadWatcher] Notification envoyée pour "${torrent.name}" (user ${userId})`);
     }
   }
+
+  void emitDownloads(userId, torrents);
+  void emitStatusBar(userId);
 }
 
 async function poll(): Promise<void> {

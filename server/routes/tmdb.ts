@@ -1,9 +1,12 @@
 import { Router } from 'express';
 import { authentication, withAdmin } from '../modules/auth';
 import {
+  buildCollectionRequest,
   buildDetailsRequest,
   buildGenresRequest,
+  buildPersonRequest,
   buildPopularRequest,
+  buildRecommendationsRequest,
   buildSearchRequest,
   buildSeasonRequest,
   buildVideosRequest,
@@ -41,7 +44,9 @@ router.get('/tmdb/:type/popular', cache(300), async (req, res) => {
 });
 
 router.get('/tmdb/:type/search', cache(300), async (req, res) => {
-  const type = req.params.type === 'movie' ? TmdbType.movie : TmdbType.series;
+  const rawType = req.params.type;
+  const type =
+    rawType === 'multi' ? 'multi' : rawType === 'movie' ? TmdbType.movie : TmdbType.series;
   const request = buildSearchRequest(type, req.query);
   const results = await proxyTmdb(request.path, request.query);
   res.json(results);
@@ -66,6 +71,28 @@ router.get('/tmdb/:type/videos/:id', cache(300), async (req, res) => {
   const type = req.params.type === 'movie' ? TmdbType.movie : TmdbType.series;
   const id = Number(req.params.id);
   const request = buildVideosRequest(type, id);
+  const results = await proxyTmdb(request.path, request.query);
+  res.json(results);
+});
+
+router.get('/tmdb/:type/recommendations/:id', cache(300), async (req, res) => {
+  const type = req.params.type === 'movie' ? TmdbType.movie : TmdbType.series;
+  const id = Number(req.params.id);
+  const request = buildRecommendationsRequest(type, id, req.query);
+  const results = await proxyTmdb(request.path, request.query);
+  res.json(results);
+});
+
+router.get('/tmdb/collection/:id', cache(300), async (req, res) => {
+  const id = Number(req.params.id);
+  const request = buildCollectionRequest(id, req.query);
+  const results = await proxyTmdb(request.path, request.query);
+  res.json(results);
+});
+
+router.get('/tmdb/person/:id', cache(300), async (req, res) => {
+  const id = Number(req.params.id);
+  const request = buildPersonRequest(id, req.query);
   const results = await proxyTmdb(request.path, request.query);
   res.json(results);
 });

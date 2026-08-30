@@ -28,9 +28,10 @@ router.use(authentication);
 router.get('/ftp/config', (req, res) => {
   try {
     const settings = getFtpSettings(req.user.id);
+    const hasPassword = Boolean(settings.password && settings.password.trim().length > 0);
     // Ne pas exposer le mot de passe
     const { password: _pw, ...safe } = settings;
-    res.json({ ok: true, config: safe });
+    res.json({ ok: true, config: { ...safe, hasPassword } });
   } catch {
     res.json({ ok: true, config: null });
   }
@@ -41,15 +42,29 @@ router.post('/ftp/configure', async (req, res) => {
     res.status(400).json({ error: 'Request body is required' });
     return;
   }
+  let currentSettings: FtpSettings | null = null;
+  try {
+    currentSettings = getFtpSettings(req.user.id);
+  } catch {
+    // Not yet configured
+  }
+
+  const authRequired = Boolean(req.body?.authRequired || false);
+  const incomingPassword = req.body?.password !== undefined ? String(req.body.password).trim() : '';
+  const password =
+    authRequired &&
+    (!incomingPassword || incomingPassword === '***********' || incomingPassword.includes('•'))
+      ? currentSettings?.password || ''
+      : incomingPassword;
+
   const setting: FtpSettings = {
     host: String(req.body?.host || '').trim(),
     port: Number(req.body?.port || 21),
     secure: Boolean(req.body?.secure || false),
-    authRequired: Boolean(req.body?.authRequired || false),
+    authRequired,
     username:
       req.body?.username !== undefined ? String(req.body?.username || '').trim() : undefined,
-    password:
-      req.body?.password !== undefined ? String(req.body?.password || '').trim() : undefined,
+    password: authRequired ? password : undefined,
     rootFolder: String(req.body?.rootFolder || '/').trim(),
     storageLimit: req.body?.storageLimit !== undefined ? Number(req.body?.storageLimit) : null,
   };
@@ -185,17 +200,79 @@ router.post('/ftp/move', async (req, res) => {
   }
 });
 
-// ─── Transfert ────────────────────────────────────────────────────────────────
+const MIME_TYPES: Record<string, string> = {
+  mp4: 'video/mp4',
+  m4v: 'video/mp4',
+  webm: 'video/webm',
+  ogv: 'video/ogg',
+  mkv: 'video/x-matroska',
+  avi: 'video/x-msvideo',
+  mov: 'video/quicktime',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  flac: 'audio/flac',
+  m4a: 'audio/mp4',
+  aac: 'audio/aac',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  txt: 'text/plain; charset=utf-8',
+  srt: 'text/plain; charset=utf-8',
+  vtt: 'text/vtt; charset=utf-8',
+  json: 'application/json',
+  pdf: 'application/pdf',
+};
 
-router.get('/ftp/download', async (req, res) => {
-  const path = String(req.query.path || '').trim();
+function getMimeType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  return MIME_TYPES[ext] || 'application/octet-stream';
+}
+
+// ─── Transfert & Streaming ───────────────────────────────────────────────────
+
+router.get('/ftp/stream', async (req, res) => {
+  const path = typeof req.query.path === 'string' ? req.query.path.trim() : '';
   if (!path) {
     res.status(400).json({ error: 'path requis' });
     return;
   }
   const filename = path.split('/').pop() || 'file';
-  res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-  res.setHeader('Content-Type', 'application/octet-stream');
+  const mimeType = getMimeType(filename);
+  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
+  res.setHeader('Content-Type', mimeType);
+  res.setHeader('Accept-Ranges', 'bytes');
+  try {
+    const size = await getFileSize(req.user.id, path);
+    res.setHeader('Content-Length', size);
+  } catch {
+    // taille non disponible, on continue sans header
+  }
+  try {
+    await downloadToStream(req.user.id, path, res);
+  } catch (err: any) {
+    if (!res.headersSent) res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.get('/ftp/download', async (req, res) => {
+  const path = typeof req.query.path === 'string' ? req.query.path.trim() : '';
+  if (!path) {
+    res.status(400).json({ error: 'path requis' });
+    return;
+  }
+  const filename = path.split('/').pop() || 'file';
+  const isInline =
+    typeof req.query.inline === 'string' && req.query.inline.toLowerCase() === 'true';
+  const mimeType = isInline ? getMimeType(filename) : 'application/octet-stream';
+  res.setHeader(
+    'Content-Disposition',
+    `${isInline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(filename)}"`,
+  );
+  res.setHeader('Content-Type', mimeType);
   try {
     const size = await getFileSize(req.user.id, path);
     res.setHeader('Content-Length', size);
@@ -210,7 +287,9 @@ router.get('/ftp/download', async (req, res) => {
 });
 
 router.post('/ftp/upload', async (req, res) => {
-  const path = String(req.query.path || req.body?.path || '').trim();
+  const pathQuery = typeof req.query.path === 'string' ? req.query.path.trim() : '';
+  const pathBody = typeof req.body?.path === 'string' ? req.body.path.trim() : '';
+  const path = pathQuery || pathBody;
   if (!path) {
     res.status(400).json({ error: 'path requis' });
     return;
@@ -235,7 +314,7 @@ router.get('/ftp/storage', async (req, res) => {
 });
 
 router.get('/ftp/info', async (req, res) => {
-  const path = String(req.query.path || '').trim();
+  const path = typeof req.query.path === 'string' ? req.query.path.trim() : '';
   if (!path) {
     res.status(400).json({ error: 'path requis' });
     return;

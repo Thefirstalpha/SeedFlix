@@ -13,6 +13,7 @@ export interface IndexerSettings {
     token: string | null | undefined;
     qualities: string[];
     languages: string[];
+    autoDownload?: boolean;
 }
 
 

@@ -59,7 +59,7 @@ describe('Logger utility', () => {
       Logger.http(req, res, 25);
     }
 
-    expect(Logger.buffer.length).toBe(methods.length);
+    expect(Logger.buffer).toHaveLength(methods.length);
   });
 
   it('should ignore whitelisted paths if status < 400', () => {

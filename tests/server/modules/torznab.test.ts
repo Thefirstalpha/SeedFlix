@@ -10,6 +10,8 @@ describe('torznab module', () => {
   const sampleSettings: IndexerSettings = {
     url: 'https://indexer.example.com/api',
     token: 'test-api-token',
+    qualities: [],
+    languages: [],
   };
 
   beforeEach(() => {

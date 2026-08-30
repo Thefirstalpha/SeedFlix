@@ -14,6 +14,7 @@ import {
     Music,
     MoveRight,
     Pencil,
+    Play,
     RefreshCw,
     Trash2,
     Upload,
@@ -26,10 +27,12 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '../components/ui/button';
+import { FtpMediaViewer } from '../components/FtpMediaViewer';
 import { useAuth } from '../context/AuthContext';
 import {
     deleteBatch,
     getDownloadUrl,
+    getFtpMediaType,
     getStorageUsage,
     listDirectory,
     makeDirectory,
@@ -102,6 +105,39 @@ function getStorageTextColorClass(percent: number): string {
 
 // ─── Sélecteur de dossier destination ────────────────────────────────────────
 
+function renderBrowseContent(
+    browseLoading: boolean,
+    browseItems: FtpFileInfo[],
+    selectedNames: string[],
+    currentPath: string,
+    browsePath: string,
+    onNavigate: (path: string) => void,
+) {
+    if (browseLoading) {
+        return (
+            <div className="flex items-center justify-center py-8 text-white/30">
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />Chargement…
+            </div>
+        );
+    }
+    if (browseItems.length === 0) {
+        return <div className="py-8 text-center text-white/30 text-sm">Aucun sous-dossier</div>;
+    }
+    return browseItems
+        .filter((i) => !selectedNames.includes(i.name) || currentPath !== browsePath)
+        .map((item) => (
+            <button
+                key={item.name}
+                type="button"
+                onClick={() => onNavigate(joinPath(browsePath, item.name))}
+                className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-white hover:bg-white/5 transition-colors text-left"
+            >
+                <FolderOpen className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                {item.name}
+            </button>
+        ));
+}
+
 function MoveDialog({
     selectedNames,
     currentPath,
@@ -124,7 +160,7 @@ function MoveDialog({
         setBrowseItems([]);
         try {
             const result = await listDirectory(p);
-            setBrowseItems(sortItems(result).filter(i => i.isDirectory));
+            setBrowseItems(sortItems(result).filter((i) => i.isDirectory));
             setBrowsePath(p);
         } catch (e: any) {
             setError(e.message);
@@ -133,7 +169,9 @@ function MoveDialog({
         }
     };
 
-    useEffect(() => { void loadBrowse('/'); }, []);
+    useEffect(() => {
+        void loadBrowse('/');
+    }, []);
 
     const handleMove = async () => {
         setMoving(true);
@@ -194,26 +232,13 @@ function MoveDialog({
 
                 {/* Liste dossiers */}
                 <div className="max-h-56 overflow-y-auto divide-y divide-white/5">
-                    {browseLoading ? (
-                        <div className="flex items-center justify-center py-8 text-white/30">
-                            <Loader2 className="w-4 h-4 animate-spin mr-2" />Chargement…
-                        </div>
-                    ) : browseItems.length === 0 ? (
-                        <div className="py-8 text-center text-white/30 text-sm">Aucun sous-dossier</div>
-                    ) : (
-                        browseItems
-                            .filter(i => !selectedNames.includes(i.name) || currentPath !== browsePath)
-                            .map(item => (
-                                <button
-                                    key={item.name}
-                                    type="button"
-                                    onClick={() => void loadBrowse(joinPath(browsePath, item.name))}
-                                    className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-white hover:bg-white/5 transition-colors text-left"
-                                >
-                                    <FolderOpen className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                                    {item.name}
-                                </button>
-                            ))
+                    {renderBrowseContent(
+                        browseLoading,
+                        browseItems,
+                        selectedNames,
+                        currentPath,
+                        browsePath,
+                        (p) => void loadBrowse(p),
                     )}
                 </div>
 
@@ -238,6 +263,86 @@ function MoveDialog({
                             </Button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function SortIcon({
+    col,
+    sortCol,
+    sortDir,
+}: Readonly<{
+    col: 'name' | 'size';
+    sortCol: 'name' | 'size';
+    sortDir: 'asc' | 'desc';
+}>) {
+    if (sortCol !== col) return <ChevronsUpDown className="w-3 h-3 ml-0.5 opacity-40" />;
+    return sortDir === 'asc'
+        ? <ChevronUp className="w-3 h-3 ml-0.5" />
+        : <ChevronDown className="w-3 h-3 ml-0.5" />;
+}
+
+function getCrumbClass(isCurrent: boolean, isAboveRoot: boolean): string {
+    if (isCurrent) {
+        return 'text-white font-medium cursor-default';
+    }
+    if (isAboveRoot) {
+        return 'text-white/20 cursor-default';
+    }
+    return 'text-cyan-400 hover:text-cyan-200 hover:bg-white/5';
+}
+
+function FtpDeleteModal({
+    pendingDelete,
+    onCancel,
+    onConfirm,
+}: Readonly<{
+    pendingDelete: FtpFileInfo[];
+    onCancel: () => void;
+    onConfirm: (items: FtpFileInfo[]) => Promise<void>;
+}>) {
+    const isMultiple = pendingDelete.length > 1;
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-xl border border-red-500/30 bg-slate-900 shadow-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-white/10">
+                    <p className="text-base font-semibold text-white">
+                        Supprimer {pendingDelete.length} élément{isMultiple ? 's' : ''} ?
+                    </p>
+                    <p className="text-xs text-white/40 mt-1">Cette action est irréversible.</p>
+                </div>
+                <ul className="max-h-40 overflow-y-auto divide-y divide-white/5 px-5 py-2">
+                    {pendingDelete.slice(0, 8).map((item) => (
+                        <li key={item.name} className="flex items-center gap-2 py-1.5 text-sm text-white/70">
+                            {getFileIcon(item.name, item.isDirectory)}
+                            <span className="truncate">{item.name}</span>
+                        </li>
+                    ))}
+                    {pendingDelete.length > 8 && (
+                        <li className="py-1.5 text-xs text-white/30 italic">
+                            …et {pendingDelete.length - 8} autre{pendingDelete.length - 8 > 1 ? 's' : ''}
+                        </li>
+                    )}
+                </ul>
+                <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/10 bg-white/5">
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={onCancel}
+                        className="text-white/50 hover:text-white h-8"
+                    >
+                        Annuler
+                    </Button>
+                    <Button
+                        size="sm"
+                        onClick={() => void onConfirm(pendingDelete)}
+                        className="bg-red-600 hover:bg-red-700 text-white h-8"
+                    >
+                        <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                        Supprimer{isMultiple ? ` (${pendingDelete.length})` : ''}
+                    </Button>
                 </div>
             </div>
         </div>
@@ -298,6 +403,9 @@ export function FtpExplorer() {
 
     // Modal déplacement
     const [showMoveDialog, setShowMoveDialog] = useState(false);
+
+    // Modal lecteur multimédia
+    const [activeMedia, setActiveMedia] = useState<{ path: string; name: string; size?: number } | null>(null);
 
     // Tri colonnes
     const [sortCol, setSortCol] = useState<'name' | 'size'>('name');
@@ -583,15 +691,18 @@ export function FtpExplorer() {
         return mul * a.name.localeCompare(b.name);
     });
 
-    const SortIcon = ({ col }: { col: 'name' | 'size' }) => {
-        if (sortCol !== col) return <ChevronsUpDown className="w-3 h-3 ml-0.5 opacity-40" />;
-        return sortDir === 'asc'
-            ? <ChevronUp className="w-3 h-3 ml-0.5" />
-            : <ChevronDown className="w-3 h-3 ml-0.5" />;
-    };
-
     return (
         <div className="space-y-4">
+            {/* Modal lecteur multimédia */}
+            {activeMedia && (
+                <FtpMediaViewer
+                    filePath={activeMedia.path}
+                    fileName={activeMedia.name}
+                    fileSize={activeMedia.size}
+                    onClose={() => setActiveMedia(null)}
+                />
+            )}
+
             {/* Modal déplacement */}
             {showMoveDialog && (
                 <MoveDialog
@@ -604,40 +715,11 @@ export function FtpExplorer() {
 
             {/* Modal confirmation suppression */}
             {pendingDelete && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                    <div className="w-full max-w-sm rounded-xl border border-red-500/30 bg-slate-900 shadow-2xl overflow-hidden">
-                        <div className="px-5 py-4 border-b border-white/10">
-                            <p className="text-base font-semibold text-white">
-                                Supprimer {pendingDelete.length} élément{pendingDelete.length > 1 ? 's' : ''} ?
-                            </p>
-                            <p className="text-xs text-white/40 mt-1">Cette action est irréversible.</p>
-                        </div>
-                        <ul className="max-h-40 overflow-y-auto divide-y divide-white/5 px-5 py-2">
-                            {pendingDelete.slice(0, 8).map(item => (
-                                <li key={item.name} className="flex items-center gap-2 py-1.5 text-sm text-white/70">
-                                    {getFileIcon(item.name, item.isDirectory)}
-                                    <span className="truncate">{item.name}</span>
-                                </li>
-                            ))}
-                            {pendingDelete.length > 8 && (
-                                <li className="py-1.5 text-xs text-white/30 italic">
-                                    …et {pendingDelete.length - 8} autre{pendingDelete.length - 8 > 1 ? 's' : ''}
-                                </li>
-                            )}
-                        </ul>
-                        <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/10 bg-white/5">
-                            <Button size="sm" variant="ghost" onClick={() => setPendingDelete(null)}
-                                className="text-white/50 hover:text-white h-8">
-                                Annuler
-                            </Button>
-                            <Button size="sm" onClick={() => void handleDeleteBatch(pendingDelete)}
-                                className="bg-red-600 hover:bg-red-700 text-white h-8">
-                                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                                Supprimer{pendingDelete.length > 1 ? ` (${pendingDelete.length})` : ''}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                <FtpDeleteModal
+                    pendingDelete={pendingDelete}
+                    onCancel={() => setPendingDelete(null)}
+                    onConfirm={handleDeleteBatch}
+                />
             )}
 
             {/* En-tête */}
@@ -730,12 +812,7 @@ export function FtpExplorer() {
                                         type="button"
                                         onClick={() => !isAboveRoot && !isCurrent && navigate(crumb.path)}
                                         disabled={isCurrent || isAboveRoot}
-                                        className={`text-sm px-1 rounded transition-colors ${isCurrent
-                                            ? 'text-white font-medium cursor-default'
-                                            : isAboveRoot
-                                                ? 'text-white/20 cursor-default'
-                                                : 'text-cyan-400 hover:text-cyan-200 hover:bg-white/5'
-                                            }`}
+                                        className={`text-sm px-1 rounded transition-colors ${getCrumbClass(isCurrent, isAboveRoot)}`}
                                     >
                                         {isRoot ? (
                                             <span className="flex items-center gap-1">
@@ -812,11 +889,11 @@ export function FtpExplorer() {
                     </button>
                     <button type="button" onClick={() => handleSortClick('name')}
                         className={`flex items-center transition-colors hover:text-white/70 ${sortCol === 'name' ? 'text-white/60' : ''}`}>
-                        Nom<SortIcon col="name" />
+                        Nom<SortIcon col="name" sortCol={sortCol} sortDir={sortDir} />
                     </button>
                     <button type="button" onClick={() => handleSortClick('size')}
                         className={`flex items-center justify-end w-24 transition-colors hover:text-white/70 ${sortCol === 'size' ? 'text-white/60' : ''}`}>
-                        Taille<SortIcon col="size" />
+                        Taille<SortIcon col="size" sortCol={sortCol} sortDir={sortDir} />
                     </button>
                     <span className="w-20" />
                 </div>
@@ -863,6 +940,15 @@ export function FtpExplorer() {
                                                 className="text-sm text-white truncate hover:text-cyan-300 transition-colors text-left">
                                                 {item.name}
                                             </button>
+                                        ) : getFtpMediaType(item.name) ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveMedia({ path: fullPath, name: item.name, size: item.size })}
+                                                className="text-sm text-white/90 hover:text-cyan-300 transition-colors text-left truncate cursor-pointer font-medium"
+                                                title="Cliquer pour ouvrir l'aperçu"
+                                            >
+                                                {item.name}
+                                            </button>
                                         ) : (
                                             <span className="text-sm text-white/80 truncate">{item.name}</span>
                                         )}
@@ -874,26 +960,34 @@ export function FtpExplorer() {
                                     </span>
 
                                     {/* Actions */}
-                                    <div className="flex items-center gap-1 w-20 justify-end">
-                                        <>
-                                            {!item.isDirectory && (
-                                                <a href={getDownloadUrl(fullPath)} download={item.name}
-                                                    className="p-1 rounded text-white/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:!text-cyan-300 hover:bg-white/10 transition-colors"
-                                                    title="Télécharger">
-                                                    <Download className="w-3.5 h-3.5" />
-                                                </a>
-                                            )}
-                                            <button type="button" onClick={() => startRename(item)} disabled={busy}
-                                                className="p-1 rounded text-white/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:!text-amber-300 hover:bg-white/10 transition-colors"
-                                                title="Renommer">
-                                                <Pencil className="w-3.5 h-3.5" />
+                                    <div className="flex items-center gap-1 w-24 justify-end">
+                                        {!item.isDirectory && getFtpMediaType(item.name) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveMedia({ path: fullPath, name: item.name, size: item.size })}
+                                                className="p-1 rounded text-white/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:!text-purple-300 hover:bg-white/10 transition-colors"
+                                                title="Lire / Aperçu"
+                                            >
+                                                <Play className="w-3.5 h-3.5" />
                                             </button>
-                                            <button type="button" onClick={() => handleDeleteSingle(item)} disabled={busy}
-                                                className="p-1 rounded text-white/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:!text-red-400 hover:bg-white/10 transition-colors"
-                                                title="Supprimer">
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                        </>
+                                        )}
+                                        {!item.isDirectory && (
+                                            <a href={getDownloadUrl(fullPath)} download={item.name}
+                                                className="p-1 rounded text-white/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:!text-cyan-300 hover:bg-white/10 transition-colors"
+                                                title="Télécharger">
+                                                <Download className="w-3.5 h-3.5" />
+                                            </a>
+                                        )}
+                                        <button type="button" onClick={() => startRename(item)} disabled={busy}
+                                            className="p-1 rounded text-white/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:!text-amber-300 hover:bg-white/10 transition-colors"
+                                            title="Renommer">
+                                            <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button type="button" onClick={() => handleDeleteSingle(item)} disabled={busy}
+                                            className="p-1 rounded text-white/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:!text-red-400 hover:bg-white/10 transition-colors"
+                                            title="Supprimer">
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
                                     </div>
                                 </div>
                             );

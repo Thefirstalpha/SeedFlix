@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import type { Movie } from '../types/movie';
 import type { Series } from '../types/series';
+import type { MultiSearchResultItem } from '../services/tmdbService';
 
 interface SearchState {
   query: string;
@@ -8,12 +9,16 @@ interface SearchState {
   activeSearchQuery: string;
   popularCacheKey: string;
   contentFilter: 'all' | 'movie' | 'series';
+  viewMode: 'card' | 'list';
   genreFilter: string;
   languageFilter: string;
   yearFrom: string;
   yearTo: string;
   minRating: string;
   filtersOpen: boolean;
+
+  // Mixed multi search results
+  searchMultiItems: MultiSearchResultItem[];
 
   // Movie state
   movieGenres: Array<{ id: number; name: string }>;
@@ -55,12 +60,15 @@ const DEFAULT_SEARCH_STATE: SearchState = {
   activeSearchQuery: '',
   popularCacheKey: '',
   contentFilter: 'all',
+  viewMode: 'card',
   genreFilter: 'all',
   languageFilter: 'all',
   yearFrom: '',
   yearTo: '',
   minRating: '0',
   filtersOpen: false,
+
+  searchMultiItems: [],
 
   movieGenres: [],
   recommendedMovies: [],
@@ -84,32 +92,70 @@ const DEFAULT_SEARCH_STATE: SearchState = {
   seriesCarouselScrollLeft: 0,
 };
 
+interface PersistedSearchPreferences {
+  contentFilter: 'all' | 'movie' | 'series';
+  viewMode: 'card' | 'list';
+  genreFilter: string;
+  languageFilter: string;
+  yearFrom: string;
+  yearTo: string;
+  minRating: string;
+}
+
+const SEARCH_PREFERENCES_KEY = 'seedflix_search_preferences';
+
 const SearchStateContext = createContext<SearchStateContextValue | undefined>(undefined);
 
-export function SearchStateProvider({ children }: { children: ReactNode }) {
+export function SearchStateProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [state, setState] = useState<SearchState>(DEFAULT_SEARCH_STATE);
 
-  // Load state from localStorage on mount
+  // Load preferences from localStorage on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('searchState');
+      const saved = localStorage.getItem(SEARCH_PREFERENCES_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved) as Partial<SearchState>;
-        setState((prev) => ({ ...prev, ...parsed }));
+        const parsed = JSON.parse(saved) as Partial<PersistedSearchPreferences>;
+        setState((prev) => ({
+          ...prev,
+          ...(parsed.contentFilter ? { contentFilter: parsed.contentFilter } : {}),
+          ...(parsed.viewMode ? { viewMode: parsed.viewMode } : {}),
+          ...(parsed.genreFilter !== undefined ? { genreFilter: parsed.genreFilter } : {}),
+          ...(parsed.languageFilter !== undefined ? { languageFilter: parsed.languageFilter } : {}),
+          ...(parsed.yearFrom !== undefined ? { yearFrom: parsed.yearFrom } : {}),
+          ...(parsed.yearTo !== undefined ? { yearTo: parsed.yearTo } : {}),
+          ...(parsed.minRating !== undefined ? { minRating: parsed.minRating } : {}),
+        }));
       }
     } catch (error) {
-      console.error('Error loading search state from localStorage:', error);
+      console.error('Error loading search preferences from localStorage:', error);
     }
   }, []);
 
-  // Save state to localStorage whenever it changes
+  // Save only lightweight preferences to localStorage whenever relevant fields change
   useEffect(() => {
     try {
-      localStorage.setItem('searchState', JSON.stringify(state));
+      const preferences: PersistedSearchPreferences = {
+        contentFilter: state.contentFilter,
+        viewMode: state.viewMode,
+        genreFilter: state.genreFilter,
+        languageFilter: state.languageFilter,
+        yearFrom: state.yearFrom,
+        yearTo: state.yearTo,
+        minRating: state.minRating,
+      };
+      localStorage.setItem(SEARCH_PREFERENCES_KEY, JSON.stringify(preferences));
     } catch (error) {
-      console.error('Error saving search state to localStorage:', error);
+      console.error('Error saving search preferences to localStorage:', error);
     }
-  }, [state]);
+  }, [
+    state.contentFilter,
+    state.viewMode,
+    state.genreFilter,
+    state.languageFilter,
+    state.yearFrom,
+    state.yearTo,
+    state.minRating,
+  ]);
 
   const updateSearchState = useCallback(
     (updates: Partial<SearchState> | ((prev: SearchState) => Partial<SearchState>)) => {
@@ -121,19 +167,22 @@ export function SearchStateProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const resetSearchState = () => {
+  const resetSearchState = useCallback(() => {
     setState(DEFAULT_SEARCH_STATE);
-    localStorage.removeItem('searchState');
-  };
+    localStorage.removeItem(SEARCH_PREFERENCES_KEY);
+  }, []);
+
+  const contextValue = useMemo<SearchStateContextValue>(
+    () => ({
+      state,
+      updateSearchState,
+      resetSearchState,
+    }),
+    [state, updateSearchState, resetSearchState],
+  );
 
   return (
-    <SearchStateContext.Provider
-      value={{
-        state,
-        updateSearchState,
-        resetSearchState,
-      }}
-    >
+    <SearchStateContext.Provider value={contextValue}>
       {children}
     </SearchStateContext.Provider>
   );

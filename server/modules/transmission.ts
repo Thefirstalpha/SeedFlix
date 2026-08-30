@@ -4,7 +4,7 @@ import { readStore, runInTransaction } from './db';
 import { ErrorCode } from './errors';
 import { messages } from './i18n';
 import { getIndexerSettings } from './indexer';
-import { getUser } from './user';
+import { getUser, updateUser } from './user';
 
 const transmissionRpcPath = '/transmission/rpc';
 const transmissionTimeoutMs = 8000;
@@ -28,10 +28,11 @@ const transmissionStatusLabels: Record<number, string> = {
   6: 'Seeding',
 };
 
-function normalizeTorrentHash(value: unknown): string {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase();
+export function normalizeTorrentHash(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().toLowerCase();
 }
 
 function toManagedTorrentEntry(input: Record<string, unknown>): ManagedTorrentEntry | null {
@@ -82,7 +83,7 @@ function writeManagedTorrents(userId: number, entries: ManagedTorrentEntry[]) {
   });
 }
 
-function registerManagedTorrent(userId: number, hash: string, link: string, name: string) {
+export function registerManagedTorrent(userId: number, hash: string, link: string, name: string) {
   const normalizedHash = normalizeTorrentHash(hash);
   const normalizedLink = String(link ?? '').trim();
   if (!normalizedHash || !normalizedLink) {
@@ -147,11 +148,15 @@ export function markManagedTorrentCompleted(userId: number, hash: string): boole
   return updated;
 }
 
+export async function testTransmission(settings: TransmissionSettings) {
+  return await executeTransmissionRpc(settings, { method: 'session-get' });
+}
+
 async function postTransmissionRpc(
   url: URL,
   headers: Record<string, string>,
-  sessionId: string | undefined,
-  body: any,
+  sessionId?: string,
+  payload?: any,
 ) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), transmissionTimeoutMs);
@@ -160,12 +165,11 @@ async function postTransmissionRpc(
     return await fetch(url, {
       method: 'POST',
       headers: {
-        Accept: 'application/json',
         'Content-Type': 'application/json',
-        ...headers,
         ...(sessionId ? { 'X-Transmission-Session-Id': sessionId } : {}),
+        ...headers,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
   } finally {
@@ -190,7 +194,24 @@ export function getTransmissionSettings(userId: number): TransmissionSettings | 
 }
 
 export async function configureTransmission(userId: number, settings: TransmissionSettings) {
-  const response = await executeTransmissionRpc(settings, { method: 'session-get' });
+  const currentSettings = getTransmissionSettings(userId);
+  let effectivePassword = settings.password;
+  if (
+    settings.authRequired &&
+    (!settings.password ||
+      settings.password.trim() === '' ||
+      settings.password === '***********' ||
+      settings.password.includes('•'))
+  ) {
+    effectivePassword = currentSettings?.password || '';
+  }
+
+  const effectiveSettings: TransmissionSettings = {
+    ...settings,
+    password: effectivePassword,
+  };
+
+  const response = await executeTransmissionRpc(effectiveSettings, { method: 'session-get' });
   if (!response.ok) {
     if (response.status === 401) {
       throw new ErrorCode(messages.settings.transmission.authFailed);
@@ -198,14 +219,12 @@ export async function configureTransmission(userId: number, settings: Transmissi
       throw new ErrorCode(`${response.status} ${response.statusText}`);
     }
   }
-  return runInTransaction(async ({ writeStore }) => {
-    const user = getUser(userId);
-    if (!user) {
-      throw new Error('User not found');
-    }
-    user.settings.transmission = settings;
-    writeStore('user', userId, user);
-  });
+  const user = getUser(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  user.settings.transmission = effectiveSettings;
+  updateUser(user);
 }
 
 function createAuthHeaders(settings: TransmissionSettings): Record<string, string> {
@@ -295,7 +314,7 @@ export async function getDownloadsTransmission(
       ],
     },
   });
-  const data = await response.json();
+  const data: any = await response.json();
   const rawTorrents = Array.isArray(data?.arguments?.torrents) ? data.arguments.torrents : [];
   const managedHashes = new Set(getManagedTorrents(userId).map((entry) => entry.hash));
 
@@ -338,7 +357,7 @@ export async function getTransmissionStats(userId: number): Promise<TorrentStats
   const response = await executeTransmissionRpc(settings, {
     method: 'session-stats',
   });
-  const data = await response.json();
+  const data: any = await response.json();
   return {
     activeTorrentCount: Number(data?.arguments?.activeTorrentCount || 0),
     pausedTorrentCount: Number(data?.arguments?.pausedTorrentCount || 0),
@@ -365,7 +384,7 @@ export async function performTransmissionAction(
     },
   });
 
-  const data = await response.json().catch(() => null);
+  const data: any = await response.json().catch(() => null);
   if (!response.ok || data?.result !== 'success')
     throw new ErrorCode(messages.settings.transmission.actionFailed);
 }
@@ -410,7 +429,12 @@ async function fetchTorrentMetainfo(torrentUrl: string) {
   }
 }
 
-export async function startDownload(userId: number, guid: string, mediaType: string) {
+export async function startDownload(
+  userId: number,
+  guid: string,
+  mediaType: string,
+  options?: { tmdbId?: number | null; seasonNumber?: number | null; episodeNumber?: number | null },
+) {
   const settings = getTransmissionSettings(userId);
   if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
   const downloadDir = mediaType === 'movie' ? settings.moviesFolder : settings.seriesFolder;
@@ -433,7 +457,7 @@ export async function startDownload(userId: number, guid: string, mediaType: str
     },
   });
 
-  const data = await response.json().catch(() => null);
+  const data: any = await response.json().catch(() => null);
   if (!response.ok || data?.result !== 'success')
     throw new ErrorCode(messages.settings.transmission.actionFailed);
 
@@ -442,5 +466,151 @@ export async function startDownload(userId: number, guid: string, mediaType: str
   const addedHash = normalizeTorrentHash(added?.hashString);
   if (addedHash) {
     registerManagedTorrent(userId, addedHash, url.toString(), String(added?.name || ''));
+  }
+
+  // Consume/cleanup wishlist and indexer results
+  try {
+    const { consumeWishlistItemForDownload } = await import('./wishlist');
+    await consumeWishlistItemForDownload(
+      userId,
+      guid,
+      mediaType === 'movie' ? 'movie' : 'series',
+      options,
+    );
+  } catch (consumeErr) {
+    console.error('Error consuming wishlist item on download:', consumeErr);
+  }
+}
+
+export interface TransmissionSessionStats {
+  altSpeedEnabled: boolean;
+  altSpeedDown: number;
+  altSpeedUp: number;
+  speedLimitDownEnabled: boolean;
+  speedLimitDown: number;
+  speedLimitUpEnabled: boolean;
+  speedLimitUp: number;
+}
+
+export async function getTurtleMode(userId: number): Promise<TransmissionSessionStats> {
+  const settings = getTransmissionSettings(userId);
+  if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
+  const response = await executeTransmissionRpc(settings, { method: 'session-get' });
+  const data: any = await response.json().catch(() => null);
+  const args = data?.arguments || {};
+  return {
+    altSpeedEnabled: Boolean(args['alt-speed-enabled']),
+    altSpeedDown: Number(args['alt-speed-down'] || 0),
+    altSpeedUp: Number(args['alt-speed-up'] || 0),
+    speedLimitDownEnabled: Boolean(args['speed-limit-down-enabled']),
+    speedLimitDown: Number(args['speed-limit-down'] || 0),
+    speedLimitUpEnabled: Boolean(args['speed-limit-up-enabled']),
+    speedLimitUp: Number(args['speed-limit-up'] || 0),
+  };
+}
+
+export async function setTurtleMode(userId: number, enabled: boolean): Promise<boolean> {
+  const settings = getTransmissionSettings(userId);
+  if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
+  const response = await executeTransmissionRpc(settings, {
+    method: 'session-set',
+    arguments: {
+      'alt-speed-enabled': Boolean(enabled),
+    },
+  });
+  const data: any = await response.json().catch(() => null);
+  if (!response.ok || data?.result !== 'success') {
+    throw new ErrorCode(messages.settings.transmission.actionFailed);
+  }
+  return Boolean(enabled);
+}
+
+export interface TorrentFileDetail {
+  index: number;
+  name: string;
+  bytesCompleted: number;
+  length: number;
+  wanted: boolean;
+  priority: number;
+}
+
+export async function getTorrentFiles(
+  userId: number,
+  torrentId: number,
+): Promise<TorrentFileDetail[]> {
+  const settings = getTransmissionSettings(userId);
+  if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
+  const response = await executeTransmissionRpc(settings, {
+    method: 'torrent-get',
+    arguments: {
+      ids: [torrentId],
+      fields: ['id', 'name', 'files', 'fileStats'],
+    },
+  });
+  const data: any = await response.json().catch(() => null);
+  const torrent = data?.arguments?.torrents?.[0];
+  if (!torrent) {
+    throw new ErrorCode('Torrent introuvable');
+  }
+
+  const files = Array.isArray(torrent.files) ? torrent.files : [];
+  const fileStats = Array.isArray(torrent.fileStats) ? torrent.fileStats : [];
+
+  return files.map((file: any, index: number) => ({
+    index,
+    name: String(file.name || ''),
+    bytesCompleted: Number(file.bytesCompleted || 0),
+    length: Number(file.length || 0),
+    wanted: fileStats[index] ? Boolean(fileStats[index].wanted) : true,
+    priority: fileStats[index] ? Number(fileStats[index].priority || 0) : 0,
+  }));
+}
+
+export async function setTorrentFilesWanted(
+  userId: number,
+  torrentId: number,
+  wantedIndices: number[],
+  unwantedIndices: number[],
+): Promise<void> {
+  const settings = getTransmissionSettings(userId);
+  if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
+
+  const args: Record<string, any> = { ids: [torrentId] };
+  if (wantedIndices.length > 0) args['files-wanted'] = wantedIndices;
+  if (unwantedIndices.length > 0) args['files-unwanted'] = unwantedIndices;
+
+  const response = await executeTransmissionRpc(settings, {
+    method: 'torrent-set',
+    arguments: args,
+  });
+  const data: any = await response.json().catch(() => null);
+  if (!response.ok || data?.result !== 'success') {
+    throw new ErrorCode(messages.settings.transmission.actionFailed);
+  }
+}
+
+export async function moveTorrentQueue(
+  userId: number,
+  torrentId: number,
+  action: 'up' | 'down' | 'top' | 'bottom',
+): Promise<void> {
+  const settings = getTransmissionSettings(userId);
+  if (!settings) throw new ErrorCode(messages.settings.transmission.authFailed);
+
+  const methodMap: Record<string, string> = {
+    up: 'queue-move-up',
+    down: 'queue-move-down',
+    top: 'queue-move-top',
+    bottom: 'queue-move-bottom',
+  };
+
+  const method = methodMap[action] || 'queue-move-up';
+  const response = await executeTransmissionRpc(settings, {
+    method,
+    arguments: { ids: [torrentId] },
+  });
+  const data: any = await response.json().catch(() => null);
+  if (!response.ok || data?.result !== 'success') {
+    throw new ErrorCode(messages.settings.transmission.actionFailed);
   }
 }

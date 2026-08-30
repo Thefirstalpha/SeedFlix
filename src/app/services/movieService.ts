@@ -1,5 +1,10 @@
-import { IndexerMovieResponse } from '../../../common/indexer';
-import { API_BASE_URL, getTmdbImageUrl, getTmdbLanguageParam } from '../config/tmdb';
+import type { IndexerMovieResponse } from '../../../common/indexer';
+import {
+  API_BASE_URL,
+  getTmdbImageUrl,
+  getTmdbLanguageParam,
+  mapTmdbLanguage,
+} from '../config/tmdb';
 import type { Movie, TMDBMovie, TMDBMovieDetails, TMDBSearchResponse } from '../types/movie';
 import { TMDB_GENRES } from '../types/movie';
 
@@ -15,8 +20,6 @@ export interface GenreItem {
   name: string;
 }
 
-
-
 export interface DiscoverFilters {
   genreId?: number;
   yearFrom?: number;
@@ -26,55 +29,10 @@ export interface DiscoverFilters {
 }
 
 const MOCK_PAGE_SIZE = 8;
-
-const GENRE_MAP: { [key: number]: string } = {
-  28: 'Action',
-  12: 'Aventure',
-  16: 'Animation',
-  35: 'Comédie',
-  80: 'Crime',
-  99: 'Documentaire',
-  18: 'Drame',
-  10751: 'Familial',
-  14: 'Fantastique',
-  36: 'Histoire',
-  27: 'Horreur',
-  10402: 'Musique',
-  9648: 'Mystère',
-  10749: 'Romance',
-  878: 'Science-Fiction',
-  10770: 'Téléfilm',
-  53: 'Thriller',
-  10752: 'Guerre',
-  37: 'Western',
-};
-
-const TMDB_LANGUAGE_MAP: Record<string, string> = {
-  fr: 'Francais',
-  en: 'Anglais',
-  ja: 'Japonais',
-  ko: 'Coreen',
-  es: 'Espagnol',
-  it: 'Italien',
-  de: 'Allemand',
-  pt: 'Portugais',
-  ru: 'Russe',
-  zh: 'Chinois',
-};
-
-function mapTmdbLanguage(code: string | undefined) {
-  const normalized = String(code || '')
-    .toLowerCase()
-    .trim();
-  if (!normalized) {
-    return 'Inconnu';
-  }
-
-  return TMDB_LANGUAGE_MAP[normalized] || normalized.toUpperCase();
-}
+const GENRE_MAP = TMDB_GENRES;
 
 // Convertir un film TMDB en notre format Movie
-function convertTMDBToMovie(tmdbMovie: TMDBMovie): Movie {
+export function convertTMDBToMovie(tmdbMovie: TMDBMovie): Movie {
   const year = tmdbMovie.release_date ? new Date(tmdbMovie.release_date).getFullYear() : 0;
   const genre =
     tmdbMovie.genre_ids && tmdbMovie.genre_ids.length > 0
@@ -299,17 +257,27 @@ export async function getMovieById(id: number, uiLanguage = 'fr'): Promise<Movie
 
     const data: TMDBMovieDetails = await response.json();
 
-    // Extraire le réalisateur
-    const director =
-      data.credits?.crew.find((person) => person.job === 'Director')?.name || 'Non disponible';
+    // Extraire les réalisateurs
+    const directors =
+      data.credits?.crew
+        .filter((person) => person.job === 'Director')
+        .map((p) => ({ id: p.id, name: p.name, job: p.job, profile_path: p.profile_path })) || [];
+    const director = directors.length > 0 ? directors[0].name : 'Non disponible';
 
-    // Extraire les acteurs principaux (top 5)
-    const actors = data.credits?.cast.slice(0, 5).map((actor) => actor.name) || [];
+    // Extraire les acteurs principaux
+    const castMembers =
+      data.credits?.cast.slice(0, 15).map((actor) => ({
+        id: actor.id,
+        name: actor.name,
+        character: actor.character,
+        profile_path: actor.profile_path,
+      })) || [];
+    const actors = castMembers.slice(0, 8).map((actor) => actor.name);
 
     // Convertir la durée
-    const hours = Math.floor(data.runtime / 60);
-    const minutes = data.runtime % 60;
-    const duration = `${hours}h ${minutes}min`;
+    const hours = Math.floor((data.runtime || 0) / 60);
+    const minutes = (data.runtime || 0) % 60;
+    const duration = hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`;
 
     // Obtenir le genre principal
     const genre = data.genres && data.genres.length > 0 ? data.genres[0].name : 'Inconnu';
@@ -330,6 +298,9 @@ export async function getMovieById(id: number, uiLanguage = 'fr'): Promise<Movie
       duration,
       releaseDate: data.release_date,
       voteCount: data.vote_count,
+      collection: data.belongs_to_collection || null,
+      castMembers,
+      directorsList: directors,
     };
   } catch (error) {
     console.error('Error fetching movie details:', error);

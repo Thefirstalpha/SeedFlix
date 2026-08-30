@@ -199,7 +199,7 @@ describe('transmission module', () => {
       await expect(performTransmissionAction('torrent-start', userId, 1)).resolves.not.toThrow();
     });
 
-    it('should start download, fetch torrent metainfo and register managed torrent', async () => {
+    it('should start download, fetch torrent metainfo and register managed torrent with options', async () => {
       const fetchSpy = vi.fn().mockImplementation(async (url: any, opts: any) => {
         const urlStr = url.toString();
         if (urlStr.includes('indexer.example.com')) {
@@ -216,16 +216,237 @@ describe('transmission module', () => {
           headers: new Headers({ 'x-transmission-session-id': 'session-token-123' }),
           json: async () => ({
             result: 'success',
-            arguments: { 'torrent-added': { id: 1, name: 'Downloaded Movie', hashString: 'hash-abc' } },
+            arguments: { 'torrent-added': { id: 1, name: 'Downloaded Series S01E01', hashString: 'hash-series-1' } },
           }),
         };
       });
       vi.stubGlobal('fetch', fetchSpy);
 
-      await startDownload(userId, 'guid-123', 'movie');
+      await startDownload(userId, 'guid-series-1', 'series', {
+        tmdbId: 1399,
+        seasonNumber: 1,
+        episodeNumber: 1,
+      });
 
       const managed = getManagedTorrents(userId);
-      expect(managed.find((t) => t.hash === 'hash-abc')).toBeDefined();
+      expect(managed.find((t) => t.hash === 'hash-series-1')).toBeDefined();
+    });
+
+    it('should handle duplicate torrents and wishlist consumption errors gracefully', async () => {
+      const fetchSpy = vi.fn().mockImplementation(async (url: any) => {
+        const urlStr = url.toString();
+        if (urlStr.includes('indexer.example.com')) {
+          return {
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/x-bittorrent' }),
+            arrayBuffer: async () => new Uint8Array([1, 2]).buffer,
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'x-transmission-session-id': 'session-token-123' }),
+          json: async () => ({
+            result: 'success',
+            arguments: { 'torrent-duplicate': { id: 2, name: 'Duplicate', hashString: 'hash-dup' } },
+          }),
+        };
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const wishlistMod = await import('../../../server/modules/wishlist');
+      vi.spyOn(wishlistMod, 'consumeWishlistItemForDownload').mockRejectedValueOnce(
+        new Error('Wishlist DB error'),
+      );
+
+      await expect(startDownload(userId, 'guid-dup', 'movie')).resolves.not.toThrow();
+    });
+  });
+
+  describe('Turtle Mode, Torrent Files & Queue Management', () => {
+    beforeEach(() => {
+      const user = createUser('userAdvancedTrans').user;
+      userId = user.id;
+      user.settings.transmission = sampleSettings;
+      updateUser(user);
+    });
+
+    it('should get turtle mode stats via getTurtleMode', async () => {
+      const { getTurtleMode } = await import('../../../server/modules/transmission');
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'x-transmission-session-id': 'session-token-123' }),
+        json: async () => ({
+          result: 'success',
+          arguments: {
+            'alt-speed-enabled': true,
+            'alt-speed-down': 500,
+            'alt-speed-up': 100,
+            'speed-limit-down-enabled': false,
+            'speed-limit-down': 0,
+            'speed-limit-up-enabled': false,
+            'speed-limit-up': 0,
+          },
+        }),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const turtle = await getTurtleMode(userId);
+      expect(turtle.altSpeedEnabled).toBe(true);
+      expect(turtle.altSpeedDown).toBe(500);
+      expect(turtle.altSpeedUp).toBe(100);
+    });
+
+    it('should set turtle mode via setTurtleMode', async () => {
+      const { setTurtleMode } = await import('../../../server/modules/transmission');
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'x-transmission-session-id': 'session-token-123' }),
+        json: async () => ({ result: 'success' }),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const result = await setTurtleMode(userId, true);
+      expect(result).toBe(true);
+      expect(fetchSpy).toHaveBeenCalled();
+    });
+
+    it('should throw error when setTurtleMode fails', async () => {
+      const { setTurtleMode } = await import('../../../server/modules/transmission');
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'x-transmission-session-id': 'session-token-123' }),
+        json: async () => ({ result: 'error' }),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      await expect(setTurtleMode(userId, true)).rejects.toThrow();
+    });
+
+    it('should get torrent files detail via getTorrentFiles', async () => {
+      const { getTorrentFiles } = await import('../../../server/modules/transmission');
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'x-transmission-session-id': 'session-token-123' }),
+        json: async () => ({
+          result: 'success',
+          arguments: {
+            torrents: [
+              {
+                id: 10,
+                name: 'Torrent Name',
+                files: [
+                  { name: 'File1.mkv', bytesCompleted: 1000, length: 2000 },
+                  { name: 'File2.srt', bytesCompleted: 50, length: 50 },
+                ],
+                fileStats: [
+                  { wanted: true, priority: 1 },
+                  { wanted: false, priority: 0 },
+                ],
+              },
+            ],
+          },
+        }),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      const files = await getTorrentFiles(userId, 10);
+      expect(files).toHaveLength(2);
+      expect(files[0].name).toBe('File1.mkv');
+      expect(files[0].wanted).toBe(true);
+      expect(files[0].priority).toBe(1);
+      expect(files[1].wanted).toBe(false);
+    });
+
+    it('should throw error when getTorrentFiles receives no torrent', async () => {
+      const { getTorrentFiles } = await import('../../../server/modules/transmission');
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'x-transmission-session-id': 'session-token-123' }),
+        json: async () => ({
+          result: 'success',
+          arguments: { torrents: [] },
+        }),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      await expect(getTorrentFiles(userId, 999)).rejects.toThrow('Torrent introuvable');
+    });
+
+    it('should set wanted/unwanted files via setTorrentFilesWanted', async () => {
+      const { setTorrentFilesWanted } = await import('../../../server/modules/transmission');
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'x-transmission-session-id': 'session-token-123' }),
+        json: async () => ({ result: 'success' }),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      await setTorrentFilesWanted(userId, 10, [0, 1], [2]);
+      expect(fetchSpy).toHaveBeenCalled();
+    });
+
+    it('should throw error when setTorrentFilesWanted fails', async () => {
+      const { setTorrentFilesWanted } = await import('../../../server/modules/transmission');
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'x-transmission-session-id': 'session-token-123' }),
+        json: async () => ({ result: 'error' }),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      await expect(setTorrentFilesWanted(userId, 10, [0], [])).rejects.toThrow();
+    });
+
+    it('should move torrent queue up, down, top, bottom via moveTorrentQueue', async () => {
+      const { moveTorrentQueue } = await import('../../../server/modules/transmission');
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'x-transmission-session-id': 'session-token-123' }),
+        json: async () => ({ result: 'success' }),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      await moveTorrentQueue(userId, 10, 'up');
+      await moveTorrentQueue(userId, 10, 'down');
+      await moveTorrentQueue(userId, 10, 'top');
+      await moveTorrentQueue(userId, 10, 'bottom');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(4);
+    });
+
+    it('should throw error when moveTorrentQueue fails', async () => {
+      const { moveTorrentQueue } = await import('../../../server/modules/transmission');
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'x-transmission-session-id': 'session-token-123' }),
+        json: async () => ({ result: 'error' }),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+
+      await expect(moveTorrentQueue(userId, 10, 'up')).rejects.toThrow();
+    });
+
+    it('should throw when user has no transmission settings configured for advanced actions', async () => {
+      const userNoSettings = createUser('noSettingsUser').user;
+      const { getTurtleMode, setTurtleMode, getTorrentFiles, setTorrentFilesWanted, moveTorrentQueue } =
+        await import('../../../server/modules/transmission');
+
+      await expect(getTurtleMode(userNoSettings.id)).rejects.toThrow();
+      await expect(setTurtleMode(userNoSettings.id, true)).rejects.toThrow();
+      await expect(getTorrentFiles(userNoSettings.id, 1)).rejects.toThrow();
+      await expect(setTorrentFilesWanted(userNoSettings.id, 1, [], [])).rejects.toThrow();
+      await expect(moveTorrentQueue(userNoSettings.id, 1, 'up')).rejects.toThrow();
     });
   });
 });

@@ -1,5 +1,10 @@
-import { IndexerSeriesResponse } from '../../../common/indexer';
-import { API_BASE_URL, getTmdbImageUrl, getTmdbLanguageParam } from '../config/tmdb';
+import type { IndexerSeriesResponse } from '../../../common/indexer';
+import {
+  API_BASE_URL,
+  getTmdbImageUrl,
+  getTmdbLanguageParam,
+  mapTmdbLanguage,
+} from '../config/tmdb';
 import type {
   Series,
   SeriesDetails,
@@ -49,31 +54,7 @@ const TV_GENRE_MAP: { [key: number]: string } = {
   37: 'Western',
 };
 
-const TMDB_LANGUAGE_MAP: Record<string, string> = {
-  fr: 'Francais',
-  en: 'Anglais',
-  ja: 'Japonais',
-  ko: 'Coreen',
-  es: 'Espagnol',
-  it: 'Italien',
-  de: 'Allemand',
-  pt: 'Portugais',
-  ru: 'Russe',
-  zh: 'Chinois',
-};
-
-function mapTmdbLanguage(code: string | undefined) {
-  const normalized = String(code || '')
-    .toLowerCase()
-    .trim();
-  if (!normalized) {
-    return 'Inconnu';
-  }
-
-  return TMDB_LANGUAGE_MAP[normalized] || normalized.toUpperCase();
-}
-
-function convertTMDBToSeries(tmdbSeries: TMDBSeries): Series {
+export function convertTMDBToSeries(tmdbSeries: TMDBSeries): Series {
   const year = tmdbSeries.first_air_date ? new Date(tmdbSeries.first_air_date).getFullYear() : 0;
   const genre =
     tmdbSeries.genre_ids && tmdbSeries.genre_ids.length > 0
@@ -88,6 +69,7 @@ function convertTMDBToSeries(tmdbSeries: TMDBSeries): Series {
     language: mapTmdbLanguage(tmdbSeries.original_language),
     genre,
     poster: getTmdbImageUrl(tmdbSeries.poster_path),
+    plot: tmdbSeries.overview || 'Aucun synopsis disponible.',
   };
 }
 
@@ -111,6 +93,13 @@ function convertTMDBToSeriesDetails(tmdbSeries: TMDBSeriesDetails): SeriesDetail
     firstAirDate: tmdbSeries.first_air_date,
     status: tmdbSeries.status,
     creators: (tmdbSeries.created_by || []).map((creator) => creator.name),
+    creatorsList: (tmdbSeries.created_by || []).map((c) => ({ id: c.id, name: c.name, profile_path: null })),
+    castMembers: (tmdbSeries.credits?.cast || []).slice(0, 15).map((actor) => ({
+      id: actor.id,
+      name: actor.name,
+      character: actor.character,
+      profile_path: actor.profile_path,
+    })),
     networks: (tmdbSeries.networks || []).map((network) => network.name),
     seasons: (tmdbSeries.seasons || [])
       .filter((season) => season.season_number >= 0)

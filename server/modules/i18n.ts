@@ -88,7 +88,6 @@ const messagesList: Record<string, Translation> = {
   },
 };
 
-let currentLanguage = 'en';
-let currentMessages: Translation = messagesList[currentLanguage];
+const currentLanguage = 'en';
 
-export let messages = currentMessages;
+export const messages: Translation = messagesList[currentLanguage];

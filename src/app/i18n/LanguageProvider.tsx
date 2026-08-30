@@ -63,7 +63,7 @@ function interpolate(template: string, vars?: Record<string, string | number>): 
     return template;
   }
 
-  return template.replace(/\{\{(.*?)\}\}/g, (_match, token) => {
+  return template.replace(/\{\{([^}]+)\}\}/g, (_match, token) => {
     const key = String(token || '').trim();
     return key in vars ? String(vars[key]) : '';
   });
@@ -349,6 +349,10 @@ export interface I18nMessages {
     popularSeries: string;
     noMoviesMatch: string;
     noSeriesMatch: string;
+    viewModeCard: string;
+    viewModeList: string;
+    movieBadge: string;
+    seriesBadge: string;
     languages: {
       french: string;
       english: string;
@@ -362,6 +366,7 @@ export interface I18nMessages {
       chinese: string;
       unknown: string;
     };
+    noResults: string;
   };
   movieDetails: {
     notFoundTitle: string;

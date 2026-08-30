@@ -73,7 +73,7 @@ export const configureTmdbApiKey = async (apiKey: string) => {
   updateGlobalConfig({ tmdbApiKey: apiKey });
 };
 
-export const proxyTmdb = async (path: string, filters: Record<string, any>) => {
+export const proxyTmdb = async (path: string, filters: Record<string, any>): Promise<any> => {
   const apiKey = await getTmdbApiKey();
   if (!apiKey) throw new ErrorCode(messages.tmdb.apiKeyNotSet);
   const url = new URL(`${tmdbBaseUrl}${path}`);
@@ -150,8 +150,16 @@ export function buildSeasonRequest(id: number, seasonNumber: number, query: Reco
   };
 }
 
-export function buildSearchRequest(mediaType: TmdbType, query: Record<string, any>) {
-  const apiPath = mediaType === 'movie' ? '/search/movie' : '/search/tv';
+export function buildSearchRequest(mediaType: TmdbType | 'multi', query: Record<string, any>) {
+  let apiPath: string;
+  if (mediaType === 'multi') {
+    apiPath = '/search/multi';
+  } else if (mediaType === TmdbType.movie) {
+    apiPath = '/search/movie';
+  } else {
+    apiPath = '/search/tv';
+  }
+
   return {
     path: apiPath,
     query: {
@@ -162,18 +170,111 @@ export function buildSearchRequest(mediaType: TmdbType, query: Record<string, an
   };
 }
 
-export async function getTmdbDetails(tmdbId: number, type: 'movie' | 'series') {
-  const request = buildDetailsRequest(
-    type == 'movie' ? TmdbType.movie : TmdbType.series,
-    tmdbId,
-    {},
-  );
-  const results = await proxyTmdb(request.path, request.query);
+export function buildRecommendationsRequest(
+  mediaType: TmdbType,
+  id: number,
+  query: Record<string, any>,
+) {
+  return {
+    path: `/${mediaType}/${id}/recommendations`,
+    query: {
+      page: Number(query.page || 1),
+      language: String(query.language || 'fr-FR'),
+    },
+  };
+}
 
-  if (!results?.id) {
+export function buildCollectionRequest(id: number, query: Record<string, any>) {
+  return {
+    path: `/collection/${id}`,
+    query: {
+      language: String(query.language || 'fr-FR'),
+    },
+  };
+}
+
+export function buildPersonRequest(id: number, query: Record<string, any>) {
+  return {
+    path: `/person/${id}`,
+    query: {
+      language: String(query.language || 'fr-FR'),
+      append_to_response: 'combined_credits',
+    },
+  };
+}
+
+export interface NormalizedTmdbDetails {
+  id: number;
+  type: 'movie' | 'series';
+  title: string;
+  originalTitle: string;
+  overview: string;
+  releaseDate: string;
+  year: number;
+  rating: number;
+  voteCount: number;
+  genres: string[];
+  posterPath: string | null;
+  backdropPath: string | null;
+  originalLanguage?: string;
+  runtime?: number;
+  numberOfSeasons?: number;
+  numberOfEpisodes?: number;
+}
+
+export function transformTmdbDetails(raw: any, type: 'movie' | 'series'): NormalizedTmdbDetails {
+  if (!raw || !raw.id) {
     throw new Error('Item not found in TMDB');
   }
 
-  //image.tmdb.org/t/p/w500/
-  return {};
+  const isMovie = type === 'movie';
+  const title = isMovie ? String(raw.title || '') : String(raw.name || '');
+  const originalTitle = isMovie
+    ? String(raw.original_title || '')
+    : String(raw.original_name || '');
+  const releaseDate = isMovie ? String(raw.release_date || '') : String(raw.first_air_date || '');
+  const year = releaseDate ? new Date(releaseDate).getFullYear() : 0;
+  const rating = Number.isFinite(Number(raw.vote_average))
+    ? Math.round(Number(raw.vote_average) * 10) / 10
+    : 0;
+  const voteCount = Number(raw.vote_count || 0);
+  const genres = Array.isArray(raw.genres)
+    ? raw.genres.map((g: any) => String(g?.name || '')).filter(Boolean)
+    : [];
+
+  return {
+    id: Number(raw.id),
+    type,
+    title,
+    originalTitle,
+    overview: String(raw.overview || ''),
+    releaseDate,
+    year,
+    rating,
+    voteCount,
+    genres,
+    posterPath: raw.poster_path ? String(raw.poster_path) : null,
+    backdropPath: raw.backdrop_path ? String(raw.backdrop_path) : null,
+    originalLanguage: raw.original_language ? String(raw.original_language) : undefined,
+    ...(isMovie && raw.runtime !== undefined ? { runtime: Number(raw.runtime) } : {}),
+    ...(!isMovie && raw.number_of_seasons !== undefined
+      ? { numberOfSeasons: Number(raw.number_of_seasons) }
+      : {}),
+    ...(!isMovie && raw.number_of_episodes !== undefined
+      ? { numberOfEpisodes: Number(raw.number_of_episodes) }
+      : {}),
+  };
+}
+
+export async function getTmdbDetails(
+  tmdbId: number,
+  type: 'movie' | 'series',
+  language = 'fr-FR',
+): Promise<NormalizedTmdbDetails> {
+  const request = buildDetailsRequest(type === 'movie' ? TmdbType.movie : TmdbType.series, tmdbId, {
+    language,
+  });
+  const results = await proxyTmdb(request.path, request.query);
+
+  return transformTmdbDetails(results, type);
 }

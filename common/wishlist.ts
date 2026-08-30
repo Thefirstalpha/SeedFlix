@@ -2,6 +2,8 @@ export interface WishListSeasonItem {
   season_number: number;
   all_episodes: boolean;
   episodes: number[];
+  autoGrab?: boolean;
+  autoGrabEpisodes?: number[];
 }
 
 export interface WishListItem {
@@ -16,4 +18,5 @@ export interface WishListItem {
   original_title: string;
   all_seasons: boolean;
   seasons: Record<number, WishListSeasonItem>;
+  autoGrab?: boolean;
 }

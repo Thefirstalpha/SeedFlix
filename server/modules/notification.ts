@@ -4,6 +4,7 @@ import { Notification } from '../../common/notification';
 import { User, WebPushSubscription } from '../../common/user';
 import { db } from './db';
 import { readGlobalConfig, updateGlobalConfig } from './setting';
+import { emitNotification, emitStatusBar } from './events';
 import { getUser, updateUser } from './user';
 
 const DISCORD_WEBHOOK_BASE_URL = 'https://discord.com';
@@ -136,7 +137,7 @@ export function getUnreadCount(userId: number): number {
 
 // ─── Ajout ────────────────────────────────────────────────────────────────────
 
-export function addNotification(userId: number, notification: NotificationPayload) {
+export function addNotification(userId: number, notification: NotificationPayload): void {
   db.prepare(
     'INSERT INTO notifications (user_id, title, message, type, read, data) VALUES (?, ?, ?, ?, 0, ?)',
   ).run(
@@ -146,6 +147,9 @@ export function addNotification(userId: number, notification: NotificationPayloa
     notification.type,
     notification.data ? JSON.stringify(notification.data) : null,
   );
+
+  const { unreadCount } = getNotifications(userId, { unreadOnly: true });
+  emitNotification(userId, notification, unreadCount);
 
   const user: User | null = getUser(userId);
   if (user?.notifications?.discord?.webhookUrl) {
@@ -211,11 +215,14 @@ export function markAsRead(userId: number, notificationId: string): boolean {
   const result = db
     .prepare('UPDATE notifications SET read = 1 WHERE user_id = ? AND id = ?')
     .run(userId, Number(notificationId));
-  return (result as any).changes > 0;
+  const changed = (result as any).changes > 0;
+  if (changed) void emitStatusBar(userId);
+  return changed;
 }
 
 export function markAllAsRead(userId: number): void {
   db.prepare('UPDATE notifications SET read = 1 WHERE user_id = ?').run(userId);
+  void emitStatusBar(userId);
 }
 
 // ─── Suppression ──────────────────────────────────────────────────────────────
@@ -224,11 +231,14 @@ export function deleteNotification(userId: number, notificationId: string): bool
   const result = db
     .prepare('DELETE FROM notifications WHERE user_id = ? AND id = ?')
     .run(userId, Number(notificationId));
-  return (result as any).changes > 0;
+  const changed = (result as any).changes > 0;
+  if (changed) void emitStatusBar(userId);
+  return changed;
 }
 
 export function clearNotifications(userId: number): void {
   db.prepare('DELETE FROM notifications WHERE user_id = ?').run(userId);
+  void emitStatusBar(userId);
 }
 
 export function normalizeDiscordWebhookUrl(input: string): string {

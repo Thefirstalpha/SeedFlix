@@ -77,6 +77,51 @@ describe('Route: /api/ftp', () => {
     expect(res.body.ok).toBe(true);
     expect(res.body.config.host).toBe('ftp.example.com');
     expect(res.body.config.password).toBeUndefined();
+    expect(res.body.config.hasPassword).toBe(true);
+  });
+
+  it('should preserve existing FTP password when authRequired is true and password is empty or placeholder', async () => {
+    const { user } = createUser('ftpUserPreserve');
+    const cookie = createSessionCookie(user.id);
+    mockedGetSettings.mockReturnValueOnce({
+      host: 'ftp.example.com',
+      port: 21,
+      secure: false,
+      authRequired: true,
+      username: 'ftpuser',
+      password: 'existingFtpPassword',
+      rootFolder: '/',
+      storageLimit: null,
+    });
+    mockedTestWithSettings.mockResolvedValueOnce({ ok: true });
+    mockedConfigure.mockResolvedValueOnce(undefined);
+
+    const res = await request(app)
+      .post('/api/ftp/configure')
+      .set('Cookie', cookie)
+      .send({
+        host: 'ftp.example.com',
+        port: 21,
+        authRequired: true,
+        username: 'ftpuser',
+        password: '',
+        rootFolder: '/new-root',
+      });
+
+    expect(res.status).toBe(200);
+    expect(mockedTestWithSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        password: 'existingFtpPassword',
+        rootFolder: '/new-root',
+      }),
+    );
+    expect(mockedConfigure).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({
+        password: 'existingFtpPassword',
+        rootFolder: '/new-root',
+      }),
+    );
   });
 
   it('should test and configure FTP settings', async () => {
@@ -182,8 +227,8 @@ describe('Route: /api/ftp', () => {
   it('should batch delete and batch move files via /api/ftp/delete-batch & /api/ftp/move', async () => {
     const { user } = createUser('ftpUser7');
     const cookie = createSessionCookie(user.id);
-    mockedRemoveBatch.mockResolvedValueOnce({ success: ['/a.txt'], failed: [] });
-    mockedMoveBatch.mockResolvedValueOnce({ success: ['/a.txt'], failed: [] });
+    mockedRemoveBatch.mockResolvedValueOnce({ failed: [] });
+    mockedMoveBatch.mockResolvedValueOnce({ failed: [] });
 
     const resDel = await request(app)
       .post('/api/ftp/delete-batch')
@@ -212,12 +257,72 @@ describe('Route: /api/ftp', () => {
       .set('Cookie', cookie);
 
     expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toContain('attachment');
     expect(res.body.toString()).toBe('file-content');
   });
 
-  it('should upload file stream via POST /api/ftp/upload', async () => {
+  it('should stream video media via GET /api/ftp/stream with video/mp4 MIME type', async () => {
+    const { user } = createUser('ftpUserStream');
+    const cookie = createSessionCookie(user.id);
+    mockedGetFileSize.mockResolvedValueOnce(Buffer.byteLength('video-binary'));
+    mockedDownloadToStream.mockImplementation(async (uid, p, res) => {
+      res.write('video-binary');
+      res.end();
+    });
+
+    const res = await request(app)
+      .get('/api/ftp/stream?path=/movies/video.mp4')
+      .set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('video/mp4');
+    expect(res.headers['content-disposition']).toContain('inline');
+    expect(res.headers['accept-ranges']).toBe('bytes');
+  });
+
+  it('should handle /api/ftp/stream error when path is missing or download fails', async () => {
+    const { user } = createUser('ftpUserStreamErr');
+    const cookie = createSessionCookie(user.id);
+
+    const resMissing = await request(app).get('/api/ftp/stream').set('Cookie', cookie);
+    expect(resMissing.status).toBe(400);
+
+    mockedGetFileSize.mockRejectedValueOnce(new Error('Cannot determine size'));
+    mockedDownloadToStream.mockRejectedValueOnce(new Error('Stream failed'));
+
+    const resFail = await request(app).get('/api/ftp/stream?path=/fail.mp4').set('Cookie', cookie);
+    expect(resFail.status).toBe(500);
+  });
+
+  it('should support inline download via GET /api/ftp/download?inline=true and handle missing path', async () => {
+    const { user } = createUser('ftpUserInline');
+    const cookie = createSessionCookie(user.id);
+
+    const resMissing = await request(app).get('/api/ftp/download').set('Cookie', cookie);
+    expect(resMissing.status).toBe(400);
+
+    mockedGetFileSize.mockResolvedValueOnce(Buffer.byteLength('image-binary'));
+    mockedDownloadToStream.mockImplementation(async (uid, p, res) => {
+      res.write('image-binary');
+      res.end();
+    });
+
+    const res = await request(app)
+      .get('/api/ftp/download?path=/photos/picture.jpg&inline=true')
+      .set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('image/jpeg');
+    expect(res.headers['content-disposition']).toContain('inline');
+  });
+
+  it('should upload file stream via POST /api/ftp/upload and handle missing path', async () => {
     const { user } = createUser('ftpUserUpload');
     const cookie = createSessionCookie(user.id);
+
+    const resMissing = await request(app).post('/api/ftp/upload').set('Cookie', cookie);
+    expect(resMissing.status).toBe(400);
+
     mockedUploadFromStream.mockResolvedValueOnce(undefined);
 
     const res = await request(app)
@@ -229,9 +334,13 @@ describe('Route: /api/ftp', () => {
     expect(res.body.ok).toBe(true);
   });
 
-  it('should get file info via GET /api/ftp/info', async () => {
+  it('should get file info via GET /api/ftp/info and handle missing path', async () => {
     const { user } = createUser('ftpUserInfo');
     const cookie = createSessionCookie(user.id);
+
+    const resMissing = await request(app).get('/api/ftp/info').set('Cookie', cookie);
+    expect(resMissing.status).toBe(400);
+
     mockedGetFileSize.mockResolvedValueOnce(2048);
     mockedGetLastModified.mockResolvedValueOnce(new Date('2024-01-01'));
 
@@ -250,8 +359,6 @@ describe('Route: /api/ftp', () => {
     mockedGetStorage.mockResolvedValueOnce({
       used: 5000,
       limit: 10000,
-      available: 5000,
-      percentage: 50,
     });
 
     const res = await request(app).get('/api/ftp/storage').set('Cookie', cookie);

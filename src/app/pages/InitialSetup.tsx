@@ -7,13 +7,11 @@ import {
   Server,
   ShieldCheck,
 } from 'lucide-react';
-import { SubmitEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 
 import { useAuth } from '../context/AuthContext';
-import {
-  acceptLegal
-} from '../services/authService';
+import { acceptLegal } from '../services/authService';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Checkbox } from '../components/ui/checkbox';
@@ -29,6 +27,235 @@ import { SettingFtp } from '../components/settings/SettingFtp';
 
 function parseSupportedLanguage(input: unknown): SupportedLanguage {
   return input === 'en' ? 'en' : 'fr';
+}
+
+interface SetupStepsNavigationProps {
+  currentStepTitle?: string;
+  currentStepNumber: number;
+  totalSteps: number;
+  progressValue: number;
+  visibleSteps: Array<{
+    key: string;
+    title: string;
+    icon: any;
+    required: boolean;
+  }>;
+  activeStep: number;
+  firstIncompleteStep: number;
+  stepsScrollerRef: React.RefObject<HTMLDivElement | null>;
+  stepItemRefs: React.MutableRefObject<Array<HTMLDivElement | null>>;
+  t: (key: string, params?: Record<string, any>) => string;
+}
+
+function SetupStepsNavigation({
+  currentStepTitle,
+  currentStepNumber,
+  totalSteps,
+  progressValue,
+  visibleSteps,
+  activeStep,
+  firstIncompleteStep,
+  stepsScrollerRef,
+  stepItemRefs,
+  t,
+}: Readonly<SetupStepsNavigationProps>) {
+  return (
+    <Card className="border-white/10 bg-white/5 text-white">
+      <CardContent className="space-y-5 p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="mt-1 text-2xl font-semibold text-white">{currentStepTitle}</h3>
+          </div>
+          <div className="text-sm text-white/60">
+            <p className="text-sm uppercase tracking-[0.22em] text-white/45">
+              {t('setup.progress', { current: currentStepNumber, total: totalSteps })}
+            </p>
+          </div>
+        </div>
+
+        <Progress value={progressValue} className="bg-white/10" />
+
+        <div ref={stepsScrollerRef} className="overflow-x-auto pb-1 [scrollbar-width:thin]">
+          <div className="flex min-w-full gap-3">
+            {visibleSteps.map((step, index) => {
+              const Icon = step.icon;
+              const isActive = index === activeStep;
+              const isComplete = !step.required && index < firstIncompleteStep;
+
+              return (
+                <div
+                  key={step.key}
+                  ref={(node) => {
+                    stepItemRefs.current[index] = node;
+                  }}
+                  className={`rounded-xl border px-4 py-3 text-left transition ${isActive
+                    ? 'border-cyan-400/60 bg-cyan-400/10'
+                    : 'border-white/10 bg-black/10 hover:bg-white/5'
+                    } min-w-[220px] shrink-0`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-lg bg-white/10 p-2">
+                        <Icon className="h-4 w-4 text-cyan-200" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs text-white/45">
+                          {t('setup.stepLabel', { index: index + 1 })}
+                        </p>
+                        <p className="font-medium text-white whitespace-nowrap">{step.title}</p>
+                      </div>
+                    </div>
+                    {isComplete ? <Check className="h-4 w-4 text-emerald-300" /> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LegalStepCard({
+  legalCheckboxChecked,
+  setLegalCheckboxChecked,
+  handleLegalAccept,
+  isLegalSaving,
+  legalError,
+  t,
+}: Readonly<{
+  legalCheckboxChecked: boolean;
+  setLegalCheckboxChecked: (v: boolean) => void;
+  handleLegalAccept: () => void;
+  isLegalSaving: boolean;
+  legalError: string | null;
+  t: (key: string) => string;
+}>) {
+  return (
+    <Card className="border-white/10 bg-white/5 text-white">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Scale className="h-5 w-5 text-cyan-300" />
+          {t('setup.legal.cardTitle')}
+        </CardTitle>
+        <CardDescription className="text-white/60">
+          {t('setup.legal.cardDescription')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <ul className="space-y-2.5 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/75">
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
+            <span>{t('setup.legal.term1')}</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
+            <span>{t('setup.legal.term2')}</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
+            <span>{t('setup.legal.term3')}</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
+            <span>{t('setup.legal.term4')}</span>
+          </li>
+        </ul>
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id="legal-accept-checkbox"
+            checked={legalCheckboxChecked}
+            onCheckedChange={(checked) => setLegalCheckboxChecked(Boolean(checked))}
+            className="mt-0.5"
+          />
+          <Label
+            htmlFor="legal-accept-checkbox"
+            className="cursor-pointer text-sm leading-snug text-white/80"
+          >
+            {t('setup.legal.checkbox')}
+          </Label>
+        </div>
+        <div className="flex justify-end">
+          <Button
+            onClick={handleLegalAccept}
+            disabled={!legalCheckboxChecked || isLegalSaving}
+            className="bg-cyan-600 text-white hover:bg-cyan-700"
+          >
+            {isLegalSaving ? t('common.saving') : t('setup.legal.accept')}
+          </Button>
+        </div>
+        {legalError ? <p className="text-sm text-red-400">{legalError}</p> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TmdbStepCard({
+  tmdbApiKey,
+  setTmdbApiKey,
+  handleTmdbSubmit,
+  isTmdbSaving,
+  tmdbMessage,
+  tmdbError,
+  t,
+}: Readonly<{
+  tmdbApiKey: string;
+  setTmdbApiKey: (v: string) => void;
+  handleTmdbSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  isTmdbSaving: boolean;
+  tmdbMessage: string | null;
+  tmdbError: string | null;
+  t: (key: string) => string;
+}>) {
+  return (
+    <Card className="border-white/10 bg-white/5 text-white">
+      <CardHeader>
+        <CardTitle>{t('setup.tmdb.cardTitle')}</CardTitle>
+        <CardDescription className="text-white/60">
+          {t('setup.tmdb.cardDescription')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleTmdbSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="setup-tmdb-key">{t('setup.tmdb.keyLabel')}</Label>
+              <a
+                href="https://developer.themoviedb.org/docs/getting-started"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-cyan-300 transition-colors hover:text-cyan-200"
+              >
+                {t('setup.tmdb.documentation')}
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </div>
+            <Input
+              id="setup-tmdb-key"
+              type="password"
+              value={tmdbApiKey}
+              onChange={(event) => setTmdbApiKey(event.target.value)}
+              placeholder={t('setup.tmdb.placeholder')}
+              className="border-white/10 bg-slate-900 text-white"
+            />
+            <p className="text-xs text-white/55">{t('setup.tmdb.helper')}</p>
+          </div>
+          {tmdbMessage ? <p className="text-sm text-emerald-300">{tmdbMessage}</p> : null}
+          {tmdbError ? <p className="text-sm text-red-300">{tmdbError}</p> : null}
+          <div className="flex items-center justify-end gap-3">
+            <Button
+              type="submit"
+              disabled={isTmdbSaving}
+              className="bg-cyan-600 text-white hover:bg-cyan-700"
+            >
+              {isTmdbSaving ? t('setup.tmdb.testing') : t('setup.tmdb.saveAndContinue')}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function InitialSetup() {
@@ -52,7 +279,6 @@ export function InitialSetup() {
   const [tmdbError, setTmdbError] = useState<string | null>(null);
   const [tmdbMessage, setTmdbMessage] = useState<string | null>(null);
   const [isTmdbSaving, setIsTmdbSaving] = useState(false);
-
 
   const [languageCode, setLanguageCode] = useState<SupportedLanguage>('fr');
   const [languageMessage, setLanguageMessage] = useState<string | null>(null);
@@ -189,7 +415,6 @@ export function InitialSetup() {
   const currentStepNumber = activeStep + 1;
   const progressValue = totalSteps > 0 ? (currentStepNumber / totalSteps) * 100 : 0;
 
-
   const goToNextVisibleStep = async () => {
     await refresh();
     if (activeStep >= totalSteps - 1) {
@@ -232,7 +457,7 @@ export function InitialSetup() {
     }
   };
 
-  const handleTmdbSubmit = async (event: SubmitEvent) => {
+  const handleTmdbSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setTmdbError(null);
     setTmdbMessage(null);
@@ -303,170 +528,44 @@ export function InitialSetup() {
         </div>
       </div>
 
-      <Card className="border-white/10 bg-white/5 text-white">
-        <CardContent className="space-y-5 p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 className="mt-1 text-2xl font-semibold text-white">{currentStep?.title}</h3>
-            </div>
-            <div className="text-sm text-white/60">
-              <p className="text-sm uppercase tracking-[0.22em] text-white/45">
-                {t('setup.progress', { current: currentStepNumber, total: totalSteps })}
-              </p>
-            </div>
-          </div>
-
-          <Progress value={progressValue} className="bg-white/10" />
-
-          <div ref={stepsScrollerRef} className="overflow-x-auto pb-1 [scrollbar-width:thin]">
-            <div className="flex min-w-full gap-3">
-              {visibleSteps.map((step, index) => {
-                const Icon = step.icon;
-                const isActive = index === activeStep;
-                const isComplete = !step.required && index < firstIncompleteStep;
-
-                return (
-                  <div
-                    key={step.key}
-                    ref={(node) => {
-                      stepItemRefs.current[index] = node;
-                    }}
-                    className={`rounded-xl border px-4 py-3 text-left transition ${isActive
-                      ? 'border-cyan-400/60 bg-cyan-400/10'
-                      : 'border-white/10 bg-black/10 hover:bg-white/5'
-                      } min-w-[220px] shrink-0`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="rounded-lg bg-white/10 p-2">
-                          <Icon className="h-4 w-4 text-cyan-200" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs text-white/45">
-                            {t('setup.stepLabel', { index: index + 1 })}
-                          </p>
-                          <p className="font-medium text-white whitespace-nowrap">{step.title}</p>
-                        </div>
-                      </div>
-                      {isComplete ? <Check className="h-4 w-4 text-emerald-300" /> : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <SetupStepsNavigation
+        currentStepTitle={currentStep?.title}
+        currentStepNumber={currentStepNumber}
+        totalSteps={totalSteps}
+        progressValue={progressValue}
+        visibleSteps={visibleSteps}
+        activeStep={activeStep}
+        firstIncompleteStep={firstIncompleteStep}
+        stepsScrollerRef={stepsScrollerRef}
+        stepItemRefs={stepItemRefs}
+        t={t}
+      />
 
       {currentStep?.key === 'legal' ? (
-        <Card className="border-white/10 bg-white/5 text-white">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Scale className="h-5 w-5 text-cyan-300" />
-              {t('setup.legal.cardTitle')}
-            </CardTitle>
-            <CardDescription className="text-white/60">
-              {t('setup.legal.cardDescription')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <ul className="space-y-2.5 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/75">
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
-                <span>{t('setup.legal.term1')}</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
-                <span>{t('setup.legal.term2')}</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
-                <span>{t('setup.legal.term3')}</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 text-cyan-400">•</span>
-                <span>{t('setup.legal.term4')}</span>
-              </li>
-            </ul>
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="legal-accept-checkbox"
-                checked={legalCheckboxChecked}
-                onCheckedChange={(checked) => setLegalCheckboxChecked(Boolean(checked))}
-                className="mt-0.5"
-              />
-              <Label
-                htmlFor="legal-accept-checkbox"
-                className="cursor-pointer text-sm leading-snug text-white/80"
-              >
-                {t('setup.legal.checkbox')}
-              </Label>
-            </div>
-            <div className="flex justify-end">
-              <Button
-                onClick={handleLegalAccept}
-                disabled={!legalCheckboxChecked || isLegalSaving}
-                className="bg-cyan-600 text-white hover:bg-cyan-700"
-              >
-                {isLegalSaving ? t('common.saving') : t('setup.legal.accept')}
-              </Button>
-            </div>
-            {legalError ? <p className="text-sm text-red-400">{legalError}</p> : null}
-          </CardContent>
-        </Card>
+        <LegalStepCard
+          legalCheckboxChecked={legalCheckboxChecked}
+          setLegalCheckboxChecked={setLegalCheckboxChecked}
+          handleLegalAccept={handleLegalAccept}
+          isLegalSaving={isLegalSaving}
+          legalError={legalError}
+          t={t}
+        />
       ) : null}
 
       {currentStep?.key === 'password' ? (
-          <SettingPassword setup={true} onComplete={goToNextVisibleStep}></SettingPassword>
+        <SettingPassword setup={true} onComplete={goToNextVisibleStep}></SettingPassword>
       ) : null}
 
       {currentStep?.key === 'tmdb' ? (
-        <Card className="border-white/10 bg-white/5 text-white">
-          <CardHeader>
-            <CardTitle>{t('setup.tmdb.cardTitle')}</CardTitle>
-            <CardDescription className="text-white/60">
-              {t('setup.tmdb.cardDescription')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleTmdbSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="setup-tmdb-key">{t('setup.tmdb.keyLabel')}</Label>
-                  <a
-                    href="https://developer.themoviedb.org/docs/getting-started"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-cyan-300 transition-colors hover:text-cyan-200"
-                  >
-                    {t('setup.tmdb.documentation')}
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                </div>
-                <Input
-                  id="setup-tmdb-key"
-                  type="password"
-                  value={tmdbApiKey}
-                  onChange={(event) => setTmdbApiKey(event.target.value)}
-                  placeholder={t('setup.tmdb.placeholder')}
-                  className="border-white/10 bg-slate-900 text-white"
-                />
-                <p className="text-xs text-white/55">{t('setup.tmdb.helper')}</p>
-              </div>
-              {tmdbMessage ? <p className="text-sm text-emerald-300">{tmdbMessage}</p> : null}
-              {tmdbError ? <p className="text-sm text-red-300">{tmdbError}</p> : null}
-              <div className="flex items-center justify-end gap-3">
-                <Button
-                  type="submit"
-                  disabled={isTmdbSaving}
-                  className="bg-cyan-600 text-white hover:bg-cyan-700"
-                >
-                  {isTmdbSaving ? t('setup.tmdb.testing') : t('setup.tmdb.saveAndContinue')}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+        <TmdbStepCard
+          tmdbApiKey={tmdbApiKey}
+          setTmdbApiKey={setTmdbApiKey}
+          handleTmdbSubmit={handleTmdbSubmit}
+          isTmdbSaving={isTmdbSaving}
+          tmdbMessage={tmdbMessage}
+          tmdbError={tmdbError}
+          t={t}
+        />
       ) : null}
 
       {currentStep?.key === 'torrent' ? (
@@ -477,11 +576,9 @@ export function InitialSetup() {
         <SettingIndexer setup={true} onComplete={goToNextVisibleStep}></SettingIndexer>
       ) : null}
 
-      
       {currentStep?.key === 'ftp' ? (
-          <SettingFtp setup={true} onComplete={goToNextVisibleStep}></SettingFtp>
+        <SettingFtp setup={true} onComplete={goToNextVisibleStep}></SettingFtp>
       ) : null}
-
     </div>
   );
 }

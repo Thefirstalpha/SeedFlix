@@ -1,4 +1,4 @@
-import { SubmitEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
@@ -10,20 +10,26 @@ import { Switch } from "../ui/switch";
 
 
 
-export function SettingTransmission({ setup, onComplete }: { setup: boolean; onComplete?: (() => void) }) {
+interface SettingTransmissionProps {
+  setup: boolean;
+  onComplete?: () => void;
+}
+
+export function SettingTransmission({ setup, onComplete }: Readonly<SettingTransmissionProps>) {
     const { t } = useI18n();
     const [torrentUrl, setTorrentUrl] = useState('');
     const [torrentPort, setTorrentPort] = useState<number | null>(null);
     const [torrentAuthRequired, setTorrentAuthRequired] = useState(false);
     const [torrentUsername, setTorrentUsername] = useState('');
     const [torrentPassword, setTorrentPassword] = useState('');
+    const [hasExistingPassword, setHasExistingPassword] = useState(false);
     const [torrentMoviesFolder, setTorrentMoviesFolder] = useState('');
     const [torrentSeriesFolder, setTorrentSeriesFolder] = useState('');
     const [torrentError, setTorrentError] = useState<string | null>(null);
     const [isTorrentSaving, setIsTorrentSaving] = useState(false);
 
 
-    const handleTorrentSave = async (event: SubmitEvent) => {
+    const handleTorrentSave = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setTorrentError(null);
         setIsTorrentSaving(true);
@@ -39,6 +45,10 @@ export function SettingTransmission({ setup, onComplete }: { setup: boolean; onC
         };
         try {
             await configureTransmission(transmissionSettings);
+            if (torrentPassword) {
+                setHasExistingPassword(true);
+                setTorrentPassword('');
+            }
             onComplete?.();
         } catch (submitError) {
             setTorrentError(
@@ -59,13 +69,14 @@ export function SettingTransmission({ setup, onComplete }: { setup: boolean; onC
             headers: { 'Content-Type': 'application/json' },
         }).then(async (response) => {
             if (response.ok) {
-                const data: TransmissionSettings = await response.json();
+                const data: any = await response.json();
                 if (data != null) {
                     setTorrentUrl(data.host || '');
                     setTorrentPort(data.port);
                     setTorrentAuthRequired(data.authRequired || false);
                     setTorrentUsername(data.username || '');
-                    setTorrentPassword(data.authRequired && data.username ? '***********' : '');
+                    setTorrentPassword('');
+                    setHasExistingPassword(Boolean(data.hasPassword || (data.authRequired && data.username)));
                     setTorrentMoviesFolder(data.moviesFolder || '');
                     setTorrentSeriesFolder(data.seriesFolder || '');
                 } else {
@@ -74,6 +85,7 @@ export function SettingTransmission({ setup, onComplete }: { setup: boolean; onC
                     setTorrentAuthRequired(false);
                     setTorrentUsername('');
                     setTorrentPassword('');
+                    setHasExistingPassword(false);
                     setTorrentMoviesFolder('');
                     setTorrentSeriesFolder('');
                 }
@@ -140,6 +152,7 @@ export function SettingTransmission({ setup, onComplete }: { setup: boolean; onC
                                     <Input
                                         id="setup-torrent-password"
                                         type="password"
+                                        placeholder={hasExistingPassword ? "••••••••••••••••" : t('setup.torrent.password')}
                                         value={torrentPassword}
                                         onChange={(event) => setTorrentPassword(event.target.value)}
                                         className="border-white/10 bg-slate-900 text-white"

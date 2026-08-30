@@ -20,9 +20,10 @@ router.use(authentication);
 router.get('/indexer/configure', async (req, res) => {
   const userId = req.user.id;
   let indexerSettings = getIndexerSettings(userId);
+  const hasToken = Boolean(indexerSettings?.token && indexerSettings.token.trim().length > 0);
   if (indexerSettings && 'token' in indexerSettings) delete indexerSettings.token;
 
-  res.status(200).json(indexerSettings);
+  res.status(200).json({ ...(indexerSettings || {}), hasToken });
 });
 
 router.post('/indexer/configure', async (req, res) => {
@@ -30,11 +31,17 @@ router.post('/indexer/configure', async (req, res) => {
     res.status(400).json({ error: 'Request body is required' });
     return;
   }
+  const currentSettings = getIndexerSettings(req.user.id);
+  const incomingToken = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+  const token =
+    incomingToken && !incomingToken.includes('•') ? incomingToken : currentSettings?.token || '';
+
   const setting: IndexerSettings = {
     url: String(req.body?.url || '').trim(),
-    token: String(req.body?.token || '').trim(),
+    token,
     qualities: Array.isArray(req.body?.qualities) ? req.body.qualities.map(String) : [],
     languages: Array.isArray(req.body?.languages) ? req.body.languages.map(String) : [],
+    autoDownload: Boolean(req.body?.autoDownload),
   };
   await configureIndexer(req.user.id, setting);
   res.status(200).json({ message: 'Indexer settings configured successfully' });

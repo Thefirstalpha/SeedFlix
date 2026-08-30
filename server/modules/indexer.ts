@@ -8,64 +8,86 @@ import { addNotification } from './notification';
 import { readGlobalConfig } from './setting';
 import { buildDetailsRequest, proxyTmdb, TmdbType } from './tmdb';
 import { checkTorznabConnection, rssTorznab, searchTorznab } from './torznab';
-import { getUser } from './user';
+import { getUser, updateUser } from './user';
 import { getWishlist } from './wishlist';
 
-// Enum of quality options
-const QUALITY_MAP: Record<string, string> = {
-  '.2160p.': '2160p',
-  '.1080p.': '1080p',
-  '.720p.': '720p',
-  '.480p.': '480p',
-  '.sd.': '480p',
-};
+const QUALITY_PATTERNS: Array<{ regex: RegExp; value: string }> = [
+  { regex: /(?:^|[\s._\-[\]()])(?:2160p|2160|4k|uhd)(?:$|[\s._\-[\]()])/i, value: '2160p' },
+  { regex: /(?:^|[\s._\-[\]()])(?:1080p|1080i|1080)(?:$|[\s._\-[\]()])/i, value: '1080p' },
+  { regex: /(?:^|[\s._\-[\]()])(?:720p|720)(?:$|[\s._\-[\]()])/i, value: '720p' },
+  { regex: /(?:^|[\s._\-[\]()])(?:480p|480|576p|576|sd)(?:$|[\s._\-[\]()])/i, value: '480p' },
+];
 
-const SOURCE_MAP: Record<string, string> = {
-  '.web-dl.': 'WEB',
-  '.webrip.': 'WEBRip',
-  '.hdrip.': 'HDRip',
-  '.bdrip.': 'BDRip',
-  '.dvdrip.': 'DVDRip',
-  '.hdtv.': 'HDTV',
-  '.sdtv.': 'SDTV',
-  '.bluray.': 'BluRay',
-  '.web.': 'WEB',
-};
+const SOURCE_PATTERNS: Array<{ regex: RegExp; value: string }> = [
+  { regex: /(?:^|[\s._\-[\]()])(?:web-?dl|web)(?:$|[\s._\-[\]()])/i, value: 'WEB' },
+  { regex: /(?:^|[\s._\-[\]()])(?:webrip)(?:$|[\s._\-[\]()])/i, value: 'WEBRip' },
+  { regex: /(?:^|[\s._\-[\]()])(?:hdrip)(?:$|[\s._\-[\]()])/i, value: 'HDRip' },
+  { regex: /(?:^|[\s._\-[\]()])(?:bdrip|brrip)(?:$|[\s._\-[\]()])/i, value: 'BDRip' },
+  { regex: /(?:^|[\s._\-[\]()])(?:dvdrip|dvd)(?:$|[\s._\-[\]()])/i, value: 'DVDRip' },
+  { regex: /(?:^|[\s._\-[\]()])(?:hdtv)(?:$|[\s._\-[\]()])/i, value: 'HDTV' },
+  { regex: /(?:^|[\s._\-[\]()])(?:sdtv)(?:$|[\s._\-[\]()])/i, value: 'SDTV' },
+  { regex: /(?:^|[\s._\-[\]()])(?:bluray|remux)(?:$|[\s._\-[\]()])/i, value: 'BluRay' },
+];
 
-const LANGUAGE_MAP: Record<string, string> = {
-  '.vff.': 'VFF',
-  '.vf2.': 'VF2',
-  '.vfq.': 'VFQ',
-  '.vostfr.': 'VOSTFR',
-  '.truefrench.': 'VFF',
-  '.multi.': 'MULTI',
-};
+const LANGUAGE_PATTERNS: Array<{ regex: RegExp; value: string }> = [
+  { regex: /(?:^|[\s._\-[\]()])(?:vostfr|subfrench)(?:$|[\s._\-[\]()])/i, value: 'VOSTFR' },
+  { regex: /(?:^|[\s._\-[\]()])(?:truefrench|vff)(?:$|[\s._\-[\]()])/i, value: 'VFF' },
+  { regex: /(?:^|[\s._\-[\]()])(?:vf2)(?:$|[\s._\-[\]()])/i, value: 'VF2' },
+  { regex: /(?:^|[\s._\-[\]()])(?:vfq)(?:$|[\s._\-[\]()])/i, value: 'VFQ' },
+  { regex: /(?:^|[\s._\-[\]()])(?:multi)(?:$|[\s._\-[\]()])/i, value: 'MULTI' },
+  { regex: /(?:^|[\s._\-[\]()])(?:french|vf)(?:$|[\s._\-[\]()])/i, value: 'VF' },
+  { regex: /(?:^|[\s._\-[\]()])(?:vo|eng|english)(?:$|[\s._\-[\]()])/i, value: 'VO' },
+];
+
+export function normalizeQuality(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const val = String(raw).trim().toLowerCase();
+  if (['2160', '2160p', '4k', 'uhd'].includes(val)) return '2160p';
+  if (['1080', '1080p', '1080i'].includes(val)) return '1080p';
+  if (['720', '720p'].includes(val)) return '720p';
+  if (['480', '480p', '576', '576p', 'sd'].includes(val)) return '480p';
+  return extractQuality(val) || val;
+}
+
+export function normalizeLanguage(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const val = String(raw).trim();
+  const upper = val.toUpperCase();
+  if (['VOSTFR', 'SUBFRENCH'].includes(upper)) return 'VOSTFR';
+  if (['VFF', 'TRUEFRENCH'].includes(upper)) return 'VFF';
+  if (['VF2'].includes(upper)) return 'VF2';
+  if (['VFQ'].includes(upper)) return 'VFQ';
+  if (['MULTI'].includes(upper)) return 'MULTI';
+  if (['VF', 'FRENCH', 'FR'].includes(upper)) return 'VF';
+  if (['VO', 'ENG', 'ENGLISH', 'EN'].includes(upper)) return 'VO';
+  return extractLanguage(val) || upper;
+}
 
 export function extractQuality(title: string): string | null {
-  const normalized = String(title || '').toLowerCase();
-  for (const option in QUALITY_MAP) {
-    if (normalized.includes(option.toLowerCase())) {
-      return QUALITY_MAP[option];
+  const normalized = String(title || '');
+  for (const { regex, value } of QUALITY_PATTERNS) {
+    if (regex.test(normalized)) {
+      return value;
     }
   }
   return null;
 }
 
 export function extractSource(title: string): string | null {
-  const normalized = String(title || '').toLowerCase();
-  for (const option in SOURCE_MAP) {
-    if (normalized.includes(option.toLowerCase())) {
-      return SOURCE_MAP[option];
+  const normalized = String(title || '');
+  for (const { regex, value } of SOURCE_PATTERNS) {
+    if (regex.test(normalized)) {
+      return value;
     }
   }
   return null;
 }
 
 export function extractLanguage(title: string): string | null {
-  const normalized = String(title || '').toLowerCase();
-  for (const option in LANGUAGE_MAP) {
-    if (normalized.includes(option.toLowerCase())) {
-      return LANGUAGE_MAP[option];
+  const normalized = String(title || '');
+  for (const { regex, value } of LANGUAGE_PATTERNS) {
+    if (regex.test(normalized)) {
+      return value;
     }
   }
   return null;
@@ -143,21 +165,42 @@ export function getIndexerSettings(userId: number): IndexerSettings | null {
     token: raw.token !== undefined && raw.token !== null ? String(raw.token) : null,
     qualities: Array.isArray(raw.qualities) ? raw.qualities.map(String) : [],
     languages: Array.isArray(raw.languages) ? raw.languages.map(String) : [],
+    autoDownload: Boolean(raw.autoDownload),
   };
 }
 
 export async function configureIndexer(userId: number, settings: IndexerSettings) {
-  await checkTorznabConnection(settings).catch((error) => {
+  const currentSettings = getIndexerSettings(userId);
+  const effectiveToken =
+    settings.token && settings.token.trim() && !settings.token.includes('•')
+      ? settings.token.trim()
+      : currentSettings?.token || '';
+
+  const effectiveSettings: IndexerSettings = {
+    ...settings,
+    token: effectiveToken,
+  };
+
+  await checkTorznabConnection(effectiveSettings).catch((error) => {
     throw new ErrorCode(`Failed to connect to Indexer: ${error.message}`);
   });
-  return runInTransaction(async ({ writeStore }) => {
-    const user = getUser(userId);
-    if (!user) {
-      throw new Error('User not found');
-    }
-    user.settings.indexer = settings;
-    writeStore('user', userId, user);
-  });
+  const user = getUser(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  user.settings.indexer = effectiveSettings;
+  updateUser(user);
+}
+
+function normalizeTorznabAttrs(block: any): Array<{ name: string; value: any }> {
+  const attr = block?.['torznab:attr'];
+  if (Array.isArray(attr)) {
+    return attr;
+  }
+  if (attr) {
+    return [attr];
+  }
+  return [];
 }
 
 async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResult[]> {
@@ -174,11 +217,7 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
     const link = block?.link;
     const guidMatch = block.guid;
     const pubDateMatch = block?.pubDate;
-    const rawAttrs = Array.isArray(block?.['torznab:attr'])
-      ? block['torznab:attr']
-      : block?.['torznab:attr']
-        ? [block['torznab:attr']]
-        : [];
+    const rawAttrs = normalizeTorznabAttrs(block);
     const attributes = rawAttrs.reduce(
       (acc: Record<string, any>, item: { name: string; value: any }) => {
         if (item?.name) acc[item.name] = item.value;
@@ -197,8 +236,8 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
       sizeHuman: attributes.size ? humanFileSize(Number(attributes.size)) : undefined,
       seeders: attributes.seeders ? Number(attributes.seeders) : undefined,
       leechers: attributes.leechers ? Number(attributes.leechers) : undefined,
-      quality: attributes.quality || extractQuality(title) || undefined,
-      language: attributes.language || extractLanguage(title) || undefined,
+      quality: extractQuality(title) || normalizeQuality(attributes.quality) || undefined,
+      language: extractLanguage(title) || normalizeLanguage(attributes.language) || undefined,
       categories: attributes.categories
         ? String(attributes.categories)
             .split(',')
@@ -224,11 +263,7 @@ async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesRe
     const link = block?.link;
     const guidMatch = block.guid;
     const pubDateMatch = block?.pubDate;
-    const rawAttrs = Array.isArray(block?.['torznab:attr'])
-      ? block['torznab:attr']
-      : block?.['torznab:attr']
-        ? [block['torznab:attr']]
-        : [];
+    const rawAttrs = normalizeTorznabAttrs(block);
     const attributes = rawAttrs.reduce(
       (acc: Record<string, any>, item: { name: string; value: any }) => {
         if (item?.name) acc[item.name] = item.value;
@@ -247,8 +282,8 @@ async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesRe
       sizeHuman: attributes.size ? humanFileSize(Number(attributes.size)) : undefined,
       seeders: attributes.seeders ? Number(attributes.seeders) : undefined,
       leechers: attributes.leechers ? Number(attributes.leechers) : undefined,
-      quality: attributes.quality || extractQuality(title) || undefined,
-      language: attributes.language || extractLanguage(title) || undefined,
+      quality: extractQuality(title) || normalizeQuality(attributes.quality) || undefined,
+      language: extractLanguage(title) || normalizeLanguage(attributes.language) || undefined,
       categories: attributes.categories
         ? String(attributes.categories)
             .split(',')
@@ -383,35 +418,217 @@ export async function rejectAllIndexerResultsByGuids(
   }
 }
 
-async function extractWishlistItemsFromIndexerResults(
+export function matchesIndexerFilters(
+  result: IndexerMovieResult | IndexerSeriesResult,
+  settings?: IndexerSettings | null,
+): boolean {
+  if (!settings) return true;
+
+  const qualities = settings.qualities;
+  if (Array.isArray(qualities) && qualities.length > 0 && !qualities.includes('all')) {
+    const rawQuality = extractQuality(result.title) || result.quality;
+    const normalizedQuality = normalizeQuality(rawQuality);
+    if (!normalizedQuality) {
+      return false;
+    }
+    const targetQualities = qualities.map(normalizeQuality).filter(Boolean);
+    const hasMatchingQuality = targetQualities.includes(normalizedQuality);
+    if (!hasMatchingQuality) {
+      return false;
+    }
+  }
+
+  const languages = settings.languages;
+  if (Array.isArray(languages) && languages.length > 0 && !languages.includes('all')) {
+    const rawLanguage = extractLanguage(result.title) || result.language;
+    const normalizedLanguage = normalizeLanguage(rawLanguage);
+    if (!normalizedLanguage) {
+      return false;
+    }
+    const targetLanguages = languages.map(normalizeLanguage).filter(Boolean);
+    const hasMatchingLanguage = targetLanguages.includes(normalizedLanguage);
+    if (!hasMatchingLanguage) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export async function extractWishlistItemsFromIndexerResults(
   wishlist: WishListItem[],
   indexerMovies: IndexerMovieResult[],
   indexerSeries: IndexerSeriesResult[],
+  settings?: IndexerSettings | null,
 ): Promise<{ movies: IndexerMovieResult[]; series: IndexerSeriesResult[] }> {
   const moviesFounds: IndexerMovieResult[] = [];
   const seriesFounds: IndexerSeriesResult[] = [];
+
   for (const item of wishlist) {
     if (item.type === 'movie') {
-      const founds = indexerMovies.filter((m) => String(m.tmdbId) === String(item.tmdb));
-      if (founds.length > 0) {
-        moviesFounds.push(...founds);
+      const founds = indexerMovies.filter((m) => {
+        if (String(m.tmdbId) !== String(item.tmdb)) return false;
+        if (!matchesIndexerFilters(m, settings)) return false;
+        return true;
+      });
+      for (const found of founds) {
+        moviesFounds.push({
+          ...found,
+          matchedWishlist: {
+            tmdbId: item.tmdb,
+            type: 'movie',
+            autoGrab: Boolean(item.autoGrab),
+          },
+        });
       }
     } else if (item.type === 'series') {
-      const founds = indexerSeries.filter(
-        (s) =>
-          String(s.tmdbId) === String(item.tmdb) &&
-          (item.all_seasons === true ||
-            (item.seasons?.[s.seasonNumber || 1] !== undefined &&
-              (item.seasons[s.seasonNumber || 1].all_episodes === true ||
-                (s.episodeNumber !== undefined &&
-                  item.seasons[s.seasonNumber || 1].episodes.includes(s.episodeNumber || 1))))),
-      );
-      if (founds.length > 0) {
-        seriesFounds.push(...founds);
+      const founds = indexerSeries.filter((s) => {
+        if (String(s.tmdbId) !== String(item.tmdb)) return false;
+        if (!matchesIndexerFilters(s, settings)) return false;
+        if (item.all_seasons === true) return true;
+        const targetSeason = s.seasonNumber || 1;
+        const seasonConfig = item.seasons?.[targetSeason];
+        if (!seasonConfig) return false;
+        if (seasonConfig.all_episodes === true) return true;
+        return (
+          s.episodeNumber !== undefined &&
+          s.episodeNumber !== null &&
+          seasonConfig.episodes.includes(s.episodeNumber)
+        );
+      });
+
+      for (const found of founds) {
+        const isEntireSeason = !found.episodeNumber && Boolean(found.seasonNumber);
+        const isAllSeasons = !found.seasonNumber && !found.episodeNumber;
+        const targetSeason = found.seasonNumber || 1;
+        const seasonConfig = item.seasons?.[targetSeason];
+
+        let isAutoGrab = false;
+        if (item.all_seasons) {
+          isAutoGrab = Boolean(item.autoGrab);
+        } else if (seasonConfig) {
+          if (found.episodeNumber !== undefined && found.episodeNumber !== null) {
+            isAutoGrab = Boolean(
+              seasonConfig.autoGrab ||
+              seasonConfig.autoGrabEpisodes?.includes(found.episodeNumber) ||
+              item.autoGrab,
+            );
+          } else {
+            // Pack saison complet
+            isAutoGrab = Boolean(seasonConfig.autoGrab || item.autoGrab);
+          }
+        } else {
+          isAutoGrab = Boolean(item.autoGrab);
+        }
+
+        seriesFounds.push({
+          ...found,
+          matchedWishlist: {
+            tmdbId: item.tmdb,
+            type: 'series',
+            seasonNumber: found.seasonNumber ?? undefined,
+            episodeNumber: found.episodeNumber ?? undefined,
+            isEntireSeason,
+            isAllSeasons,
+            autoGrab: isAutoGrab,
+          },
+        });
       }
     }
   }
   return { movies: moviesFounds, series: seriesFounds };
+}
+
+export function purgeIndexerResultsForMedia(
+  userId: number,
+  tmdbId: number,
+  type: 'movie' | 'series',
+  seasonNumber?: number,
+  episodeNumber?: number,
+  downloadedGuid?: string,
+): void {
+  runInTransaction(({ writeStore }) => {
+    const moviesResult = (readStore('indexer-movie-result', userId) || []) as IndexerMovieResult[];
+    const seriesResult = (readStore('indexer-series-result', userId) ||
+      []) as IndexerSeriesResult[];
+    const blacklist = (readStore('indexer-blacklist', userId) || []) as string[];
+
+    const newBlacklist = new Set(blacklist);
+
+    if (downloadedGuid) {
+      newBlacklist.add(`${type}:${tmdbId}:${downloadedGuid}`);
+    }
+
+    if (type === 'movie') {
+      const remainingMovies: IndexerMovieResult[] = [];
+      for (const m of moviesResult) {
+        if (Number(m.tmdbId) === tmdbId || m.guid === downloadedGuid) {
+          if (m.guid) newBlacklist.add(`movie:${tmdbId}:${m.guid}`);
+        } else {
+          remainingMovies.push(m);
+        }
+      }
+      writeStore('indexer-movie-result', userId, remainingMovies);
+    } else {
+      const remainingSeries: IndexerSeriesResult[] = [];
+      for (const s of seriesResult) {
+        const matchesTmdb = Number(s.tmdbId) === tmdbId;
+        const matchesSeason = seasonNumber === undefined || s.seasonNumber === seasonNumber;
+        const matchesEpisode = episodeNumber === undefined || s.episodeNumber === episodeNumber;
+        const isDownloaded = s.guid === downloadedGuid;
+
+        if (isDownloaded || (matchesTmdb && matchesSeason && matchesEpisode)) {
+          if (s.guid) newBlacklist.add(`series:${tmdbId}:${s.guid}`);
+        } else {
+          remainingSeries.push(s);
+        }
+      }
+      writeStore('indexer-series-result', userId, remainingSeries);
+    }
+
+    writeStore('indexer-blacklist', userId, Array.from(newBlacklist));
+  });
+}
+
+export function resetIndexerStateForMedia(
+  userId: number,
+  tmdbId: number,
+  type?: 'movie' | 'series',
+  seasonNumber?: number,
+  episodeNumber?: number,
+): void {
+  runInTransaction(({ writeStore }) => {
+    const moviesResult = (readStore('indexer-movie-result', userId) || []) as IndexerMovieResult[];
+    const seriesResult = (readStore('indexer-series-result', userId) ||
+      []) as IndexerSeriesResult[];
+    const blacklist = (readStore('indexer-blacklist', userId) || []) as string[];
+
+    if (!type || type === 'movie') {
+      const remainingMovies = moviesResult.filter((m) => Number(m.tmdbId) !== tmdbId);
+      writeStore('indexer-movie-result', userId, remainingMovies);
+    }
+
+    if (!type || type === 'series') {
+      const remainingSeries = seriesResult.filter((s) => {
+        if (Number(s.tmdbId) !== tmdbId) return true;
+        if (seasonNumber !== undefined && s.seasonNumber !== seasonNumber) return true;
+        if (episodeNumber !== undefined && s.episodeNumber !== episodeNumber) return true;
+        return false;
+      });
+      writeStore('indexer-series-result', userId, remainingSeries);
+    }
+
+    // Reset blacklist entries for this media so future searches can find them again
+    const prefixMovie = `movie:${tmdbId}:`;
+    const prefixSeries = `series:${tmdbId}:`;
+    const filteredBlacklist = blacklist.filter((entry) => {
+      if ((!type || type === 'movie') && entry.startsWith(prefixMovie)) return false;
+      if ((!type || type === 'series') && entry.startsWith(prefixSeries)) return false;
+      return true;
+    });
+
+    writeStore('indexer-blacklist', userId, filteredBlacklist);
+  });
 }
 
 // Automated job to search wishlist items in the indexer and update their status
@@ -424,35 +641,46 @@ export async function processWishlistIndexer() {
         continue;
       }
       console.log(`Processing wishlist indexer for user ${user.username}`);
+      const indexerSettings = getIndexerSettings(user.id);
       const lastMovies = await getLastMovies(user.id);
       const lastSeries = await getLastSeries(user.id);
       const { movies: moviesFounds, series: seriesFounds } =
-        await extractWishlistItemsFromIndexerResults(wishlist, lastMovies, lastSeries);
+        await extractWishlistItemsFromIndexerResults(
+          wishlist,
+          lastMovies,
+          lastSeries,
+          indexerSettings,
+        );
 
       if (moviesFounds.length > 0 || seriesFounds.length > 0) {
         console.log(
           `User ${user.username} has ${moviesFounds.length} movies and ${seriesFounds.length} series found in indexer`,
         );
 
-        await runInTransaction(async ({ writeStore }) => {
+        let remainingMovies: IndexerMovieResult[] = [];
+        let remainingSeries: IndexerSeriesResult[] = [];
+
+        runInTransaction(({ writeStore }) => {
           // Read blacklist of movies and series already notified or blacklisted by the user to avoid duplicates
-          const blacklist = readStore('indexer-blacklist', user.id) || [];
+          const blacklist = (readStore('indexer-blacklist', user.id) || []) as string[];
 
           // Read current indexer results to avoid notifying about the same release multiple times if it stays in the last results for a while
-          const moviesResult = await getMoviesIndexerResult(user.id);
-          const seriesResult = await getSeriesIndexerResult(user.id);
+          const moviesResult = (readStore('indexer-movie-result', user.id) ||
+            []) as IndexerMovieResult[];
+          const seriesResult = (readStore('indexer-series-result', user.id) ||
+            []) as IndexerSeriesResult[];
 
           // Create keys for found movies and series to compare with blacklist and current results
           const moviesKey = new Set(moviesResult.map((m) => `movie:${m.tmdbId}:${m.guid}`));
           const seriesKey = new Set(seriesResult.map((s) => `series:${s.tmdbId}:${s.guid}`));
 
           // Filter found movies and series to only keep those not in blacklist and not already in current results
-          const remainingMovies: IndexerMovieResult[] = moviesFounds.filter(
+          remainingMovies = moviesFounds.filter(
             (m) =>
               !blacklist.includes(`movie:${m.tmdbId}:${m.guid}`) &&
               !moviesKey.has(`movie:${m.tmdbId}:${m.guid}`),
           );
-          const remainingSeries: IndexerSeriesResult[] = seriesFounds.filter(
+          remainingSeries = seriesFounds.filter(
             (s) =>
               !blacklist.includes(`series:${s.tmdbId}:${s.guid}`) &&
               !seriesKey.has(`series:${s.tmdbId}:${s.guid}`),
@@ -464,51 +692,93 @@ export async function processWishlistIndexer() {
           if (remainingSeries.length > 0) {
             writeStore('indexer-series-result', user.id, [...seriesResult, ...remainingSeries]);
           }
-
-          // Notifications pour les nouveaux résultats
-          const uniqueMovieTitles = [
-            ...new Set(remainingMovies.map((m) => m.title || `Film #${m.tmdbId}`)),
-          ];
-          const uniqueSeriesTitles = [
-            ...new Set(remainingSeries.map((s) => s.title || `Série #${s.tmdbId}`)),
-          ];
-
-          if (uniqueMovieTitles.length === 1) {
-            addNotification(user.id, {
-              title: 'Film disponible',
-              message: uniqueMovieTitles[0],
-              type: 'search',
-              data: { tmdbId: remainingMovies[0].tmdbId, type: 'movie' },
-            });
-          } else if (uniqueMovieTitles.length > 1) {
-            addNotification(user.id, {
-              title: `${uniqueMovieTitles.length} nouveaux films disponibles`,
-              message:
-                uniqueMovieTitles.slice(0, 3).join(', ') +
-                (uniqueMovieTitles.length > 3 ? `… (+${uniqueMovieTitles.length - 3})` : ''),
-              type: 'search',
-              data: { count: uniqueMovieTitles.length, type: 'movie' },
-            });
-          }
-
-          if (uniqueSeriesTitles.length === 1) {
-            addNotification(user.id, {
-              title: 'Épisode disponible',
-              message: uniqueSeriesTitles[0],
-              type: 'search',
-              data: { tmdbId: remainingSeries[0].tmdbId, type: 'series' },
-            });
-          } else if (uniqueSeriesTitles.length > 1) {
-            addNotification(user.id, {
-              title: `${uniqueSeriesTitles.length} nouveaux épisodes disponibles`,
-              message:
-                uniqueSeriesTitles.slice(0, 3).join(', ') +
-                (uniqueSeriesTitles.length > 3 ? `… (+${uniqueSeriesTitles.length - 3})` : ''),
-              type: 'search',
-              data: { count: uniqueSeriesTitles.length, type: 'series' },
-            });
-          }
         });
+
+        // Auto-Download (Auto-Grab) pour les favoris ayant l'option activée
+        const autoDownloadedMovieGuids = new Set<string>();
+        const autoDownloadedSeriesGuids = new Set<string>();
+
+        const { startDownload } = await import('./transmission');
+        for (const movie of remainingMovies) {
+          if (movie.guid && movie.matchedWishlist?.autoGrab) {
+            try {
+              await startDownload(user.id, movie.guid, 'movie', {
+                tmdbId: movie.tmdbId ? Number(movie.tmdbId) : undefined,
+              });
+              autoDownloadedMovieGuids.add(movie.guid);
+            } catch (dlErr) {
+              console.log(`Auto-download failed for movie "${movie.title}": ${dlErr}`);
+            }
+          }
+        }
+        for (const series of remainingSeries) {
+          if (series.guid && series.matchedWishlist?.autoGrab) {
+            try {
+              await startDownload(user.id, series.guid, 'series', {
+                tmdbId: series.tmdbId ? Number(series.tmdbId) : undefined,
+                seasonNumber: series.seasonNumber ?? undefined,
+                episodeNumber: series.episodeNumber ?? undefined,
+              });
+              autoDownloadedSeriesGuids.add(series.guid);
+            } catch (dlErr) {
+              console.log(`Auto-download failed for series "${series.title}": ${dlErr}`);
+            }
+          }
+        }
+
+        // Notifications pour les nouveaux résultats
+        const uniqueMovieTitles = [
+          ...new Set(remainingMovies.map((m) => m.title || `Film #${m.tmdbId}`)),
+        ];
+        const uniqueSeriesTitles = [
+          ...new Set(remainingSeries.map((s) => s.title || `Série #${s.tmdbId}`)),
+        ];
+
+        if (uniqueMovieTitles.length === 1) {
+          const isAutoDl = autoDownloadedMovieGuids.has(remainingMovies[0].guid || '');
+          addNotification(user.id, {
+            title: isAutoDl ? 'Téléchargement automatique lancé' : 'Film disponible',
+            message: uniqueMovieTitles[0],
+            type: isAutoDl ? 'success' : 'search',
+            data: { tmdbId: remainingMovies[0].tmdbId, type: 'movie' },
+          });
+        } else if (uniqueMovieTitles.length > 1) {
+          const autoDlCount = autoDownloadedMovieGuids.size;
+          addNotification(user.id, {
+            title:
+              autoDlCount > 0
+                ? `${autoDlCount} téléchargements automatiques de films lancés`
+                : `${uniqueMovieTitles.length} nouveaux films disponibles`,
+            message:
+              uniqueMovieTitles.slice(0, 3).join(', ') +
+              (uniqueMovieTitles.length > 3 ? `… (+${uniqueMovieTitles.length - 3})` : ''),
+            type: autoDlCount > 0 ? 'success' : 'search',
+            data: { count: uniqueMovieTitles.length, type: 'movie' },
+          });
+        }
+
+        if (uniqueSeriesTitles.length === 1) {
+          const isAutoDl = autoDownloadedSeriesGuids.has(remainingSeries[0].guid || '');
+          addNotification(user.id, {
+            title: isAutoDl ? 'Téléchargement automatique lancé' : 'Épisode disponible',
+            message: uniqueSeriesTitles[0],
+            type: isAutoDl ? 'success' : 'search',
+            data: { tmdbId: remainingSeries[0].tmdbId, type: 'series' },
+          });
+        } else if (uniqueSeriesTitles.length > 1) {
+          const autoDlCount = autoDownloadedSeriesGuids.size;
+          addNotification(user.id, {
+            title:
+              autoDlCount > 0
+                ? `${autoDlCount} téléchargements automatiques d'épisodes lancés`
+                : `${uniqueSeriesTitles.length} nouveaux épisodes disponibles`,
+            message:
+              uniqueSeriesTitles.slice(0, 3).join(', ') +
+              (uniqueSeriesTitles.length > 3 ? `… (+${uniqueSeriesTitles.length - 3})` : ''),
+            type: autoDlCount > 0 ? 'success' : 'search',
+            data: { count: uniqueSeriesTitles.length, type: 'series' },
+          });
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

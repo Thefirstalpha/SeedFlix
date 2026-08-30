@@ -3,6 +3,7 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { Switch } from "../ui/switch";
 import { useI18n } from "../../i18n/LanguageProvider";
 import { IndexerSettings } from "../../../../common/settings";
 import { configureIndexer } from "../../services/settingService";
@@ -15,8 +16,10 @@ export function SettingIndexer({ setup, onComplete }: Readonly<{ setup: boolean;
     const { t } = useI18n();
     const [indexerUrl, setIndexerUrl] = useState('');
     const [indexerToken, setIndexerToken] = useState('');
+    const [hasExistingToken, setHasExistingToken] = useState(false);
     const [indexerQualities, setIndexerQualities] = useState<string[]>(['all']);
     const [indexerLanguages, setIndexerLanguages] = useState<string[]>(['all']);
+    const [indexerAutoDownload, setIndexerAutoDownload] = useState(false);
     const [indexerMessage, setIndexerMessage] = useState<string | null>(null);
     const [indexerError, setIndexerError] = useState<string | null>(null);
     const [isIndexerSaving, setIsIndexerSaving] = useState(false);
@@ -34,10 +37,15 @@ export function SettingIndexer({ setup, onComplete }: Readonly<{ setup: boolean;
             token: indexerToken,
             qualities: indexerQualities,
             languages: indexerLanguages,
+            autoDownload: indexerAutoDownload,
         };
         try {
             await configureIndexer(indexerSettings);
             setIndexerMessage(t('settings.messages.configurationSaved'));
+            if (indexerToken) {
+                setHasExistingToken(true);
+                setIndexerToken('');
+            }
             onComplete?.();
         } catch (submitError) {
             setIndexerError(
@@ -61,9 +69,11 @@ export function SettingIndexer({ setup, onComplete }: Readonly<{ setup: boolean;
             if (response.ok) {
                 const data = await response.json();
                 setIndexerUrl(data.url || '');
-                setIndexerToken(data.token || '');
+                setIndexerToken('');
+                setHasExistingToken(Boolean(data.hasToken || data.token));
                 setIndexerQualities(data.qualities || ['all']);
                 setIndexerLanguages(data.languages || ['all']);
+                setIndexerAutoDownload(Boolean(data.autoDownload));
             }
         })
     }, [t]);
@@ -95,7 +105,7 @@ export function SettingIndexer({ setup, onComplete }: Readonly<{ setup: boolean;
                             <Input
                                 id="indexer-token"
                                 type="password"
-                                placeholder="••••••••••••••••"
+                                placeholder={hasExistingToken ? "••••••••••••••••" : t('settings.api.indexer.token')}
                                 value={indexerToken}
                                 onChange={(e) => setIndexerToken(e.target.value)}
                                 className="bg-slate-900 border-white/10 text-white"
@@ -151,6 +161,22 @@ export function SettingIndexer({ setup, onComplete }: Readonly<{ setup: boolean;
                                 </label>
                             ))}
                         </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3.5 rounded-lg bg-slate-900/60 border border-white/10 mt-2">
+                        <div className="space-y-0.5 pr-4">
+                            <Label htmlFor="indexer-autodownload" className="text-white font-medium cursor-pointer text-sm">
+                                Téléchargement automatique (Auto-Grab)
+                            </Label>
+                            <p className="text-xs text-white/60">
+                                Dès qu'une release de votre wishlist est détectée avec la qualité/langue souhaitée, elle est automatiquement envoyée à Transmission.
+                            </p>
+                        </div>
+                        <Switch
+                            id="indexer-autodownload"
+                            checked={indexerAutoDownload}
+                            onCheckedChange={setIndexerAutoDownload}
+                        />
                     </div>
 
                     {indexerMessage && <p className="text-sm text-emerald-300">{indexerMessage}</p>}

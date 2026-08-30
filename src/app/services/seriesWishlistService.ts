@@ -11,7 +11,12 @@ async function fetchJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function addToWishlist(tmdbId: number, season?: number, episode?: number): Promise<void> {
+export async function addToWishlist(
+  tmdbId: number,
+  season?: number,
+  episode?: number,
+  autoGrab?: boolean,
+): Promise<void> {
   await fetch(`${API_BASE_URL}/wishlist`, {
     method: 'POST',
     credentials: 'include',
@@ -23,6 +28,7 @@ export async function addToWishlist(tmdbId: number, season?: number, episode?: n
       tmdbId: tmdbId,
       season: season,
       episode: episode,
+      autoGrab: Boolean(autoGrab),
     }),
   });
 }
@@ -54,7 +60,7 @@ export async function getSeriesWishlist(): Promise<WishListItem[]> {
 
 export async function getSeriesWishlistStatus(seriesId: number): Promise<WishListItem | undefined> {
   try {
-    const data = await fetchJson<any>(`${BASE}/${seriesId}`);
+    const data = await fetchJson<any>(`${BASE}/${seriesId}?type=series`);
     if (data && typeof data === 'object' && 'exists' in data && typeof data.exists === 'boolean') {
       return data.exists && 'content' in data ? (data.content as WishListItem) : undefined;
     }

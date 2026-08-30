@@ -19,6 +19,7 @@ export function SettingFtp({ setup, onComplete }: Readonly<{ setup?: boolean; on
     const [ftpAuthRequired, setFtpAuthRequired] = useState(false);
     const [ftpUsername, setFtpUsername] = useState('');
     const [ftpPassword, setFtpPassword] = useState('');
+    const [hasExistingPassword, setHasExistingPassword] = useState(false);
     const [ftpRootFolder, setFtpRootFolder] = useState('/');
     const [ftpStorageLimit, setFtpStorageLimit] = useState('');
     const [ftpMessage, setFtpMessage] = useState<string | null>(null);
@@ -26,15 +27,17 @@ export function SettingFtp({ setup, onComplete }: Readonly<{ setup?: boolean; on
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
-        getFtpConfig().then((config) => {
+        getFtpConfig().then((config: any) => {
             if (!config) return;
             setFtpHost(config.host || '');
             setFtpPort(String(config.port || 21));
             setFtpSecure(config.secure ?? false);
             setFtpAuthRequired(config.authRequired ?? false);
             setFtpUsername(config.username || '');
+            setFtpPassword('');
+            setHasExistingPassword(Boolean(config.hasPassword || (config.authRequired && config.username)));
             setFtpRootFolder(config.rootFolder || '/');
-            setFtpStorageLimit(config.storageLimit !== null ? String(config.storageLimit) : '');
+            setFtpStorageLimit(config.storageLimit !== null && config.storageLimit !== undefined ? String(config.storageLimit) : '');
         }).catch(() => { });
     }, []);
 
@@ -56,6 +59,10 @@ export function SettingFtp({ setup, onComplete }: Readonly<{ setup?: boolean; on
                 storageLimit: ftpStorageLimit ? Number(ftpStorageLimit) : null,
             });
             setFtpMessage('Connexion réussie — configuration enregistrée.');
+            if (ftpPassword) {
+                setHasExistingPassword(true);
+                setFtpPassword('');
+            }
             onComplete?.();
         } catch (e: any) {
             setFtpError(e.message || 'Erreur lors de l\'enregistrement.');
@@ -105,7 +112,14 @@ export function SettingFtp({ setup, onComplete }: Readonly<{ setup?: boolean; on
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="ftp-password">Mot de passe</Label>
-                                    <Input id="ftp-password" type="password" value={ftpPassword} onChange={e => setFtpPassword(e.target.value)} className="bg-slate-900 border-white/10 text-white" />
+                                    <Input
+                                        id="ftp-password"
+                                        type="password"
+                                        placeholder={hasExistingPassword ? "••••••••••••••••" : ""}
+                                        value={ftpPassword}
+                                        onChange={e => setFtpPassword(e.target.value)}
+                                        className="bg-slate-900 border-white/10 text-white"
+                                    />
                                 </div>
                             </div>
                         ) : null}

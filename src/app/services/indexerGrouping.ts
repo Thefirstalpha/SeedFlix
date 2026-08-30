@@ -55,8 +55,7 @@ export function isCompleteSeriesPack(title: string): boolean {
     norm.includes('intégrale') ||
     norm.includes('complete series') ||
     norm.includes('complete.series') ||
-    /s\d{1,2}[\s._-]*to[\s._-]*s\d{1,2}/i.test(norm) ||
-    /s\d{1,2}[\s._-]*-[._-]*s\d{1,2}/i.test(norm) ||
+    /s\d{1,2}(?:[\s._]*to|[\s._]*-)[\s._]*s\d{1,2}/i.test(norm) ||
     /seasons?\s*\d+\s*-\s*\d+/i.test(norm)
   );
 }
@@ -167,16 +166,13 @@ function getEpisodeTitle(ep: EpisodeGroup, labels: GroupLabels): string {
     : `Épisode ${ep.episode}`;
 }
 
-function buildEpisodeModeSections(
+function collectEpisodeItems(
   items: IndexerSeriesResult[],
-  labels: GroupLabels,
-  formatCount: (count: number) => string,
-): SeriesSectionGroup[] {
-  const episodesMap = new Map<string, EpisodeGroup>();
-  const seasonPacksMap = new Map<number, IndexerSeriesResult[]>();
-  const completeSeriesItems: IndexerSeriesResult[] = [];
-  const unclassifiedItems: IndexerSeriesResult[] = [];
-
+  episodesMap: Map<string, EpisodeGroup>,
+  seasonPacksMap: Map<number, IndexerSeriesResult[]>,
+  completeSeriesItems: IndexerSeriesResult[],
+  unclassifiedItems: IndexerSeriesResult[],
+): void {
   for (const item of items) {
     const s = getItemSeason(item);
     const e = getItemEpisode(item);
@@ -197,6 +193,19 @@ function buildEpisodeModeSections(
       classifyFallbackItem(item, completeSeriesItems, unclassifiedItems);
     }
   }
+}
+
+function buildEpisodeModeSections(
+  items: IndexerSeriesResult[],
+  labels: GroupLabels,
+  formatCount: (count: number) => string,
+): SeriesSectionGroup[] {
+  const episodesMap = new Map<string, EpisodeGroup>();
+  const seasonPacksMap = new Map<number, IndexerSeriesResult[]>();
+  const completeSeriesItems: IndexerSeriesResult[] = [];
+  const unclassifiedItems: IndexerSeriesResult[] = [];
+
+  collectEpisodeItems(items, episodesMap, seasonPacksMap, completeSeriesItems, unclassifiedItems);
 
   const sections: SeriesSectionGroup[] = [];
   const sortedEpisodes = Array.from(episodesMap.values()).sort((a, b) => {
@@ -229,8 +238,13 @@ export function buildSeriesSections({
 }: BuildSeriesSectionsParams): SeriesSectionGroup[] {
   if (items.length === 0) return [];
 
-  const formatCount = (count: number) =>
-    labels.resultsCount ? labels.resultsCount(count) : `${count} version${count > 1 ? 's' : ''}`;
+  const formatCount = (count: number) => {
+    if (labels.resultsCount) {
+      return labels.resultsCount(count);
+    }
+    const plural = count > 1 ? 's' : '';
+    return `${count} version${plural}`;
+  };
 
   return mode === 'season'
     ? buildSeasonModeSections(items, labels, formatCount)

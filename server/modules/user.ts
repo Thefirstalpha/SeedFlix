@@ -1,5 +1,6 @@
 import { User, WebPushSubscription } from '../../common/user';
 import { createAuth } from './auth';
+import { decryptSecret, encryptSecret } from './crypto';
 import { db, readStore, runInTransaction } from './db';
 
 function normalizeWebPushSubscriptions(subscriptions: unknown): WebPushSubscription[] {
@@ -31,6 +32,20 @@ function normalizeDiscordNotification(discord: any): User['notifications']['disc
   return { webhookUrl: String(discord.webhookUrl) };
 }
 
+export function serializeUser(user: User): Record<string, any> {
+  const copy: any = JSON.parse(JSON.stringify(user));
+  if (copy.settings?.indexer?.token) {
+    copy.settings.indexer.token = encryptSecret(copy.settings.indexer.token);
+  }
+  if (copy.settings?.transmission?.password) {
+    copy.settings.transmission.password = encryptSecret(copy.settings.transmission.password);
+  }
+  if (copy.settings?.ftp?.password) {
+    copy.settings.ftp.password = encryptSecret(copy.settings.ftp.password);
+  }
+  return copy;
+}
+
 export const getUser = (id: number): User | null => {
   const user = readStore('user', id);
   if (!user) return null;
@@ -56,13 +71,14 @@ export const getUser = (id: number): User | null => {
           ? null
           : {
               url: String(user.settings.indexer?.url || ''),
-              token: String(user.settings.indexer?.token || ''),
+              token: decryptSecret(String(user.settings.indexer?.token || '')) || '',
               qualities: Array.isArray(user.settings.indexer?.qualities)
                 ? user.settings.indexer.qualities.map(String)
                 : [],
               languages: Array.isArray(user.settings.indexer?.languages)
                 ? user.settings.indexer.languages.map(String)
                 : [],
+              autoDownload: Boolean(user.settings.indexer?.autoDownload),
             },
       transmission:
         user.settings?.transmission === null
@@ -72,7 +88,7 @@ export const getUser = (id: number): User | null => {
               port: Number(user.settings.transmission?.port || 0),
               authRequired: Boolean(user.settings.transmission?.authRequired),
               username: String(user.settings.transmission?.username || ''),
-              password: String(user.settings.transmission?.password || ''),
+              password: decryptSecret(String(user.settings.transmission?.password || '')) || '',
               moviesFolder: String(user.settings.transmission?.moviesFolder || ''),
               seriesFolder: String(user.settings.transmission?.seriesFolder || ''),
             },
@@ -90,7 +106,7 @@ export const getUser = (id: number): User | null => {
                   : undefined,
               password:
                 user.settings.ftp?.password !== undefined
-                  ? String(user.settings.ftp?.password || '')
+                  ? decryptSecret(String(user.settings.ftp?.password || '')) || ''
                   : undefined,
               rootFolder: String(user.settings.ftp?.rootFolder || ''),
               storageLimit:
@@ -139,7 +155,7 @@ export const createUser = (
         },
       },
     };
-    writeStore('user', user.id, user);
+    writeStore('user', user.id, serializeUser(user));
     return { user, password };
   });
 };
@@ -154,6 +170,6 @@ export const deleteUser = (id: number) => {
 
 export const updateUser = (user: User) => {
   return runInTransaction(({ writeStore }) => {
-    writeStore('user', user.id, user);
+    writeStore('user', user.id, serializeUser(user));
   });
 };

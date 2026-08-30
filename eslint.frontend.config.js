@@ -25,6 +25,7 @@ export default [
 				React: "readonly",
 				HTMLDivElement: "readonly",
 				HTMLInputElement: "readonly",
+				HTMLTextAreaElement: "readonly",
 				HTMLFormElement: "readonly",
 				HTMLButtonElement: "readonly",
 				HTMLSelectElement: "readonly",
@@ -50,7 +51,10 @@ export default [
 				MouseEvent: "readonly",
 				KeyboardEvent: "readonly",
 				localStorage: "readonly",
-				Response: "readonly"
+				Response: "readonly",
+				EventSource: "readonly",
+				MessageEvent: "readonly",
+				NodeJS: "readonly"
 			}
 		},
 		plugins: {

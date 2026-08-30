@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { db, initDB, resetDatabase, writeStore } from '../../../server/modules/db';
+import { db, initDB, readStore, resetDatabase, writeStore } from '../../../server/modules/db';
 import {
   configureIndexer,
   extractEpisodeNumber,
@@ -7,9 +7,11 @@ import {
   extractQuality,
   extractSeasonNumber,
   extractSource,
+  extractWishlistItemsFromIndexerResults,
   getIndexerSettings,
   getMoviesIndexerResult,
   getSeriesIndexerResult,
+  matchesIndexerFilters,
   processWishlistIndexer,
   rejectAllIndexerResultsByGuids,
   rejectIndexerResultByGuid,
@@ -43,6 +45,14 @@ vi.mock('../../../server/modules/tmdb', async (importOriginal) => {
   };
 });
 
+vi.mock('../../../server/modules/transmission', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../server/modules/transmission')>();
+  return {
+    ...actual,
+    startDownload: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
 describe('indexer module', () => {
   let userId: number;
   const sampleSettings: IndexerSettings = {
@@ -69,6 +79,11 @@ describe('indexer module', () => {
       expect(extractQuality('Movie.Name.2024.2160p.mkv')).toBe('2160p');
       expect(extractQuality('Movie.Name.2024.720p.mkv')).toBe('720p');
       expect(extractQuality('Movie.Name.2024.SD.mkv')).toBe('480p');
+      expect(extractQuality('Movie Name 2024 1080p WEB-DL')).toBe('1080p');
+      expect(extractQuality('Movie Name (2024) [4K UHD]')).toBe('2160p');
+      expect(extractQuality('Movie Name 1080i HDTV')).toBe('1080p');
+      expect(extractQuality('Movie_Name_720p_x265')).toBe('720p');
+      expect(extractQuality('Movie.Name.576p.DVDRip')).toBe('480p');
       expect(extractQuality('Movie.Name.NoQuality')).toBeNull();
     });
 
@@ -77,6 +92,8 @@ describe('indexer module', () => {
       expect(extractSource('Movie.Name.2024.1080p.bluray.x264')).toBe('BluRay');
       expect(extractSource('Movie.Name.2024.1080p.webrip.x264')).toBe('WEBRip');
       expect(extractSource('Movie.Name.2024.hdtv.x264')).toBe('HDTV');
+      expect(extractSource('Movie Name 2024 REMUX 1080p')).toBe('BluRay');
+      expect(extractSource('Movie Name 2024 BDRip x264')).toBe('BDRip');
       expect(extractSource('Movie.NoSource')).toBeNull();
     });
 
@@ -85,6 +102,11 @@ describe('indexer module', () => {
       expect(extractLanguage('Movie.Name.2024.vff.1080p')).toBe('VFF');
       expect(extractLanguage('Movie.Name.2024.truefrench.1080p')).toBe('VFF');
       expect(extractLanguage('Movie.Name.2024.vostfr.1080p')).toBe('VOSTFR');
+      expect(extractLanguage('Movie Name 2024 TRUEFRENCH 1080p')).toBe('VFF');
+      expect(extractLanguage('Movie Name 2024 VFQ 1080p')).toBe('VFQ');
+      expect(extractLanguage('Movie Name 2024 SUBFRENCH 720p')).toBe('VOSTFR');
+      expect(extractLanguage('Movie Name 2024 FRENCH 1080p')).toBe('VF');
+      expect(extractLanguage('Movie Name 2024 VO 1080p')).toBe('VO');
       expect(extractLanguage('Movie.NoLanguage')).toBeNull();
     });
 
@@ -121,6 +143,40 @@ describe('indexer module', () => {
       const saved = getIndexerSettings(userId);
       expect(saved?.url).toBe(sampleSettings.url);
       expect(saved?.token).toBe(sampleSettings.token);
+    });
+
+    it('should preserve existing token when updating settings without re-providing token', async () => {
+      vi.mocked(torznabModule.checkTorznabConnection).mockResolvedValue({} as any);
+
+      await configureIndexer(userId, sampleSettings);
+
+      await configureIndexer(userId, {
+        url: 'https://indexer-updated.example.com',
+        token: '',
+        qualities: ['2160p'],
+        languages: ['VFF'],
+      });
+
+      const saved = getIndexerSettings(userId);
+      expect(saved?.url).toBe('https://indexer-updated.example.com');
+      expect(saved?.token).toBe('tok-123');
+      expect(saved?.qualities).toEqual(['2160p']);
+      expect(saved?.languages).toEqual(['VFF']);
+    });
+
+    it('should strictly reject 1080p and VOSTFR releases when 2160p and VFF are configured', () => {
+      const settings: IndexerSettings = {
+        url: 'https://indexer.example.com',
+        token: 'tok-123',
+        qualities: ['2160p'],
+        languages: ['VFF'],
+      };
+
+      expect(matchesIndexerFilters({ title: 'Movie.2024.1080p.VOSTFR.WEB-DL' } as any, settings)).toBe(false);
+      expect(matchesIndexerFilters({ title: 'Movie.2024.2160p.VOSTFR.WEB-DL' } as any, settings)).toBe(false);
+      expect(matchesIndexerFilters({ title: 'Movie.2024.1080p.VFF.WEB-DL' } as any, settings)).toBe(false);
+      expect(matchesIndexerFilters({ title: 'Movie.2024.2160p.VFF.WEB-DL' } as any, settings)).toBe(true);
+      expect(matchesIndexerFilters({ title: 'Movie.2024.4K.UHD.TRUEFRENCH' } as any, settings)).toBe(true);
     });
 
     it('should throw error when indexer connection check fails', async () => {
@@ -345,12 +401,336 @@ describe('indexer module', () => {
       expect(notifs.notifications.length).toBeGreaterThanOrEqual(1);
     });
 
+    it('should automatically start download when item has autoGrab enabled', async () => {
+      const user = createUser('userAutoDl').user;
+      user.settings.indexer = { ...sampleSettings };
+      updateUser(user);
+
+      writeStore('wishlist', user.id, [
+        {
+          tmdb: 550,
+          type: 'movie',
+          title: 'Fight Club',
+          original_title: 'Fight Club',
+          releaseDate: '1999-10-15',
+          addedAt: '2024-01-01',
+          autoGrab: true,
+        },
+      ]);
+
+      vi.mocked(torznabModule.rssTorznab).mockResolvedValue({
+        rss: {
+          channel: {
+            item: [
+              {
+                title: 'Fight.Club.1999.1080p.MULTI',
+                link: 'https://link-fc',
+                guid: 'guid-fc-auto',
+                'torznab:attr': [{ name: 'tmdbid', value: '550' }, { name: 'size', value: '1000' }],
+              },
+            ],
+          },
+        },
+      } as any);
+
+      const transmissionModule = await import('../../../server/modules/transmission');
+
+      await processWishlistIndexer();
+
+      expect(transmissionModule.startDownload).toHaveBeenCalledWith(
+        user.id,
+        'guid-fc-auto',
+        'movie',
+        expect.objectContaining({ tmdbId: 550 }),
+      );
+
+      const notifs = getNotifications(user.id);
+      expect(notifs.notifications.some((n) => n.title.includes('automatique'))).toBe(true);
+    });
+
+    it('should NOT automatically start download when item has autoGrab false (classic favorite)', async () => {
+      const user = createUser('userClassicDl').user;
+      user.settings.indexer = { ...sampleSettings };
+      updateUser(user);
+
+      writeStore('wishlist', user.id, [
+        {
+          tmdb: 550,
+          type: 'movie',
+          title: 'Fight Club',
+          original_title: 'Fight Club',
+          releaseDate: '1999-10-15',
+          addedAt: '2024-01-01',
+          autoGrab: false,
+        },
+      ]);
+
+      vi.mocked(torznabModule.rssTorznab).mockResolvedValue({
+        rss: {
+          channel: {
+            item: [
+              {
+                title: 'Fight.Club.1999.1080p.MULTI',
+                link: 'https://link-fc',
+                guid: 'guid-fc-classic',
+                'torznab:attr': [{ name: 'tmdbid', value: '550' }, { name: 'size', value: '1000' }],
+              },
+            ],
+          },
+        },
+      } as any);
+
+      const transmissionModule = await import('../../../server/modules/transmission');
+      vi.mocked(transmissionModule.startDownload).mockClear();
+
+      await processWishlistIndexer();
+
+      expect(transmissionModule.startDownload).not.toHaveBeenCalled();
+
+      const notifs = getNotifications(user.id);
+      expect(notifs.notifications.some((n) => n.title.includes('Film disponible'))).toBe(true);
+
+      const movieResults = await getMoviesIndexerResult(user.id);
+      expect(movieResults).toHaveLength(1);
+      expect(movieResults[0].guid).toBe('guid-fc-classic');
+    });
+
+    it('should remove wishlist item and blacklist release when auto-download occurs to prevent loops', async () => {
+      const user = createUser('userAutoDlWishlistRemoval').user;
+      user.settings.indexer = { ...sampleSettings };
+      user.settings.transmission = {
+        host: 'http://transmission.local',
+        port: 9091,
+        authRequired: false,
+        username: '',
+        password: '',
+        moviesFolder: '/movies',
+        seriesFolder: '/series',
+      };
+      updateUser(user);
+
+      writeStore('wishlist', user.id, [
+        { tmdb: 550, type: 'movie', title: 'Fight Club', original_title: 'Fight Club', releaseDate: '1999', addedAt: '2024-01-01', autoGrab: true },
+      ]);
+
+      vi.mocked(torznabModule.rssTorznab).mockResolvedValue({
+        rss: {
+          channel: {
+            item: [
+              {
+                title: 'Fight.Club.1999.1080p.MULTI',
+                link: 'https://link-fc',
+                guid: 'guid-fc-auto-1',
+                'torznab:attr': [{ name: 'tmdbid', value: '550' }, { name: 'size', value: '1000' }],
+              },
+            ],
+          },
+        },
+      } as any);
+
+      const transmissionModule = await import('../../../server/modules/transmission');
+      const { consumeWishlistItemForDownload } = await import('../../../server/modules/wishlist');
+      vi.mocked(transmissionModule.startDownload).mockImplementationOnce(async (uid, guid, type, opts) => {
+        await consumeWishlistItemForDownload(uid, guid, type as any, opts);
+      });
+
+      // Execute wishlist auto-download
+      await processWishlistIndexer();
+
+      // Wishlist item should be removed
+      const { getWishlistSync } = await import('../../../server/modules/wishlist');
+      const wishlistAfter = getWishlistSync(user.id);
+      expect(wishlistAfter).toHaveLength(0);
+
+      // Release must be blacklisted to prevent downloading again
+      const blacklist = (readStore('indexer-blacklist', user.id) || []) as string[];
+      expect(blacklist).toContain('movie:550:guid-fc-auto-1');
+
+      // Second run: no releases found because wishlist is empty
+      vi.mocked(torznabModule.rssTorznab).mockClear();
+      await processWishlistIndexer();
+      expect(torznabModule.rssTorznab).not.toHaveBeenCalled();
+    });
+
+    it('should handle multiple releases and auto-download failures in processWishlistIndexer', async () => {
+      const user = createUser('userMultiReleases').user;
+      user.settings.indexer = { ...sampleSettings };
+      updateUser(user);
+
+      writeStore('wishlist', user.id, [
+        { tmdb: 550, type: 'movie', title: 'Fight Club', original_title: 'Fight Club', releaseDate: '1999', addedAt: '2024-01-01', autoGrab: true },
+        { tmdb: 680, type: 'movie', title: 'Pulp Fiction', original_title: 'Pulp Fiction', releaseDate: '1994', addedAt: '2024-01-01', autoGrab: true },
+        { tmdb: 1399, type: 'series', title: 'Game of Thrones', original_title: 'Game of Thrones', releaseDate: '2011', addedAt: '2024-01-01', all_seasons: true, autoGrab: true },
+      ]);
+
+      vi.mocked(torznabModule.rssTorznab).mockImplementation(async (settings, type) => {
+        if (type === 'movie') {
+          return {
+            rss: {
+              channel: {
+                item: [
+                  { title: 'Fight.Club.1999.1080p.MULTI', link: 'l1', guid: 'g-fc', 'torznab:attr': [{ name: 'tmdbid', value: '550' }, { name: 'size', value: '100' }] },
+                  { title: 'Pulp.Fiction.1994.1080p.MULTI', link: 'l2', guid: 'g-pf', 'torznab:attr': [{ name: 'tmdbid', value: '680' }, { name: 'size', value: '100' }] },
+                ],
+              },
+            },
+          } as any;
+        } else {
+          return {
+            rss: {
+              channel: {
+                item: [
+                  { title: 'Game.of.Thrones.S01E01.1080p.MULTI', link: 'l3', guid: 'g-got-1', 'torznab:attr': [{ name: 'tmdbid', value: '1399' }, { name: 'size', value: '100' }] },
+                  { title: 'Game.of.Thrones.S01E02.1080p.MULTI', link: 'l4', guid: 'g-got-2', 'torznab:attr': [{ name: 'tmdbid', value: '1399' }, { name: 'size', value: '100' }] },
+                ],
+              },
+            },
+          } as any;
+        }
+      });
+
+      const transmissionModule = await import('../../../server/modules/transmission');
+      vi.mocked(transmissionModule.startDownload).mockRejectedValueOnce(new Error('Transmission disk full'));
+
+      await processWishlistIndexer();
+
+      const notifs = getNotifications(user.id);
+      expect(notifs.notifications.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should filter releases during wishlist processing based on user quality and language preferences', async () => {
+      const user = createUser('userQualityLangFilter').user;
+      user.settings.indexer = {
+        url: 'https://indexer.example.com',
+        token: 'tok-123',
+        qualities: ['1080p'],
+        languages: ['VFF'],
+      };
+      updateUser(user);
+
+      writeStore('wishlist', user.id, [
+        { tmdb: 550, type: 'movie', title: 'Fight Club', original_title: 'Fight Club', releaseDate: '1999', addedAt: '2024-01-01' },
+      ]);
+
+      // Release 1: 720p VFF (rejected due to quality)
+      // Release 2: 1080p MULTI (rejected due to language)
+      // Release 3: 1080p VFF (accepted)
+      vi.mocked(torznabModule.rssTorznab).mockResolvedValue({
+        rss: {
+          channel: {
+            item: [
+              { title: 'Fight.Club.1999.720p.VFF', link: 'l1', guid: 'g-720-vff', 'torznab:attr': [{ name: 'tmdbid', value: '550' }] },
+              { title: 'Fight.Club.1999.1080p.MULTI', link: 'l2', guid: 'g-1080-multi', 'torznab:attr': [{ name: 'tmdbid', value: '550' }] },
+              { title: 'Fight.Club.1999.1080p.VFF', link: 'l3', guid: 'g-1080-vff', 'torznab:attr': [{ name: 'tmdbid', value: '550' }] },
+            ],
+          },
+        },
+      } as any);
+
+      await processWishlistIndexer();
+
+      const movieResults = await getMoviesIndexerResult(user.id);
+      expect(movieResults).toHaveLength(1);
+      expect(movieResults[0].guid).toBe('g-1080-vff');
+    });
+
+    it('should allow all qualities and languages if "all" or empty is specified in settings', async () => {
+      const user = createUser('userAllFilter').user;
+      user.settings.indexer = {
+        url: 'https://indexer.example.com',
+        token: 'tok-123',
+        qualities: ['all'],
+        languages: [],
+      };
+      updateUser(user);
+
+      writeStore('wishlist', user.id, [
+        { tmdb: 550, type: 'movie', title: 'Fight Club', original_title: 'Fight Club', releaseDate: '1999', addedAt: '2024-01-01' },
+      ]);
+
+      vi.mocked(torznabModule.rssTorznab).mockResolvedValue({
+        rss: {
+          channel: {
+            item: [
+              { title: 'Fight.Club.1999.720p.VO', link: 'l1', guid: 'g-720-vo', 'torznab:attr': [{ name: 'tmdbid', value: '550' }] },
+            ],
+          },
+        },
+      } as any);
+
+      await processWishlistIndexer();
+
+      const movieResults = await getMoviesIndexerResult(user.id);
+      expect(movieResults).toHaveLength(1);
+      expect(movieResults[0].guid).toBe('g-720-vo');
+    });
+
     it('should update indexer process when pullAuto setting changes', () => {
       updateGlobalConfig({ pullAuto: true });
-      updateIndexerProcess();
+      expect(() => updateIndexerProcess()).not.toThrow();
 
       updateGlobalConfig({ pullAuto: false });
-      updateIndexerProcess();
+      expect(() => updateIndexerProcess()).not.toThrow();
+    });
+  });
+
+  describe('purgeIndexerResultsForMedia & resetIndexerStateForMedia', () => {
+    it('should purge results and add to blacklist for movie and series', async () => {
+      const { purgeIndexerResultsForMedia } = await import('../../../server/modules/indexer');
+
+      writeStore('indexer-movie-result', userId, [
+        { tmdbId: '550', guid: 'g-movie', title: 'Fight Club' } as any,
+      ]);
+      writeStore('indexer-series-result', userId, [
+        { tmdbId: '1399', guid: 'g-series-s1e1', title: 'GoT S1E1', seasonNumber: 1, episodeNumber: 1 } as any,
+        { tmdbId: '1399', guid: 'g-series-s2e1', title: 'GoT S2E1', seasonNumber: 2, episodeNumber: 1 } as any,
+      ]);
+
+      purgeIndexerResultsForMedia(userId, 550, 'movie', undefined, undefined, 'g-movie');
+      purgeIndexerResultsForMedia(userId, 1399, 'series', 1, 1, 'g-series-s1e1');
+
+      const remainingMovies = await getMoviesIndexerResult(userId);
+      const remainingSeries = await getSeriesIndexerResult(userId);
+
+      expect(remainingMovies).toHaveLength(0);
+      expect(remainingSeries).toHaveLength(1);
+      expect(remainingSeries[0].seasonNumber).toBe(2);
+    });
+
+    it('should reset indexer state and clean blacklist entries with resetIndexerStateForMedia', async () => {
+      const { resetIndexerStateForMedia } = await import('../../../server/modules/indexer');
+
+      writeStore('indexer-movie-result', userId, [
+        { tmdbId: '550', guid: 'g1', title: 'Fight Club' } as any,
+        { tmdbId: '680', guid: 'g2', title: 'Pulp Fiction' } as any,
+      ]);
+      writeStore('indexer-series-result', userId, [
+        { tmdbId: '1399', guid: 'g3', title: 'GoT S1E1', seasonNumber: 1, episodeNumber: 1 } as any,
+        { tmdbId: '1399', guid: 'g4', title: 'GoT S2E1', seasonNumber: 2, episodeNumber: 1 } as any,
+      ]);
+      writeStore('indexer-blacklist', userId, [
+        'movie:550:g1',
+        'movie:680:g2',
+        'series:1399:g3',
+        'series:1399:g4',
+      ]);
+
+      // Reset movie 550
+      resetIndexerStateForMedia(userId, 550, 'movie');
+      let movies = await getMoviesIndexerResult(userId);
+      expect(movies.find((m) => Number(m.tmdbId) === 550)).toBeUndefined();
+      expect(movies.find((m) => Number(m.tmdbId) === 680)).toBeDefined();
+
+      // Reset series 1399 season 1
+      resetIndexerStateForMedia(userId, 1399, 'series', 1, 1);
+      let series = await getSeriesIndexerResult(userId);
+      expect(series.find((s) => s.seasonNumber === 1)).toBeUndefined();
+      expect(series.find((s) => s.seasonNumber === 2)).toBeDefined();
+
+      // Reset without type
+      resetIndexerStateForMedia(userId, 680);
+      movies = await getMoviesIndexerResult(userId);
+      expect(movies).toHaveLength(0);
     });
   });
 });

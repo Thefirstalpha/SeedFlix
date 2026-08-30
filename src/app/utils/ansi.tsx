@@ -78,97 +78,98 @@ function get256Color(n: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
-function applySingleCode(state: AnsiStyleState, code: number) {
-  if (code === 0) {
-    state.bold = false;
-    state.dim = false;
-    state.italic = false;
-    state.underline = false;
-    state.color = undefined;
-    state.bgColor = undefined;
-    return;
-  }
-  if (code === 1) {
-    state.bold = true;
-    return;
-  }
-  if (code === 2) {
-    state.dim = true;
-    return;
-  }
-  if (code === 3) {
-    state.italic = true;
-    return;
-  }
-  if (code === 4) {
-    state.underline = true;
-    return;
-  }
-  if (code === 22) {
-    state.bold = false;
-    state.dim = false;
-    return;
-  }
-  if (code === 23) {
-    state.italic = false;
-    return;
-  }
-  if (code === 24) {
-    state.underline = false;
-    return;
-  }
-  if (code === 39) {
-    state.color = undefined;
-    return;
-  }
-  if (code === 49) {
-    state.bgColor = undefined;
-    return;
-  }
-
-  if (code >= 30 && code <= 37) {
-    state.color = STANDARD_FG_COLORS[code - 30];
-    return;
-  }
-  if (code >= 90 && code <= 97) {
-    state.color = BRIGHT_FG_COLORS[code - 90];
-    return;
-  }
-  if (code >= 40 && code <= 47) {
-    state.bgColor = STANDARD_BG_COLORS[code - 40];
-    return;
-  }
-  if (code >= 100 && code <= 107) {
-    state.bgColor = BRIGHT_BG_COLORS[code - 100];
-    return;
+function applyFormatCode(state: AnsiStyleState, code: number): boolean {
+  switch (code) {
+    case 0:
+      state.bold = false;
+      state.dim = false;
+      state.italic = false;
+      state.underline = false;
+      state.color = undefined;
+      state.bgColor = undefined;
+      return true;
+    case 1:
+      state.bold = true;
+      return true;
+    case 2:
+      state.dim = true;
+      return true;
+    case 3:
+      state.italic = true;
+      return true;
+    case 4:
+      state.underline = true;
+      return true;
+    case 22:
+      state.bold = false;
+      state.dim = false;
+      return true;
+    case 23:
+      state.italic = false;
+      return true;
+    case 24:
+      state.underline = false;
+      return true;
+    case 39:
+      state.color = undefined;
+      return true;
+    case 49:
+      state.bgColor = undefined;
+      return true;
+    default:
+      return false;
   }
 }
 
+function applyColorCode(state: AnsiStyleState, code: number): void {
+  if (code >= 30 && code <= 37) {
+    state.color = STANDARD_FG_COLORS[code - 30];
+  } else if (code >= 90 && code <= 97) {
+    state.color = BRIGHT_FG_COLORS[code - 90];
+  } else if (code >= 40 && code <= 47) {
+    state.bgColor = STANDARD_BG_COLORS[code - 40];
+  } else if (code >= 100 && code <= 107) {
+    state.bgColor = BRIGHT_BG_COLORS[code - 100];
+  }
+}
+
+function applySingleCode(state: AnsiStyleState, code: number): void {
+  if (!applyFormatCode(state, code)) {
+    applyColorCode(state, code);
+  }
+}
+
+function parseExtendedColor(codes: number[], index: number, isBg: boolean, state: AnsiStyleState): number {
+  if (codes[index + 1] === 5 && index + 2 < codes.length) {
+    const col = get256Color(codes[index + 2]);
+    if (isBg) state.bgColor = col;
+    else state.color = col;
+    return 2;
+  }
+  if (codes[index + 1] === 2 && index + 4 < codes.length) {
+    const col = `rgb(${codes[index + 2]}, ${codes[index + 3]}, ${codes[index + 4]})`;
+    if (isBg) state.bgColor = col;
+    else state.color = col;
+    return 4;
+  }
+  return 0;
+}
+
 function applyCodes(state: AnsiStyleState, rawCodes: string) {
-  const codes = rawCodes === '' ? [0] : rawCodes.split(';').map((c) => parseInt(c, 10) || 0);
+  const codes = rawCodes === '' ? [0] : rawCodes.split(';').map((c) => Number.parseInt(c, 10) || 0);
   for (let i = 0; i < codes.length; i++) {
     const code = codes[i];
     if (code === 38 && i + 1 < codes.length) {
-      if (codes[i + 1] === 5 && i + 2 < codes.length) {
-        state.color = get256Color(codes[i + 2]);
-        i += 2;
-        continue;
-      }
-      if (codes[i + 1] === 2 && i + 4 < codes.length) {
-        state.color = `rgb(${codes[i + 2]}, ${codes[i + 3]}, ${codes[i + 4]})`;
-        i += 4;
+      const advanced = parseExtendedColor(codes, i, false, state);
+      if (advanced > 0) {
+        i += advanced;
         continue;
       }
     }
     if (code === 48 && i + 1 < codes.length) {
-      if (codes[i + 1] === 5 && i + 2 < codes.length) {
-        state.bgColor = get256Color(codes[i + 2]);
-        i += 2;
-        continue;
-      }
-      if (codes[i + 1] === 2 && i + 4 < codes.length) {
-        state.bgColor = `rgb(${codes[i + 2]}, ${codes[i + 3]}, ${codes[i + 4]})`;
-        i += 4;
+      const advanced = parseExtendedColor(codes, i, true, state);
+      if (advanced > 0) {
+        i += advanced;
         continue;
       }
     }
@@ -215,7 +216,7 @@ export function parseAnsi(text: string): AnsiSpan[] {
       const chunk = text.slice(lastIndex, match.index);
       spans.push({ text: chunk, style: stateToStyle(state) });
     }
-    const rawCodes = match[1] !== undefined ? match[1] : match[2];
+    const rawCodes = match[1] ?? match[2];
     applyCodes(state, rawCodes);
     lastIndex = ANSI_REGEX.lastIndex;
   }
@@ -243,7 +244,7 @@ interface AnsiLineProps {
   highlightText?: string;
 }
 
-export const AnsiLine: React.FC<AnsiLineProps> = memo(({ line, lineNumber, highlightText }) => {
+export const AnsiLine: React.FC<Readonly<AnsiLineProps>> = memo(({ line, lineNumber, highlightText }) => {
   const spans = React.useMemo(() => parseAnsi(line), [line]);
 
   return (
@@ -255,30 +256,32 @@ export const AnsiLine: React.FC<AnsiLineProps> = memo(({ line, lineNumber, highl
       )}
       <span className="flex-1 whitespace-pre-wrap break-all select-text">
         {spans.map((span, idx) => {
+          const spanKey = `span-${idx}-${span.text.slice(0, 8)}`;
           if (!highlightText || highlightText.trim() === '') {
             return (
-              <span key={idx} style={span.style}>
+              <span key={spanKey} style={span.style}>
                 {span.text}
               </span>
             );
           }
 
-          const escaped = highlightText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const escaped = highlightText.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
           const parts = span.text.split(new RegExp(`(${escaped})`, 'gi'));
           return (
-            <span key={idx} style={span.style}>
-              {parts.map((part, pIdx) =>
-                part.toLowerCase() === highlightText.toLowerCase() ? (
+            <span key={spanKey} style={span.style}>
+              {parts.map((part, pIdx) => {
+                const partKey = `part-${pIdx}-${part.slice(0, 8)}`;
+                return part.toLowerCase() === highlightText.toLowerCase() ? (
                   <mark
-                    key={pIdx}
+                    key={partKey}
                     className="bg-yellow-400/30 text-yellow-200 rounded px-0.5 font-bold"
                   >
                     {part}
                   </mark>
                 ) : (
                   part
-                ),
-              )}
+                );
+              })}
             </span>
           );
         })}

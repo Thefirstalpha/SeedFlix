@@ -1,4 +1,4 @@
-import { SubmitEvent, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 
@@ -11,7 +11,12 @@ import {
     changePassword,
 } from '../../services/authService';
 
-export function SettingPassword({ setup, onComplete }: { setup: boolean; onComplete?: (() => void) | undefined }) {
+interface SettingPasswordProps {
+  setup: boolean;
+  onComplete?: () => void;
+}
+
+export function SettingPassword({ setup, onComplete }: Readonly<SettingPasswordProps>) {
 
     const { user, refresh } = useAuth();
     const { t } = useI18n();
@@ -23,7 +28,7 @@ export function SettingPassword({ setup, onComplete }: { setup: boolean; onCompl
 
 
 
-    const handlePasswordUpdate = async (event: SubmitEvent) => {
+    const handlePasswordUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setError(null);
         setMessage(null);

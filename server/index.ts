@@ -15,6 +15,7 @@ import { router as settingsRouter } from './routes/settings';
 import { router as ftpRouter } from './routes/ftp';
 import { router as notificationRouter } from './routes/notification';
 import { router as adminRouter } from './routes/admin';
+import { router as eventsRouter } from './routes/events';
 import { initDB } from './modules/db';
 import { startDownloadWatcher } from './modules/downloadWatcher';
 import { ErrorCode } from './modules/errors';
@@ -37,6 +38,11 @@ startDownloadWatcher();
 
 const app: import('express').Express = express();
 app.disable('x-powered-by');
+
+app.use((_req, res, next) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+  next();
+});
 
 app.use(express.static(clientDistDir));
 app.use((req, res, next) => {
@@ -68,6 +74,7 @@ app.use('/api', settingsRouter);
 app.use('/api', ftpRouter);
 app.use('/api', notificationRouter);
 app.use('/api', adminRouter);
+app.use('/api', eventsRouter);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof ErrorCode) {

@@ -6,6 +6,7 @@ export interface Series {
   language?: string;
   genre: string;
   poster: string;
+  plot?: string;
 }
 
 export interface SeriesSeason {
@@ -39,6 +40,8 @@ export interface SeriesDetails extends Series {
   creators: string[];
   networks: string[];
   seasons: SeriesSeason[];
+  castMembers?: Array<{ id: number; name: string; character: string; profile_path: string | null }>;
+  creatorsList?: Array<{ id: number; name: string; profile_path: string | null }>;
 }
 
 export interface TMDBSeries {

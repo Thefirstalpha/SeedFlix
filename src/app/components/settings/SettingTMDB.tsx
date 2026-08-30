@@ -16,7 +16,7 @@ export function SettingTMDB() {
     const [isTmdbSaving, setIsTmdbSaving] = useState(false);
 
 
-    const handleTmdbSave = async (event: React.FormEvent) => {
+    const handleTmdbSave = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setTmdbMessage(null);
         setTmdbError(null);

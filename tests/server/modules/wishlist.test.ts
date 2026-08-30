@@ -3,10 +3,13 @@ import { db, initDB, writeStore } from '../../../server/modules/db';
 import * as tmdbModule from '../../../server/modules/tmdb';
 import {
   addToWishlist,
+  consumeWishlistItemForDownload,
   deleteWishlist,
   deleteWishlistItems,
   getWishlist,
+  updateWishlistAutoGrab,
 } from '../../../server/modules/wishlist';
+import { readStore } from '../../../server/modules/db';
 
 // Mock TMDB proxy to avoid real network calls
 vi.mock('../../../server/modules/tmdb', async (importOriginal) => {
@@ -25,7 +28,7 @@ describe('wishlist module', () => {
   });
 
   beforeEach(() => {
-    db.prepare("DELETE FROM kv_store WHERE namespace = 'whishlist'").run();
+    db.prepare("DELETE FROM kv_store WHERE namespace IN ('wishlist', 'whishlist')").run();
     vi.clearAllMocks();
   });
 
@@ -383,6 +386,24 @@ describe('wishlist module', () => {
         episodes: [1, 2],
       });
     });
+
+    it('should read from legacy whishlist namespace if wishlist is empty', async () => {
+      writeStore('whishlist', 1, [
+        {
+          tmdb: 300,
+          type: 'movie',
+          title: 'Legacy Movie',
+          original_title: 'Legacy Movie',
+          releaseDate: '2020-01-01',
+          addedAt: '2020-01-01T00:00:00.000Z',
+        },
+      ]);
+
+      const list = await getWishlist(1);
+      expect(list).toHaveLength(1);
+      expect(list[0].tmdb).toBe(300);
+      expect(list[0].title).toBe('Legacy Movie');
+    });
   });
 
   describe('deleteWishlist', () => {
@@ -475,6 +496,286 @@ describe('wishlist module', () => {
     it('should handle empty or null items array gracefully', async () => {
       await deleteWishlistItems(1, []);
       expect(await getWishlist(1)).toEqual([]);
+    });
+
+    it('should reset indexer results and blacklist when an item is deleted', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleMovie);
+      await addToWishlist(1, 550, 'movie');
+
+      writeStore('indexer-movie-result', 1, [
+        { tmdbId: '550', guid: 'guid-550', title: 'Fight Club 1080p', link: 'http://' } as any,
+      ]);
+      writeStore('indexer-blacklist', 1, ['movie:550:guid-550', 'movie:999:guid-999']);
+
+      await deleteWishlist(1, 550, 'movie');
+
+      expect(await getWishlist(1)).toHaveLength(0);
+      const remainingResults = readStore('indexer-movie-result', 1) as any[];
+      expect(remainingResults).toHaveLength(0);
+      const remainingBlacklist = readStore('indexer-blacklist', 1) as string[];
+      expect(remainingBlacklist).toEqual(['movie:999:guid-999']);
+    });
+  });
+
+  describe('consumeWishlistItemForDownload', () => {
+    const sampleMovie = {
+      id: 550,
+      title: 'Fight Club',
+      original_title: 'Fight Club',
+      release_date: '1999-10-15',
+      genres: [{ id: 18, name: 'Drama' }],
+      vote_average: 8.433,
+      poster_path: '/poster.jpg',
+    };
+
+    const sampleSeries = {
+      id: 1399,
+      name: 'Game of Thrones',
+      original_name: 'Game of Thrones',
+      first_air_date: '2011-04-17',
+      genres: [{ id: 10765, name: 'Sci-Fi & Fantasy' }],
+      vote_average: 8.455,
+      poster_path: '/poster2.jpg',
+      seasons: [
+        { season_number: 1, episode_count: 10 },
+        { season_number: 2, episode_count: 10 },
+      ],
+    };
+
+    it('should consume a movie from wishlist and purge indexer results when downloaded', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleMovie);
+      await addToWishlist(1, 550, 'movie');
+
+      writeStore('indexer-movie-result', 1, [
+        { tmdbId: '550', guid: 'guid-movie-1', title: 'Fight Club 1080p', link: 'http://' } as any,
+      ]);
+
+      await consumeWishlistItemForDownload(1, 'guid-movie-1', 'movie');
+
+      expect(await getWishlist(1)).toHaveLength(0);
+      const remainingResults = readStore('indexer-movie-result', 1) as any[];
+      expect(remainingResults).toHaveLength(0);
+      const blacklist = readStore('indexer-blacklist', 1) as string[];
+      expect(blacklist).toContain('movie:550:guid-movie-1');
+    });
+
+    it('should explode an all_seasons series into remaining episodes when a single episode is downloaded', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series');
+
+      // Mock for TMDB details query inside consumeWishlistItemForDownload
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+
+      writeStore('indexer-series-result', 1, [
+        {
+          tmdbId: '1399',
+          guid: 'guid-s01e01',
+          title: 'Game of Thrones S01E01',
+          seasonNumber: 1,
+          episodeNumber: 1,
+          link: 'http://',
+        } as any,
+      ]);
+
+      await consumeWishlistItemForDownload(1, 'guid-s01e01', 'series');
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist).toHaveLength(1);
+      const item = wishlist[0];
+      expect(item.all_seasons).toBe(false);
+      expect(item.seasons[1].all_episodes).toBe(false);
+      expect(item.seasons[1].episodes).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      expect(item.seasons[2].all_episodes).toBe(true);
+    });
+
+    it('should remove a downloaded episode from a specific episode list in wishlist', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 1, 1);
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 1, 2);
+
+      await consumeWishlistItemForDownload(1, 'guid-s01e01', 'series', {
+        tmdbId: 1399,
+        seasonNumber: 1,
+        episodeNumber: 1,
+      });
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist).toHaveLength(1);
+      expect(wishlist[0].seasons[1].episodes).toEqual([2]);
+    });
+
+    it('should remove entire series when the last remaining episode is downloaded', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 1, 1);
+
+      await consumeWishlistItemForDownload(1, 'guid-s01e01', 'series', {
+        tmdbId: 1399,
+        seasonNumber: 1,
+        episodeNumber: 1,
+      });
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist).toHaveLength(0);
+    });
+
+    it('should remove full season from wishlist when a season pack is downloaded', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 1);
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 2);
+
+      await consumeWishlistItemForDownload(1, 'guid-s01-pack', 'series', {
+        tmdbId: 1399,
+        seasonNumber: 1,
+      });
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist).toHaveLength(1);
+      expect(Object.keys(wishlist[0].seasons)).toEqual(['2']);
+    });
+
+    it('should split all_seasons series into remaining seasons when a season pack is downloaded', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series');
+
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+
+      await consumeWishlistItemForDownload(1, 'guid-s01-pack', 'series', {
+        tmdbId: 1399,
+        seasonNumber: 1,
+      });
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist).toHaveLength(1);
+      expect(wishlist[0].all_seasons).toBe(false);
+      expect(Object.keys(wishlist[0].seasons)).toEqual(['2']);
+      expect(wishlist[0].seasons[2].all_episodes).toBe(true);
+    });
+
+    it('should remove entire series when full series download is consumed without season/episode', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series');
+
+      await consumeWishlistItemForDownload(1, 'guid-full-series', 'series', {
+        tmdbId: 1399,
+      });
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist).toHaveLength(0);
+    });
+
+    it('should split single season with all_episodes into remaining episode list when single episode downloaded', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 1);
+
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+
+      await consumeWishlistItemForDownload(1, 'guid-s01e01', 'series', {
+        tmdbId: 1399,
+        seasonNumber: 1,
+        episodeNumber: 1,
+      });
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist).toHaveLength(1);
+      expect(wishlist[0].seasons[1].all_episodes).toBe(false);
+      expect(wishlist[0].seasons[1].episodes).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    });
+
+    it('should purge indexer results when guid is given without matching tmdbId', async () => {
+      writeStore('indexer-movie-result', 1, [
+        { tmdbId: '999', guid: 'guid-unknown', title: 'Unknown Movie' } as any,
+      ]);
+
+      await consumeWishlistItemForDownload(1, 'guid-unknown', 'movie');
+
+      const movies = readStore('indexer-movie-result', 1) as any[];
+      expect(movies.find((m) => m.guid === 'guid-unknown')).toBeUndefined();
+    });
+  });
+
+  describe('autoGrab support and updateWishlistAutoGrab', () => {
+    const sampleMovie = {
+      id: 550,
+      title: 'Fight Club',
+      original_title: 'Fight Club',
+      release_date: '1999-10-15',
+      genres: [{ id: 18, name: 'Drama' }],
+      vote_average: 8.4,
+      poster_path: '/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg',
+    };
+
+    it('should default autoGrab to false when not specified', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleMovie);
+      await addToWishlist(1, 550, 'movie');
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist[0].autoGrab).toBe(false);
+    });
+
+    it('should save autoGrab = true when specified during creation', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleMovie);
+      await addToWishlist(1, 550, 'movie', undefined, undefined, true);
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist[0].autoGrab).toBe(true);
+    });
+
+    it('should update autoGrab flag on an existing item with updateWishlistAutoGrab', async () => {
+      mockedProxyTmdb.mockResolvedValueOnce(sampleMovie);
+      await addToWishlist(1, 550, 'movie', undefined, undefined, false);
+
+      const updated = updateWishlistAutoGrab(1, 550, 'movie', true);
+      expect(updated).toBe(true);
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist[0].autoGrab).toBe(true);
+
+      const toggledOff = updateWishlistAutoGrab(1, 550, 'movie', false);
+      expect(toggledOff).toBe(true);
+
+      const wishlistAfter = await getWishlist(1);
+      expect(wishlistAfter[0].autoGrab).toBe(false);
+    });
+
+    it('should support autoGrab per season and per episode', async () => {
+      const sampleSeries = {
+        id: 1399,
+        name: 'Game of Thrones',
+        original_name: 'Game of Thrones',
+        first_air_date: '2011-04-17',
+        genres: [{ id: 10765, name: 'Sci-Fi & Fantasy' }],
+        vote_average: 8.455,
+        poster_path: '/1XS1oqL89opfnbLl8WnZY1kv4Kd.jpg',
+      };
+
+      // Add season 1 with autoGrab = true
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 1, undefined, true);
+
+      // Add season 2 episode 3 with autoGrab = true
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 2, 3, true);
+
+      // Add season 2 episode 4 with autoGrab = false
+      mockedProxyTmdb.mockResolvedValueOnce(sampleSeries);
+      await addToWishlist(1, 1399, 'series', 2, 4, false);
+
+      const wishlist = await getWishlist(1);
+      expect(wishlist).toHaveLength(1);
+      expect(wishlist[0].seasons[1].autoGrab).toBe(true);
+      expect(wishlist[0].seasons[2].autoGrabEpisodes).toContain(3);
+      expect(wishlist[0].seasons[2].autoGrabEpisodes).not.toContain(4);
+
+      // Toggle season 1 autoGrab to false
+      updateWishlistAutoGrab(1, 1399, 'series', false, 1);
+      // Toggle episode 4 autoGrab to true
+      updateWishlistAutoGrab(1, 1399, 'series', true, 2, 4);
+
+      const wishlistAfter = await getWishlist(1);
+      expect(wishlistAfter[0].seasons[1].autoGrab).toBe(false);
+      expect(wishlistAfter[0].seasons[2].autoGrabEpisodes).toContain(4);
     });
   });
 });

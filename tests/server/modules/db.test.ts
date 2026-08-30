@@ -4,6 +4,7 @@ import {
   initDB,
   listNamespaces,
   readStore,
+  readStores,
   resetDatabase,
   runInTransaction,
   writeStore,
@@ -60,11 +61,29 @@ describe('db module', () => {
     expect(names).toContain('ns2');
   });
 
+  it('should read multiple stores by namespace via readStores', () => {
+    writeStore('multi-store-ns', 1, { user: 1 });
+    writeStore('multi-store-ns', 2, { user: 2 });
+
+    const allInNs = readStores('multi-store-ns');
+    expect(allInNs).toHaveLength(2);
+    expect(allInNs).toEqual(expect.arrayContaining([{ user: 1 }, { user: 2 }]));
+  });
+
   it('should reset database and create default admin user', () => {
     writeStore('dummy', 1, { data: 'test' });
     resetDatabase();
 
     expect(readStore('dummy', 1)).toBeNull();
+    const user = db.prepare('SELECT username FROM auth_users WHERE username = ?').get('admin') as any;
+    expect(user?.username).toBe('admin');
+  });
+
+  it('should initialize DB tables and ensure admin user in initDB', () => {
+    db.prepare("DELETE FROM auth_users WHERE username = 'admin'").run();
+    db.prepare("DELETE FROM kv_store WHERE namespace = 'user' AND user_id = 1").run();
+    initDB();
+
     const user = db.prepare('SELECT username FROM auth_users WHERE username = ?').get('admin') as any;
     expect(user?.username).toBe('admin');
   });

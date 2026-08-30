@@ -17,6 +17,11 @@ vi.mock('../../../server/modules/transmission', async (importOriginal) => {
     performTransmissionAction: vi.fn(),
     startDownload: vi.fn(),
     unmanageTorrentForUser: vi.fn(),
+    getTurtleMode: vi.fn(),
+    setTurtleMode: vi.fn(),
+    getTorrentFiles: vi.fn(),
+    setTorrentFilesWanted: vi.fn(),
+    moveTorrentQueue: vi.fn(),
   };
 });
 
@@ -28,6 +33,12 @@ describe('Route: /api/transmission', () => {
   const mockedGetStats = vi.mocked(transmissionModule.getTransmissionStats);
   const mockedPerformAction = vi.mocked(transmissionModule.performTransmissionAction);
   const mockedUnmanage = vi.mocked(transmissionModule.unmanageTorrentForUser);
+  const mockedStartDownload = vi.mocked(transmissionModule.startDownload);
+  const mockedGetTurtleMode = vi.mocked(transmissionModule.getTurtleMode);
+  const mockedSetTurtleMode = vi.mocked(transmissionModule.setTurtleMode);
+  const mockedGetTorrentFiles = vi.mocked(transmissionModule.getTorrentFiles);
+  const mockedSetTorrentFilesWanted = vi.mocked(transmissionModule.setTorrentFilesWanted);
+  const mockedMoveTorrentQueue = vi.mocked(transmissionModule.moveTorrentQueue);
 
   beforeAll(() => {
     initDB();
@@ -56,6 +67,44 @@ describe('Route: /api/transmission', () => {
     expect(res.status).toBe(200);
     expect(res.body.host).toBe('http://transmission.local');
     expect(res.body.password).toBeUndefined();
+    expect(res.body.hasPassword).toBe(true);
+  });
+
+  it('should preserve existing password when authRequired is true and password is empty or placeholder', async () => {
+    const { user } = createUser('transUserPreserve');
+    const cookie = createSessionCookie(user.id);
+    mockedGetSettings.mockReturnValueOnce({
+      host: 'http://transmission.local',
+      port: 9091,
+      authRequired: true,
+      username: 'admin',
+      password: 'existingSecretPassword',
+      moviesFolder: '/movies',
+      seriesFolder: '/series',
+    } as any);
+    mockedConfigure.mockResolvedValueOnce(undefined);
+
+    const res = await request(app)
+      .post('/api/transmission/configure')
+      .set('Cookie', cookie)
+      .send({
+        host: 'http://transmission.local',
+        port: 9091,
+        authRequired: true,
+        username: 'admin',
+        password: '',
+        moviesFolder: '/new-movies',
+        seriesFolder: '/new-series',
+      });
+
+    expect(res.status).toBe(200);
+    expect(mockedConfigure).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({
+        password: 'existingSecretPassword',
+        moviesFolder: '/new-movies',
+      }),
+    );
   });
 
   it('should save transmission settings via POST /api/transmission/configure', async () => {
@@ -105,6 +154,94 @@ describe('Route: /api/transmission', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.activeTorrentCount).toBe(2);
+  });
+
+  it('should get turtle mode via GET /api/transmission/turtle', async () => {
+    const { user } = createUser('transTurtleUser');
+    const cookie = createSessionCookie(user.id);
+    mockedGetTurtleMode.mockResolvedValueOnce({
+      altSpeedEnabled: true,
+      altSpeedDown: 50,
+      altSpeedUp: 10,
+      speedLimitDownEnabled: false,
+      speedLimitDown: 0,
+      speedLimitUpEnabled: false,
+      speedLimitUp: 0,
+    });
+
+    const res = await request(app).get('/api/transmission/turtle').set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(res.body.altSpeedEnabled).toBe(true);
+    expect(mockedGetTurtleMode).toHaveBeenCalledWith(user.id);
+  });
+
+  it('should set turtle mode via POST /api/transmission/turtle', async () => {
+    const { user } = createUser('transTurtleUser2');
+    const cookie = createSessionCookie(user.id);
+    mockedSetTurtleMode.mockResolvedValueOnce(true);
+
+    const res = await request(app)
+      .post('/api/transmission/turtle')
+      .set('Cookie', cookie)
+      .send({ enabled: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.altSpeedEnabled).toBe(true);
+    expect(mockedSetTurtleMode).toHaveBeenCalledWith(user.id, true);
+  });
+
+  it('should get torrent files via GET /api/transmission/torrent/:id/files', async () => {
+    const { user } = createUser('transFilesUser');
+    const cookie = createSessionCookie(user.id);
+    mockedGetTorrentFiles.mockResolvedValueOnce([
+      {
+        index: 0,
+        name: 'video.mkv',
+        bytesCompleted: 100,
+        length: 200,
+        wanted: true,
+        priority: 0,
+      },
+    ]);
+
+    const res = await request(app)
+      .get('/api/transmission/torrent/42/files')
+      .set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(res.body.files).toHaveLength(1);
+    expect(mockedGetTorrentFiles).toHaveBeenCalledWith(user.id, 42);
+  });
+
+  it('should set torrent files wanted/unwanted via POST /api/transmission/torrent/:id/files', async () => {
+    const { user } = createUser('transFilesUser2');
+    const cookie = createSessionCookie(user.id);
+    mockedSetTorrentFilesWanted.mockResolvedValueOnce(undefined);
+
+    const res = await request(app)
+      .post('/api/transmission/torrent/42/files')
+      .set('Cookie', cookie)
+      .send({ wanted: [0, 1], unwanted: [2] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(mockedSetTorrentFilesWanted).toHaveBeenCalledWith(user.id, 42, [0, 1], [2]);
+  });
+
+  it('should move torrent queue via POST /api/transmission/torrent/:id/queue', async () => {
+    const { user } = createUser('transQueueUser');
+    const cookie = createSessionCookie(user.id);
+    mockedMoveTorrentQueue.mockResolvedValueOnce(undefined);
+
+    const res = await request(app)
+      .post('/api/transmission/torrent/42/queue')
+      .set('Cookie', cookie)
+      .send({ action: 'top' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(mockedMoveTorrentQueue).toHaveBeenCalledWith(user.id, 42, 'top');
   });
 
   it('should resume torrent via POST /api/transmission/resume/:id', async () => {
@@ -157,6 +294,31 @@ describe('Route: /api/transmission', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
+  });
+
+  it('should add torrent with tmdb and season/episode options via POST /api/transmission/add', async () => {
+    const { user } = createUser('transAddUser');
+    const cookie = createSessionCookie(user.id);
+    mockedStartDownload.mockResolvedValueOnce(undefined);
+
+    const res = await request(app)
+      .post('/api/transmission/add')
+      .set('Cookie', cookie)
+      .send({
+        mediaType: 'series',
+        guid: 'guid-s01e01',
+        tmdbId: 1399,
+        seasonNumber: 1,
+        episodeNumber: 1,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+    expect(mockedStartDownload).toHaveBeenCalledWith(user.id, 'guid-s01e01', 'series', {
+      tmdbId: 1399,
+      seasonNumber: 1,
+      episodeNumber: 1,
+    });
   });
 });
 

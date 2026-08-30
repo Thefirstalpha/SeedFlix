@@ -14,10 +14,44 @@ import {
   rejectIndexerResult,
 } from '../services/indexerResultService';
 import { addTorrentToClient } from '../services/torrentService';
-import { getWishlist, removeMultipleFromWishlist } from '../services/wishlistService';
+import {
+  getWishlist,
+  removeMultipleFromWishlist,
+  updateWishlistAutoGrab,
+} from '../services/wishlistService';
 import { WishListItem } from '../../../common/wishlist';
 import { IndexerMovieResult, IndexerSeriesResult } from '../../../common/indexer';
 
+
+function formatGroupedSeries(seriesItems: WishListItem[]) {
+  return seriesItems
+    .map((item) => {
+      const seasonEntries = Object.entries(item.seasons)
+        .map(([key, s]) => ({ seasonNumber: Number(key), all_episodes: s.all_episodes, episodes: s.episodes }))
+        .sort((a, b) => a.seasonNumber - b.seasonNumber);
+      const seasonsAllEpisodes = seasonEntries.filter((s) => s.all_episodes);
+      const episodeEntries = seasonEntries
+        .flatMap((s) => s.episodes.map((ep) => ({ seasonNumber: s.seasonNumber, episodeNumber: ep })))
+        .sort((a, b) =>
+          a.seasonNumber !== b.seasonNumber
+            ? a.seasonNumber - b.seasonNumber
+            : a.episodeNumber - b.episodeNumber,
+        );
+      return {
+        tmdb: item.tmdb,
+        title: item.title,
+        poster_path: item.poster_path ?? '',
+        genre: item.genre,
+        rating: item.rating,
+        all_seasons: item.all_seasons,
+        releaseDate: item.releaseDate,
+        seasons: seasonsAllEpisodes,
+        episodes: episodeEntries,
+        autoGrab: item.autoGrab,
+      };
+    })
+    .sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+}
 
 export function WishList() {
   const navigate = useNavigate();
@@ -82,7 +116,6 @@ export function WishList() {
     setSelectedMovieIds([]);
     setSelectedSeriesIds([]);
   };
-
 
   const loadIndexerResults = async () => {
     try {
@@ -159,30 +192,7 @@ export function WishList() {
     setIsSeriesSelectionMode(false);
   };
 
-  const groupedSeries = seriesItems.map((item) => {
-    const seasonEntries = Object.entries(item.seasons)
-      .map(([key, s]) => ({ seasonNumber: Number(key), all_episodes: s.all_episodes, episodes: s.episodes }))
-      .sort((a, b) => a.seasonNumber - b.seasonNumber);
-    const seasonsAllEpisodes = seasonEntries.filter((s) => s.all_episodes);
-    const episodeEntries = seasonEntries
-      .flatMap((s) => s.episodes.map((ep) => ({ seasonNumber: s.seasonNumber, episodeNumber: ep })))
-      .sort((a, b) =>
-        a.seasonNumber !== b.seasonNumber
-          ? a.seasonNumber - b.seasonNumber
-          : a.episodeNumber - b.episodeNumber,
-      );
-    return {
-      tmdb: item.tmdb,
-      title: item.title,
-      poster_path: item.poster_path ?? '',
-      genre: item.genre,
-      rating: item.rating,
-      all_seasons: item.all_seasons,
-      releaseDate: item.releaseDate,
-      seasons: seasonsAllEpisodes,
-      episodes: episodeEntries,
-    };
-  }).sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+  const groupedSeries = formatGroupedSeries(seriesItems);
 
   const uniqueSeriesCount = groupedSeries.length;
   const movieCountLabel = t(
@@ -238,19 +248,39 @@ export function WishList() {
     const key = `${target.guid}:add`;
     setActionKey(key);
     try {
-      await addTorrentToClient(target.guid, type);
-      // Blacklister après ajout (best effort)
-      try {
-        await rejectIndexerResult(target.guid ?? '');
-      } catch {
-        // silent
-      }
+      const tmdbId = target.tmdbId ? Number(target.tmdbId) : target.matchedWishlist?.tmdbId;
+      const seasonNumber = 'seasonNumber' in target ? target.seasonNumber ?? target.matchedWishlist?.seasonNumber : target.matchedWishlist?.seasonNumber;
+      const episodeNumber = 'episodeNumber' in target ? target.episodeNumber ?? target.matchedWishlist?.episodeNumber : target.matchedWishlist?.episodeNumber;
+
+      await addTorrentToClient(target.guid, type, {
+        tmdbId,
+        seasonNumber: seasonNumber !== null && seasonNumber !== undefined ? Number(seasonNumber) : undefined,
+        episodeNumber: episodeNumber !== null && episodeNumber !== undefined ? Number(episodeNumber) : undefined,
+      });
+
       await Promise.allSettled([loadIndexerResults(), loadWishlist()]);
     } catch (error) {
       console.error('Error adding torrent from wishlist:', error);
     } finally {
       setActionKey(null);
     }
+  };
+
+  const handleToggleAutoGrab = async (
+    tmdbId: number,
+    type: 'movie' | 'series',
+    autoGrab: boolean,
+  ) => {
+    // Optimistic update
+    setWishlist((prev) =>
+      prev.map((item) => {
+        if (item.tmdb === tmdbId && item.type === type) {
+          return { ...item, autoGrab };
+        }
+        return item;
+      }),
+    );
+    await updateWishlistAutoGrab(tmdbId, type, autoGrab);
   };
 
   
@@ -341,6 +371,8 @@ export function WishList() {
                 return (
                   <div
                     key={movie.tmdb}
+                    role={isSelectionMode ? undefined : 'button'}
+                    tabIndex={isSelectionMode ? undefined : 0}
                     className={
                       isSelectionMode
                         ? undefined
@@ -351,8 +383,6 @@ export function WishList() {
                         navigate(`/movie/${movie.tmdb}`);
                       }
                     }}
-                    tabIndex={isSelectionMode ? -1 : 0}
-                    role="button"
                     onKeyDown={(e) => {
                       if (!isSelectionMode && (e.key === 'Enter' || e.key === ' ')) {
                         e.preventDefault();
@@ -366,6 +396,8 @@ export function WishList() {
                       year={movieYear}
                       rating={movie.rating ?? 0}
                       genre={movie.genre ?? ''}
+                      autoGrab={movie.autoGrab}
+                      onToggleAutoGrab={(val) => handleToggleAutoGrab(movie.tmdb, 'movie', val)}
                       targets={movieTargets}
                       type="movie"
                       actionKey={actionKey}
@@ -376,13 +408,6 @@ export function WishList() {
                       {isSelectionMode && (
                         <div
                           className="mb-2"
-                          onClick={(e) => e.stopPropagation()}
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.stopPropagation();
-                            }
-                          }}
                         >
                           <Checkbox
                             checked={selectedMovieIds.includes(movie.tmdb)}
@@ -470,6 +495,8 @@ export function WishList() {
                 return (
                   <div
                     key={group.tmdb}
+                    role={isSeriesSelectionMode ? undefined : 'button'}
+                    tabIndex={isSeriesSelectionMode ? undefined : 0}
                     className={
                       isSeriesSelectionMode
                         ? undefined
@@ -480,8 +507,6 @@ export function WishList() {
                         navigate(`/series/${group.tmdb}`);
                       }
                     }}
-                    tabIndex={isSeriesSelectionMode ? -1 : 0}
-                    role="button"
                     onKeyDown={(e) => {
                       if (!isSeriesSelectionMode && (e.key === 'Enter' || e.key === ' ')) {
                         e.preventDefault();
@@ -495,6 +520,8 @@ export function WishList() {
                       year={year}
                       genre={group.genre}
                       rating={group.rating}
+                      autoGrab={group.autoGrab}
+                      onToggleAutoGrab={(val) => handleToggleAutoGrab(group.tmdb, 'series', val)}
                       targets={groupTargets}
                       type="series"
                       actionKey={actionKey}
@@ -505,14 +532,6 @@ export function WishList() {
                       {isSeriesSelectionMode && (
                         <div
                           className="mb-2"
-                          onClick={(event) => event.stopPropagation()}
-                          tabIndex={0}
-                          role="presentation"
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.stopPropagation();
-                            }
-                          }}
                         >
                           <label className="inline-flex items-center gap-2 text-sm text-white/80">
                             <Checkbox

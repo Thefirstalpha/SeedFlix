@@ -128,5 +128,42 @@ describe('downloadWatcher module', () => {
     const notifications = getNotifications(user.id);
     expect(notifications.notifications).toHaveLength(0);
   });
+
+  it('should return early when user has no managed torrents or when transmission throws', async () => {
+    const { user } = createUser('watcherEmptyUser');
+    user.settings.transmission = {
+      host: 'http://transmission.local',
+      port: 9091,
+      authRequired: false,
+      username: '',
+      password: '',
+      moviesFolder: '/movies',
+      seriesFolder: '/series',
+    };
+    updateUser(user);
+
+    // Case 1: no managed torrents
+    startDownloadWatcher();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Case 2: managed torrent exists, but getDownloadsTransmission throws
+    writeStore('transmission.app-torrents', user.id, [
+      {
+        hash: 'hash-error',
+        link: 'https://torrent.link',
+        name: 'Error Movie',
+        addedAt: new Date().toISOString(),
+        completedNotifiedAt: null,
+      },
+    ]);
+    vi.spyOn(transmissionModule, 'getDownloadsTransmission').mockRejectedValueOnce(
+      new Error('Transmission down'),
+    );
+
+    startDownloadWatcher();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(getNotifications(user.id).notifications).toHaveLength(0);
+  });
 });
 
