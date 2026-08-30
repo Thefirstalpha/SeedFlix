@@ -205,17 +205,25 @@ function normalizeTorznabAttrs(block: any): Array<{ name: string; value: any }> 
 
 async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResult[]> {
   if (!xmlBody.rss?.channel) {
+  if (!xmlBody?.rss?.channel) {
     throw new ErrorCode('Invalid Indexer response format');
   }
 
   const itemBlocks = xmlBody.rss?.channel?.item || [];
+  const rawItemBlocks = xmlBody.rss?.channel?.item || [];
+  const itemBlocks = Array.isArray(rawItemBlocks) ? rawItemBlocks : [rawItemBlocks];
 
   let results: IndexerMovieResult[] = [];
 
   for (const block of itemBlocks) {
+    if (!block) continue;
     const title = block?.title;
     const link = block?.link;
     const guidMatch = block.guid;
+    const guidMatch =
+      typeof block?.guid === 'object' && block?.guid !== null
+        ? block.guid['#text'] || String(block.guid)
+        : block?.guid;
     const pubDateMatch = block?.pubDate;
     const rawAttrs = normalizeTorznabAttrs(block);
     const attributes = rawAttrs.reduce(
@@ -230,6 +238,7 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
       title: String(title ?? ''),
       link: typeof link === 'string' ? link : '',
       guid: guidMatch,
+      guid: typeof guidMatch === 'string' ? guidMatch : guidMatch ? String(guidMatch) : undefined,
       pubDate: typeof pubDateMatch === 'string' ? pubDateMatch : undefined,
       tmdbId: attributes.tmdbid || undefined,
       size: attributes.size ? Number(attributes.size) : undefined,
@@ -251,17 +260,25 @@ async function parseMovieIndexerResponse(xmlBody: any): Promise<IndexerMovieResu
 
 async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesResult[]> {
   if (!xmlBody.rss?.channel) {
+  if (!xmlBody?.rss?.channel) {
     throw new ErrorCode('Invalid Indexer response format');
   }
 
   const itemBlocks = xmlBody.rss?.channel?.item || [];
+  const rawItemBlocks = xmlBody.rss?.channel?.item || [];
+  const itemBlocks = Array.isArray(rawItemBlocks) ? rawItemBlocks : [rawItemBlocks];
 
   let results: IndexerSeriesResult[] = [];
 
   for (const block of itemBlocks) {
+    if (!block) continue;
     const title = block?.title;
     const link = block?.link;
     const guidMatch = block.guid;
+    const guidMatch =
+      typeof block?.guid === 'object' && block?.guid !== null
+        ? block.guid['#text'] || String(block.guid)
+        : block?.guid;
     const pubDateMatch = block?.pubDate;
     const rawAttrs = normalizeTorznabAttrs(block);
     const attributes = rawAttrs.reduce(
@@ -276,6 +293,7 @@ async function parseSeriesIndexerResponse(xmlBody: any): Promise<IndexerSeriesRe
       title: typeof title === 'string' ? title : '',
       link: typeof link === 'string' ? link : '',
       guid: guidMatch,
+      guid: typeof guidMatch === 'string' ? guidMatch : guidMatch ? String(guidMatch) : undefined,
       pubDate: typeof pubDateMatch === 'string' ? pubDateMatch : undefined,
       tmdbId: attributes.tmdbid || undefined,
       size: attributes.size ? Number(attributes.size) : undefined,
