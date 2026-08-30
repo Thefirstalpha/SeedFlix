@@ -27,10 +27,13 @@ LABEL org.opencontainers.image.title="SeedFlix"
 LABEL org.opencontainers.image.description="SeedFlix full-stack app (React + Express)"
 LABEL org.opencontainers.image.version="${IMAGE_TAG}"
 
+COPY package*.json ./
 # Install ffmpeg for on-the-fly media remuxing/transcoding in production/Kubernetes.
 # Remove npm/npx afterward: the app runs with node only in production.
 RUN apk add --no-cache ffmpeg \
 	&& npm install -g npm@"${NPM_VERSION}" --ignore-scripts \
+	&& npm ci --omit=dev --ignore-scripts \
+	&& npm cache clean --force \
 	&& rm -rf /usr/local/lib/node_modules/npm \
 	&& rm -f /usr/local/bin/npm /usr/local/bin/npx
 
