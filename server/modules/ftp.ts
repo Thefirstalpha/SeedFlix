@@ -1,7 +1,40 @@
 import { Client, FileInfo } from 'basic-ftp';
-import { Readable, Writable } from 'node:stream';
+import { spawn } from 'node:child_process';
+import { Readable, Transform, Writable } from 'node:stream';
 import { FtpSettings } from '../../common/settings';
 import { getUser, updateUser } from './user';
+
+class ByteLimitTransform extends Transform {
+  private bytesWritten = 0;
+  constructor(private maxBytes: number) {
+    super();
+  }
+
+  _transform(
+    chunk: Buffer,
+    _encoding: string,
+    callback: (error?: Error | null, data?: any) => void,
+  ) {
+    if (this.bytesWritten >= this.maxBytes) {
+      callback(null, null);
+      this.push(null);
+      return;
+    }
+    const remaining = this.maxBytes - this.bytesWritten;
+    if (chunk.length <= remaining) {
+      this.bytesWritten += chunk.length;
+      callback(null, chunk);
+      if (this.bytesWritten >= this.maxBytes) {
+        this.push(null);
+      }
+    } else {
+      const slice = chunk.subarray(0, remaining);
+      this.bytesWritten += slice.length;
+      callback(null, slice);
+      this.push(null);
+    }
+  }
+}
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -159,13 +192,139 @@ export async function getLastModified(userId: number, remotePath: string): Promi
   return withClient(userId, (client) => client.lastMod(remotePath));
 }
 
-/** Télécharge un fichier distant vers un stream de sortie. */
+/** Télécharge un fichier distant vers un stream de sortie (avec support de l'offset startAt et de la limitation maxBytes). */
 export async function downloadToStream(
   userId: number,
   remotePath: string,
   dest: Writable,
+  startAt = 0,
+  maxBytes?: number,
 ): Promise<void> {
-  await withClient(userId, (client) => client.downloadTo(dest, remotePath));
+  await withClient(userId, async (client) => {
+    const onClose = () => {
+      try {
+        client.close();
+      } catch {
+        // ignore
+      }
+    };
+    dest.once('close', onClose);
+
+    try {
+      if (maxBytes !== undefined && maxBytes > 0) {
+        const limiter = new ByteLimitTransform(maxBytes);
+        limiter.pipe(dest, { end: true });
+        await client.downloadTo(limiter, remotePath, startAt);
+      } else {
+        await client.downloadTo(dest, remotePath, startAt);
+      }
+    } catch (err: any) {
+      if (dest.destroyed || (dest as any).closed || dest.writableEnded) {
+        return;
+      }
+      throw err;
+    } finally {
+      dest.removeListener('close', onClose);
+    }
+  });
+}
+
+/** Transcode ou remuxe un flux multimédia distant vers MP4 fragmenté à la volée via FFmpeg. */
+export async function transcodeToStream(
+  userId: number,
+  remotePath: string,
+  dest: Writable,
+  options?: { startTime?: number; forceTranscode?: boolean },
+): Promise<void> {
+  const startTime = options?.startTime && options.startTime > 0 ? options.startTime : 0;
+  const forceTranscode = Boolean(options?.forceTranscode);
+
+  const ffmpegArgs: string[] = [
+    '-loglevel',
+    'error',
+    '-analyzeduration',
+    '100M',
+    '-probesize',
+    '50M',
+  ];
+
+  if (startTime > 0) {
+    ffmpegArgs.push('-ss', String(startTime));
+  }
+
+  ffmpegArgs.push('-i', 'pipe:0', '-map', '0:v:0?', '-map', '0:a:0?', '-sn');
+
+  if (forceTranscode) {
+    ffmpegArgs.push(
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-tune',
+      'zerolatency',
+      '-crf',
+      '23',
+    );
+  } else {
+    ffmpegArgs.push('-c:v', 'copy');
+  }
+
+  ffmpegArgs.push(
+    '-c:a',
+    'aac',
+    '-b:a',
+    '192k',
+    '-ac',
+    '2',
+    '-f',
+    'mp4',
+    '-movflags',
+    'frag_keyframe+empty_moov+default_base_moof',
+    'pipe:1',
+  );
+
+  const ffmpeg = spawn('ffmpeg', ffmpegArgs, { stdio: ['pipe', 'pipe', 'pipe'] });
+
+  ffmpeg.stdout.pipe(dest);
+
+  let ffmpegErr = '';
+  ffmpeg.stderr.on('data', (d) => {
+    ffmpegErr += d.toString();
+  });
+
+  const cleanup = () => {
+    try {
+      if (!ffmpeg.killed) ffmpeg.kill('SIGKILL');
+    } catch {
+      // ignore
+    }
+  };
+
+  dest.once('close', cleanup);
+  dest.once('error', cleanup);
+
+  try {
+    await withClient(userId, async (client) => {
+      const onClientClose = () => {
+        try {
+          client.close();
+        } catch {
+          // ignore
+        }
+      };
+      dest.once('close', onClientClose);
+      try {
+        await client.downloadTo(ffmpeg.stdin, remotePath);
+      } finally {
+        dest.removeListener('close', onClientClose);
+      }
+    });
+  } catch (err: any) {
+    cleanup();
+    if (!dest.destroyed && !(dest as any).closed && !dest.writableEnded) {
+      throw new Error(`Transcode error: ${ffmpegErr || err.message}`);
+    }
+  }
 }
 
 /** Upload depuis un stream vers un chemin distant. */

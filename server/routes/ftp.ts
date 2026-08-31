@@ -17,6 +17,7 @@ import {
   rename,
   testFtpConnection,
   testFtpConnectionWithSettings,
+  transcodeToStream,
   uploadFromStream,
 } from '../modules/ftp';
 
@@ -234,6 +235,26 @@ function getMimeType(filename: string): string {
 
 // ─── Transfert & Streaming ───────────────────────────────────────────────────
 
+router.head('/ftp/stream', async (req, res) => {
+  const path = typeof req.query.path === 'string' ? req.query.path.trim() : '';
+  if (!path) {
+    res.status(400).end();
+    return;
+  }
+  const filename = path.split('/').pop() || 'file';
+  const mimeType = getMimeType(filename);
+  try {
+    const size = await getFileSize(req.user.id, path);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Length', size);
+    res.status(200).end();
+  } catch {
+    res.status(500).end();
+  }
+});
+
 router.get('/ftp/stream', async (req, res) => {
   const path = typeof req.query.path === 'string' ? req.query.path.trim() : '';
   if (!path) {
@@ -242,20 +263,112 @@ router.get('/ftp/stream', async (req, res) => {
   }
   const filename = path.split('/').pop() || 'file';
   const mimeType = getMimeType(filename);
-  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
-  res.setHeader('Content-Type', mimeType);
-  res.setHeader('Accept-Ranges', 'bytes');
+
+  let fileSize: number | null = null;
   try {
-    const size = await getFileSize(req.user.id, path);
-    res.setHeader('Content-Length', size);
+    fileSize = await getFileSize(req.user.id, path);
   } catch {
-    // taille non disponible, on continue sans header
+    // Taille non disponible, on continue en mode stream direct
   }
+
+  const rangeHeader = req.headers.range;
+
+  if (rangeHeader && fileSize !== null && fileSize > 0) {
+    const parts = rangeHeader
+      .replace(/bytes=/, '')
+      .trim()
+      .split('-');
+    let start = parseInt(parts[0], 10);
+    let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+    if (isNaN(start)) {
+      start = fileSize - end;
+      end = fileSize - 1;
+    }
+
+    if (isNaN(end) || end >= fileSize) {
+      end = fileSize - 1;
+    }
+
+    if (start < 0 || start > end || start >= fileSize) {
+      res.setHeader('Content-Range', `bytes */${fileSize}`);
+      res.status(416).end();
+      return;
+    }
+
+    const chunkSize = end - start + 1;
+
+    res.status(206);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+    res.setHeader('Content-Length', chunkSize);
+
+    try {
+      await downloadToStream(req.user.id, path, res, start, chunkSize);
+    } catch (err: any) {
+      if (!res.headersSent) res.status(500).json({ ok: false, error: err.message });
+    }
+  } else {
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Accept-Ranges', 'bytes');
+    if (fileSize !== null) {
+      res.setHeader('Content-Length', fileSize);
+    }
+
+    try {
+      await downloadToStream(req.user.id, path, res, 0);
+    } catch (err: any) {
+      if (!res.headersSent) res.status(500).json({ ok: false, error: err.message });
+    }
+  }
+});
+
+router.get('/ftp/transcode', async (req, res) => {
+  const path = typeof req.query.path === 'string' ? req.query.path.trim() : '';
+  if (!path) {
+    res.status(400).json({ error: 'path requis' });
+    return;
+  }
+  const startTime = req.query.startTime ? Number(req.query.startTime) : 0;
+  const force = req.query.force === 'true';
+  const filename = path.split('/').pop() || 'video';
+  const baseName = filename.replace(/\.[^/.]+$/, '');
+
+  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(baseName)}.mp4"`);
+  res.setHeader('Content-Type', 'video/mp4');
+
   try {
-    await downloadToStream(req.user.id, path, res);
+    await transcodeToStream(req.user.id, path, res, {
+      startTime: isNaN(startTime) ? 0 : startTime,
+      forceTranscode: force,
+    });
   } catch (err: any) {
     if (!res.headersSent) res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+router.get('/ftp/playlist.m3u', (req, res) => {
+  const path = typeof req.query.path === 'string' ? req.query.path.trim() : '';
+  if (!path) {
+    res.status(400).json({ error: 'path requis' });
+    return;
+  }
+  const filename = path.split('/').pop() || 'video';
+  const host = req.get('host') || 'localhost:4000';
+  const protocol = req.protocol;
+  const streamUrl = `${protocol}://${host}/api/ftp/stream?path=${encodeURIComponent(path)}`;
+
+  const m3uContent = `#EXTM3U\n#EXTINF:-1,${filename}\n${streamUrl}\n`;
+
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${encodeURIComponent(filename)}.m3u"`,
+  );
+  res.setHeader('Content-Type', 'audio/x-mpegurl');
+  res.send(m3uContent);
 });
 
 router.get('/ftp/download', async (req, res) => {
