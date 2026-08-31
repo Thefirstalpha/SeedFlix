@@ -463,4 +463,91 @@ describe('Route: /api/ftp', () => {
     expect(res.body.ok).toBe(true);
     expect(res.body.used).toBe(5000);
   });
+
+  it('should handle errors in mkdir, file/dir delete, delete-batch, rename and move', async () => {
+    const { user } = createUser('ftpUserErrRoutes');
+    const cookie = createSessionCookie(user.id);
+
+    vi.mocked(ftpModule.makeDirectory).mockRejectedValueOnce(new Error('mkdir failed'));
+    const resMkdir = await request(app)
+      .post('/api/ftp/mkdir')
+      .set('Cookie', cookie)
+      .send({ path: '/new_dir' });
+    expect(resMkdir.status).toBe(500);
+
+    vi.mocked(ftpModule.removeFile).mockRejectedValueOnce(new Error('removeFile failed'));
+    const resRemoveFile = await request(app)
+      .delete('/api/ftp/file')
+      .set('Cookie', cookie)
+      .send({ path: '/file.txt' });
+    expect(resRemoveFile.status).toBe(500);
+
+    vi.mocked(ftpModule.removeDirectory).mockRejectedValueOnce(new Error('removeDir failed'));
+    const resRemoveDir = await request(app)
+      .delete('/api/ftp/directory')
+      .set('Cookie', cookie)
+      .send({ path: '/dir' });
+    expect(resRemoveDir.status).toBe(500);
+
+    vi.mocked(ftpModule.removeBatch).mockRejectedValueOnce(new Error('batch delete failed'));
+    const resBatch = await request(app)
+      .post('/api/ftp/delete-batch')
+      .set('Cookie', cookie)
+      .send({ items: [{ path: '/f.txt', isDirectory: false }] });
+    expect(resBatch.status).toBe(500);
+
+    vi.mocked(ftpModule.rename).mockRejectedValueOnce(new Error('rename failed'));
+    const resRename = await request(app)
+      .post('/api/ftp/rename')
+      .set('Cookie', cookie)
+      .send({ oldPath: '/a', newPath: '/b' });
+    expect(resRename.status).toBe(500);
+
+    vi.mocked(ftpModule.moveBatch).mockRejectedValueOnce(new Error('move failed'));
+    const resMove = await request(app)
+      .post('/api/ftp/move')
+      .set('Cookie', cookie)
+      .send({ paths: ['/a'], destinationDir: '/dest' });
+    expect(resMove.status).toBe(500);
+  });
+
+  it('should handle errors in head stream, transcode, download, upload, storage and info', async () => {
+    const { user } = createUser('ftpUserErrStreams');
+    const cookie = createSessionCookie(user.id);
+
+    mockedGetFileSize.mockRejectedValueOnce(new Error('Cannot determine size'));
+    const resHead = await request(app)
+      .head('/api/ftp/stream?path=/video.mp4')
+      .set('Cookie', cookie);
+    expect(resHead.status).toBe(500);
+
+    mockedTranscodeToStream.mockRejectedValueOnce(new Error('Transcode error'));
+    const resTranscode = await request(app)
+      .get('/api/ftp/transcode?path=/video.mkv')
+      .set('Cookie', cookie);
+    expect(resTranscode.status).toBe(500);
+
+    mockedDownloadToStream.mockRejectedValueOnce(new Error('Download failed'));
+    const resDownload = await request(app)
+      .get('/api/ftp/download?path=/file.bin')
+      .set('Cookie', cookie);
+    expect(resDownload.status).toBe(500);
+
+    mockedUploadFromStream.mockRejectedValueOnce(new Error('Upload failed'));
+    const resUpload = await request(app)
+      .post('/api/ftp/upload?path=/file.bin')
+      .set('Cookie', cookie);
+    expect(resUpload.status).toBe(500);
+
+    mockedGetStorage.mockRejectedValueOnce(new Error('Storage failed'));
+    const resStorage = await request(app).get('/api/ftp/storage').set('Cookie', cookie);
+    expect(resStorage.status).toBe(500);
+
+    mockedGetFileSize.mockRejectedValueOnce(new Error('Size fail'));
+    mockedGetLastModified.mockRejectedValueOnce(new Error('Mod fail'));
+    const resInfo = await request(app).get('/api/ftp/info?path=/file.txt').set('Cookie', cookie);
+    expect(resInfo.status).toBe(200);
+    expect(resInfo.body.size).toBeNull();
+    expect(resInfo.body.lastModified).toBeNull();
+  });
 });

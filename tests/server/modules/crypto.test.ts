@@ -36,5 +36,27 @@ describe('crypto module', () => {
     expect(encryptedTwice).toBe(encryptedOnce);
     expect(decryptSecret(encryptedTwice)).toBe(secret);
   });
+
+  it('should handle environment variable SECRET_KEY if defined', async () => {
+    const { _resetCachedKey } = await import('../../../server/modules/crypto');
+    process.env.SEEDFLIX_SECRET_KEY = 'custom-env-secret-key-for-seedflix';
+    _resetCachedKey();
+
+    const encrypted = encryptSecret('test-secret');
+    expect(decryptSecret(encrypted)).toBe('test-secret');
+
+    delete process.env.SEEDFLIX_SECRET_KEY;
+    _resetCachedKey();
+  });
+
+  it('should return cipherText if parts count is invalid', () => {
+    const invalidCipher = 'enc:v1:invalid-parts-only-two';
+    expect(decryptSecret(invalidCipher)).toBe(invalidCipher);
+  });
+
+  it('should return cipherText if decipher throws an error on corrupted payload', () => {
+    const corruptedCipher = 'enc:v1:0123456789ab:0123456789abcdef:invalidhexdata';
+    expect(decryptSecret(corruptedCipher)).toBe(corruptedCipher);
+  });
 });
 
